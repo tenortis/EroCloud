@@ -1,0 +1,162 @@
+/*
+#all_usercams {
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    display:none;
+    overflow-x: auto;
+    white-space: nowrap;
+    position: relative;
+}
+
+
+#all_usercams video {
+    height:100px;
+    width: 178px;
+}
+
+#all_usercams .video-js {
+    width:178px !important;
+    height:100px !important;
+}
+
+#all_usercams .vjs-control-bar {
+    display:none;
+}
+
+#all_usercams .ui-widget-header {
+    border-top: none;
+    text-align:center;
+}
+
+#all_usercams .all_usercams_icons {
+    position:absolute;
+    top:18px;
+    right:0;
+    background-color: rgba(0,0,0,0.4);
+    color:#ffffff;
+    cursor:pointer;
+}
+*/
+#cambar {
+    height:0px;
+    width:100%;
+    bottom: 0;
+    border-left:none;
+    border-right:none;
+    border-bottom:none;
+    position: absolute;
+    padding:0;
+    margin:0;
+    box-sizing: border-box;
+    display:none;
+}
+
+#cambar .user_video_container_dragable .ui-widget-header.top {
+    position: absolute;
+    top: 0;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 3px 0px 3px 5px;
+    border: none;
+    overflow: hidden;
+    font-weight: normal;
+}
+
+
+#cambar .user_video_container_dragable .ui-widget-header.top .material-symbols-outlined {
+    color: #2779aa;
+    font-size: 18px;
+    vertical-align: middle;
+    cursor:pointer;
+}
+
+#cambar .user_video_container_dragable .ui-widget-header.left {
+    position:absolute;
+    top:0;
+    right:0;
+    height:100%;
+    box-sizing: border-box;
+    border: none;
+}
+
+#cambar .user_video_container_dragable .ui-widget-header.left .material-symbols-outlined {
+    color: #2779aa;
+    display:block;
+}
+
+#cambar .user_video_container_dragable .ui-widget-header.left .move {
+    cursor:grabbing;
+}
+
+#cambar .user_video_container_dragable .ui-widget-header.left .volume,
+#cambar .user_video_container_dragable .ui-widget-header.left .open_cam2cam {
+    cursor:pointer;
+}
+
+.box_shadow {
+    -webkit-box-shadow: 5px 5px 10px 0px rgba(0,0,0,0.5);
+    -moz-box-shadow: 5px 5px 10px 0px rgba(0,0,0,0.5);
+    box-shadow: 5px 5px 10px 0px rgba(0,0,0,0.5);
+}
+
+#usercam_box {
+    padding:0;
+    top:70px;
+    left:400px;
+    position:absolute;
+    display:none;
+    z-index:1;
+    width: fit-content;
+    max-height: 800px;
+}
+
+#usercam_box #livecam_header {
+    min-width:620px;
+    padding:5px 5px 5px 10px;
+    text-align:center;
+    cursor:-webkit-grab;
+    border-bottom:none;
+}
+
+#usercam_box #livecam_header table,
+#usercam_box #livecam_content #controls table {
+    width:100%;
+}
+
+#usercam_box #livecam_header table .material-symbols-outlined {
+    cursor:pointer;
+}
+
+#usercam_box #livecam_header,
+#usercam_box #livecam_content {
+    -webkit-box-shadow: 5px 5px 5px 0px rgba(170,170,170,0.7);
+    -moz-box-shadow: 5px 5px 5px 0px rgba(170,170,170,0.7);
+    box-shadow: 5px 5px 5px 0px rgba(170,170,170,0.7);
+}
+
+#usercam_box #livecam_content {
+    min-width:640px;
+    height: inherit;
+    overflow:hidden;
+}
+
+#usercam_box #livecam_content video {
+    display: block;
+    width:640px;
+    height:360px;
+}
+
+#usercam_box .ui-widget-header td {vertical-align:middle}
+#usercam_box .ui-widget-header td:first-child {text-align:left;}
+
+#usercam_box .ui-widget-header td:nth-child(2) {
+    text-align:right;
+    width:25px;
+}
+
+#usercam_box .ui-widget-header td i {
+    vertical-align: sub;
+    font-size:20px;
+}
+

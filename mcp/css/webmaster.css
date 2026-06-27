@@ -1,0 +1,159 @@
+
+
+#site_home_webmaster {
+    margin:0 auto 50px auto;
+    max-width:1390px;
+    padding:20px;
+}
+
+#site_home_webmaster p {
+    line-height:1.6;
+}
+
+#site_home_webmaster h1,
+#site_home_webmaster h2,
+#site_home_webmaster h3,
+#site_home_webmaster h4 {
+    font-family: 'Roboto Slab', serif;
+    letter-spacing: 0px;
+    line-height: 1.5;
+    margin-top:30px;
+    font-style: normal;
+    color:#ae4740;
+}
+
+#site_home_webmaster h1 {
+    font-weight: 400;
+    font-size:45px;
+}
+    
+#site_home_webmaster h2,
+#site_home_webmaster h3 {
+    font-weight: 300;
+    font-size:35px;
+}
+
+#site_home_webmaster ul {
+    list-style-type:none;
+    margin-left:10px;
+    line-height:2;
+}
+
+#banner_top {
+    position:relative;
+    margin-bottom:70px;
+}
+
+#banner_top #headline_picture img {
+    width: 70%;
+    height: auto;
+    margin-left: 30%;
+}
+
+#headline_box {
+    position: absolute;
+    top: 10%;
+    padding:40px 50px;
+    width: 40%;
+    background-color: #ffffff;
+}
+
+#headline_box p {
+    font-size:20px;
+}
+
+@media (min-width: 1260px) AND (max-width: 1440px) {
+    #headline_box {
+        padding:20px 30px;
+    }
+    
+    #headline_box p {
+        font-size:18px;
+    }    
+    
+}
+
+@media (min-width: 1024px) AND (max-width: 1259px) {
+    #headline_box {
+        padding:20px 30px;
+    }
+    
+    #headline_box p {
+        font-size:18px;
+    }    
+        
+    #site_home_webmaster h1 {
+        font-size:32px;
+    }
+}
+
+@media (min-width: 801px) AND (max-width: 1023px) {
+    #site_home_webmaster h1 {
+        font-size:35px;
+    }
+
+    #site_home_webmaster h2,
+    #site_home_webmaster h3 {
+        font-size:30px;
+    }
+    
+    #headline_box {
+        position: relative;
+        width:auto;
+        padding:0;
+    }
+    
+    #banner_top {
+        margin-bottom:40px;
+    }
+    
+    #headline_picture {
+        max-height:200px;
+        overflow:hidden;
+    }
+    
+    #banner_top #headline_picture {
+        max-height:400px;
+        overflow:hidden;
+    }
+    
+    #banner_top #headline_picture img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        margin-left:0;
+    }
+}
+
+@media (max-width: 800px) {
+    #site_home_webmaster h1 {
+        font-size:28px;
+    }
+
+    #site_home_webmaster h2,
+    #site_home_webmaster h3 {
+        font-size:24px;
+    }
+    
+    #headline_box {
+        position: relative;
+        width:auto;
+        padding:0;
+    }
+    
+    #banner_top {
+        margin-bottom:40px;
+    }
+    
+    #banner_top #headline_picture {
+        height:400px;
+        overflow:hidden;
+    }
+    
+    #banner_top #headline_picture img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        margin-left:0;
+    }
+}

@@ -1,0 +1,20 @@
+# verhindert das Auflistung des Verzeichnissesinhalts
+Options -Indexes
+
+RewriteEngine on
+
+# www1.erocloud.net
+
+# Main dir = /ads/
+RewriteRule ^l/(.*)/(.*)/(.*)$ get_textlink.php?site_id=$1&wmid=$2&cid=$3
+RewriteRule ^l/(.*)/(.*)$ get_textlink.php?site_id=$1&wmid=$2
+
+#Bannercode  - Link zum Javascript fuer BannerCode
+RewriteRule ^bc/(.*)/(.*)/(.*)$ get_bannercode.php?file_id=$1&wmid=$2&cid=$3
+RewriteRule ^bc/(.*)/(.*)$ get_bannercode.php?file_id=$1&wmid=$2
+RewriteRule ^bc/(.*)$ get_bannercode.php?file_id=$1&%{QUERY_STRING}
+
+#Banner - Image
+RewriteRule ^b/(.*)/(.*)/(.*)$ get_banner.php?file_id=$1&wmid=$2&cid=$3
+RewriteRule ^b/(.*)/(.*)$ get_banner.php?file_id=$1&wmid=$2
+RewriteRule ^b/(.*)$ get_banner.php?file_id=$1

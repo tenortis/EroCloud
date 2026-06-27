@@ -1,0 +1,112 @@
+
+
+.userlist {
+    border-bottom:1px solid #cccccc;
+    color: #6f6f6f;
+    border-bottom:1px solid var(--borderColor, #cccccc);
+    color:var(--colorB, #6f6f6f);
+    position:relative;
+    cursor:pointer;
+}
+
+.userlist-site {
+    font-size:9px;
+}
+
+.userlist-avatar {
+    float:left;
+    width:30px;
+    overflow:hidden;
+    position:relative;
+    padding:2px;
+}
+
+.userlist-avatar div {
+    border-radius:18px;
+    -webkit-border-radius:18px;
+    -moz-border-radius:18px;
+    width:28px;
+    height:28px;
+    overflow:hidden;
+}
+
+.userlist-avatar_online {
+    border:2px solid #00CC00;
+    border:2px solid var(--colorOnline, #00CC00);
+}
+
+.userlist-avatar div img {
+    width:100%;
+    height:100%;
+    object-fit: cover;
+}
+
+.userlist-user {
+    float:left;
+    padding:2px 0 0 5px;
+    max-width:65%;
+}
+
+.userlist-user div:first-child {
+    font-weight:bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.userlist-user div:last-child {
+    font-size: 10px;
+    color: #aaaaaa;
+    color: var(--colorC, #aaaaaa);
+}
+
+.userlist-icons {
+    right:5px;
+    position:absolute;
+    top:7px;
+}
+
+.userlist_active,
+.userlist:hover {
+    background-color: #eeeeee;
+    background-color:var(--colorE, #eeeeee);
+}
+
+.userlist_active > .userlist-user div:first-child,
+.userlist:hover > .userlist-user div:first-child {
+    color: #000000;
+    color:var(--colorD, #000000);
+}
+
+.userlist_active > .userlist-user div:last-child,
+.userlist:hover > .userlist-user div:last-child {
+    color: #6f6f6f;
+    color:var(--colorB, #6f6f6f);
+}
+
+.userlist_search_head,
+.userlist_marked_as_unanswered_head,
+.userlist_unread_head,
+.userlist_online_head,
+.userlist_offline_head {
+    cursor:pointer;
+    padding:2px;
+    border-top:none;
+    border-left:none;
+    border-right:none;
+    display: inline-flex;
+    width:100%;
+    vertical-align: middle;
+    align-items: center;    
+}
+
+.userlist_offline {
+    display:none;
+}
+
+.material-symbols-outlined.coin-icon {
+   font-size: 17px;
+   margin-bottom:0 !important;
+   color: #088A29;
+   color:var(--colorCoinIcon, #088A29);
+}

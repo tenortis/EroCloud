@@ -1,0 +1,240 @@
+
+#webcam_box {
+    padding:0;
+    top:70px;
+    left:400px;
+    position:absolute;
+    display:none;
+    z-index:1;
+    width: fit-content;
+    max-height: 800px;
+}
+
+#webcam_box #livecam_header {
+    min-width:550px;
+    padding:5px 5px 5px 10px;
+    text-align:center;
+    cursor:-webkit-grab;
+    box-sizing: border-box;
+    border-bottom:none;
+}
+
+#webcam_box #livecam_header table,
+#webcam_box #livecam_content #controls table {
+    width:100%;
+}
+
+#webcam_box #livecam_header table .material-symbols-outlined {
+    cursor:pointer;
+}
+
+#webcam_box #livecam_header,
+#webcam_box #livecam_content {
+    -webkit-box-shadow: 5px 5px 5px 0px rgba(170,170,170,0.7);
+    -moz-box-shadow: 5px 5px 5px 0px rgba(170,170,170,0.7);
+    box-shadow: 5px 5px 5px 0px rgba(170,170,170,0.7);
+}
+
+#webcam_box #livecam_content {
+    min-width:550px;
+    height: inherit;
+    overflow:hidden;
+}
+
+#webcam_box .ui-widget-header td {vertical-align:middle}
+#webcam_box .ui-widget-header td:first-child {text-align:left;}
+
+#webcam_box .ui-widget-header td:nth-child(2),
+#webcam_box .ui-widget-header td:nth-child(3) {
+    text-align:right;
+    width:25px;
+}
+
+#webcam_box .ui-widget-header td i {
+    vertical-align: sub;
+    font-size:20px;
+}
+
+/*
+#webcam_box #livecam_content #publisher_box {
+    position:relative;
+    box-sizing: border-box;
+    min-height:360px;
+    min-width:640px;
+    height:58%;
+}
+
+#webcam_box #livecam_content #publisher_container {
+    height:100%;
+}
+
+#webcam_box #livecam_content #publisher {
+    background-image:url(/Messenger/Cam/testbild.jpg);
+    background-size: auto 100%;
+    min-width:640px;
+    width:100%;
+    min-height:360px;
+    height:100%;
+}
+*/
+
+#webcam_box #livecam_content #publisher_container {
+    background-image:url(/Messenger/Cam/testbild.jpg);
+    width:550px;
+    height:309px;
+}
+
+#webcam_box #livecam_content #publisher_container .video-js {
+    width: 100%;
+    height: 100%;
+    width: -webkit-fill-available;
+    height: -webkit-fill-available;	
+}
+
+#webcam_box #livecam_content #publisher_box {
+    position:relative;
+    box-sizing: border-box;
+}
+
+
+
+#webcam_box #livecam_content #status_bar {
+    filter:alpha(opacity=50);
+    opacity: 0.5;
+    -moz-opacity:0.5;
+    position:absolute;
+    top:0;
+    left:0;
+    z-index:99998;
+    background-color:#000000;
+    width:100%;
+    height:34px;
+    box-sizing: border-box;
+}
+
+#webcam_box #livecam_content #status {
+    z-index:99999;
+    position:absolute;
+    color:#ffffff;
+    width:100%;
+    padding:10px;
+    box-sizing: border-box;
+}
+
+#webcam_box #livecam_content #controls {
+    padding:5px;
+    box-sizing: border-box;
+    width:100%;
+    color:#2779aa;
+    border-left:none;
+    border-right:none;
+}
+
+#webcam_box #livecam_content #controls td:nth-child(1) {
+    text-align:left;
+    max-width:270px;
+    min-width:40px;
+    font-weight:normal;
+}
+
+#webcam_box #livecam_content #controls td:nth-child(1) select {
+    width:150px;
+}
+
+#webcam_box #livecam_content #controls td:nth-child(2) {
+    text-align:center;
+    width:auto;
+}
+
+#webcam_box #livecam_content #controls td:nth-child(3) {
+    text-align:right;
+    width:100px;
+}
+
+
+#webcam_box #livecam_content #controls a.ui-button {
+    color:#2779aa !important;
+}
+
+#webcam_box #livecam_content #controls #mic_on,
+#webcam_box #livecam_content #controls #mic_off {
+    cursor:pointer;
+    font-size:25px !important;
+}
+
+#webcam_box #livecam_content #controls #status_cam_on,
+#webcam_box #livecam_content #controls #status_cam_off {
+    font-size:20px;
+}
+
+#webcam_box #livecam_content #controls #mic_on, 
+#webcam_box #livecam_content #controls #status_cam_on,
+#webcam_box #livecam_content #controls .webcam_play {
+    color:#5cb85c;
+}
+
+#webcam_box #livecam_content #controls #mic_off,
+#webcam_box #livecam_content #controls #status_cam_off,
+#webcam_box #livecam_content #controls .webcam_stop {
+    color:#d43f3a;
+}
+
+#webcam_box #livecam_content #controls .material-symbols-outlined {
+    font-size:35px;
+    vertical-align:middle;
+    cursor:pointer;
+}
+
+#webcam_box #livecam_content #controls #livecam_group_actors {
+    display:none;
+}
+
+#webcam_box #livecam_content .help_icon {
+    font-size:18px;
+    vertical-align:middle;
+    margin-left:5px;
+}
+
+#webcam_box #livecam_content form div {
+    margin-top:10px;
+}
+		
+#webcam_box #livecam_content form input {
+    padding:1px 2px;
+}
+
+#webcam_box #livecam_content .cam_user {
+    margin-left:239px;
+    min-height:215px;
+    width:auto;
+}
+
+#webcam_box #livecam_content .cam_user #user .material-symbols-outlined {
+    vertical-align: middle;
+    font-size:20px;
+}
+
+#webcam_box .cam_user #cam_user_auto_on {
+    border-left:none;
+    border-right:none;
+    border-top:none;
+    padding:5px;
+    font-weight:normal;
+    font-size:15px;
+}
+
+#webcam_box .cam_user #cam_user_auto_on .material-symbols-outlined {
+    vertical-align:sub;
+    font-size:20px;
+}
+
+#webcam_box #user .ui-widget-header {
+    border-left:none;
+    border-right:none;
+    border-top:none;
+    padding:5px;
+    font-weight:normal;
+    text-align:center;
+    font-size:11px;
+}
+

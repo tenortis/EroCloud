@@ -1,0 +1,94 @@
+
+#upload_photos .abort_upload {
+    position: relative;
+    display: none;
+    cursor: pointer !important;
+    text-align: center;
+    width: 100%;
+    width: -webkit-fill-available;
+    width: -moz-fill-available;
+    vertical-align: middle;
+    padding: 15px 10px 10px 10px;
+}
+
+#upload_photos .abort_upload span {
+    font-size:34px;
+    color:rgb(111, 111, 111);
+    padding-top:7px;
+}
+
+#upload_banners {
+    position: absolute;
+    cursor: pointer;
+    top: 0px;
+    width: 100%;
+    width: -webkit-fill-available;
+    width: -moz-fill-available;
+    height: 84px;
+    left: 0px;
+    z-index: 100;
+    opacity: 0;
+}
+
+.upload_banners {
+    position:relative;
+    border: 1px solid #4297d7;
+    background: #E3ECF7;
+    color: #222;
+    cursor: pointer !important;
+    font-weight: bold;
+    text-align: center;
+    width: 100%;
+    width: -webkit-fill-available;
+    width: -moz-fill-available;
+    padding: 30px 20px 20px 20px;
+}
+
+.upload_banners span {
+    font-size:20px;
+    color:rgb(111, 111, 111);
+    padding-top:7px;
+}
+
+.upload_banners:hover i {
+    color:#3399ff;
+}
+
+.upload_banners_error {
+    display:none;
+    padding:5px;
+    margin:0 10px 10px 0;
+}
+
+#upload_photos .progress {
+    border-left: 1px solid #008000;
+    border-right: 1px solid #008000;
+    border-bottom: 1px solid #008000;
+    position:relative;
+    display:none;
+    width:auto;
+    box-sizing:border-box;
+}
+
+#upload_photos .bar {
+    background-color: #B4F5B4;
+    width:0%;
+    height:26px;
+    border-radius: 3px;
+}
+
+#upload_photos .percent {
+    position:absolute;
+    display:inline-block;
+    top:2px;
+    text-align: center;
+    width: 100%;
+    width: -webkit-fill-available;
+    width: -moz-fill-available;
+}
+
+#standard_banner_sizes table table td  {padding:0 5px; border:1px solid #000;}
+
+#standard_banner_sizes table table td:first-child {
+    text-align:center;
+}

@@ -1,0 +1,72 @@
+ErrorDocument 403 https://erocloud.net
+ErrorDocument 404 https://erocloud.net
+
+SetEnvIf Origin "^http(s)?://(.+\.)?(login\.pay4coins.com|merchant\.p4coins.com|pay4coins.com|erocloud.net)$" origin_is=$0 
+Header always set Access-Control-Allow-Origin %{origin_is}e env=origin_is
+
+
+# verhindert das Auflistung des Verzeichnissesinhalts
+Options -Indexes
+
+RewriteEngine on
+
+RewriteRule ^erocloud_logo.png$ images/erocloud_logo.png
+RewriteRule ^favicon/(.*)$ images/favicons/$1
+
+# jQuery usw.
+RewriteRule ^fw/(.*)$ includes/frameworks/$1
+RewriteRule ^Ajax/(.*)$ includes/ajax/$1?%{QUERY_STRING}
+RewriteRule ^Overlays/(.*)$ includes/overlays/$1?%{QUERY_STRING}
+
+RewriteRule ^Startseite$ index.php?mod=home&%{QUERY_STRING}
+RewriteRule ^StudioLogin$ index.php?mod=studiologin&%{QUERY_STRING}
+RewriteRule ^Webmaster$ index.php?mod=webmaster&%{QUERY_STRING}
+
+RewriteRule ^amoredea/RedirectContent/(.*)_(.*)$ redirect_open_content.php?content_id=$1&month=$2%{QUERY_STRING}
+
+RewriteRule ^Groups$ index.php?mod=groups&%{QUERY_STRING}
+RewriteRule ^New-Actor$ index.php?mod=new_actor&%{QUERY_STRING}
+RewriteRule ^Actors$ index.php?mod=actors&%{QUERY_STRING}
+RewriteRule ^Actor/(.*)$ index.php?mod=actor&id=$1&%{QUERY_STRING}
+RewriteRule ^New-CoActor$ index.php?mod=co_actor_create&%{QUERY_STRING}
+RewriteRule ^CoActors$ index.php?mod=co_actors&%{QUERY_STRING}
+RewriteRule ^CoActor/(.*)$ index.php?mod=co_actor&id=$1&%{QUERY_STRING}
+RewriteRule ^Hotline$ index.php?mod=hotline&%{QUERY_STRING}
+RewriteRule ^amoredea/Comments$ index.php?mod=amoredea_comments&%{QUERY_STRING}
+RewriteRule ^amoredea/Messages$ index.php?mod=amoredea_messages&%{QUERY_STRING}
+RewriteRule ^ProfilePicture/(.*)$ includes/profile_picture.php?id=$1&%{QUERY_STRING}
+RewriteRule ^Movie-Upload index.php?mod=movie_upload&%{QUERY_STRING}
+RewriteRule ^Movies index.php?mod=movies&%{QUERY_STRING}
+RewriteRule ^video/(.*)$ index.php?mod=movie&id=$1&%{QUERY_STRING}
+RewriteRule ^Photo-Album-Upload index.php?mod=photo_album_upload&%{QUERY_STRING}
+RewriteRule ^Photo-Albums index.php?mod=photo_albums&%{QUERY_STRING}
+RewriteRule ^Photo-Album/(.*)$ index.php?mod=photo_album&id=$1&%{QUERY_STRING}
+RewriteRule ^AlbumPhoto/(.*)$ includes/show_album_photo.php?photo_id=$1&%{QUERY_STRING}
+
+RewriteRule ^Statistics/TotalSales$ index.php?mod=statistics_total_sales&%{QUERY_STRING}
+RewriteRule ^Statistics/TotalActorsSales$ index.php?mod=statistics_actors_sales&%{QUERY_STRING}
+RewriteRule ^Statistics/TotalActorSales/(.*)/Day/(.*)$ index.php?mod=statistics_actor_sales_day&actor_id=$1&day=$2%{QUERY_STRING}
+RewriteRule ^Statistics/TotalActorSales/(.*)$ index.php?mod=statistics_actor_sales&actor_id=$1&%{QUERY_STRING}
+RewriteRule ^Statistics$ index.php?mod=statistics_total_sales&%{QUERY_STRING}
+
+RewriteRule ^Webmaster/Edit-Campaign$ index.php?mod=webmaster_edit_campaign&%{QUERY_STRING}
+RewriteRule ^Webmaster/New-Campaign$ index.php?mod=webmaster_new_campaign&%{QUERY_STRING}
+RewriteRule ^Webmaster/Ads/(.*)$ index.php?mod=webmaster_ads_domain&domain=$1&%{QUERY_STRING}
+RewriteRule ^Webmaster/NewAds$ index.php?mod=webmaster_newads&%{QUERY_STRING}
+RewriteRule ^Webmaster/Ads$ index.php?mod=webmaster_ads&%{QUERY_STRING}
+RewriteRule ^Webmaster/Statistics$ index.php?mod=webmaster_stats&%{QUERY_STRING}
+RewriteRule ^Webmaster/Advertise-Partner$ index.php?mod=webmaster_advertise_partner&%{QUERY_STRING}
+
+RewriteRule ^faq$ index.php?mod=faq&%{QUERY_STRING}
+
+RewriteRule ^Player/(.*)$ includes/movie_player.php?id=$1&%{QUERY_STRING}
+RewriteRule ^PlayerPoster/(.*)$ includes/movie_poster.php?id=$1&%{QUERY_STRING}
+
+RewriteRule ^Messenger/Cam/(.*)$ messenger/livecam/$1?%{QUERY_STRING}
+RewriteRule ^Messenger/usercams/(.*)$ messenger/usercams/$1?%{QUERY_STRING}
+RewriteRule ^Messenger/css/(.*)$ messenger/css/$1?%{QUERY_STRING}
+RewriteRule ^Messenger/js/(.*)$ messenger/js/$1?%{QUERY_STRING}
+RewriteRule ^Messenger/Ajax/(.*)$ messenger/includes/ajax/$1?%{QUERY_STRING}
+RewriteRule ^Messenger/Sound/(.*)$ messenger/sounds/$1?%{QUERY_STRING}
+RewriteRule ^Messenger/emojiarea/(.*)$ messenger/includes/emojiarea/$1?%{QUERY_STRING}
+RewriteRule ^Messenger$ messenger/index.php?%{QUERY_STRING}

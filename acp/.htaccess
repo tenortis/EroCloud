@@ -1,0 +1,112 @@
+AuthName "Access denid!"
+AuthType Basic
+AuthUserFile /var/www/web1/htdocs/.acp_htpasswd
+require valid-user
+
+<Limit GET POST>
+	
+    order deny,allow
+    deny from all
+
+    #asl
+    #allow from 88.75.
+    #allow from 92.78.
+    allow from 88.73.
+    allow from 94.222.
+    allow from 178.0.
+    allow from 178.5.
+    allow from 178.8.
+    allow from 178.12.
+    allow from 188.102.
+    allow from 188.103.
+    allow from 188.106.
+
+    #Choc
+    allow from 80.129.239.232
+
+    #schn
+    allow from 84.136.
+    allow from 84.167.
+
+    # Tina
+    allow from 83.37.
+    allow from 83.47.
+    allow from 88.24.
+    allow from 88.25.
+    allow from 82.207.
+
+    # Daniel
+    allow from 85.54.
+    allow from 84.187.
+    allow from 91.10.
+
+    # Thilo
+    allow from 89.244.
+
+    # Martin
+    BrowserMatch "(Linux; Android 7.0; HTC One A9 Build/NRD90M)" allowed
+    BrowserMatch "(Linux; Android 6.0.1; SM-G900F Build/MMB29M)" allowed
+    BrowserMatch "(Linux; Android 9; SM-G950F)" allowed
+
+    allow from env=allowed
+	
+</Limit>
+
+ErrorDocument 403 https://erocloud.net
+ErrorDocument 404 https://erocloud.net
+
+# verhindert das Auflistung des Verzeichnissesinhalts
+Options -Indexes
+
+RewriteRule ^erocloud_logo.png$ images/erocloud_logo.png
+RewriteRule ^favicon/(.*)$ images/favicons/$1
+
+# jQuery usw.
+RewriteRule ^fw/(.*)$ includes/frameworks/$1
+RewriteRule ^Ajax/(.*)$ includes/ajax/$1?%{QUERY_STRING}
+
+RewriteRule ^Startseite$ index.php?mod=home&%{QUERY_STRING}
+
+RewriteRule ^Filme-pruefen index.php?mod=movies_checking&%{QUERY_STRING}
+RewriteRule ^gesperrte-Filme index.php?mod=movies_blocked&%{QUERY_STRING}
+RewriteRule ^Film-pruefen/(.*)$ index.php?mod=movie_checking&id=$1&%{QUERY_STRING}
+
+RewriteRule ^Filme-online index.php?mod=movies_online&%{QUERY_STRING}
+RewriteRule ^Film-bearbeiten/(.*)$ index.php?mod=movie_edit&id=$1&%{QUERY_STRING}
+
+RewriteRule ^Fotoalben-pruefen index.php?mod=photo_albums_checking&%{QUERY_STRING}
+RewriteRule ^Fotoalbum-pruefen/(.*)$ index.php?mod=photo_album_checking&id=$1&%{QUERY_STRING}
+
+RewriteRule ^Fotoalben-online index.php?mod=photo_albums_online&%{QUERY_STRING}
+RewriteRule ^Fotoalbum-bearbeiten/(.*)$ index.php?mod=photo_album_edit&id=$1&%{QUERY_STRING}
+RewriteRule ^AlbumPhoto/(.*)$ includes/show_album_photo.php?photo_id=$1&%{QUERY_STRING}
+
+RewriteRule ^Actors index.php?mod=actors&%{QUERY_STRING}
+RewriteRule ^Actor/(.*)$ index.php?mod=actor&id=$1&%{QUERY_STRING}
+
+RewriteRule ^Sites index.php?mod=sites&%{QUERY_STRING}
+RewriteRule ^Site/(.*)$ index.php?mod=site&id=$1&%{QUERY_STRING}
+
+RewriteRule ^Banner index.php?mod=banners&%{QUERY_STRING}
+RewriteRule ^Neue-Banner index.php?mod=banners_new&%{QUERY_STRING}
+
+RewriteRule ^Haendler/(.*)$ index.php?mod=merchant&id=$1&%{QUERY_STRING}
+RewriteRule ^Haendler$ index.php?mod=merchants&%{QUERY_STRING}
+
+RewriteRule ^User/(.*)$ index.php?mod=user&id=$1&%{QUERY_STRING}
+RewriteRule ^User$ index.php?mod=users&%{QUERY_STRING}
+
+RewriteRule ^Punktesystem$ index.php?mod=pointssystem&%{QUERY_STRING}
+
+RewriteRule ^Webcams$ index.php?mod=webcams&id=$1&%{QUERY_STRING}
+RewriteRule ^alle-Nachrichten$ index.php?mod=all_chats&%{QUERY_STRING}
+RewriteRule ^Chat/(.*)$ index.php?mod=chat&id=$1&%{QUERY_STRING}
+
+RewriteRule ^Webmaster/Partner$ index.php?mod=webmaster_partner&%{QUERY_STRING}
+
+
+RewriteRule ^Errors$ index.php?mod=errors&%{QUERY_STRING}
+
+
+
+

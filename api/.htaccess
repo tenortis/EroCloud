@@ -1,0 +1,31 @@
+#ErrorDocument 403 http://cloud2.erocms.net/mcp
+#ErrorDocument 404 http://cloud2.erocms.net/mcp
+
+# verhindert das Auflistung des Verzeichnissesinhalts
+Options -Indexes
+
+RewriteEngine on
+
+RewriteRule ^Player/(.*)/(.*)/(.*)$ movie_player.php?user_streaming_key=$1&movie_id=$2&access_token=$3%{QUERY_STRING}
+RewriteRule ^Downloader/(.*)/(.*)/(.*)$ movie_downloader.php?user_streaming_key=$1&movie_id=$2&access_token=$3%{QUERY_STRING}
+RewriteRule ^PhotoAlbumDownloader/(.*)/(.*)/(.*)$ photo_album_downloader.php?user_key=$1&album_id=$2&access_token=$3%{QUERY_STRING}
+RewriteRule ^PlayerPoster/FSK16/(.*)$ movie_poster.php?fsk=16&file_id=$1&%{QUERY_STRING}
+RewriteRule ^PlayerPoster/FSK18/(.*)$ movie_poster.php?fsk=18&file_id=$1&%{QUERY_STRING}
+RewriteRule ^ProfilePicture/(.*)$ profile_picture.php?id=$1&%{QUERY_STRING}
+
+RewriteRule ^PhotoAlbumPoster/FSK16/(.*)$ photo_album_poster.php?fsk=16&album_id=$1&%{QUERY_STRING}
+RewriteRule ^PhotoAlbumPoster/FSK18/(.*)$ photo_album_poster.php?fsk=18&album_id=$1&%{QUERY_STRING}
+RewriteRule ^AlbumPhoto/(.*)$ album_photo_thumb.php?photo_id=$1&%{QUERY_STRING}
+RewriteRule ^MyAlbumPhoto/(.*)/(.*)/(.*)$ my_album_photo.php?user_key=$1&access_token=$2&photo_id=$3%{QUERY_STRING}
+
+RewriteRule ^MessengerImage/(.*)/(.*)/(.*)$ messenger_image.php?merchant_id=$1&actor_id=$2&filename=$3&%{QUERY_STRING}
+RewriteRule ^MessengerImageInfo/(.*)/(.*)/(.*)$ messenger_image_info.php?merchant_id=$1&actor_id=$2&filename=$3&%{QUERY_STRING}
+RewriteRule ^MessengerPDF/(.*)/(.*)/(.*)$ messenger_pdf.php?merchant_id=$1&actor_id=$2&filename=$3&%{QUERY_STRING}
+RewriteRule ^MessengerPDFpreview/(.*)/(.*)/(.*)$ messenger_pdf_preview.php?merchant_id=$1&actor_id=$2&filename=$3&%{QUERY_STRING}
+
+# User Tracking
+RewriteRule ^gtag/js$ usertracking/gtag-js.php?%{QUERY_STRING}
+RewriteRule ^gtag/iframe$ usertracking/gtag-iframe.php?%{QUERY_STRING}
+RewriteRule ^gtag/p4c_iframe$ usertracking/gtag-p4c-iframe.php?%{QUERY_STRING}
+RewriteRule ^getguuid/(.*)$ usertracking/get_guuid_be_email.php?email=$1%{QUERY_STRING}
+

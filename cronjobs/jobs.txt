@@ -1,0 +1,18 @@
+# alle 5 Minuten prü¼fen ob Filme konvertiert werden müssen
+*/5 * * * * /usr/bin/php /var/www/web1/htdocs/cronjobs/convert_movie.php
+
+# jede Minute prüfen ob neue Chats importiert werden müssen
+*/5 * * * * /usr/bin/php /var/www/web1/htdocs/mcp/messenger/cronjobs/crawl_erocms_chats.php
+
+# alle 5 Minuten - für das Webmasterprogramm nach neue Conversions crawlen
+*/2 * * * */usr/bin/php /var/www/web1/htdocs/cronjobs/import_conversions.php --today
+
+# 1x am Tag (0:10 Uhr) - für das Webmasterprogramm nach Conversions von gestern crawlen
+11 0 * * * /usr/bin/php /var/www/web1/htdocs/cronjobs/import_conversions.php --today
+
+# jede Stunde
+8 * * * * /usr/bin/php /var/www/web1/htdocs/cronjobs/crawl_erocms_revenues.php --all--type=webcam--month
+
+# alle 5 Minuten - Darsteller einen neu ausgewählten Partner zuordnen.
+*/5 * * * */usr/bin/php /var/www/web1/htdocs/cronjobs/actor_reassign.php
+

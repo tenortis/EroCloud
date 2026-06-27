@@ -1,0 +1,142 @@
+#!/usr/bin/php
+<?php
+ 
+echo 'nichts ausgeführt!';
+exit;
+
+define('SAFE_INC', 1);
+
+$sourcedir = dirname(dirname(__FILE__));
+include_once($sourcedir."/config.inc.php");
+include_once(MCP_DIR."/common.inc.php");
+
+function getImageList($site_obj) {
+    global $fileTypes;
+    
+    $ads_url = 'https://'.$site_obj->domain.'/ads/promotion/';
+    
+    $ch = curl_init(); 
+    curl_setopt ($ch, CURLOPT_UNRESTRICTED_AUTH, 1);
+    curl_setopt ($ch, CURLOPT_AUTOREFERER, 1);
+    curl_setopt ($ch, CURLOPT_URL, $ads_url.'/imglist.php');
+    curl_setopt ($ch, CURLOPT_HEADER, 0);
+    curl_setopt ($ch, CURLOPT_USERAGENT, "EroCloud-Bot ".date("Y")." / https://erocloud.net");
+    curl_setopt ($ch, CURLOPT_FRESH_CONNECT, 1);
+    curl_setopt ($ch, CURLOPT_RETURNTRANSFER, 1); 
+    curl_setopt ($ch, CURLOPT_TIMEOUT, 10); 
+    curl_setopt ($ch, CURLOPT_POST, 0);
+    $imageList = curl_exec ($ch);
+    
+    $site_id = $site_obj->id;
+    $path = ADS_PATH.'/'.ADS_DEFAULT_DIR.'/'.$site_id;
+
+    // erstelle Speicher für Albumbilder
+    if (!file_exists($path)) {
+        mkdir($path, 0777, true);
+    }
+    
+    // Wenn beim aufrufen der URL ein Fehler aufgetreten ist
+    #echo "\n".$import_url."\n";
+    #echo $imageList.'===============================';
+    if (!empty($imageList)) {
+        $imageList = str_replace("\r", '', $imageList);
+        $imageList = explode("\n", trim($imageList));
+        $i=1;
+        foreach($imageList as $line) {
+            list($img, $wh, $size, $ftime) = explode("\t", trim($line));
+            list($width, $height) = explode('x', $wh);
+            
+            // Groessen pruefen
+            if (
+                // Banner
+                ($width ==  80 AND $height ==  31) OR // Micro Bar
+                ($width == 120 AND $height ==  90) OR // Button 1
+                ($width == 120 AND $height ==  60) OR // Button 2
+                ($width == 120 AND $height == 240) OR // Vertical Banner
+                ($width == 125 AND $height == 125) OR // Square Button
+                ($width == 234 AND $height ==  60) OR // Half Banner
+                ($width == 468 AND $height ==  60) OR // Full Banner
+                ($width == 728 AND $height ==  90) OR // Leaderboard / Superbanner / Supersize Banner
+
+                // Rectangle
+                ($width == 180 AND $height == 150) OR // Rectangle
+                ($width == 300 AND $height == 250) OR // Medium Rectangle
+                ($width == 240 AND $height == 400) OR // Square Pop-Up
+                ($width == 250 AND $height == 250) OR // Vertical Rectangle
+                ($width == 400 AND $height == 400) OR // Superstitial / Flying Layer / AdLayer / Interstitial
+
+                // Skyscraper
+                ($width == 160 AND $height == 600) OR // Wide Skyscraper
+                ($width == 120 AND $height == 600) OR // Skyscraper
+                ($width == 200 AND $height == 600) OR // Wide Skyscraper alternative
+                ($width == 300 AND $height == 600) OR // Half Page Ad
+                ($width == 420 AND $height == 600)    // Expandable Skyscraper
+            ) {
+            
+                $fDateTime = date('Y-m-d H:i:s', $ftime);
+                $mediaType = strtolower(pathinfo($img, PATHINFO_EXTENSION));
+
+                $file_id = strtolower(md5($site_id.$img));
+                
+                $file_name = date("Ymd_His_".$i).'.'.$mediaType;        
+
+                $file_path = $path.'/'.$file_name;
+
+                $images[] = array(
+                    'file_id' => $file_id,
+                    'width' => $width,
+                    'height' => $height,
+                    'mediatype' => $mediaType,
+                    'import_date' => $fDateTime
+                );
+                
+                
+                $img = file_get_contents($ads_url.$img);
+                if ($img) {  
+                    $rs_check = p4c_query("SELECT * FROM `ads_media` WHERE `file_id`='".p4c_escape_string($file_id)."' LIMIT 1;",__FILE__,__LINE__);
+                    if (p4c_num_rows($rs_check) == 0) {
+                        p4c_query("INSERT INTO `ads_media` SET
+                            `file_id` = '". p4c_escape_string($file_id)."',
+                            `storage_location` = '".ADS_DEFAULT_DIR."',
+                            `site_id` = '". p4c_escape_string($site_obj->id)."',
+                            `type`     = '".p4c_escape_string($mediaType)."',
+                            `width`    = '".p4c_escape_string($width)."',
+                            `height`   = '".p4c_escape_string($height)."',
+                            `filename` = '". p4c_escape_string($file_name)."',
+                            `upload_datetime` = '".date("Y-m-d H:i:s", strtotime($fDateTime))."'
+                        ",__FILE__,__LINE__);
+
+                        if (!file_put_contents($file_path, $img)) {
+                            p4c_query("DELETE * FROM `ads_media` WHERE `id`='".p4c_insert_id()."' LIMIT 1;",__FILE__,__LINE__);
+                        }
+                        
+                        $i++;
+                    }
+                }
+            }
+        }
+        #return $images;
+    }
+    
+    #return false;
+}
+
+
+$rs_sites = p4c_query("SELECT * FROM `sites` WHERE
+    `status` = '1' AND
+    `shop_system` = 'erocms' AND
+    `is_eroads_active` = '1';
+",__FILE__,__LINE__);
+
+if (p4c_num_rows($rs_sites) > 0) {
+    while($site_obj = p4c_fetch_object($rs_sites)) {
+        print_r(getImageList($site_obj));
+    }
+}
+
+p4c_close(DB_HOST);
+
+// PHP Fehlermeldung loggen
+p4c_errorlog(error_get_last());
+
+?>

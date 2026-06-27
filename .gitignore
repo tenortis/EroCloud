@@ -1,0 +1,10 @@
+# Große Datenbank-Backups (GitHub Limit 100MB)
+backup.sql
+
+# Temporäre Dateien und Logs
+tmp/
+log/
+
+# Testvideos und ffmpeg logs (Verhindert Push-Fehler bei großen Dateien)
+acp/test_video_preview/*.mp4
+acp/test_video_preview/*.log

@@ -1,0 +1,159 @@
+
+.left_menu {
+    padding:15px 15px 5px 0px;
+    border-top:none;
+    border-left:none;
+    border-bottom:none;
+    height: 95vh;
+    min-height: 95vh;
+    width:225px;
+    min-width:230px;
+    vertical-align:top;
+    font-family: Roboto,RobotoDraft,Helvetica,Arial,sans-serif;
+}
+
+.left_menu .material-symbols-outlined {
+    padding-right:10px;
+    vertical-align:middle;
+}
+
+
+.left_menu  .material-symbols-outlined {
+  font-variation-settings:
+  'FILL' 0,
+  'wght' 400,
+  'GRAD' 0,
+  'opsz' 48
+}
+
+.left_menu a span {
+    vertical-align:middle;
+}
+
+.left_menu a {
+    padding:5px 5px 5px 28px;
+    color:rgb(111, 111, 111);
+    display:block;
+    font-size:13px;
+    -webkit-border-top-right-radius: 20px;
+    -webkit-border-bottom-right-radius: 20px;
+    -moz-border-radius-topright: 20px;
+    -moz-border-radius-bottomright: 20px;
+    border-top-right-radius: 20px;
+    border-bottom-right-radius: 20px;
+}
+
+.left_menu a:hover,
+.left_menu .active {
+    background-color:rgba(0, 0, 0, 0.06);
+}
+
+.left_menu .active {
+    font-weight:bold;
+}
+
+.left_menu .active .material-symbols-outlined {
+    color:#3399ff;
+}
+
+.left_menu img {
+    width:150px;
+    height:30.25px;;
+    padding-left: 15px;
+}
+
+.left_menu .submenu {
+    padding: 5px 5px 5px 0px;
+    color: rgb(111, 111, 111);
+    display: block;
+    cursor: pointer;
+}
+
+.left_menu .submenu .amoredea_icon {
+    color: #ff5400;
+    font-size: 40px;
+    display: inline-block;
+    padding: 0 15px 0 7px;
+    vertical-align: middle;
+    margin-top: -11px;
+    font-weight: bold;
+    margin-bottom: -4px;
+}
+
+.left_menu .submenu #count_content_online {
+    position: absolute;
+    left: 25px;
+    top: 16px;
+    width: 34px;
+    text-align: center;
+    vertical-align: middle;
+    color: #f8f8f8;
+    font-weight: 400;
+    font-size: 11px;
+}
+
+.left_menu .submenu .arrow {
+    padding-right:0;
+    vertical-align: middle;
+}
+
+.left_menu .submenu_amoredea,
+.left_menu .submenu_upload,
+.left_menu .submenu_online,
+.left_menu .submenu_actors,
+.left_menu .submenu_statistics,
+.left_menu .submenu_webmaster,
+.left_menu .submenu_checking,
+.left_menu .submenu_banners,
+.left_menu .submenu_chats {
+    display:none;
+}
+
+.left_menu .submenu_actors {
+    max-height: 230px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    border-bottom:1px solid rgba(0, 0, 0, 0.06);
+    border-top:1px solid rgba(0, 0, 0, 0.06);
+}
+
+.left_menu .submenu_amoredea a,
+.left_menu .submenu_upload a,
+.left_menu .submenu_online a,
+.left_menu .submenu_statistics a,
+.left_menu .submenu_webmaster a,
+.left_menu .submenu_checking a,
+.left_menu .submenu_banners a,
+.left_menu .submenu_chats a {
+    padding:5px 5px 5px 40px;
+}
+
+.left_menu .submenu_actors a {
+    padding:5px 5px 5px 30px;
+}
+
+.left_menu .submenu_actors .avatar {
+    border:1px solid #222;
+    width:30px;
+    height:30px;
+    overflow:hidden;
+    border-radius:50%;
+    -webkit-border-radius:50%;
+    -moz-border-radius:50%;
+    display:inline-block;
+    padding:0;
+    margin:0 10px 0 0;
+    vertical-align:middle;
+}
+
+.left_menu .submenu_actors .avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    padding:0;
+}
+
+.left_menu .submenu_actors .active .avatar {
+    border:1px solid #3399ff;
+}

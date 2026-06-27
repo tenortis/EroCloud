@@ -1,0 +1,15 @@
+# verhindert das Auflistung des Verzeichnissesinhalts
+ErrorDocument 403 https://ad5.tv
+ErrorDocument 404 https://ad5.tv
+
+Options -Indexes
+
+RewriteEngine on
+
+# ad5.tv
+
+# Holt die PartnerID vom angegeben Darsteller (Profil)
+# Dies ist die WMID (PID) vom Merchant der den neuen Merchent (der diese URL aufruft) geworben hat
+RewriteRule ^wm/(.*)$ index.php?set_webmaster_id=$1 [QSA,L]
+
+
