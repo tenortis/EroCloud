@@ -23,7 +23,18 @@ if (!function_exists('cleanup_get_folder_size')) {
 // -----------------------------------------------------------------------------
 // 1. REITER 1: LÖSCH-VORSCHAU (Simulationslogik)
 // -----------------------------------------------------------------------------
-$rs_deleted_movies = p4c_query("SELECT * FROM `movies` WHERE `status` = 'deleted' ORDER BY `deleted_datetime` ASC;", __FILE__, __LINE__);
+$rs_deleted_movies = p4c_query("
+    SELECT * FROM `movies` 
+    WHERE `status` = 'deleted'
+       OR (
+           (`released` = '2' OR `status` = 'blocked')
+           AND `status` != 'deleted'
+           AND `movie_checked` != '0000-00-00 00:00:00'
+           AND `movie_checked` < '".date("Y-m-d H:i:s", strtotime("-180 days"))."'
+           AND (`last_updated_datetime` = '0000-00-00 00:00:00' OR `last_updated_datetime` < '".date("Y-m-d H:i:s", strtotime("-180 days"))."')
+       )
+    ORDER BY `deleted_datetime` ASC, `id` ASC;
+", __FILE__, __LINE__);
 
 $upcoming_count = 0;
 $upcoming_total_size = 0;
@@ -41,7 +52,11 @@ while ($row = p4c_fetch_object($rs_deleted_movies)) {
     $planned_date = '';
     $planned_ts = 0;
     
-    if ($purchases_count == 0) {
+    if ($row->status !== 'deleted') {
+        $rule = '<span style="color: #c41cc4; font-weight: bold;">Regel 4: Alt & Abgelehnt</span>';
+        $planned_ts = 1;
+        $planned_date = '<span style="color: #ff0000; font-weight: bold;">Sofort (n&auml;chster Cronjob-Lauf)</span>';
+    } elseif ($purchases_count == 0) {
         $planned_ts = 1;
         // Regel 1: Nie gekauft -> Sofortige Löschung
         $rule = '<span style="color: #d05c00; font-weight: bold;">Regel 1: Nie gekauft</span>';
@@ -257,7 +272,8 @@ $site .= '
             Diese Ansicht zeigt Ihnen alle Filme, die sich im Status "Gelöscht" (Soft-Delete) befinden, und berechnet das geplante physische Löschdatum basierend auf der neuen Löschlogik:<br />
             1. <strong>Regel 1 (Nie gekauft):</strong> Sofortige physische Löschung.<br />
             2. <strong>Regel 2 (Inaktiv - Kauf & View > 2 Jahre her):</strong> Physische Löschung 30 Tage nach Markierung als gelöscht.<br />
-            3. <strong>Regel 3 (Aktiv - Kauf/View < 2 Jahre her):</strong> Standard-Löschung nach 365 Tagen ab Löschdatum.
+            3. <strong>Regel 3 (Aktiv - Kauf/View < 2 Jahre her):</strong> Standard-Löschung nach 365 Tagen ab Löschdatum.<br />
+            4. <strong>Regel 4 (Alt & Abgelehnt - Inaktiv > 180 Tage):</strong> Sofortige physische Löschung von abgelehnten/gesperrten Filmen, die seit 6 Monaten nicht mehr bearbeitet wurden.
         </div>
 
         <div class="filter-pills-container" style="margin-bottom: 15px;">
@@ -266,6 +282,7 @@ $site .= '
             <span class="filter-pill" data-rule="Regel 1" style="background-color: #ffd2b2; border-color: #d05c00; color: #d05c00;">Regel 1: Nie gekauft</span>
             <span class="filter-pill" data-rule="Regel 2" style="background-color: #d2eaf4; border-color: #1c94c4; color: #1c94c4;">Regel 2: Inaktiv (> 2 Jahre)</span>
             <span class="filter-pill" data-rule="Regel 3" style="background-color: #e5e5e5; border-color: #666; color: #333;">Regel 3: Aktiv (< 2 Jahre)</span>
+            <span class="filter-pill" data-rule="Regel 4" style="background-color: #ffd6ff; border-color: #c41cc4; color: #c41cc4;">Regel 4: Alt & Abgelehnt</span>
         </div>
 
         <table id="table_cleanup_preview" style="width: 100%;">
