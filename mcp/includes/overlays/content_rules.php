@@ -58,7 +58,7 @@ $site .= '
         <div class="mb-4">
             <h5 class="fw-bold">Löschung von Content durch den Partner</h5>
             <p>Ein Partner kann jederzeit die Löschung seines Contents beantragen. In diesem Fall wird der Content für neue Käufe entfernt. 
-            Content, der bereits von Endkunden erworben wurde, bleibt für diese weiterhin streambar.</p>
+            Bereits verkaufter Content wird für die Käufer über eine übergangsfrist von bis zu 365 Tagen (bei aktiver Nutzung innerhalb der letzten 2 Jahre) bzw. 30 Tagen (wenn der Film seit mehr als 2 Jahren nicht mehr gekauft oder angesehen wurde) bereitgehalten, bevor die Videodateien aus kapazitäts- und datenschutzrechtlichen Gründen endgültig vom Server entfernt werden. Innerhalb dieser Fristen bleibt der Content für bestehende Käufer weiterhin streambar.</p>
         </div>
 
         <div class="mb-4">
@@ -71,9 +71,12 @@ $site .= '
             <h5 class="fw-bold">Umgang mit Content nach Vertragsbeendigung und technische Einschränkungen</h5>
             <p>Nach Beendigung des Vertragsverhältnisses wird Content, der innerhalb der letzten 
             <span class="fw-bold">365 Tage</span> nicht verkauft oder angesehen wurde, unwiderruflich gelöscht. 
-            Der Partner wird vorab über die geplante Löschung informiert. Bereits verkaufter Content bleibt für die jeweiligen Käufer 
-            weiterhin streambar, sofern keine technischen Einschränkungen, wie infrastrukturelle oder kapazitätsbedingte Begrenzungen, 
-            eine weitere Bereitstellung unmöglich machen.</p>
+            Der Partner wird vorab über die geplante Löschung informiert. Bereits verkaufter Content wird für die Käufer über eine übergangsfrist von bis zu 365 Tagen (bei aktiver Nutzung) bzw. 30 Tagen (bei Inaktivität seit mehr als 2 Jahren) bereitgehalten, bevor die Videodateien aus kapazitäts- und datenschutzrechtlichen Gründen endgültig vom Server entfernt werden.</p>
+        </div>
+
+        <div class="mb-4">
+            <h5 class="fw-bold">Automatische Bereinigung von Entwürfen und abgelehnten Videos</h5>
+            <p>Unveröffentlichte Filmentwürfe sowie abgelehnte Filme, die über einen Zeitraum von mehr als 180 Tagen nicht mehr bearbeitet oder erneut zur Prüfung eingereicht wurden, werden zur Freigabe von Server-Ressourcen automatisch und unwiderruflich gelöscht.</p>
         </div>
 
         <div class="mb-4">
