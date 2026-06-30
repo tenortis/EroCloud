@@ -169,6 +169,9 @@ $site = '<!DOCTYPE html>
 
                     $rs_movies_online = p4c_query("SELECT COUNT(*) AS `cnt` FROM `movies_online`;", __FILE__, __LINE__);
                     $count_movies_online = p4c_fetch_object($rs_movies_online)->cnt;
+
+                    $rs_movies_drafts = p4c_query("SELECT COUNT(*) AS `cnt` FROM `movies` WHERE `released`='0' AND `status`!='deleted';", __FILE__, __LINE__);
+                    $count_movies_drafts = p4c_fetch_object($rs_movies_drafts)->cnt;
                     
                     $rs_photo_albums_online = p4c_query("SELECT COUNT(*) AS `cnt` FROM `photo_albums_online`;", __FILE__, __LINE__);
                     $count_photo_albums_online = p4c_fetch_object($rs_photo_albums_online)->cnt;
@@ -200,6 +203,7 @@ $site = '<!DOCTYPE html>
                     $navWebcams = '';
                     $navSites = '';
                     $navContentCleanup = '';
+                    $navMoviesDrafts = '';
                     $navWMPartner = '';
                     $navBanners = '';
                     $navNewBanners = '';
@@ -257,6 +261,9 @@ $site = '<!DOCTYPE html>
                     } elseif (isset($_GET['mod']) AND $_GET['mod']=='movies_blocked') {
                         $navMoviesBlocked = 'class="active"';
                         $main = 'movies_blocked.php';                        
+                    } elseif (isset($_GET['mod']) AND $_GET['mod']=='movies_drafts') {
+                        $navMoviesDrafts = 'class="active"';
+                        $main = 'movies_drafts.php';
                     } elseif (isset($_GET['mod']) AND $_GET['mod']=='movies_online') {
                         $navMoviesOnline = 'class="active"';
                         $main = 'movies_online.php';
@@ -354,6 +361,11 @@ $site = '<!DOCTYPE html>
                             <a '.$navMoviesOnline.' href="'.ACP_URL.'/Filme-online">
                                 <i class="material-symbols-outlined md-30">video_library</i>
                                 <span>Filme online ('.$count_movies_online.')</span>
+                            </a>
+
+                            <a '.$navMoviesDrafts.' href="'.ACP_URL.'/Filme-in-Planung">
+                                <i class="material-symbols-outlined md-30">pending_actions</i>
+                                <span>Filme in Planung ('.$count_movies_drafts.')</span>
                             </a>
 
                             <a '.$navFotoalbenOnline.' href="'.ACP_URL.'/Fotoalben-online">

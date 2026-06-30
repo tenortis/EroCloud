@@ -82,6 +82,7 @@ RewriteRule ^Filme-pruefen index.php?mod=movies_checking&%{QUERY_STRING}
 RewriteRule ^gesperrte-Filme index.php?mod=movies_blocked&%{QUERY_STRING}
 RewriteRule ^Film-pruefen/(.*)$ index.php?mod=movie_checking&id=$1&%{QUERY_STRING}
 
+RewriteRule ^Filme-in-Planung index.php?mod=movies_drafts&%{QUERY_STRING}
 RewriteRule ^Filme-online index.php?mod=movies_online&%{QUERY_STRING}
 RewriteRule ^Content-Bereinigung$ index.php?mod=content_cleanup&%{QUERY_STRING}
 RewriteRule ^Film-bearbeiten/(.*)$ index.php?mod=movie_edit&id=$1&%{QUERY_STRING}
