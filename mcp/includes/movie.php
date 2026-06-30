@@ -11,61 +11,51 @@ if (!defined('SAFE_INC'))
     die ("Hacking attempt...");
 
 if (isset($_POST['delete_movie'])) {
-    
-    function delete_directory($dirname, $movie_obj) {
-        if(is_dir($dirname)) {
-            $dir_handle = opendir($dirname);
-        }
-        
-        //Falls Verzeichnis nicht geoeffnet werden kann, mit Fehlermeldung terminieren
-        if($dir_handle) {
-            while($file=readdir($dir_handle)) {
-                if($file!="." && $file!="..")  {
-                    //Datei loeschen 
-                    if(!is_dir($dirname."/".$file)) {
-                        @unlink($dirname."/".$file);
-                    //Falls es sich um ein Verzeichnis handelt, "delete_directory" aufrufen
-                    } else {
-                        delete_directory($dirname.'/'.$file, $movie_obj);
-                    }
-                }
-            }
-
-            closedir($dir_handle);
-            //Verzeichnis loeschen
-            rmdir($dirname);
-        }
-
-        $merchant_id = $_SESSION['merchant_id'];
-
-        p4c_query("DELETE FROM `movies` WHERE
-            `id`='". p4c_escape_string($movie_obj->id)."' AND
-            `merchant_id`='".abs($merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
-
-        p4c_query("DELETE FROM `movies_online` WHERE
-            `id`='". p4c_escape_string($movie_obj->id)."' AND
-            `merchant_id`='".abs($merchant_id)."' LIMIT 1;",__FILE__,__LINE__);        
-
-        return true;
-    }
-    
-    
     $movie_id = abs($_POST['movie_id']);
     
     $rs_check_movie_exists = p4c_query("SELECT * FROM `movies` WHERE `id`='".$movie_id."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_check_movie_exists) == 1) {
         $movie_obj = p4c_fetch_object($rs_check_movie_exists);
         
-        $dirname = MOVIES_PATH.'/'.$movie_obj->storage_location.'/'.$_SESSION['merchant_id'].'/'.$movie_id;
+        // Watertight check to determine if the movie was ever approved, is online, or has purchases
+        $is_published_or_purchased = false;
         
-        if (delete_directory($dirname, $movie_obj) === true) {
-            header('Location: '.MCP_URL.'/Movies?del=ok');
-            exit;
-            
-        } else {
-            $error = "Der Film konnte nicht gel&ouml;scht werden.";
+        if ($movie_obj->movie_checked != '0000-00-00 00:00:00') {
+            $is_published_or_purchased = true;
         }
         
+        if (!$is_published_or_purchased) {
+            $rs_online = p4c_query("SELECT `id` FROM `movies_online` WHERE `file_id`='".p4c_escape_string($movie_obj->file_id)."' LIMIT 1;",__FILE__,__LINE__);
+            if (p4c_num_rows($rs_online) > 0) {
+                $is_published_or_purchased = true;
+            }
+        }
+        
+        if (!$is_published_or_purchased) {
+            $rs_access = p4c_query("SELECT `id` FROM `movies_access` WHERE `movie_id`='".p4c_escape_string($movie_obj->file_id)."' LIMIT 1;",__FILE__,__LINE__);
+            if (p4c_num_rows($rs_access) > 0) {
+                $is_published_or_purchased = true;
+            }
+        }
+        
+        $deleted_datetime = '0000-00-00 00:00:00';
+        if ($is_published_or_purchased) {
+            $deleted_datetime = date("Y-m-d H:i:s");
+        }
+        
+        // Soft delete: update status and deleted_datetime in movies and movies_online
+        p4c_query("UPDATE `movies` SET 
+            `status`='deleted', 
+            `deleted_datetime`='".$deleted_datetime."' 
+            WHERE `id`='".$movie_id."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__);
+            
+        p4c_query("UPDATE `movies_online` SET 
+            `status`='deleted', 
+            `deleted_datetime`='".$deleted_datetime."' 
+            WHERE `file_id`='".p4c_escape_string($movie_obj->file_id)."' LIMIT 1;",__FILE__,__LINE__);
+            
+        header('Location: '.MCP_URL.'/Movies?del=ok');
+        exit;
     }
 }
 
