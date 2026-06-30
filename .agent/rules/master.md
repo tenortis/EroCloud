@@ -26,7 +26,7 @@ description: Das unveränderliche Grundgesetz für alle KI-Interaktionen in dies
     * `ads/`: Anzeigenverwaltung.
     * `includes/`: Kernbibliotheken und Hilfsfunktionen.
 * **PHP Version:**
-    * Native PHP (Legacy & Custom-Struktur). Keine externen Frameworks einbetten, sondern vorhandene Struktur nutzen.
+    * **PHP 7.3 (lokal: 7.3.3) zwingend.** Neuentwicklungen und Anpassungen müssen vollständig kompatibel mit PHP 7.3 sein. Keine Features aus neueren PHP-Versionen verwenden. Native PHP (Legacy & Custom-Struktur) nutzen, keine externen Frameworks einbetten.
 * **Bootstrapping:** Nutzung von `common.inc.php` in den jeweiligen Verzeichnissen für Bootstrapping ist Pflicht.
 
 ## 2. 🛡️ SICHERHEIT & DATENBANK
