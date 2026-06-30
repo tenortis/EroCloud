@@ -1,6 +1,7 @@
 CKEDITOR.editorConfig = function( config ) {
     config.language = "de";
     config.height = 300;
+    config.versionCheck = false;
 
     config.toolbar = [
         { name: 'clipboard', items: ['Undo', 'Redo' ] },

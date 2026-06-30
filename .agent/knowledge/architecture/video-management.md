@@ -83,7 +83,19 @@ Ein Administrator prüft das Video im **Admin Control Panel (ACP)**:
 
 ---
 
-## 6. 🗑️ Löschen und Archivieren
+## 6. 📋 Händler-Filmliste (MCP)
+Die Übersicht aller hochgeladenen Filme des Händlers im Merchant Control Panel (MCP):
+* **Pfad**: `mcp/includes/movies.php` (AJAX-Quelle: `mcp/includes/ajax/movies.php` über Route `/Movies`).
+* **Funktion**: Listet alle hochgeladenen Filme tabellarisch auf (unter Verwendung von jQuery DataTables).
+* **Anzeigefelder**:
+  * **Status**: Zeigt über Icons an, ob der Film z. B. konvertiert wird, online ist oder abgelehnt wurde.
+  * **ID, Vorschaubilder, Filmtitel, Darsteller**.
+  * **Online ab (`online_at`)**: Zeigt an, wann der Film veröffentlicht werden soll (deutsches Format `d.m.Y H:i` mit zeitlich korrekter Sortierung über `title-string`).
+  * **Käufe (Streaming/Download) & Provision**.
+
+---
+
+## 7. 🗑️ Löschen und Archivieren
 Um alte, nicht mehr genutzte Inhalte zu bereinigen, greifen nach Freigabe des neuen Cronjobs folgende Schutzfristen (simuliert unter `/Content-Bereinigung`):
 * **Regel 1 (Nie gekauft)**: Sofortige Löschung nach Soft-Delete.
 * **Regel 2 (Inaktiv > 2 Jahre)**: Löschung nach 30 Tagen Karenzzeit ab Soft-Delete.

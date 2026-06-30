@@ -712,7 +712,7 @@ $site = '<!DOCTYPE html>
                             <textarea id="edit_user_notes" ></textarea>
                             <script>
                                 CKEDITOR.replace("edit_user_notes", {
-                                    customConfig: "'.MCP_URL.'/fw/ckeditor/simple_config.js",
+                                    customConfig: "'.MCP_URL.'/fw/ckeditor/simple_config.js?v=1",
                                     resize_enabled: false,
                                     allowedContent: true,
                                     contentsCss : ".cke_editable{background-color:#ffffcc;font-family:verdana,arial;font-size:13px;}"

@@ -41,8 +41,25 @@ define('SUPPORT_PHONE_NUMBER','+49 (0)6106 625 918 27');
 // Domain
 define('COMPANYNAME','CIPA MEDIA S.L.');
 define('PROJECTNAME','EroCloud');
-define('DOMAIN',    'erocloud.net');
-define('URL',       'https://erocloud.net');
+
+$is_local = false;
+if (isset($_SERVER['HTTP_HOST']) && (
+    strpos($_SERVER['HTTP_HOST'], 'erocloud.local') !== false || 
+    $_SERVER['HTTP_HOST'] === 'localhost' || 
+    $_SERVER['HTTP_HOST'] === '127.0.0.1'
+)) {
+    $is_local = true;
+} elseif (DIRECTORY_SEPARATOR === '\\') {
+    $is_local = true;
+}
+
+if ($is_local) {
+    define('DOMAIN',    'erocloud.local');
+    define('URL',       'https://erocloud.local');
+} else {
+    define('DOMAIN',    'erocloud.net');
+    define('URL',       'https://erocloud.net');
+}
 
 // amoredeoa
 define('amoredea_URL','https://amoredea.com');
@@ -54,22 +71,42 @@ define('Pay4Coins_API_URL','https://api.pay4coins.com');
 define('Pay4Coins_MCP_URL','https://merchant.pay4coins.com');
 
 // ACP Domain
-define('ACP_DOMAIN','acp.erocloud.net');
-define('ACP_URL',   'https://acp.erocloud.net');
+if ($is_local) {
+    define('ACP_DOMAIN','acp.erocloud.local');
+    define('ACP_URL',   'https://acp.erocloud.local');
+} else {
+    define('ACP_DOMAIN','acp.erocloud.net');
+    define('ACP_URL',   'https://acp.erocloud.net');
+}
 define('ACP_SESSION_DURATION', strtotime("-30 minutes")); // Nach diesen Minuten inaktivit�t, wird der Admin automatisch abgemeldet
 
 // MCP Domain (Merchant-Control-Panel)
-define('MCP_DOMAIN','erocloud.net');
-define('MCP_URL',   'https://erocloud.net');
+if ($is_local) {
+    define('MCP_DOMAIN','erocloud.local');
+    define('MCP_URL',   'https://erocloud.local');
+} else {
+    define('MCP_DOMAIN','erocloud.net');
+    define('MCP_URL',   'https://erocloud.net');
+}
 define('MCP_SESSION_DURATION', strtotime("-180 minutes")); // Nach diesen Minuten inaktivit�t, wird der Admin automatisch abgemeldet
 
 // API Domain
-define('API_DOMAIN','api.erocloud.net');
-define('API_URL',   'https://api.erocloud.net');
+if ($is_local) {
+    define('API_DOMAIN','api.erocloud.local');
+    define('API_URL',   'https://api.erocloud.local');
+} else {
+    define('API_DOMAIN','api.erocloud.net');
+    define('API_URL',   'https://api.erocloud.net');
+}
 
 // Ads Domain
-define('ADS_DOMAIN','www1.erocloud.net');
-define('ADS_URL',   'https://www1.erocloud.net');
+if ($is_local) {
+    define('ADS_DOMAIN','www1.erocloud.local');
+    define('ADS_URL',   'https://www1.erocloud.local');
+} else {
+    define('ADS_DOMAIN','www1.erocloud.net');
+    define('ADS_URL',   'https://www1.erocloud.net');
+}
 
 // Login Domain
 define('LOGIN_DOMAIN','login.pay4coins.com');

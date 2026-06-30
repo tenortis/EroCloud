@@ -20,7 +20,7 @@ $merchant_id = abs($_SESSION['merchant_id']);
 $rs_movies = p4c_query("SELECT `movies`.`id`, `convert_status`, `file_id`, `checksum`, `filename`, `title`, `movie_checked`, `released`, `username`, `actor_id`, `convert_endtime`
     FROM `movies` LEFT JOIN `actors` ON `movies`.`actor_id`=`actors`.`id` WHERE `movies`.`merchant_id`='".abs($merchant_id)."' AND `movies`.`status`!='deleted' AND `actors`.`status`!='deleted' ORDER BY `id` DESC;", __FILE__, __LINE__);
 */
-$rs_movies = p4c_query("SELECT `movies`.`id`, `convert_status`, `file_id`, `checksum`, `filename`, `title`, `movie_checked`, `released`, `actor_id`, `convert_endtime`
+$rs_movies = p4c_query("SELECT `movies`.`id`, `convert_status`, `file_id`, `checksum`, `filename`, `title`, `movie_checked`, `released`, `actor_id`, `convert_endtime`, `online_at`
     FROM `movies` WHERE `movies`.`merchant_id`='".abs($merchant_id)."' AND `movies`.`status`!='deleted' ORDER BY `id` DESC;", __FILE__, __LINE__);
 
 
@@ -83,6 +83,7 @@ if (p4c_num_rows($rs_movies) > 0) {
         $row[] = '<div><img src="'.API_URL.'/PlayerPoster/FSK16/'.$movie_ary->file_id.'?w=100&cs='.$cs.'" /></div><div><img src="'.API_URL.'/PlayerPoster/FSK18/'.$movie_ary->file_id.'?w=100&cs='.$cs.'" /></div>';
         $row[] = '<a href="'.MCP_URL.'/video/'.$movie_ary->id.'">'.$movie_ary->title.'</a>';
         $row[] = $username;
+        $row[] = ($movie_ary->online_at != '0000-00-00 00:00:00' && !empty($movie_ary->online_at)) ? '<span title="'.$movie_ary->online_at.'">'.date('d.m.Y H:i', strtotime($movie_ary->online_at)).'</span>' : '-';
         $row[] = p4c_result($rs_count_streaming, 0,0);
         $row[] = p4c_result($rs_count_download, 0,0);
         $row[] = $commision.' EUR';

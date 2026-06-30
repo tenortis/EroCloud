@@ -1,6 +1,7 @@
 CKEDITOR.editorConfig = function( config ) {
 	config.language = "de";
 	config.height = 300;
+	config.versionCheck = false;
 	customConfig: "myconfig.js";
 	
 	config.toolbar = [

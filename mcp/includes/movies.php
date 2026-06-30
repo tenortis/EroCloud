@@ -95,6 +95,7 @@ if ($count_movies == 0) {
                     {sWidth: "120px", "sClass": "center", "orderable": false},
                     {sWidth: "auto"},
                     {sWidth: "15%", "sClass": "center", "sType": "title-string"},
+                    {sWidth: "110px", "sClass": "center", "sType": "title-string"},
                     {sWidth: "8%", "sClass": "center"},
                     {sWidth: "8%", "sClass": "center"},
                     {sWidth: "80px", "sClass": "center"}
@@ -141,6 +142,7 @@ if ($count_movies == 0) {
                     <th>Vorschaubilder</th>
                     <th style="text-align:left;">Filmtitel</th>
                     <th>Darsteller</th>
+                    <th>Online ab</th>
                     <th>K&auml;ufe Streaming</th>
                     <th>K&auml;ufe Download</th>
                     <th>Provision</th>

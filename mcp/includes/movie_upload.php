@@ -462,7 +462,7 @@ $site .= '
                 <div class="edit_content" style="margin-bottom:8px;">
                     <textarea name="description" id="description" >'.$movie['description'].'</textarea>
                     <script>
-                        CKEDITOR.replace("description", {customConfig: "'.MCP_URL.'/fw/ckeditor/movie_upload_config.js"});
+                        CKEDITOR.replace("description", {customConfig: "'.MCP_URL.'/fw/ckeditor/movie_upload_config.js?v=1"});
                     </script>
                 </div>
     

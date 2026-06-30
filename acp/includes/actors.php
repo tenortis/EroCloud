@@ -9,7 +9,8 @@
 if (!defined('SAFE_INC'))
     die ("Hacking attempt...");
 
-$rs_actors = p4c_query("SELECT * FROM `actors`", __FILE__, __LINE__);
+$rs_actors_count = p4c_query("SELECT COUNT(*) AS `cnt` FROM `actors`", __FILE__, __LINE__);
+$actors_count = p4c_fetch_object($rs_actors_count)->cnt;
 
 
 $site .= '
@@ -110,7 +111,7 @@ $site .= '
         // ]]>
         </script>
         
-        <div class="ui-widget-header" style="padding:10px; font-size:20px;">'.p4c_num_rows($rs_actors).' Profile</div>
+        <div class="ui-widget-header" style="padding:10px; font-size:20px;">'.$actors_count.' Profile</div>
         <div class="ui-widget-content" style="padding:10px; border-top:none; margin-bottom:20px;">
             Hier sind alle Darsteller-Profile aufgelistet.
         </div>
