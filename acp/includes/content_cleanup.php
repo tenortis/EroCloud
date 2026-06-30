@@ -15,11 +15,15 @@ while ($row = p4c_fetch_object($rs_deleted_movies)) {
     $purchases_count = p4c_num_rows($rs_access);
     
     $last_buy_date = '-';
+    $last_buy_ts = 0;
     $last_view_date = '-';
+    $last_view_ts = 0;
     $rule = '';
     $planned_date = '';
+    $planned_ts = 0;
     
     if ($purchases_count == 0) {
+        $planned_ts = 1;
         // Regel 1: Nie gekauft -> Sofortige Löschung
         $rule = '<span style="color: #d05c00; font-weight: bold;">Regel 1: Nie gekauft</span>';
         $planned_date = '<span style="color: #ff0000; font-weight: bold;">Sofort (Nächster Cronjob-Lauf)</span>';
@@ -82,20 +86,26 @@ while ($row = p4c_fetch_object($rs_deleted_movies)) {
         }
     }
 
-    $online_date_fmt = ($row->online_at != '0000-00-00 00:00:00' && $row->online_at != '') ? date("d.m.Y H:i:s", strtotime($row->online_at)) : '-';
+    $online_ts = ($row->online_at != '0000-00-00 00:00:00' && $row->online_at != '') ? strtotime($row->online_at) : 0;
+    $online_date_cell = '<span style="display:none;">'.$online_ts.'</span>' . (($online_ts > 0) ? date("d.m.Y H:i:s", $online_ts) : '-');
     
-    $deleted_date_fmt = ($row->deleted_datetime != '0000-00-00 00:00:00') ? date("d.m.Y H:i:s", strtotime($row->deleted_datetime)) : '-';
+    $deleted_ts = ($row->deleted_datetime != '0000-00-00 00:00:00') ? strtotime($row->deleted_datetime) : 0;
+    $deleted_date_cell = '<span style="display:none;">'.$deleted_ts.'</span>' . (($deleted_ts > 0) ? date("d.m.Y H:i:s", $deleted_ts) : '-');
+    
+    $last_buy_cell = '<span style="display:none;">'.$last_buy_ts.'</span>' . $last_buy_date;
+    $last_view_cell = '<span style="display:none;">'.$last_view_ts.'</span>' . $last_view_date;
+    $planned_cell = '<span style="display:none;">'.$planned_ts.'</span>' . $planned_date;
     
     $preview_rows_html .= '
     <tr>
         <td>'.$row->id.'</td>
         <td>'.$edit_link.'</td>
         <td>'.$actor_name.'</td>
-        <td>'.$online_date_fmt.'</td>
-        <td>'.$deleted_date_fmt.'</td>
-        <td>'.$last_buy_date.'</td>
-        <td>'.$last_view_date.'</td>
-        <td>'.$planned_date.'</td>
+        <td>'.$online_date_cell.'</td>
+        <td>'.$deleted_date_cell.'</td>
+        <td>'.$last_buy_cell.'</td>
+        <td>'.$last_view_cell.'</td>
+        <td>'.$planned_cell.'</td>
         <td>'.$rule.'</td>
     </tr>';
 }
@@ -125,15 +135,17 @@ while ($log_row = p4c_fetch_object($rs_deleted_log)) {
         $size_text = $size_bytes . ' Bytes';
     }
     
-    $log_deleted_date = ($log_row->last_updated_datetime != '0000-00-00 00:00:00' && $log_row->last_updated_datetime != '') 
-        ? date("d.m.Y H:i:s", strtotime($log_row->last_updated_datetime)) 
-        : date("d.m.Y H:i:s", strtotime($log_row->deleted_datetime));
+    $log_deleted_ts = ($log_row->last_updated_datetime != '0000-00-00 00:00:00' && $log_row->last_updated_datetime != '') 
+        ? strtotime($log_row->last_updated_datetime) 
+        : strtotime($log_row->deleted_datetime);
+    $log_deleted_date = date("d.m.Y H:i:s", $log_deleted_ts);
+    $log_deleted_cell = '<span style="display:none;">'.$log_deleted_ts.'</span>' . $log_deleted_date;
         
     $history_rows_html .= '
     <tr>
         <td>'.$log_row->movie_id.'</td>
         <td>'.htmlspecialchars($log_row->title, ENT_QUOTES, 'UTF-8').'</td>
-        <td>'.$log_deleted_date.'</td>
+        <td>'.$log_deleted_cell.'</td>
         <td>'.$size_text.'</td>
         <td>'.$log_row->purchases.'x</td>
         <td>'.$log_row->views.'x</td>
