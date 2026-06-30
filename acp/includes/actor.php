@@ -1092,7 +1092,8 @@ $site .= '
     <table id="table_actor_movies" style="width:100%;">
         <thead>
             <tr>
-                <th style="width:60px;">ID</th>
+                <th style="width:60px;">Film-ID</th>
+                <th style="width:65px;">Online-ID</th>
                 <th style="width:50px;">Status</th>
                 <th style="width:100px;">Vorschau</th>
                 <th>Titel</th>
@@ -1128,7 +1129,14 @@ while ($movie_obj = p4c_fetch_object($rs_actor_movies)) {
     
     $title_decoded = htmlspecialchars($movie_obj->title, ENT_QUOTES, 'UTF-8');
     
-    $action_url = ACP_URL.'/Film-bearbeiten/'.$movie_obj->id;
+    // Fetch Online ID if exists
+    $online_id_text = '-';
+    $rs_online_id = p4c_query("SELECT `id` FROM `movies_online` WHERE `file_id`='".p4c_escape_string($movie_obj->file_id)."' LIMIT 1;", __FILE__, __LINE__);
+    if (p4c_num_rows($rs_online_id) > 0) {
+        $online_id = p4c_result($rs_online_id, 0);
+        $online_id_text = $online_id;
+    }
+    $action_url = ($online_id_text !== '-') ? ACP_URL.'/Film-bearbeiten/'.$online_id_text : ACP_URL.'/Film-bearbeiten/'.$movie_obj->id;
     $action_text = 'Bearbeiten';
     if ($movie_obj->released == 1 && $movie_obj->movie_checked == '0000-00-00 00:00:00') {
         $action_url = ACP_URL.'/Film-pruefen/'.$movie_obj->id;
@@ -1145,6 +1153,7 @@ while ($movie_obj = p4c_fetch_object($rs_actor_movies)) {
     $site .= '
         <tr>
             <td>'.$movie_obj->id.'</td>
+            <td>'.$online_id_text.'</td>
             <td>'.$status_icon.'</td>
             <td>'.$poster_html.'</td>
             <td><a href="'.$action_url.'"><b>'.$title_decoded.'</b></a>'.$released_status.'</td>
@@ -1172,7 +1181,8 @@ $site .= '
     <table id="table_actor_albums" style="width:100%;">
         <thead>
             <tr>
-                <th style="width:60px;">ID</th>
+                <th style="width:60px;">Album-ID</th>
+                <th style="width:65px;">Online-ID</th>
                 <th style="width:50px;">Status</th>
                 <th style="width:100px;">Vorschau</th>
                 <th>Titel</th>
@@ -1207,7 +1217,14 @@ while ($album_obj = p4c_fetch_object($rs_actor_albums)) {
     
     $title_decoded = htmlspecialchars($album_obj->title, ENT_QUOTES, 'UTF-8');
     
-    $action_url = ACP_URL.'/Fotoalbum-bearbeiten/'.$album_obj->id;
+    // Fetch Online ID if exists
+    $online_id_text = '-';
+    $rs_online_id = p4c_query("SELECT `id` FROM `photo_albums_online` WHERE `album_id`='".p4c_escape_string($album_obj->album_id)."' LIMIT 1;", __FILE__, __LINE__);
+    if (p4c_num_rows($rs_online_id) > 0) {
+        $online_id = p4c_result($rs_online_id, 0);
+        $online_id_text = $online_id;
+    }
+    $action_url = ($online_id_text !== '-') ? ACP_URL.'/Fotoalbum-bearbeiten/'.$online_id_text : ACP_URL.'/Fotoalbum-bearbeiten/'.$album_obj->id;
     $action_text = 'Bearbeiten';
     if ($album_obj->released == 1 && $album_obj->album_checked == '0000-00-00 00:00:00') {
         $action_url = ACP_URL.'/Fotoalbum-pruefen/'.$album_obj->id;
@@ -1217,6 +1234,7 @@ while ($album_obj = p4c_fetch_object($rs_actor_albums)) {
     $site .= '
         <tr>
             <td>'.$album_obj->id.'</td>
+            <td>'.$online_id_text.'</td>
             <td>'.$status_icon.'</td>
             <td>'.$poster_html.'</td>
             <td><a href="'.$action_url.'"><b>'.$title_decoded.'</b></a>'.$released_status.'</td>
