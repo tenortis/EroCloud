@@ -50,7 +50,7 @@ while ($row = p4c_fetch_object($rs_deleted_movies)) {
             $rule = '<span style="color: #1c94c4;">Regel 2: Inaktiv (> 2 Jahre)</span>';
             $planned_ts = strtotime($row->deleted_datetime . " + 30 days");
             if ($planned_ts < time()) {
-                $planned_date = '<span style="color: #ff0000; font-weight: bold;">Bereit zur Löschung</span>';
+                $planned_date = '<span style="color: #ff0000; font-weight: bold;">Sofort (nächster Cronjob-Lauf)</span>';
             } else {
                 $planned_date = date("d.m.Y H:i:s", $planned_ts);
             }
@@ -59,7 +59,7 @@ while ($row = p4c_fetch_object($rs_deleted_movies)) {
             $rule = '<span>Regel 3: Aktiv (< 2 Jahre)</span>';
             $planned_ts = strtotime($row->deleted_datetime . " + 365 days");
             if ($planned_ts < time()) {
-                $planned_date = '<span style="color: #ff0000; font-weight: bold;">Bereit zur Löschung</span>';
+                $planned_date = '<span style="color: #ff0000; font-weight: bold;">Sofort (nächster Cronjob-Lauf)</span>';
             } else {
                 $planned_date = date("d.m.Y H:i:s", $planned_ts);
             }
