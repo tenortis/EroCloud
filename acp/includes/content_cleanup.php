@@ -36,6 +36,15 @@ $rs_deleted_movies = p4c_query("
                NULLIF(`last_updated_datetime`, '0000-00-00 00:00:00')
            ) < '".date("Y-m-d H:i:s", strtotime("-180 days"))."'
        )
+       OR (
+           `released` = '0'
+           AND `status` != 'deleted'
+           AND COALESCE(
+               NULLIF(`create_datetime`, '0000-00-00 00:00:00'),
+               NULLIF(`online_at`, '0000-00-00 00:00:00'),
+               NULLIF(`last_updated_datetime`, '0000-00-00 00:00:00')
+           ) < '".date("Y-m-d H:i:s", strtotime("-180 days"))."'
+       )
     ORDER BY `deleted_datetime` ASC, `id` ASC;
 ", __FILE__, __LINE__);
 
@@ -55,7 +64,11 @@ while ($row = p4c_fetch_object($rs_deleted_movies)) {
     $planned_date = '';
     $planned_ts = 0;
     
-    if ($row->status !== 'deleted') {
+    if ($row->released == '0' && $row->status !== 'deleted') {
+        $rule = '<span style="color: #c00000; font-weight: bold;">Regel 5: Inaktive Entw&uuml;rfe</span>';
+        $planned_ts = 1;
+        $planned_date = '<span style="color: #ff0000; font-weight: bold;">Sofort (n&auml;chster Cronjob-Lauf)</span>';
+    } elseif ($row->status !== 'deleted') {
         $rule = '<span style="color: #c41cc4; font-weight: bold;">Regel 4: Alt & Abgelehnt</span>';
         $planned_ts = 1;
         $planned_date = '<span style="color: #ff0000; font-weight: bold;">Sofort (n&auml;chster Cronjob-Lauf)</span>';
@@ -276,7 +289,8 @@ $site .= '
             1. <strong>Regel 1 (Nie gekauft):</strong> Sofortige physische Löschung.<br />
             2. <strong>Regel 2 (Inaktiv - Kauf & View > 2 Jahre her):</strong> Physische Löschung 30 Tage nach Markierung als gelöscht.<br />
             3. <strong>Regel 3 (Aktiv - Kauf/View < 2 Jahre her):</strong> Standard-Löschung nach 365 Tagen ab Löschdatum.<br />
-            4. <strong>Regel 4 (Alt & Abgelehnt - Inaktiv > 180 Tage):</strong> Sofortige physische Löschung von abgelehnten/gesperrten Filmen, die seit 6 Monaten nicht mehr bearbeitet wurden.
+            4. <strong>Regel 4 (Alt & Abgelehnt - Inaktiv > 180 Tage):</strong> Sofortige physische Löschung von abgelehnten/gesperrten Filmen, die seit 6 Monaten nicht mehr bearbeitet wurden.<br />
+            5. <strong>Regel 5 (Inaktive Entw&uuml;rfe - Inaktiv > 180 Tage):</strong> Sofortige physische L&ouml;schung von unbest&auml;tigten Creator-Entw&uuml;rfen, die seit 6 Monaten nicht mehr bearbeitet wurden.
         </div>
 
         <div class="filter-pills-container" style="margin-bottom: 15px;">
@@ -286,6 +300,7 @@ $site .= '
             <span class="filter-pill" data-rule="Regel 2" style="background-color: #d2eaf4; border-color: #1c94c4; color: #1c94c4;">Regel 2: Inaktiv (> 2 Jahre)</span>
             <span class="filter-pill" data-rule="Regel 3" style="background-color: #e5e5e5; border-color: #666; color: #333;">Regel 3: Aktiv (< 2 Jahre)</span>
             <span class="filter-pill" data-rule="Regel 4" style="background-color: #ffd6ff; border-color: #c41cc4; color: #c41cc4;">Regel 4: Alt & Abgelehnt</span>
+            <span class="filter-pill" data-rule="Regel 5" style="background-color: #fce4d6; border-color: #c00000; color: #c00000;">Regel 5: Inaktive Entw&uuml;rfe</span>
         </div>
 
         <table id="table_cleanup_preview" style="width: 100%;">

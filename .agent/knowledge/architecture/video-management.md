@@ -77,9 +77,9 @@ Ein Administrator prüft das Video im **Admin Control Panel (ACP)**:
   * **Ablehnung (Rejection)**: Der Admin wählt einen Ablehnungsgrund aus.
     * Der Status `released` wird auf `2` (abgelehnt) gesetzt.
     * Der Grund wird in der Tabelle `rejection_reason_movie_history` geloggt.
-* **Fehlersuche & Archivierung (`/gesperrte-Filme`)**:
-  * Abgelehnte, blockierte und gelöschte Filme werden gesammelt aufgelistet.
-  * Farbige Badges (`Löschung`, `Abgelehnt`, `Gesperrt`) und eine neue Spalte "Bearbeitet am" erlauben eine direkte Zuweisung des aktuellen Status und Änderungszeitpunkts.
+* **Fehlersuche & Archivierung (`/gesperrte-Filme` & `/Filme-in-Planung`)**:
+  * Abgelehnte, blockierte und gelöschte Filme werden gesammelt aufgelistet (mit Badges wie `Löschung`, `Abgelehnt`, `Gesperrt`).
+  * Die Seite `/Filme-in-Planung` listet ungesendete Entwürfe (`released = 0`) inklusive Konvertierungsstatus und belegtem Speicherplatz auf.
 
 ---
 
@@ -89,6 +89,7 @@ Um alte, nicht mehr genutzte Inhalte zu bereinigen, greifen nach Freigabe des ne
 * **Regel 2 (Inaktiv > 2 Jahre)**: Löschung nach 30 Tagen Karenzzeit ab Soft-Delete.
 * **Regel 3 (Aktiv < 2 Jahre)**: Löschung nach 365 Tagen ab Soft-Delete (Kundenrechte-Schutz).
 * **Regel 4 (Alt & Abgelehnt > 180 Tage)**: Sofortige Löschung von ungenutzten abgelehnten Film-Entwürfen, die seit 6 Monaten nicht mehr bearbeitet wurden.
+* **Regel 5 (Inaktive Entwürfe > 180 Tage)**: Sofortige Löschung von unbestätigten Creator-Entwürfen, die seit 6 Monaten nicht mehr bearbeitet wurden.
 
 Bei der physischen Bereinigung durch den Cronjob (`cronjobs/delete_movie.php`):
 * Wird die Gesamtgröße des Video-Ordners ermittelt.

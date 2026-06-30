@@ -43,7 +43,7 @@ Im System existieren drei unterschiedliche Wege, wie Filme gelöscht werden:
   * Aktualisiert den Status des Filmes in `movies` (und falls vorhanden in `movies_online`) auf `'deleted'`.
 
 ### Pfad C: Sofortige Hard-Deletion durch den Creator (Merchant - MCP)
-* **Dateien**: `mcp/includes/movie.php` (beim Bearbeiten) und `mcp/includes/movie_upload.php` (beim Abbrechen des Uploads).
+* **Dateien**: `mcp/includes/movie.php` (beim Bearbeiten) und `mcp/includes/uploader/upload_movie.php` (beim Abbrechen des Uploads).
 * **Trigger**: Der Creator löscht seinen Film direkt im Merchant Control Panel.
 * **Ablauf**:
   * Es wird die lokale Funktion `delete_directory()` aufgerufen.
@@ -81,6 +81,11 @@ Um den Speicherplatz effizient zu bereinigen und gleichzeitig die erworbenen Nut
   3. `create_datetime` (Erstellungsdatum)
   4. `last_updated_datetime` (Letzte Bearbeitung)
 
+### Regel 5: Inaktive Entwürfe (> 180 Tage)
+* **Zielgruppe**: Filme im Status *Planung/Entwurf* (`released = 0`), die nicht gelöscht wurden, aber seit **über 180 Tagen (6 Monaten) inaktiv** sind.
+* **Frist**: **Sofortige physische Löschung** (da sie nie online waren und nie gekauft werden konnten).
+* **Kaskadierende Altersprüfung**: Das Alter wird über den ersten befüllten Wert aus `create_datetime`, `online_at` oder `last_updated_datetime` geprüft.
+
 ---
 
 ## 4. 🖥️ Benutzeroberfläche & Bereinigungssimulation (ACP)
@@ -89,7 +94,7 @@ Um den Speicherplatz effizient zu bereinigen und gleichzeitig die erworbenen Nut
 * **Pfad**: `acp/includes/content_cleanup.php`
 * **Features**:
   * **Statistikbox**: Zeigt live die exakte Anzahl der Filme an, die beim nächsten Cronjob-Lauf gelöscht werden, sowie den exakten, freizugebenden Speicherplatz auf dem Server (in MB/GB/TB).
-  * **Interaktive Filter-Pills**: Schnelle Filterung der Datensätze nach Regel 1, Regel 2, Regel 3 und Regel 4 ohne Seiten-Reload (mittels DataTables `fnFilter`).
+  * **Interaktive Filter-Pills**: Schnelle Filterung der Datensätze nach Regel 1, Regel 2, Regel 3, Regel 4 und Regel 5 ohne Seiten-Reload (mittels DataTables `fnFilter`).
   * **Präzise Datumssortierung**: Umgehung von DataTables-Sortierungsproblemen bei deutschen Datumsformaten durch Vorschalten eines unsichtbaren Unix-Timestamps:
     `'<span style="display:none;">' . $timestamp . '</span>' . $formatted_date`
   * **Händler-/Darsteller-Zuordnung**: Auflistung des Profilnamens (Darsteller) inklusive Direktlink in das ACP-Händlerprofil.
