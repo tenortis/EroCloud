@@ -314,13 +314,64 @@ $site .= '
             }
         })
 
+        jQuery("#tabs").tabs();
+        
+        jQuery("#table_actor_movies").dataTable({
+            "bJQueryUI": true,
+            "iDisplayLength": 25,
+            "aaSorting": [[ 0, "desc" ]],
+            "oLanguage": {
+                "sProcessing":   "Bitte warten...",
+                "sLengthMenu":   "_MENU_ Einträge anzeigen",
+                "sZeroRecords":  "Keine Einträge vorhanden.",
+                "sInfo":         "_START_ bis _END_ von _TOTAL_ Einträgen",
+                "sInfoEmpty":    "0 bis 0 von 0 Einträgen",
+                "sInfoFiltered": "(gefiltert von _MAX_ Einträgen)",
+                "sSearch":       "Suchen",
+                "oPaginate": {
+                    "sFirst":    "Erster",
+                    "sPrevious": "Zurück",
+                    "sNext":     "Nächster",
+                    "sLast":     "Letzter"
+                }
+            }
+        });
+        
+        jQuery("#table_actor_albums").dataTable({
+            "bJQueryUI": true,
+            "iDisplayLength": 25,
+            "aaSorting": [[ 0, "desc" ]],
+            "oLanguage": {
+                "sProcessing":   "Bitte warten...",
+                "sLengthMenu":   "_MENU_ Einträge anzeigen",
+                "sZeroRecords":  "Keine Einträge vorhanden.",
+                "sInfo":         "_START_ bis _END_ von _TOTAL_ Einträgen",
+                "sInfoEmpty":    "0 bis 0 von 0 Einträgen",
+                "sInfoFiltered": "(gefiltert von _MAX_ Einträgen)",
+                "sSearch":       "Suchen",
+                "oPaginate": {
+                    "sFirst":    "Erster",
+                    "sPrevious": "Zurück",
+                    "sNext":     "Nächster",
+                    "sLast":     "Letzter"
+                }
+            }
+        });
+
     })
    
 // ]]>
 </script>
 
+<div id="tabs" style="margin-bottom:50px;">
+    <ul>
+        <li><a href="#tab-profile">Profil-Daten</a></li>
+        <li><a href="#tab-videos">Videos</a></li>
+        <li><a href="#tab-albums">Fotoalben</a></li>
+    </ul>
 
-<div id="site_actor" style="width:600px; margin-bottom:50px; display: inline-block;">
+    <div id="tab-profile">
+        <div id="site_actor" style="width:600px; margin-bottom:50px; display: inline-block;">
     <form action="'.ACP_URL.'/Actor/'.$actor_id.'" method="post">';
         if (isset($error) AND !empty($error)) {
             $site .= '<div class="ui-state-error" style="padding:10px; margin-bottom:10px;">'.$error.'</div>';
@@ -1025,6 +1076,154 @@ $site .= '
     </div>
 
 </div>
+</div> <!-- End of tab-profile -->
+
+<!-- Videos Tab -->
+';
+
+$rs_actor_movies = p4c_query("SELECT * FROM `movies` WHERE `actor_id`='".abs($actor_id)."' ORDER BY `id` DESC;", __FILE__, __LINE__);
+$site .= '
+<div id="tab-videos">
+    <div class="ui-widget-header" style="padding:10px; font-size:20px;">Filme von '.htmlspecialchars($actor->get("username"), ENT_QUOTES, 'UTF-8').'</div>
+    <div class="ui-widget-content" style="padding:10px; border-top:none; margin-bottom:20px;">
+        Hier sind alle Filme aufgelistet, die diesem Darsteller-Profil zugeordnet sind.
+    </div>
+
+    <table id="table_actor_movies" style="width:100%;">
+        <thead>
+            <tr>
+                <th style="width:60px;">ID</th>
+                <th style="width:50px;">Status</th>
+                <th style="width:100px;">Vorschau</th>
+                <th>Titel</th>
+                <th style="width:100px;">Preis (Coins)</th>
+                <th style="width:80px;">Dauer</th>
+                <th style="width:150px;">Veröffentlichung</th>
+                <th style="width:120px;">Aktionen</th>
+            </tr>
+        </thead>
+        <tbody>';
+
+while ($movie_obj = p4c_fetch_object($rs_actor_movies)) {
+    if ($movie_obj->status == 'active') {
+        $status_icon = '<img src="'.ACP_URL.'/images/icons/on.png" alt="" title="aktiv" class="status" />';
+    } else if ($movie_obj->status == 'blocked') {
+        $status_icon = '<img src="'.ACP_URL.'/images/icons/off.png" alt="" title="gesperrt" class="status" />';
+    } else if ($movie_obj->status == 'deleted') {
+        $status_icon = '<img src="'.ACP_URL.'/images/icons/off.png" alt="" title="gelöscht" class="status" />';
+    } else {
+        $status_icon = '<img src="'.ACP_URL.'/images/icons/off.png" alt="" title="inaktiv" class="status" />';
+    }
+    
+    $released_status = '';
+    if ($movie_obj->released == 0) {
+        $released_status = ' <span style="font-size:10px; background:#ddd; color:#333; padding:2px 5px; border-radius:3px; margin-left:5px;">Entwurf</span>';
+    } else if ($movie_obj->released == 1 && $movie_obj->movie_checked == '0000-00-00 00:00:00') {
+        $released_status = ' <span style="font-size:10px; background:#ff9900; color:#fff; padding:2px 5px; border-radius:3px; margin-left:5px;">In Prüfung</span>';
+    } else if ($movie_obj->released == 2) {
+        $released_status = ' <span style="font-size:10px; background:#ff3333; color:#fff; padding:2px 5px; border-radius:3px; margin-left:5px;">Abgelehnt</span>';
+    }
+    
+    $poster_html = '<div><img src="'.API_URL.'/PlayerPoster/FSK16/'.$movie_obj->file_id.'?w=80&cs='.$movie_obj->checksum.'" /></div>';
+    
+    $title_decoded = htmlspecialchars($movie_obj->title, ENT_QUOTES, 'UTF-8');
+    
+    $action_url = ACP_URL.'/Film-bearbeiten/'.$movie_obj->id;
+    $action_text = 'Bearbeiten';
+    if ($movie_obj->released == 1 && $movie_obj->movie_checked == '0000-00-00 00:00:00') {
+        $action_url = ACP_URL.'/Film-pruefen/'.$movie_obj->id;
+        $action_text = 'Prüfen';
+    }
+    
+    $site .= '
+        <tr>
+            <td>'.$movie_obj->id.'</td>
+            <td>'.$status_icon.'</td>
+            <td>'.$poster_html.'</td>
+            <td><a href="'.$action_url.'"><b>'.$title_decoded.'</b></a>'.$released_status.'</td>
+            <td>'.$movie_obj->amount_own.'</td>
+            <td>'.$movie_obj->playtime_string.'</td>
+            <td>'.$movie_obj->online_at.'</td>
+            <td><a class="button" href="'.$action_url.'">'.$action_text.'</a></td>
+        </tr>';
+}
+$site .= '
+        </tbody>
+    </table>
+</div>
+';
+
+// Fotoalben Tab
+$rs_actor_albums = p4c_query("SELECT * FROM `photo_albums` WHERE `actor_id`='".abs($actor_id)."' ORDER BY `id` DESC;", __FILE__, __LINE__);
+$site .= '
+<div id="tab-albums">
+    <div class="ui-widget-header" style="padding:10px; font-size:20px;">Fotoalben von '.htmlspecialchars($actor->get("username"), ENT_QUOTES, 'UTF-8').'</div>
+    <div class="ui-widget-content" style="padding:10px; border-top:none; margin-bottom:20px;">
+        Hier sind alle Fotoalben aufgelistet, die diesem Darsteller-Profil zugeordnet sind.
+    </div>
+
+    <table id="table_actor_albums" style="width:100%;">
+        <thead>
+            <tr>
+                <th style="width:60px;">ID</th>
+                <th style="width:50px;">Status</th>
+                <th style="width:100px;">Vorschau</th>
+                <th>Titel</th>
+                <th style="width:100px;">Anzahl Fotos</th>
+                <th style="width:150px;">Veröffentlichung</th>
+                <th style="width:120px;">Aktionen</th>
+            </tr>
+        </thead>
+        <tbody>';
+
+while ($album_obj = p4c_fetch_object($rs_actor_albums)) {
+    if ($album_obj->status == 'active') {
+        $status_icon = '<img src="'.ACP_URL.'/images/icons/on.png" alt="" title="aktiv" class="status" />';
+    } else if ($album_obj->status == 'blocked') {
+        $status_icon = '<img src="'.ACP_URL.'/images/icons/off.png" alt="" title="gesperrt" class="status" />';
+    } else if ($album_obj->status == 'deleted') {
+        $status_icon = '<img src="'.ACP_URL.'/images/icons/off.png" alt="" title="gelöscht" class="status" />';
+    } else {
+        $status_icon = '<img src="'.ACP_URL.'/images/icons/off.png" alt="" title="inaktiv" class="status" />';
+    }
+    
+    $released_status = '';
+    if ($album_obj->released == 0) {
+        $released_status = ' <span style="font-size:10px; background:#ddd; color:#333; padding:2px 5px; border-radius:3px; margin-left:5px;">Entwurf</span>';
+    } else if ($album_obj->released == 1 && $album_obj->album_checked == '0000-00-00 00:00:00') {
+        $released_status = ' <span style="font-size:10px; background:#ff9900; color:#fff; padding:2px 5px; border-radius:3px; margin-left:5px;">In Prüfung</span>';
+    } else if ($album_obj->released == 2) {
+        $released_status = ' <span style="font-size:10px; background:#ff3333; color:#fff; padding:2px 5px; border-radius:3px; margin-left:5px;">Abgelehnt</span>';
+    }
+    
+    $poster_html = '<div><img src="'.API_URL.'/PhotoAlbumPoster/FSK16/'.$album_obj->album_id.'?w=80&cs='.$album_obj->checksum.'" /></div>';
+    
+    $title_decoded = htmlspecialchars($album_obj->title, ENT_QUOTES, 'UTF-8');
+    
+    $action_url = ACP_URL.'/Fotoalbum-bearbeiten/'.$album_obj->id;
+    $action_text = 'Bearbeiten';
+    if ($album_obj->released == 1 && $album_obj->album_checked == '0000-00-00 00:00:00') {
+        $action_url = ACP_URL.'/Fotoalbum-pruefen/'.$album_obj->id;
+        $action_text = 'Prüfen';
+    }
+    
+    $site .= '
+        <tr>
+            <td>'.$album_obj->id.'</td>
+            <td>'.$status_icon.'</td>
+            <td>'.$poster_html.'</td>
+            <td><a href="'.$action_url.'"><b>'.$title_decoded.'</b></a>'.$released_status.'</td>
+            <td>'.$album_obj->number_of_photos.'</td>
+            <td>'.$album_obj->online_at.'</td>
+            <td><a class="button" href="'.$action_url.'">'.$action_text.'</a></td>
+        </tr>';
+}
+$site .= '
+        </tbody>
+    </table>
+</div>
+
+</div> <!-- End of tabs -->
 ';
 
 
