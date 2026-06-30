@@ -4,10 +4,29 @@ if (!defined('SAFE_INC'))
     die ("Hacking attempt...");
 
 // -----------------------------------------------------------------------------
+// 0. HILFSFUNKTIONEN
+// -----------------------------------------------------------------------------
+if (!function_exists('cleanup_get_folder_size')) {
+    function cleanup_get_folder_size($folderPath) {
+        $size = 0;
+        if (!is_dir($folderPath)) {
+            return 0;
+        }
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($folderPath, FilesystemIterator::SKIP_DOTS));
+        foreach ($iterator as $file) {
+            $size += $file->getSize();
+        }
+        return $size;
+    }
+}
+
+// -----------------------------------------------------------------------------
 // 1. REITER 1: LÖSCH-VORSCHAU (Simulationslogik)
 // -----------------------------------------------------------------------------
 $rs_deleted_movies = p4c_query("SELECT * FROM `movies` WHERE `status` = 'deleted' ORDER BY `deleted_datetime` ASC;", __FILE__, __LINE__);
 
+$upcoming_count = 0;
+$upcoming_total_size = 0;
 $preview_rows_html = '';
 while ($row = p4c_fetch_object($rs_deleted_movies)) {
     // Check purchases
@@ -96,6 +115,12 @@ while ($row = p4c_fetch_object($rs_deleted_movies)) {
     $last_view_cell = '<span style="display:none;">'.$last_view_ts.'</span>' . $last_view_date;
     $planned_cell = '<span style="display:none;">'.$planned_ts.'</span>' . $planned_date;
     
+    if ($purchases_count == 0 || $planned_ts < time()) {
+        $upcoming_count++;
+        $folder = MOVIES_PATH.'/'.$row->storage_location.'/'.$row->merchant_id.'/'.$row->id;
+        $upcoming_total_size += cleanup_get_folder_size($folder);
+    }
+    
     $preview_rows_html .= '
     <tr>
         <td>'.$row->id.'</td>
@@ -108,6 +133,17 @@ while ($row = p4c_fetch_object($rs_deleted_movies)) {
         <td>'.$planned_cell.'</td>
         <td>'.$rule.'</td>
     </tr>';
+}
+
+// Format upcoming total size
+if ($upcoming_total_size >= 1099511627776) {
+    $upcoming_size_text = number_format($upcoming_total_size / 1099511627776, 2) . ' TB';
+} elseif ($upcoming_total_size >= 1073741824) {
+    $upcoming_size_text = number_format($upcoming_total_size / 1073741824, 2) . ' GB';
+} elseif ($upcoming_total_size >= 1048576) {
+    $upcoming_size_text = number_format($upcoming_total_size / 1048576, 2) . ' MB';
+} else {
+    $upcoming_size_text = number_format($upcoming_total_size / 1024, 2) . ' KB';
 }
 
 
@@ -204,6 +240,17 @@ $site .= '
     <!-- Tab 1: Lösch-Vorschau -->
     <div id="tab-cleanup-preview">
         <div class="ui-widget-header" style="padding:10px; font-size:20px; margin-bottom:20px;">Lösch-Vorschau (Simulation der neuen Löschlogik)</div>
+        
+        <div class="ui-widget-content" style="padding: 15px; margin-bottom: 20px; border-radius: 4px; border: 1px solid #D1D1D1; background: #fcfdfd;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                <tr>
+                    <td style="width: 30%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2;">Löschung beim nächsten Cronjob-Lauf:</td>
+                    <td style="width: 20%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2; font-weight: bold; color: #ff0000;">'.$upcoming_count.' Filme</td>
+                    <td style="width: 30%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2;">Freizugebender Speicherplatz:</td>
+                    <td style="width: 20%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2; font-weight: bold; color: #d05c00;">'.$upcoming_size_text.'</td>
+                </tr>
+            </table>
+        </div>
         
         <div class="ui-widget-content" style="padding: 12px; margin-bottom: 20px; border-radius: 4px; border: 1px solid #D1D1D1; background: #fffdf6; font-size: 13px; line-height: 1.5;">
             <strong>Information zur Bereinigungs-Simulation:</strong><br />
