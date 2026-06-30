@@ -71,12 +71,27 @@ while ($row = p4c_fetch_object($rs_deleted_movies)) {
         $edit_link = '<a href="'.ACP_URL.'/Film-pruefen/'.$row->id.'"><b>'.htmlspecialchars($row->title, ENT_QUOTES, 'UTF-8').'</b></a>';
     }
     
+    // Resolve Actor/Profile name
+    $actor_name = '-';
+    if ($row->actor_id > 0) {
+        $rs_actor = p4c_query("SELECT `username` FROM `actors` WHERE `id` = '".abs($row->actor_id)."' LIMIT 1;", __FILE__, __LINE__);
+        if (p4c_num_rows($rs_actor) > 0) {
+            $actor_name = '<a href="'.ACP_URL.'/Actor/'.$row->actor_id.'" target="_blank">'.htmlspecialchars(p4c_result($rs_actor, 0), ENT_QUOTES, 'UTF-8').'</a>';
+        } else {
+            $actor_name = 'ID: '.$row->actor_id;
+        }
+    }
+
+    $online_date_fmt = ($row->online_at != '0000-00-00 00:00:00' && $row->online_at != '') ? date("d.m.Y H:i:s", strtotime($row->online_at)) : '-';
+    
     $deleted_date_fmt = ($row->deleted_datetime != '0000-00-00 00:00:00') ? date("d.m.Y H:i:s", strtotime($row->deleted_datetime)) : '-';
     
     $preview_rows_html .= '
     <tr>
         <td>'.$row->id.'</td>
         <td>'.$edit_link.'</td>
+        <td>'.$actor_name.'</td>
+        <td>'.$online_date_fmt.'</td>
         <td>'.$deleted_date_fmt.'</td>
         <td>'.$last_buy_date.'</td>
         <td>'.$last_view_date.'</td>
@@ -199,6 +214,8 @@ $site .= '
                 <tr>
                     <th style="width: 70px;">Film-ID</th>
                     <th>Filmtitel</th>
+                    <th>Profilname</th>
+                    <th>Online seit</th>
                     <th>Soft-Delete seit</th>
                     <th>Letzter Kauf</th>
                     <th>Letzter Zugriff</th>
@@ -257,13 +274,13 @@ $site .= '
             jQuery(this).addClass("active");
             
             var rule = jQuery(this).data("rule");
-            previewTable.fnFilter(rule, 6);
+            previewTable.fnFilter(rule, 8);
         });
 
         var previewTable = jQuery("#table_cleanup_preview").dataTable({
             "bJQueryUI": true,
             "iDisplayLength": 25,
-            "aaSorting": [[ 5, "asc" ]],
+            "aaSorting": [[ 7, "asc" ]],
             "oLanguage": {
                 "sSearch": "Suchen:",
                 "sLengthMenu": "_MENU_ Einträge anzeigen",
