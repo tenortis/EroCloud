@@ -372,6 +372,50 @@ if ($count_buys > 0) {
         $idx--;
     }
 }
+
+// Calculate file size
+if (file_exists($file_path)) {
+    $bytes = filesize($file_path);
+    if ($bytes >= 1073741824) {
+        $file_size_text = number_format($bytes / 1073741824, 2) . ' GB';
+    } elseif ($bytes >= 1048576) {
+        $file_size_text = number_format($bytes / 1048576, 2) . ' MB';
+    } elseif ($bytes >= 1024) {
+        $file_size_text = number_format($bytes / 1024, 2) . ' KB';
+    } else {
+        $file_size_text = $bytes . ' Bytes';
+    }
+} else {
+    $file_size_text = 'Datei existiert nicht auf dem Server';
+}
+
+// Convert status mapping
+$convert_status_map = array(
+    0 => 'Warteschlange (nicht konvertiert)',
+    1 => 'Erfolgreich konvertiert',
+    2 => 'In Konvertierung',
+    3 => 'Fehler (Konvertierung fehlgeschlagen)'
+);
+$convert_status_val = $m->field('convert_status');
+$convert_status_text = isset($convert_status_map[$convert_status_val]) ? $convert_status_map[$convert_status_val] : 'Unbekannt (Value: '.$convert_status_val.')';
+
+// Calculate convert duration
+$convert_duration_text = '-';
+if ($m->field('convert_starttime') != '0000-00-00 00:00:00' && $m->field('convert_endtime') != '0000-00-00 00:00:00' && !empty($m->field('convert_starttime')) && !empty($m->field('convert_endtime'))) {
+    $diff_seconds = strtotime($m->field('convert_endtime')) - strtotime($m->field('convert_starttime'));
+    if ($diff_seconds > 0) {
+        $hours = floor($diff_seconds / 3600);
+        $minutes = floor(($diff_seconds / 60) % 60);
+        $seconds = $diff_seconds % 60;
+        
+        $duration_parts = array();
+        if ($hours > 0) $duration_parts[] = $hours . ' Std.';
+        if ($minutes > 0) $duration_parts[] = $minutes . ' Min.';
+        if ($seconds > 0 || empty($duration_parts)) $duration_parts[] = $seconds . ' Sek.';
+        
+        $convert_duration_text = implode(' ', $duration_parts);
+    }
+}
 // ----------------------------------------------------
 
 $finded_poppers = false;
@@ -459,6 +503,7 @@ $site .= '
     <ul>
         <li><a href="#tab-edit">Bearbeiten</a></li>
         <li><a href="#tab-purchases">Käufe & Zugriffe ('.$count_buys.')</a></li>
+        <li><a href="#tab-tech">Technische Details</a></li>
     </ul>
 
     <div id="tab-edit" style="padding:0;">
@@ -1173,6 +1218,79 @@ $site .= '
             '.$buys_rows_html.'
         </tbody>
     </table>
+</div>
+
+<div id="tab-tech">
+    <div class="ui-widget-header" style="padding:10px; font-size:20px; margin-bottom:20px;">Technische Filmdetails</div>
+    
+    <div class="ui-widget-content" style="padding: 15px; border-radius: 4px; border: 1px solid #D1D1D1; background: #fcfdfd;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr>
+                <td style="width: 25%; padding: 10px 5px; border-bottom: 1px solid #e2e2e2; font-weight: bold;">Eigenschaft</td>
+                <td style="width: 75%; padding: 10px 5px; border-bottom: 1px solid #e2e2e2; font-weight: bold;">Wert</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">Film-ID (Tabelle: movies):</td>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">'.$m->field('id').'</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">Online-ID (Tabelle: movies_online):</td>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">'.($m_online->field('id') ?: '-').'</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">Eindeutige File-ID (Hash):</td>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2; font-family: monospace;">'.$m->field('file_id').'</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">Hochgeladen/Erstellt am:</td>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">'.($m->field('create_datetime') != '0000-00-00 00:00:00' && $m->field('create_datetime') != '' ? date("d.m.Y H:i:s", strtotime($m->field('create_datetime'))) : '-').'</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">Freigeschaltet am:</td>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">'.($m_online->field('released_datetime') != '0000-00-00 00:00:00' && $m_online->field('released_datetime') != '' ? date("d.m.Y H:i:s", strtotime($m_online->field('released_datetime'))) : '-').'</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">Absoluter Dateipfad:</td>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2; font-family: monospace; word-break: break-all;">'.$file_path.'</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">Dateiname:</td>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2; font-family: monospace;">'.$m_online->field('filename').'</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">Dateigröße:</td>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">'.$file_size_text.'</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">Auflösung:</td>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">'.$m_online->field('resolution').'</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">Spieldauer:</td>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">'.$m_online->field('playtime_string').' ('.$m_online->field('playtime_seconds').' Sekunden)</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">Checksumme (MD5):</td>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2; font-family: monospace;">'.$m->field('checksum').'</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">Konvertierungsstatus:</td>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">'.$convert_status_text.'</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">Konvertierungsstart:</td>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">'.($m->field('convert_starttime') != '0000-00-00 00:00:00' && $m->field('convert_starttime') != '' ? date("d.m.Y H:i:s", strtotime($m->field('convert_starttime'))) : '-').'</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">Konvertierungsende:</td>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">'.($m->field('convert_endtime') != '0000-00-00 00:00:00' && $m->field('convert_endtime') != '' ? date("d.m.Y H:i:s", strtotime($m->field('convert_endtime'))) : '-').'</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 5px;">Konvertierungsdauer:</td>
+                <td style="padding: 10px 5px;">'.$convert_duration_text.'</td>
+            </tr>
+        </table>
+    </div>
 </div>
 
 </div> <!-- End of movie_edit_tabs -->';
