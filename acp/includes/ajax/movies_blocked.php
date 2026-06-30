@@ -63,11 +63,11 @@ if (p4c_num_rows($rs_movies) > 0) {
         if ($movie_ary->status == 'active' AND $movie_ary->convert_status == 1) {
             $status = '<img src="'.ACP_URL.'/images/icons/on.png" alt="" title="aktiv" class="status" />';
         } else if ($movie_ary->status == 'blocked') {
-            $status = '<img src="'.ACP_URL.'/images/icons/off.png" alt="" title="gesperrt" class="status" />';
+            $status = '<img src="'.ACP_URL.'/images/icons/off.png" alt="" title="gesperrt" class="status" /> <span style="display:inline-block; background-color: #f0f0f0; border: 1px solid #888; color: #666; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-left:5px;">Gesperrt</span>';
         } else if ($movie_ary->status == 'deleted') {
-            $status = '<img src="'.ACP_URL.'/images/icons/off.png" alt="" title="gel&ouml;scht" class="status" />';
+            $status = '<img src="'.ACP_URL.'/images/icons/off.png" alt="" title="gel&ouml;scht" class="status" /> <span style="display:inline-block; background-color: #fde8e8; border: 1px solid #e53e3e; color: #e53e3e; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-left:5px;">Löschung</span>';
         } else {
-            $status = '<img src="'.ACP_URL.'/images/icons/off.png" alt="" title="abgeleht" class="status" />';
+            $status = '<img src="'.ACP_URL.'/images/icons/off.png" alt="" title="abgeleht" class="status" /> <span style="display:inline-block; background-color: #ffe8d6; border: 1px solid #dd8047; color: #dd8047; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-left:5px;">Abgelehnt</span>';
         }
         
         if ($movie_ary->category_master == 'porn') {

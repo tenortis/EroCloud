@@ -73,7 +73,7 @@ $site .= '
                     "aoColumns": [
                         {"sClass": "center", "sWidth":"50px", "sType": "num-html"},
                         {"sClass": "center", "sWidth":"50px", "sType": "num-html"},
-                        {"sClass": "center", "sWidth":"50px", "sType": "title-string"},
+                        {"sClass": "center", "sWidth":"110px", "sType": "title-string"},
                         {"sClass": "center", "sWidth":"150px"},
                         {"sClass": "center", "sWidth":"150px"},
                         {"sClass": "center", "sWidth":"160px"},
