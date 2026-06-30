@@ -1132,6 +1132,13 @@ while ($movie_obj = p4c_fetch_object($rs_actor_movies)) {
     $action_text = 'Bearbeiten';
     if ($movie_obj->released == 1 && $movie_obj->movie_checked == '0000-00-00 00:00:00') {
         $action_url = ACP_URL.'/Film-pruefen/'.$movie_obj->id;
+    } else {
+        $rs_online_id = p4c_query("SELECT `id` FROM `movies_online` WHERE `file_id`='".p4c_escape_string($movie_obj->file_id)."' LIMIT 1;", __FILE__, __LINE__);
+        if (p4c_num_rows($rs_online_id) > 0) {
+            $action_url = ACP_URL.'/Film-bearbeiten/'.p4c_result($rs_online_id, 0);
+        }
+    }
+    if ($movie_obj->released == 1 && $movie_obj->movie_checked == '0000-00-00 00:00:00') {
         $action_text = 'Prüfen';
     }
     
