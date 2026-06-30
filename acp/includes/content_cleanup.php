@@ -29,9 +29,12 @@ $rs_deleted_movies = p4c_query("
        OR (
            (`released` = '2' OR `status` = 'blocked')
            AND `status` != 'deleted'
-           AND `movie_checked` != '0000-00-00 00:00:00'
-           AND `movie_checked` < '".date("Y-m-d H:i:s", strtotime("-180 days"))."'
-           AND (`last_updated_datetime` = '0000-00-00 00:00:00' OR `last_updated_datetime` < '".date("Y-m-d H:i:s", strtotime("-180 days"))."')
+           AND COALESCE(
+               NULLIF(`movie_checked`, '0000-00-00 00:00:00'),
+               NULLIF(`online_at`, '0000-00-00 00:00:00'),
+               NULLIF(`create_datetime`, '0000-00-00 00:00:00'),
+               NULLIF(`last_updated_datetime`, '0000-00-00 00:00:00')
+           ) < '".date("Y-m-d H:i:s", strtotime("-180 days"))."'
        )
     ORDER BY `deleted_datetime` ASC, `id` ASC;
 ", __FILE__, __LINE__);
