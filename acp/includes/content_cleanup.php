@@ -181,7 +181,7 @@ if ($upcoming_total_size >= 1099511627776) {
 // -----------------------------------------------------------------------------
 // 2. REITER 2: LÖSCH-HISTORIE (Aus movies_deleted)
 // -----------------------------------------------------------------------------
-$rs_deleted_log = p4c_query("SELECT * FROM `movies_deleted` ORDER BY `deleted_datetime` DESC;", __FILE__, __LINE__);
+$rs_deleted_log = p4c_query("SELECT * FROM `movies_deleted` ORDER BY `deletion_logged_at` DESC;", __FILE__, __LINE__);
 $count_deleted_log = p4c_num_rows($rs_deleted_log);
 
 $total_saved_bytes = 0;
@@ -202,8 +202,8 @@ while ($log_row = p4c_fetch_object($rs_deleted_log)) {
         $size_text = $size_bytes . ' Bytes';
     }
     
-    $log_deleted_ts = ($log_row->last_updated_datetime != '0000-00-00 00:00:00' && $log_row->last_updated_datetime != '') 
-        ? strtotime($log_row->last_updated_datetime) 
+    $log_deleted_ts = ($log_row->deletion_logged_at != '0000-00-00 00:00:00' && $log_row->deletion_logged_at != '')
+        ? strtotime($log_row->deletion_logged_at)
         : strtotime($log_row->deleted_datetime);
     $log_deleted_date = date("d.m.Y H:i:s", $log_deleted_ts);
     $log_deleted_cell = '<span style="display:none;">'.$log_deleted_ts.'</span>' . $log_deleted_date;
