@@ -88,7 +88,33 @@ Um den Speicherplatz effizient zu bereinigen und gleichzeitig die erworbenen Nut
 
 ---
 
-## 4. 🖥️ Benutzeroberfläche & Bereinigungssimulation (ACP)
+## 4. ⚙️ Physischer Bereinigungs-Cronjob (`cronjobs/delete_movie.php`)
+
+Der Cronjob führt die tatsächliche, physische Bereinigung auf dem Server und in der Datenbank aus. Er wurde vollständig auf das 5-Regel-Modell umgestellt und arbeitet wie folgt:
+
+### A. Ablauf & Regel-Abarbeitung
+1. **Haupt-Abfrage (Regel 1–5):**
+   * Der Cronjob selektiert über eine präzise SQL-Abfrage alle Filme, bei denen die Karenz- bzw. Schutzfristen einer der 5 Regeln abgelaufen sind.
+   * Wenn Filme gefunden werden, werden diese nacheinander verarbeitet.
+2. **Fallback-Abfrage (Inaktivität > 6 Jahre):**
+   * Finden die 5 Regeln keine Treffer, schaltet der Cronjob auf ein Fallback-Modul um.
+   * Dieses sucht nach bis zu 10 aktiven Online-Filmen, die älter als 6 Jahre sind und bei denen seit mindestens 6 Jahren kein Kauf oder View stattfand.
+   * Dadurch wird sichergestellt, dass auch uralte, ungenutzte Online-Leichen im Hintergrund bereinigt werden.
+
+### B. Einzelverarbeitung der Löschkandidaten
+Für jeden identifizierten Löschkandidaten führt das Skript folgende Schritte aus:
+1. **Größenermittlung:** Die exakte Ordnergröße (`folder_size_bytes`) des Film-Ordners wird ermittelt.
+2. **Verzeichnislöschung:** Der Ordner `MOVIES_PATH/storage_location/merchant_id/movie_id/` wird rekursiv über `deleteFolder()` gelöscht.
+   * *Robustheit bei fehlenden Dateien:* Wenn das Verzeichnis bereits gelöscht wurde oder fehlt, gibt die Funktion sofort `true` zurück. Dadurch läuft der Cronjob stabil weiter und bereinigt auch verwaiste Datenbankleichen.
+3. **Archiv-Logging (`movies_deleted`):**
+   * Die Metadaten des Films sowie die ermittelte Byte-Größe werden in der Archivtabelle protokolliert.
+   * Das genaue Löschdatum wird über den MySQL-Default `current_timestamp()` automatisch in der Spalte `deletion_logged_at` erfasst.
+4. **Datenbankbereinigung:**
+   * Der Datensatz wird rückstandslos aus `movies`, `movies_online` und `movies_access` gelöscht.
+
+---
+
+## 5. 🖥️ Benutzeroberfläche & Bereinigungssimulation (ACP)
 
 ### A. Lösch-Vorschau-Modul (`/Content-Bereinigung`)
 * **Pfad**: `acp/includes/content_cleanup.php`
@@ -110,7 +136,7 @@ Um den Speicherplatz effizient zu bereinigen und gleichzeitig die erworbenen Nut
 
 ---
 
-## 5. ⚠️ Identifizierte Logikkonflikte & Risiken
+## 6. ⚠️ Identifizierte Logikkonflikte & Risiken
 
 Bei der Code-Analyse wurden folgende Logikkonflikte und potenzielle Probleme identifiziert:
 
