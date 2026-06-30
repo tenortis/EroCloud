@@ -1,10 +1,10 @@
 ---
 name: movie-deletion-lifecycle
-description: Umfassende Dokumentation und Analyse des Lösch-Lebenszyklus von Filmen in EroCloud sowie Aufzählung von Logikkonflikten.
+description: Umfassende Dokumentation und Analyse des Lösch-Lebenszyklus von Filmen in EroCloud sowie Aufzählung von Logikkonflikten und Bereinigungseinstellungen.
 usage: 'Referenz für Arbeiten an der Löschlogik im MCP, ACP und in Cronjobs.'
 ---
 
-# 🗑️ Lösch-Lebenszyklus von Filmen (Movie Deletion Lifecycle)
+# 🎥 Lösch-Lebenszyklus von Filmen (Movie Deletion Lifecycle)
 
 Dieses Dokument beschreibt die Mechanismen, Regeln und Abläufe beim Löschen von Filmen im gesamten EroCloud-System. Es unterteilt sich in die verschiedenen Löschpfade, die physische Bereinigung per Cronjob und eine Analyse von identifizierten Logikkonflikten im aktuellen System.
 
@@ -21,7 +21,7 @@ Das Löschen von Filmen interagiert mit folgenden Datenbank-Tabellen:
 
 ---
 
-## 2. 🛣️ Die drei Löschpfade (Delete Pathways)
+## 2. 🔀 Die drei ursprünglichen Löschpfade (Delete Pathways)
 
 Im System existieren drei unterschiedliche Wege, wie Filme gelöscht werden:
 
@@ -57,42 +57,62 @@ Im System existieren drei unterschiedliche Wege, wie Filme gelöscht werden:
 
 ---
 
-## 3. 🧹 Asynchrones Aufräumen & Archivieren (Cronjob)
-Der Cronjob `cronjobs/delete_movie.php` läuft im Hintergrund und übernimmt das physische Löschen für Soft-deleted und inaktive Filme.
+## 3. 🛡️ Die neue optimierte Löschlogik (Best Practice)
+Um den Speicherplatz effizient zu bereinigen und gleichzeitig die erworbenen Nutzungsrechte von Kunden zu schützen, wurde eine differenzierte Schutzfristen-Logik entwickelt. Diese wird in der **Lösch-Vorschau** (`acp/includes/content_cleanup.php`) simuliert:
 
-### Ablauf:
-1. **Zielgruppen-Bestimmung**:
-   * **Gruppe 1**: Filme mit `status = 'deleted'` und (`deleted_datetime = '0000-00-00 00:00:00'` ODER `deleted_datetime < 1 Jahr`).
-   * **Gruppe 2 (Bei Inaktivität)**: Wenn keine Filme aus Gruppe 1 vorhanden sind, greift die automatische Speicherplatz-Optimierung. Es werden bis zu 10 Filme gelöscht, die älter als 6 Jahre sind (`online_at < -6 years`) und auf die in den letzten 6 Jahren kein Zugriff/Kauf stattfand (`movies_access.access_token_datetime < -6 years`).
-2. **Archivierung & Löschung**:
-   * Die Gesamtgröße des Ordners wird ermittelt (`getFolderSize`).
-   * Der Ordner unter `MOVIES_PATH/...` wird rekursiv gelöscht.
-   * Der Datensatz wird in die Logtabelle `movies_deleted` verschoben (INSERT SELECT):
-     ```sql
-     INSERT INTO movies_deleted (..., folder_size_bytes, deleted_by)
-     SELECT m.*, [folder_size] AS folder_size_bytes, 'cronjob' AS deleted_by
-     FROM movies m WHERE m.id = [movie_id]
-     ```
-   * Die Datensätze werden aus `movies_access`, `movies` und `movies_online` gelöscht.
+### Regel 1: Nie gekauft
+* **Zielgruppe**: Filme im Status `deleted`, die **nie gekauft** wurden (`movies_access`-Einträge = 0).
+* **Frist**: **Sofortige physische Löschung** beim nächsten Cronjob-Lauf (0 Tage Wartezeit).
+
+### Regel 2: Inaktiv (> 2 Jahre)
+* **Zielgruppe**: Filme im Status `deleted`, die zwar gekauft wurden, deren letzter Kauf und letzter Video-View jedoch **über 2 Jahre zurückliegen**.
+* **Frist**: **30 Tage Wartezeit** nach der Vormerkung (Soft-Delete) als Sicherheitskarenzzeit.
+
+### Regel 3: Aktiv (< 2 Jahre)
+* **Zielgruppe**: Filme im Status `deleted`, bei denen innerhalb der letzten 2 Jahre ein Kauf oder ein View stattfand.
+* **Frist**: **365 Tage Wartezeit** ab dem Soft-Delete-Datum (1 Jahr Download- & Streaming-Garantie für aktive Kunden).
+
+### Regel 4: Alt & Abgelehnt (> 180 Tage)
+* **Zielgruppe**: Filme im Status *Abgelehnt* (`released = 2`) oder *Gesperrt* (`status = 'blocked'`), die nicht gelöscht wurden, aber seit **über 180 Tagen (6 Monaten) inaktiv** sind.
+* **Frist**: **Sofortige physische Löschung** (da sie nie online waren und nie gekauft werden konnten).
+* **Kaskadierende Altersprüfung**: Da bei älteren abgelehnten Filmen das Prüfdatum (`movie_checked`) manchmal den Standardwert `'0000-00-00 00:00:00'` besitzt, ermittelt das System das Alter dynamisch über den ersten befüllten Wert aus folgender Kaskade:
+  1. `movie_checked` (Prüfdatum)
+  2. `online_at` (Geplantes Online-Datum)
+  3. `create_datetime` (Erstellungsdatum)
+  4. `last_updated_datetime` (Letzte Bearbeitung)
 
 ---
 
-## 4. 🛑 Identifizierte Logikkonflikte & Risiken
+## 4. 🖥️ Benutzeroberfläche & Bereinigungssimulation (ACP)
+
+### A. Lösch-Vorschau-Modul (`/Content-Bereinigung`)
+* **Pfad**: `acp/includes/content_cleanup.php`
+* **Features**:
+  * **Statistikbox**: Zeigt live die exakte Anzahl der Filme an, die beim nächsten Cronjob-Lauf gelöscht werden, sowie den exakten, freizugebenden Speicherplatz auf dem Server (in MB/GB/TB).
+  * **Interaktive Filter-Pills**: Schnelle Filterung der Datensätze nach Regel 1, Regel 2, Regel 3 und Regel 4 ohne Seiten-Reload (mittels DataTables `fnFilter`).
+  * **Präzise Datumssortierung**: Umgehung von DataTables-Sortierungsproblemen bei deutschen Datumsformaten durch Vorschalten eines unsichtbaren Unix-Timestamps:
+    `'<span style="display:none;">' . $timestamp . '</span>' . $formatted_date`
+  * **Händler-/Darsteller-Zuordnung**: Auflistung des Profilnamens (Darsteller) inklusive Direktlink in das ACP-Händlerprofil.
+
+### B. Überarbeitung der Blockierten Filme (`/gesperrte-Filme`)
+* **Pfad**: `acp/includes/movies_blocked.php` (und AJAX-Schnittstelle)
+* **Features**:
+  * **Statustext-Badges**: Eindeutige Kennzeichnung des Filmstatus per Badge direkt neben dem roten Deaktivierungs-Icon:
+    * `Löschung` (Rot) für soft-gelöschte Filme.
+    * `Abgelehnt` (Orange) für abgelehnte Filme.
+    * `Gesperrt` (Grau) für manuell gesperrte Filme.
+  * **Bearbeitungsdatum-Spalte**: Zeigt über die neue Spalte "Bearbeitet am" das genaue Datum der letzten Statusänderung an (gelöscht am / geprüft am).
+
+---
+
+## 5. ⚠️ Identifizierte Logikkonflikte & Risiken
 
 Bei der Code-Analyse wurden folgende Logikkonflikte und potenzielle Probleme identifiziert:
 
-### ⚠️ Konflikt 1: MCP-Löschung umgeht den Kundenschutz für bereits gekaufte Filme
-* **Problem**: Wenn ein Admin einen Film oder ein Profil löscht, wird dies als **Soft-Delete** durchgeführt. Die Begründung im UI lautet: *"Bereits gekaufte Filme werden nicht gelöscht und stehen dem Kunden weiterhin zur Verfügung."* Der Cronjob stellt sicher, dass diese Filme erst nach 1 Jahr gelöscht werden (Karenzzeit für Downloads/Streaming).
-* **Konflikt**: Löscht ein Merchant (Creator) seinen Film über das MCP (`mcp/includes/movie.php`), wird das Verzeichnis **sofort physisch gelöscht** und die DB-Einträge entfernt. Kunden, die diesen Film bereits rechtmäßig erworben haben, verlieren augenblicklich und ohne Vorwarnung den Zugriff auf ihren bezahlten Content.
+### ⚡ Konflikt 1: MCP-Löschung umgeht den Kundenschutz für bereits gekaufte Filme
+* **Problem**: Wenn ein Admin einen Film oder ein Profil löscht, wird dies als **Soft-Delete** durchgeführt. Der Cronjob stellt sicher, dass diese Filme erst nach Ablauf der Schutzfristen gelöscht werden.
+* **Konflikt**: Löscht ein Merchant (Creator) seinen Film über das MCP (`mcp/includes/movie.php`), wird das Verzeichnis **sofort physisch gelöscht** und die DB-Einträge entfernt. Kunden, die diesen Film bereits rechtmäßig erworben haben, verlieren augenblicklich den Zugriff auf ihren bezahlten Content.
 
-### ⚠️ Konflikt 2: Fehlendes Archiv-Log bei MCP-Löschung
+### ⚡ Konflikt 2: Fehlendes Archiv-Log bei MCP-Löschung
 * **Problem**: Der Cronjob verschiebt gelöschte Filme vor dem Löschen in die Tabelle `movies_deleted`, um den Vorgang zu protokollieren.
-* **Konflikt**: Wenn der Händler den Film im MCP löscht, wird der Eintrag direkt per SQL-`DELETE` entfernt. Es findet **kein Eintrag in `movies_deleted`** statt. Bei Support-Anfragen von Kunden bezüglich verschwundener Filme fehlt jegliche Historie, wann und von wem der Film gelöscht wurde.
-
-### ⚠️ Konflikt 3: Sofortiges Löschen bei Standard-Timestamp (`0000-00-00 00:00:00`)
-* **Problem**: Die Cronjob-Bedingung löscht Filme sofort, wenn `deleted_datetime` den Standardwert `'0000-00-00 00:00:00'` aufweist.
-* **Konflikt**: Sollte bei einer Soft-Löschung (z. B. durch ein Update-Statement oder DB-Standardwerte) `deleted_datetime` nicht korrekt befüllt werden, greift die 1-jährige Schutzfrist nicht. Der Film wird sofort beim nächsten Cron-Durchlauf vernichtet.
-
-### ⚠️ Konflikt 4: Code-Duplizierung
-* **Problem**: Die Funktion `delete_directory()` ist in `mcp/includes/movie.php` und `mcp/includes/movie_upload.php` redundant deklariert.
-* **Konflikt**: Änderungen an der Löschlogik (z. B. Behebung des Konflikts 1) müssen an mehreren Stellen nachgezogen werden, was die Fehleranfälligkeit erhöht.
+* **Konflikt**: Wenn der Händler den Film im MCP löscht, wird der Eintrag direkt per SQL-`DELETE` entfernt. Es findet **kein Eintrag in `movies_deleted`** statt. Bei Support-Anfragen von Kunden bezüglich verschwundener Filme fehlt jegliche Historie.

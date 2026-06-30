@@ -1,10 +1,10 @@
 ---
 name: video-management
-description: Detaillierte Dokumentation über den Video-Lebenszyklus von Upload, Konvertierung, Freigabe bis Archivierung.
+description: Detaillierte Dokumentation über den Video-Lebenszyklus von Upload, Konvertierung, Freigabe, Speichernutzung bis Archivierung.
 usage: 'Referenz für Arbeiten am Videoupload, FFmpeg-Konvertierungen und der ACP-Videoprüfung.'
 ---
 
-# 🎥 Video-Verwaltung (Video Lifecycle)
+# 📹 Video-Verwaltung (Video Lifecycle)
 
 Dieses Dokument beschreibt im Detail den gesamten Lebenslauf eines Videos (Filmes) in EroCloud: vom Upload durch den Creator über die Konvertierung und Admin-Prüfung bis hin zur Archivierung und physischen Löschung.
 
@@ -16,6 +16,10 @@ Dieses Dokument beschreibt im Detail den gesamten Lebenslauf eines Videos (Filme
 * **Physischer Speicherpfad**: 
   `c:\xampp\htdocs\cloud_storage\[merchant_id]\[movie_id]/`
 * **Hintergrund**: Die Ablage im Webroot (`cloud_storage/`) ermöglicht eine direkte Auslieferung und das Streaming der optimierten Mediendateien über den Webserver (Apache/Nginx).
+
+### Speicherplatz-Auslesung bei Online-Filmen (`/Filme-online`)
+* Um die Serverauslastung zu minimieren, wird der gesamte belegte Speicherplatz aller veröffentlichten Videos über einen **24-Stunden-Cache** zwischengespeichert.
+* Administratoren können eine Echtzeit-Neuberechnung über die Schaltfläche **`[Größe neu berechnen]`** erzwingen (Parameter `?recalc_size=1`).
 
 ---
 
@@ -56,13 +60,13 @@ Ein Hintergrund-Cronjob kümmert sich um die automatische Aufbereitung der Video
 
 ## 4. 🖼️ Vorschaubilder und Custom Covers (MCP)
 Nach der Konvertierung kann der Händler das Video bearbeiten (`mcp/includes/movie.php`):
-* **Thumbnail-Auswahl**: Der Händler wählt aus den 10 extrahierten Thumbnails jeweils eines für die FSK16- und FSK18-Vorschau aus. Dies wird als Zahl (1–10) in den Spalten `preview_image_fsk16`/`preview_image_fsk18` der Tabelle `movies` gespeichert.
+* **Thumbnail-Auswahl**: Der Händler wählt aus den 10 extrahierten Thumbnails jeweils eines für die FSK16- und FSK18-Vorschau aus. Dies wird als Zahl (1-10) in den Spalten `preview_image_fsk16`/`preview_image_fsk18` der Tabelle `movies` gespeichert.
 * **Custom Poster Upload**: Lädt der Händler eigene Vorschaubilder hoch (`mcp/includes/uploader/upload_movie_poster.php`), werden diese als `thumb_[movie_id]_[file_id]_11.[ext]` (FSK16) bzw. `_12.[ext]` (FSK18) im Videoordner gespeichert.
 * **Freigabe**: Das Speichern setzt `released = '1'` (zur Prüfung freigegeben) und `movie_checked = '0000-00-00 00:00:00'`, wodurch das Video dem Administrator zur Prüfung vorgelegt wird.
 
 ---
 
-## 5. 🛡️ Prüfung und Freischaltung (ACP)
+## 5. 🔍 Prüfung und Freischaltung (ACP)
 Ein Administrator prüft das Video im **Admin Control Panel (ACP)**:
 
 * **Listenansicht**: `acp/includes/movies_checking.php` (AJAX-Quelle: `acp/includes/ajax/movies_checking.php`).
@@ -70,21 +74,24 @@ Ein Administrator prüft das Video im **Admin Control Panel (ACP)**:
 * **Prüfungsseite**: `acp/includes/movie_checking.php`.
   * Der Admin kann alle Metadaten anpassen, die FSK16/18 Covers ändern und die Vorschau-Länge definieren.
   * **Freischaltung (Status active)**: Setzt `status = 'active'`, `movie_checked = current_datetime` und fügt das Video in die Tabelle `movies_online` ein. Erst hierdurch ist das Video auf den Frontend-Webseiten sichtbar.
-  * **Ablehnung (Rejection)**: Der Admin wählt einen Ablehnungsgrund aus der Tabelle `rejection_reason_movie` aus.
+  * **Ablehnung (Rejection)**: Der Admin wählt einen Ablehnungsgrund aus.
     * Der Status `released` wird auf `2` (abgelehnt) gesetzt.
     * Der Grund wird in der Tabelle `rejection_reason_movie_history` geloggt.
-    * **Automatische Ablehnung**: Fehlt dem Video ein zugeordneter Hauptdarsteller (`actor_id = 0`), lehnt das System das Video beim Aufruf automatisch mit dem Grund `no_actor_selected` ab.
+* **Fehlersuche & Archivierung (`/gesperrte-Filme`)**:
+  * Abgelehnte, blockierte und gelöschte Filme werden gesammelt aufgelistet.
+  * Farbige Badges (`Löschung`, `Abgelehnt`, `Gesperrt`) und eine neue Spalte "Bearbeitet am" erlauben eine direkte Zuweisung des aktuellen Status und Änderungszeitpunkts.
 
 ---
 
-## 6. 🧹 Löschen und Archivieren
-Das Löschen von Videos erfolgt physisch im Hintergrund, um Dateileichen zu vermeiden:
+## 6. 🗑️ Löschen und Archivieren
+Um alte, nicht mehr genutzte Inhalte zu bereinigen, greifen nach Freigabe des neuen Cronjobs folgende Schutzfristen (simuliert unter `/Content-Bereinigung`):
+* **Regel 1 (Nie gekauft)**: Sofortige Löschung nach Soft-Delete.
+* **Regel 2 (Inaktiv > 2 Jahre)**: Löschung nach 30 Tagen Karenzzeit ab Soft-Delete.
+* **Regel 3 (Aktiv < 2 Jahre)**: Löschung nach 365 Tagen ab Soft-Delete (Kundenrechte-Schutz).
+* **Regel 4 (Alt & Abgelehnt > 180 Tage)**: Sofortige Löschung von ungenutzten abgelehnten Film-Entwürfen, die seit 6 Monaten nicht mehr bearbeitet wurden.
 
-* **Pfad**: `cronjobs/delete_movie.php`.
-* **Ablauf**:
-  * Der Cronjob sucht nach:
-    1. Videos, die den Status `status = 'deleted'` haben (z.B. durch Händler gelöscht oder durch Darsteller-Löschung kaskadiert).
-    2. Alten Videos (`online_at` älter als 6 Jahre), auf die seit mindestens 6 Jahren kein Zugriff (`movies_access`) mehr stattgefunden hat (automatische Bereinigung).
-  * Berechnet die Ordnergröße und löscht den physischen Ordner des Videos unter `MOVIES_PATH`.
-  * Schreibt einen Logeintrag in die Archivtabelle `movies_deleted` (inklusive Dateigröße).
-  * Löscht die Tabelleneinträge aus `movies_access`, `movies` und `movies_online`.
+Bei der physischen Bereinigung durch den Cronjob (`cronjobs/delete_movie.php`):
+* Wird die Gesamtgröße des Video-Ordners ermittelt.
+* Wird der physische Ordner gelöscht.
+* Wird ein Eintrag in `movies_deleted` mit der freigegebenen Byte-Größe zur Protokollierung geschrieben.
+* Werden alle Bezüge in `movies`, `movies_online` und `movies_access` bereinigt.
