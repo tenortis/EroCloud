@@ -137,6 +137,37 @@ if ($total_saved_bytes >= 1099511627776) {
 
 // Build the page output HTML
 $site .= '
+<style type="text/css">
+.filter-pills-container {
+    margin-bottom: 20px;
+    padding: 10px;
+    background: #fdfdfd;
+    border: 1px solid #d1d1d1;
+    border-radius: 4px;
+    font-size: 13px;
+}
+.filter-pill {
+    display: inline-block;
+    padding: 5px 12px;
+    margin-left: 8px;
+    border-radius: 15px;
+    border: 1px solid #ccc;
+    background-color: #f6f6f6;
+    color: #333;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.filter-pill:hover {
+    opacity: 0.8;
+}
+.filter-pill.active {
+    font-weight: bold;
+    box-shadow: 0 0 5px rgba(0,0,0,0.15);
+    border-width: 2px;
+}
+</style>
+
 <div id="content_cleanup_tabs" style="margin-top: 10px;">
     <ul>
         <li><a href="#tab-cleanup-preview">Lösch-Vorschau</a></li>
@@ -153,6 +184,14 @@ $site .= '
             1. <strong>Regel 1 (Nie gekauft):</strong> Sofortige physische Löschung.<br />
             2. <strong>Regel 2 (Inaktiv - Kauf & View > 2 Jahre her):</strong> Physische Löschung 30 Tage nach Markierung als gelöscht.<br />
             3. <strong>Regel 3 (Aktiv - Kauf/View < 2 Jahre her):</strong> Standard-Löschung nach 365 Tagen ab Löschdatum.
+        </div>
+
+        <div class="filter-pills-container" style="margin-bottom: 15px;">
+            <strong>Regel filtern:</strong>
+            <span class="filter-pill active" data-rule="">Alle anzeigen</span>
+            <span class="filter-pill" data-rule="Regel 1" style="background-color: #ffd2b2; border-color: #d05c00; color: #d05c00;">Regel 1: Nie gekauft</span>
+            <span class="filter-pill" data-rule="Regel 2" style="background-color: #d2eaf4; border-color: #1c94c4; color: #1c94c4;">Regel 2: Inaktiv (> 2 Jahre)</span>
+            <span class="filter-pill" data-rule="Regel 3" style="background-color: #e5e5e5; border-color: #666; color: #333;">Regel 3: Aktiv (< 2 Jahre)</span>
         </div>
 
         <table id="table_cleanup_preview" style="width: 100%;">
@@ -211,6 +250,16 @@ $site .= '
     jQuery(document).ready(function() {
         jQuery("#content_cleanup_tabs").tabs();
         
+        var previewTable = jQuery("#table_cleanup_preview").DataTable();
+        
+        jQuery(".filter-pill").click(function() {
+            jQuery(".filter-pill").removeClass("active");
+            jQuery(this).addClass("active");
+            
+            var rule = jQuery(this).data("rule");
+            previewTable.column(6).search(rule).draw();
+        });
+
         jQuery("#table_cleanup_preview").dataTable({
             "bJQueryUI": true,
             "iDisplayLength": 25,
