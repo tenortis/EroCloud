@@ -250,7 +250,7 @@ $site .= '
     jQuery(document).ready(function() {
         jQuery("#content_cleanup_tabs").tabs();
         
-        var previewTable = jQuery("#table_cleanup_preview").DataTable();
+
         
         jQuery(".filter-pill").click(function() {
             jQuery(".filter-pill").removeClass("active");
@@ -260,7 +260,7 @@ $site .= '
             previewTable.column(6).search(rule).draw();
         });
 
-        jQuery("#table_cleanup_preview").dataTable({
+        var previewTable = jQuery("#table_cleanup_preview").DataTable({
             "bJQueryUI": true,
             "iDisplayLength": 25,
             "aaSorting": [[ 5, "asc" ]],
