@@ -24,7 +24,7 @@ function private_substr($str, $len=20) {
     return $str;    
 }
 
-$rs_movies = p4c_query("SELECT `id`, `file_id`, `merchant_id`, `actor_id`, `checksum`, `title`, `online_at`, `status`, `convert_status`, `movie_language`, `category_master` FROM `movies` WHERE `convert_status` > '1' AND (`released`='2' OR `status`!='active') ORDER BY `id` DESC;", __FILE__, __LINE__);
+$rs_movies = p4c_query("SELECT `id`, `file_id`, `merchant_id`, `actor_id`, `checksum`, `title`, `online_at`, `status`, `convert_status`, `movie_language`, `category_master`, `movie_checked`, `deleted_datetime`, `last_updated_datetime` FROM `movies` WHERE `convert_status` > '1' AND (`released`='2' OR `status`!='active') ORDER BY `id` DESC;", __FILE__, __LINE__);
 if (p4c_num_rows($rs_movies) > 0) {
     $output = array(
     	"sEcho" => 0,
@@ -96,7 +96,26 @@ if (p4c_num_rows($rs_movies) > 0) {
         $row[] = $status;
         $row[] = '<div><img src="'.API_URL.'/PlayerPoster/FSK16/'.$movie_ary->file_id.'?w=100&cs='.$movie_ary->checksum.'" /></div><div><img src="'.API_URL.'/PlayerPoster/FSK18/'.$movie_ary->file_id.'?w=100&cs='.$movie_ary->checksum.'" /></div>';
         $row[] = $actor;
-        $row[] = $movie_ary->online_at;
+        
+        $online_ts = ($movie_ary->online_at != '0000-00-00 00:00:00' && $movie_ary->online_at != '') ? strtotime($movie_ary->online_at) : 0;
+        $online_date_cell = '<span style="display:none;">'.$online_ts.'</span>' . (($online_ts > 0) ? date("d.m.Y H:i:s", $online_ts) : '-');
+        $row[] = $online_date_cell;
+        
+        $action_ts = 0;
+        if ($movie_ary->status == 'deleted') {
+            if ($movie_ary->deleted_datetime != '0000-00-00 00:00:00') {
+                $action_ts = strtotime($movie_ary->deleted_datetime);
+            }
+        } else {
+            if ($movie_ary->movie_checked != '0000-00-00 00:00:00') {
+                $action_ts = strtotime($movie_ary->movie_checked);
+            } elseif ($movie_ary->last_updated_datetime != '0000-00-00 00:00:00') {
+                $action_ts = strtotime($movie_ary->last_updated_datetime);
+            }
+        }
+        $action_date_cell = '<span style="display:none;">'.$action_ts.'</span>' . (($action_ts > 0) ? date("d.m.Y H:i:s", $action_ts) : '-');
+        $row[] = $action_date_cell;
+        
         $row[] = $movie_language_ary[$movie_ary->movie_language];
         $row[] = $category_master;
         $row[] = '<a href="'.ACP_URL.'/Film-pruefen/'.$movie_ary->id.'">'.utf8_decode($title).'</a>';

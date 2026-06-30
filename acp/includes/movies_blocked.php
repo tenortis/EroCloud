@@ -77,6 +77,7 @@ $site .= '
                         {"sClass": "center", "sWidth":"150px"},
                         {"sClass": "center", "sWidth":"150px"},
                         {"sClass": "center", "sWidth":"160px"},
+                        {"sClass": "center", "sWidth":"160px"},
                         {"sClass": "center", "sWidth":"50px"},
                         {"sClass": "center", "sWidth":"50px"},
                         {"sClass": "left", "sWidth":"auto"}
@@ -113,6 +114,7 @@ $site .= '
                     <th>Vorschaubilder</th>
                     <th>Darsteller</th>
                     <th>Geht online am</th>
+                    <th>Bearbeitet am</th>
                     <th>Filmsprache</th>
                     <th>Hauptkat.</th>
                     <th style="text-align:left;">Filmtitel</th>
