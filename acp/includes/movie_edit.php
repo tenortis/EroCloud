@@ -307,6 +307,73 @@ if (isset($_POST['save_movie'])) {
     }
 }
 
+// ----------------------------------------------------
+// Purchases & Access statistics calculation
+// ----------------------------------------------------
+$rs_buys = p4c_query("SELECT * FROM `movies_access` WHERE `movie_id`='".p4c_escape_string($m_online->field('file_id'))."' ORDER BY `buy_timestamp` DESC;", __FILE__, __LINE__);
+$count_buys = p4c_num_rows($rs_buys);
+
+$total_price = 0;
+$total_commission = 0;
+$count_streaming = 0;
+$count_download = 0;
+$last_buy = '-';
+$last_view = '-';
+
+$buys_rows_html = '';
+if ($count_buys > 0) {
+    $idx = $count_buys;
+    while ($buy_obj = p4c_fetch_object($rs_buys)) {
+        $total_price += $buy_obj->movie_price;
+        $total_commission += $buy_obj->actor_commision;
+        
+        if ($buy_obj->buy_as == 'streaming') {
+            $count_streaming++;
+        } else if ($buy_obj->buy_as == 'download') {
+            $count_download++;
+        }
+        
+        if ($last_buy == '-') {
+            $last_buy = date("d.m.Y H:i:s", strtotime($buy_obj->buy_timestamp));
+        }
+        
+        if ($buy_obj->access_token_datetime != '0000-00-00 00:00:00' && !empty($buy_obj->access_token_datetime)) {
+            $view_time = date("d.m.Y H:i:s", strtotime($buy_obj->access_token_datetime));
+            if ($last_view == '-') {
+                $last_view = $view_time;
+            }
+        } else {
+            $view_time = '-';
+        }
+        
+        // Resolve user
+        $rs_user = p4c_query("SELECT `username` FROM `members` WHERE `id`='".abs($buy_obj->user_id)."' LIMIT 1;", __FILE__, __LINE__);
+        $username = (p4c_num_rows($rs_user) > 0) ? p4c_result($rs_user, 0) : 'ID: '.$buy_obj->user_id;
+        $user_link = '<a href="'.ACP_URL.'/User/'.$buy_obj->user_id.'" target="_blank">'.htmlspecialchars($username, ENT_QUOTES, 'UTF-8').'</a>';
+        
+        // Resolve shop
+        $rs_shop = p4c_query("SELECT `domain` FROM `sites` WHERE `p4c_shop_id`='".abs($buy_obj->shop_id)."' LIMIT 1;", __FILE__, __LINE__);
+        $shop_domain = (p4c_num_rows($rs_shop) > 0) ? p4c_result($rs_shop, 0) : 'Shop: '.$buy_obj->shop_id;
+        $shop_link = '<a href="'.ACP_URL.'/Site/'.htmlspecialchars($shop_domain, ENT_QUOTES, 'UTF-8').'" target="_blank">'.htmlspecialchars($shop_domain, ENT_QUOTES, 'UTF-8').'</a>';
+        
+        $buy_type = ($buy_obj->buy_as == 'streaming') ? 'Streaming' : 'Download';
+        
+        $buys_rows_html .= '
+        <tr>
+            <td>'.$idx.'</td>
+            <td>'.date("d.m.Y H:i:s", strtotime($buy_obj->buy_timestamp)).'</td>
+            <td>'.$user_link.'</td>
+            <td>'.$shop_link.'</td>
+            <td>'.$buy_type.'</td>
+            <td>'.$buy_obj->movie_price.' Coins</td>
+            <td>'.$buy_obj->actor_commision.' Coins ('.$buy_obj->actor_commision_percent.'%)</td>
+            <td>'.$view_time.'</td>
+        </tr>';
+        $idx--;
+    }
+}
+// ----------------------------------------------------
+
 $finded_poppers = false;
 $category_ary = explode(',', $movie['category_slave']);
 $rs_movie_categories = p4c_query("SELECT * FROM `movie_categories` WHERE `category_group`='fetish' ORDER BY `name_id` ASC;",__FILE__,__LINE__);
@@ -388,10 +455,16 @@ $site .= '
 -->
 </style>
 
-<form action="" method="post">
+<div id="movie_edit_tabs">
+    <ul>
+        <li><a href="#tab-edit">Bearbeiten</a></li>
+        <li><a href="#tab-purchases">Käufe & Zugriffe ('.$count_buys.')</a></li>
+    </ul>
 
-    <div style="width:600px; float:left;">
-        <div class="ui-widget-header" style="padding:10px; font-size:20px; margin-bottom:20px;">Film bearbeiten</div> ';
+    <div id="tab-edit" style="padding:0;">
+        <form action="" method="post">
+            <div style="width:600px; float:left;">
+                <div class="ui-widget-header" style="padding:10px; font-size:20px; margin-bottom:20px;">Film bearbeiten</div> ';
         if (isset($error) AND !empty($error)) {
             $site .= '<div class="ui-state-error" style="padding:10px; margin:10px 0;">'.$error.'</div>';
         }
@@ -405,6 +478,7 @@ $site .= '
         <script type="text/javascript">
         // <![CDATA[
             jQuery(document).ready(function() {
+                jQuery("#movie_edit_tabs").tabs();
                 jQuery(".group1").colorbox({photo:true, rel:"group1", maxWidth:"100%", width:"auto", maxHeight:"80%"});
                 
                 jQuery.fn.preis_je_sekunde = function() {
@@ -442,6 +516,26 @@ $site .= '
                         jQuery("#alert_status_mess").html("ACHTUNG!<br />Sofern der Film noch nicht gekauft wurde, wird er unwiderruflich gel&ouml;scht. Sollte er bereits gekaufte worden sein, wird er nur nicht mehr angezeigt und stehen den Kunden, die diesen Film gekauft haben, weiterhin zur Verf&uuml;gung.");
                     }
                 })
+
+                jQuery("#table_movie_purchases").dataTable({
+                    "bJQueryUI": true,
+                    "iDisplayLength": 25,
+                    "aaSorting": [[ 1, "desc" ]],
+                    "oLanguage": {
+                        "sSearch": "Suchen:",
+                        "sLengthMenu": "_MENU_ Einträge anzeigen",
+                        "sInfo": "Zeige _START_ bis _END_ von _TOTAL_ Einträgen",
+                        "sInfoEmpty": "Keine Einträge vorhanden",
+                        "sInfoFiltered": "(gefiltert aus _MAX_ Einträgen)",
+                        "sZeroRecords": "Keine passenden Einträge gefunden",
+                        "oPaginate": {
+                            "sFirst": "Erste",
+                            "sLast": "Letzte",
+                            "sNext": "Nächste",
+                            "sPrevious": "Zurück"
+                        }
+                    }
+                });
 
             })
 
@@ -1033,5 +1127,53 @@ $site .= '
             $site .= '
         </div>
     </div>
-</form>';
+</form>
+</div> <!-- End of tab-edit -->
+
+<div id="tab-purchases">
+    <div class="ui-widget-header" style="padding:10px; font-size:20px; margin-bottom:20px;">Käufe & Zugriffe für '.htmlspecialchars($movie['title'], ENT_QUOTES, 'UTF-8').'</div>
+    
+    <div class="ui-widget-content" style="padding: 15px; margin-bottom: 20px; border-radius: 4px; border: 1px solid #D1D1D1; background: #fcfdfd;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr>
+                <td style="width: 25%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2;">Käufe Gesamt:</td>
+                <td style="width: 25%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2; font-weight: bold; color: #1c94c4;">'.$count_buys.'x</td>
+                <td style="width: 25%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2;">Zuletzt gekauft am:</td>
+                <td style="width: 25%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2; font-weight: bold;">'.$last_buy.'</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px 5px; border-bottom: 1px solid #e2e2e2;">Gesamteinnahmen (Coins):</td>
+                <td style="padding: 8px 5px; border-bottom: 1px solid #e2e2e2; font-weight: bold; color: #008000;">'.$total_price.' Coins</td>
+                <td style="padding: 8px 5px; border-bottom: 1px solid #e2e2e2;">Zuletzt angeschaut am:</td>
+                <td style="padding: 8px 5px; border-bottom: 1px solid #e2e2e2; font-weight: bold;">'.$last_view.'</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px 5px;">Provision Creator (Coins):</td>
+                <td style="padding: 8px 5px; font-weight: bold; color: #d05c00;">'.$total_commission.' Coins</td>
+                <td style="padding: 8px 5px;">Streaming / Download:</td>
+                <td style="padding: 8px 5px; font-weight: bold;">'.$count_streaming.' / '.$count_download.'</td>
+            </tr>
+        </table>
+    </div>
+
+    <table id="table_movie_purchases" style="width: 100%;">
+        <thead>
+            <tr>
+                <th style="width: 50px;">#</th>
+                <th>Kaufdatum</th>
+                <th>Benutzer</th>
+                <th>Shop / Webseite</th>
+                <th>Typ</th>
+                <th>Preis</th>
+                <th>Provision Creator</th>
+                <th>Letzter Zugriff</th>
+            </tr>
+        </thead>
+        <tbody>
+            '.$buys_rows_html.'
+        </tbody>
+    </table>
+</div>
+
+</div> <!-- End of movie_edit_tabs -->';
 ?>
