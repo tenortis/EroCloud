@@ -28,35 +28,85 @@ function getFolderSize($folderPath) {
 }
 
 echo "======================================================================\n";
-echo "STARTING DRY-RUN SIMULATION (NO DELETIONS WILL BE EXECUTED)\n";
+echo "STARTING CORRECTED DRY-RUN SIMULATION\n";
 echo "======================================================================\n\n";
 
-// Neue Abfrage basierend auf den 5 Regeln
-$rs_movies = p4c_query("
-    SELECT * FROM `movies` 
-    WHERE `status` = 'deleted'
-       OR (
-           (`released` = '2' OR `status` = 'blocked')
-           AND `status` != 'deleted'
-           AND COALESCE(
-               NULLIF(`movie_checked`, '0000-00-00 00:00:00'),
-               NULLIF(`online_at`, '0000-00-00 00:00:00'),
-               NULLIF(`create_datetime`, '0000-00-00 00:00:00'),
-               NULLIF(`last_updated_datetime`, '0000-00-00 00:00:00')
-           ) < '".date("Y-m-d H:i:s", strtotime("-180 days"))."'
-       )
-       OR (
-           `released` = '0'
-           AND `status` != 'deleted'
-           AND COALESCE(
-               NULLIF(`create_datetime`, '0000-00-00 00:00:00'),
-               NULLIF(`online_at`, '0000-00-00 00:00:00'),
-               NULLIF(`last_updated_datetime`, '0000-00-00 00:00:00')
-           ) < '".date("Y-m-d H:i:s", strtotime("-180 days"))."'
-       )
-    ORDER BY `id` ASC;
-", __FILE__, __LINE__);
+$now_minus_30 = date("Y-m-d H:i:s", strtotime("-30 days"));
+$now_minus_365 = date("Y-m-d H:i:s", strtotime("-365 days"));
+$now_minus_2years = date("Y-m-d H:i:s", strtotime("-2 years"));
+$now_minus_180days = date("Y-m-d H:i:s", strtotime("-180 days"));
 
+// Pruefung der Schutzfristen direkt im SQL Query
+$sql_query = "
+    SELECT * FROM `movies` 
+    WHERE 
+      -- Regel 1: Nie gekauft & Soft-Deleted
+      (
+        `status` = 'deleted'
+        AND NOT EXISTS (
+            SELECT 1 FROM `movies_access` WHERE `movies_access`.`movie_id` = `movies`.`file_id`
+        )
+      )
+      OR
+      -- Regel 2: Inaktiv (> 2 Jahre) & Soft-Deleted -> 30 Tage Schutzfrist abgelaufen
+      (
+        `status` = 'deleted'
+        AND EXISTS (
+            SELECT 1 FROM `movies_access` WHERE `movies_access`.`movie_id` = `movies`.`file_id`
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM `movies_access` 
+            WHERE `movies_access`.`movie_id` = `movies`.`file_id` 
+              AND (
+                   `movies_access`.`buy_timestamp` >= '{$now_minus_2years}' 
+                   OR (`movies_access`.`access_token_datetime` != '0000-00-00 00:00:00' AND `movies_access`.`access_token_datetime` >= '{$now_minus_2years}')
+              )
+        )
+        AND `deleted_datetime` != '0000-00-00 00:00:00'
+        AND `deleted_datetime` < '{$now_minus_30}'
+      )
+      OR
+      -- Regel 3: Aktiv (< 2 Jahre) & Soft-Deleted -> 365 Tage Schutzfrist abgelaufen
+      (
+        `status` = 'deleted'
+        AND EXISTS (
+            SELECT 1 FROM `movies_access` 
+            WHERE `movies_access`.`movie_id` = `movies`.`file_id` 
+              AND (
+                   `movies_access`.`buy_timestamp` >= '{$now_minus_2years}' 
+                   OR (`movies_access`.`access_token_datetime` != '0000-00-00 00:00:00' AND `movies_access`.`access_token_datetime` >= '{$now_minus_2years}')
+              )
+        )
+        AND `deleted_datetime` != '0000-00-00 00:00:00'
+        AND `deleted_datetime` < '{$now_minus_365}'
+      )
+      OR
+      -- Regel 4: Alt & Abgelehnt (> 180 Tage)
+      (
+        (`released` = '2' OR `status` = 'blocked')
+        AND `status` != 'deleted'
+        AND COALESCE(
+            NULLIF(`movie_checked`, '0000-00-00 00:00:00'),
+            NULLIF(`online_at`, '0000-00-00 00:00:00'),
+            NULLIF(`create_datetime`, '0000-00-00 00:00:00'),
+            NULLIF(`last_updated_datetime`, '0000-00-00 00:00:00')
+        ) < '{$now_minus_180days}'
+      )
+      OR
+      -- Regel 5: Inaktive Entwuerfe (> 180 Tage)
+      (
+        `released` = '0'
+        AND `status` != 'deleted'
+        AND COALESCE(
+            NULLIF(`create_datetime`, '0000-00-00 00:00:00'),
+            NULLIF(`online_at`, '0000-00-00 00:00:00'),
+            NULLIF(`last_updated_datetime`, '0000-00-00 00:00:00')
+        ) < '{$now_minus_180days}'
+      )
+    ORDER BY `id` ASC;
+";
+
+$rs_movies = p4c_query($sql_query, __FILE__, __LINE__);
 $count_delete_movie = p4c_num_rows($rs_movies);
 $fallback_mode = false;
 
