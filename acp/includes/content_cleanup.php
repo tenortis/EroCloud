@@ -257,10 +257,10 @@ $site .= '
             jQuery(this).addClass("active");
             
             var rule = jQuery(this).data("rule");
-            previewTable.column(6).search(rule).draw();
+            previewTable.fnFilter(rule, 6);
         });
 
-        var previewTable = jQuery("#table_cleanup_preview").DataTable({
+        var previewTable = jQuery("#table_cleanup_preview").dataTable({
             "bJQueryUI": true,
             "iDisplayLength": 25,
             "aaSorting": [[ 5, "asc" ]],
