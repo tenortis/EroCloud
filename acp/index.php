@@ -156,34 +156,34 @@ $site = '<!DOCTYPE html>
             <tr>
                 <td class="ui-widget-content left_menu">';
                     
-                    $rs_movies_checking = p4c_query("SELECT `id`, `file_id`, `merchant_id`, `actor_id`, `checksum`, `title`, `online_at` FROM `movies` WHERE `movie_checked`='000-00-00 00:00:00' AND `released`='1' AND `convert_status` > '1' ORDER BY `id` DESC;", __FILE__, __LINE__);
-                    $count_movies_checking = p4c_num_rows($rs_movies_checking);
+                    $rs_movies_checking = p4c_query("SELECT COUNT(*) AS `cnt` FROM `movies` WHERE `movie_checked`='000-00-00 00:00:00' AND `released`='1' AND `convert_status` > '1';", __FILE__, __LINE__);
+                    $count_movies_checking = p4c_fetch_object($rs_movies_checking)->cnt;
 
-                    $rs_movies_blocked = p4c_query("SELECT `id`, `file_id`, `merchant_id`, `actor_id`, `checksum`, `title`, `online_at` FROM `movies` WHERE `convert_status` > '1' AND (`released`='2' OR `status`!='active') ORDER BY `id` DESC;", __FILE__, __LINE__);
-                    $count_movies_blocked = p4c_num_rows($rs_movies_blocked);
+                    $rs_movies_blocked = p4c_query("SELECT COUNT(*) AS `cnt` FROM `movies` WHERE `convert_status` > '1' AND (`released`='2' OR `status`!='active');", __FILE__, __LINE__);
+                    $count_movies_blocked = p4c_fetch_object($rs_movies_blocked)->cnt;
 
-                    $rs_photo_albums_checking = p4c_query("SELECT `id`, `album_id`, `merchant_id`, `actor_id`, `checksum`, `title`, `online_at` FROM `photo_albums` WHERE `album_checked`='000-00-00 00:00:00' AND `released`='1' ORDER BY `id` DESC;", __FILE__, __LINE__);
-                    $count_photo_albums_checking = p4c_num_rows($rs_photo_albums_checking);
+                    $rs_photo_albums_checking = p4c_query("SELECT COUNT(*) AS `cnt` FROM `photo_albums` WHERE `album_checked`='000-00-00 00:00:00' AND `released`='1';", __FILE__, __LINE__);
+                    $count_photo_albums_checking = p4c_fetch_object($rs_photo_albums_checking)->cnt;
                     
                     $count_content_checking = $count_movies_checking + $count_photo_albums_checking;
 
-                    $rs_movies_online = p4c_query("SELECT * FROM `movies_online`", __FILE__, __LINE__);
-                    $count_movies_online = p4c_num_rows($rs_movies_online);
+                    $rs_movies_online = p4c_query("SELECT COUNT(*) AS `cnt` FROM `movies_online`;", __FILE__, __LINE__);
+                    $count_movies_online = p4c_fetch_object($rs_movies_online)->cnt;
                     
-                    $rs_photo_albums_online = p4c_query("SELECT `id`, `album_id`, `merchant_id`, `actor_id`, `checksum`, `title`, `online_at` FROM `photo_albums_online` ORDER BY `id` DESC;", __FILE__, __LINE__);
-                    $count_photo_albums_online = p4c_num_rows($rs_photo_albums_online);
+                    $rs_photo_albums_online = p4c_query("SELECT COUNT(*) AS `cnt` FROM `photo_albums_online`;", __FILE__, __LINE__);
+                    $count_photo_albums_online = p4c_fetch_object($rs_photo_albums_online)->cnt;
                     
                     $count_content_online = $count_movies_online + $count_photo_albums_online;
                     
-                    $rs_count_new_banners = p4c_query("SELECT * FROM `ads_media` WHERE `new_filename`!='' AND `rejected`='0';", __FILE__, __LINE__);
-                    $count_new_banners = p4c_num_rows($rs_count_new_banners);
+                    $rs_count_new_banners = p4c_query("SELECT COUNT(*) AS `cnt` FROM `ads_media` WHERE `new_filename`!='' AND `rejected`='0';", __FILE__, __LINE__);
+                    $count_new_banners = p4c_fetch_object($rs_count_new_banners)->cnt;
                     
                     $rs_actor_cams = p4c_query("SELECT `streamserver_url`, `stream_id`, `username`, `actor_id` FROM `actor_cams` LEFT JOIN `actors` ON
                         `actor_cams`.`actor_id`=`actors`.`id` WHERE
                         `datetime` >= '".date("Y-m-d H-i-s", strtotime("-80 seconds"))."';",__FILE__,__LINE__);
 
-                    $rs_count_new_actors = p4c_query("SELECT * FROM `actors` WHERE `created_datetime`>='".date("Y-m-d H:i:s",strtotime("-5 days"))."' AND `status`='inactive';",__FILE__,__LINE__);
-                    $count_new_actors = p4c_num_rows($rs_count_new_actors);
+                    $rs_count_new_actors = p4c_query("SELECT COUNT(*) AS `cnt` FROM `actors` WHERE `created_datetime`>='".date("Y-m-d H:i:s",strtotime("-5 days"))."' AND `status`='inactive';",__FILE__,__LINE__);
+                    $count_new_actors = p4c_fetch_object($rs_count_new_actors)->cnt;
                     $count_new_actors_hmtl = '';
                     if ($count_new_actors > 0) {
                         $count_new_actors_hmtl = ' <span style="color: coral;" title="'.$count_new_actors.' Profile m&uuml;ssen gepr&uuml;ft werden.">('.$count_new_actors.')</span>';
@@ -199,6 +199,7 @@ $site = '<!DOCTYPE html>
                     $navFotoalbenOnline = '';
                     $navWebcams = '';
                     $navSites = '';
+                    $navContentCleanup = '';
                     $navWMPartner = '';
                     $navBanners = '';
                     $navNewBanners = '';
@@ -262,6 +263,9 @@ $site = '<!DOCTYPE html>
                     } elseif (isset($_GET['mod']) AND $_GET['mod']=='movie_edit') {
                         $navMoviesOnline = 'class="active"';
                         $main = 'movie_edit.php';
+                    } elseif (isset($_GET['mod']) AND $_GET['mod']=='content_cleanup') {
+                        $navContentCleanup = 'class="active"';
+                        $main = 'content_cleanup.php';
                         
                     } elseif (isset($_GET['mod']) AND $_GET['mod']=='photo_albums_checking') {
                         $navFotoalben = 'class="active"';
@@ -355,6 +359,11 @@ $site = '<!DOCTYPE html>
                             <a '.$navFotoalbenOnline.' href="'.ACP_URL.'/Fotoalben-online">
                                 <i class="material-symbols-outlined md-30">photo_library</i>
                                 <span>Fotoalben online ('.$count_photo_albums_online.')</span>
+                            </a>
+
+                            <a '.$navContentCleanup.' href="'.ACP_URL.'/Content-Bereinigung">
+                                <i class="material-symbols-outlined md-30">delete_sweep</i>
+                                <span>Content-Bereinigung</span>
                             </a>
                         </div>';
                     }

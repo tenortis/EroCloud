@@ -1,12 +1,21 @@
 AuthName "Access denid!"
 AuthType Basic
-AuthUserFile /var/www/web1/htdocs/.acp_htpasswd
+<If "%{HTTP_HOST} == 'acp.erocloud.local'">
+    AuthUserFile "C:/xampp/htdocs/EroCloud/.acp_htpasswd"
+</If>
+<Else>
+    AuthUserFile /var/www/web1/htdocs/.acp_htpasswd
+</Else>
 require valid-user
 
 <Limit GET POST>
 	
     order deny,allow
     deny from all
+
+    # Localhost
+    allow from 127.0.0.1
+    allow from ::1
 
     #asl
     #allow from 88.75.
@@ -52,11 +61,13 @@ require valid-user
 	
 </Limit>
 
-ErrorDocument 403 https://erocloud.net
-ErrorDocument 404 https://erocloud.net
+#ErrorDocument 403 https://erocloud.net
+#ErrorDocument 404 https://erocloud.net
 
 # verhindert das Auflistung des Verzeichnissesinhalts
 Options -Indexes
+
+RewriteEngine On
 
 RewriteRule ^erocloud_logo.png$ images/erocloud_logo.png
 RewriteRule ^favicon/(.*)$ images/favicons/$1
@@ -72,6 +83,7 @@ RewriteRule ^gesperrte-Filme index.php?mod=movies_blocked&%{QUERY_STRING}
 RewriteRule ^Film-pruefen/(.*)$ index.php?mod=movie_checking&id=$1&%{QUERY_STRING}
 
 RewriteRule ^Filme-online index.php?mod=movies_online&%{QUERY_STRING}
+RewriteRule ^Content-Bereinigung$ index.php?mod=content_cleanup&%{QUERY_STRING}
 RewriteRule ^Film-bearbeiten/(.*)$ index.php?mod=movie_edit&id=$1&%{QUERY_STRING}
 
 RewriteRule ^Fotoalben-pruefen index.php?mod=photo_albums_checking&%{QUERY_STRING}
