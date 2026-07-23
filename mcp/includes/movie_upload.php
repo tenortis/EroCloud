@@ -119,6 +119,18 @@ if (isset($_POST['upload_content'])) {
     $movie['description'] = str_replace(["#?", "?en"], ["#", "en"], $movie['description']);
 
     
+    if(isset($_POST['category_master'])) {
+        $movie['category_master'] = trim(strip_tags($_POST['category_master']));
+    } else {
+        $movie['category_master'] = 'porn';
+    }
+
+    if (!isset($_POST['category_slave']) OR !is_array($_POST['category_slave'])) {
+        $error = 'W&auml;hle alle Kategorien die zum Film passen.';
+    } else {
+        $movie['category_slave'] = trim(strip_tags(implode(',', $_POST['category_slave'])));
+    }
+
     if(isset($_POST['actor_id'])) {
         $movie['actor_id'] = abs($_POST['actor_id']);
     }
@@ -234,6 +246,8 @@ if (isset($_POST['upload_content'])) {
                 `amount_webmaster` = '".abs($movie['amount_webmaster'])."',
                 `as_download` = '".abs($movie['as_download'])."',
                 `amount_download` = '".abs($movie['amount_download'])."',
+                `category_master` = '".p4c_escape_string($movie['category_master'])."',
+                `category_slave` = '".p4c_escape_string($movie['category_slave'])."',
                 `visible_for_website`= '".p4c_escape_string($movie['visible_for_website'])."'
                 WHERE `id`='".abs($movie_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__)) {
 
@@ -264,6 +278,8 @@ if (isset($_POST['upload_content'])) {
                 `amount_webmaster` = '".abs($movie['amount_webmaster'])."',
                 `as_download` = '".abs($movie['as_download'])."',
                 `amount_download` = '".abs($movie['amount_download'])."',
+                `category_master` = '".p4c_escape_string($movie['category_master'])."',
+                `category_slave` = '".p4c_escape_string($movie['category_slave'])."',
                 `visible_for_website`= '".p4c_escape_string($movie['visible_for_website'])."';",__FILE__,__LINE__)) {
 
                 $movie_id = p4c_insert_id();
@@ -303,9 +319,55 @@ $site .= '
 -->
 </style>
 
-<div style="width:600px;">
+<div style="max-width: 1600px;">
     <h1 class="h4">Film in die EroCloud hochladen</h1>
     ';
+
+function get_upload_wizard_html($active_step = 1) {
+    $steps = [
+        1 => ["title" => "Filminfos angeben"],
+        2 => ["title" => "Film hochladen"],
+        3 => ["title" => "Film konvertiert"],
+        4 => ["title" => "Ver&ouml;ffentlichen"]
+    ];
+
+    $html = '
+        <!-- Top Step Wizard Header -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body p-3">
+                <div class="row text-center g-2">';
+
+    foreach ($steps as $step_num => $step_data) {
+        $is_completed = ($step_num < $active_step);
+        $is_current = ($step_num == $active_step);
+
+        if ($is_completed) {
+            $box_class = 'bg-success text-white shadow-sm';
+            $badge_html = '<span class="badge bg-white text-success rounded-circle mb-1"><i class="bi bi-check-lg"></i></span>';
+        } else if ($is_current) {
+            $box_class = 'bg-success text-white shadow-sm fw-bold';
+            $badge_html = '<span class="badge bg-white text-success rounded-circle mb-1">'.$step_num.'</span>';
+        } else {
+            $box_class = 'bg-light text-muted';
+            $badge_html = '<span class="badge bg-secondary rounded-circle mb-1">'.$step_num.'</span>';
+        }
+
+        $html .= '
+                    <div class="col-3">
+                        <div class="p-2 rounded '.$box_class.' h-100 d-flex flex-column justify-content-center align-items-center" style="min-height: 70px;">
+                            '.$badge_html.'
+                            <small class="d-block lh-sm">Schritt '.$step_num.'<br><span class="fw-normal">'.$step_data['title'].'</span></small>
+                        </div>
+                    </div>';
+    }
+
+    $html .= '
+                </div>
+            </div>
+        </div>';
+
+    return $html;
+}
 
     if (!isset($_GET['step']) OR (isset($_GET['step']) AND $_GET['step'] == 1)) {
     
@@ -362,302 +424,449 @@ $site .= '
         </script>
     
         
-        <div class="ui-widget-content" style="padding:10px 0;">
-            <table style="width:600px">
-                <tr>
-                    <td style="width:25%; text-align:center; color:#008000; font-weight:bold; font-size:15px;">
-                        Schritt 1<br />
-                        <i class="material-symbols-outlined md-40 md-ok">subject</i><br />
-                        Filminfos angeben
-                    </td>
-                    <td style="width:25%; text-align:center; font-size:15px;">
-                        Schritt 2<br />
-                        <i class="material-symbols-outlined md-40">cloud_upload</i><br />
-                        Film hochladen
-                    </td>
-                    <td style="width:25%; text-align:center; font-size:15px;">
-                        Schritt 3<br />
-                        <i class="material-symbols-outlined md-40">settings</i><br />
-                        Film konvertieren
-                    </td>
-                    <td style="width:25%; text-align:center; font-size:15px;">
-                        Schritt 4<br />
-                        <i class="material-symbols-outlined md-40">cloud_done</i><br />
-                        ver&ouml;ffentlichen
-                    </td>
-                </tr>
-            </table>
-        </div>
-		
-        <div style="margin:10px 0 5px 0;">
-            <div style="width:50%; display:inline-block; text-align:center;">
-                <a class="movie_tips" href="javascript:;">Hinweise zur Qualit&auml;t deiner Filme</a>
-            </div>
-            <div style="width:49%; display:inline-block; text-align:center;">
-                <a class="movie_rendering_tips" href="javascript:;">So renderst du deine Filme richtig.</a>
-            </div>
-        </div>
         
-        <div class="movie_tips_popup">
-            <div style="text-align:right; top:20px; right:10px; position:absolute;">
-                <a href="#" class="close_overlay"><b>&#x2715;</b></a>
-            </div>';        
-                include_once(MCP_DIR.'/includes/overlays/movie_tips.php');
-                $site .= '
-            <div style="text-align:right; float:right;">
-                <a href="#" class="close_overlay"><b>&#x2715;</b> Schlie&szlig;en</a>
-            </div>
+' . get_upload_wizard_html(1) . '
+
+        <!-- Buttons for Quality & Rendering Modals -->
+        <div class="d-flex flex-wrap gap-2 mb-4">
+            <button type="button" class="btn btn-outline-info shadow-sm" data-bs-toggle="modal" data-bs-target="#modalMovieTips">
+                <i class="bi bi-info-circle me-1"></i> Hinweise zur Qualit&auml;t deiner Filme
+            </button>
+            <button type="button" class="btn btn-outline-secondary shadow-sm" data-bs-toggle="modal" data-bs-target="#modalMovieRenderingTips">
+                <i class="bi bi-gear me-1"></i> So renderst du deine Filme richtig
+            </button>
         </div>
-        
-        <div class="movie_rendering_tips_popup">
-            <div style="text-align:right; top:20px; right:10px; position:absolute;">
-                <a href="#" class="close_overlay"><b>&#x2715;</b></a>
-            </div>';        
-            include_once(MCP_DIR.'/includes/overlays/movie_rendering_tips.php');
-            $site .= '
-            <div style="text-align:right; float:right;">
-                <a href="#" class="close_overlay"><b>&#x2715;</b> Schlie&szlig;en</a>
+
+        <!-- Modal Movie Tips -->
+        <div class="modal fade" id="modalMovieTips" tabindex="-1" aria-labelledby="modalMovieTipsLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold" id="modalMovieTipsLabel"><i class="bi bi-info-circle me-2 text-info"></i>Hinweise zur Qualit&auml;t deiner Filme</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">';
+                        ob_start();
+                        include_once(MCP_DIR.'/includes/overlays/movie_tips.php');
+                        $movie_tips_content = ob_get_clean();
+                        $site .= $movie_tips_content . '
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schlie&szlig;en</button>
+                    </div>
+                </div>
             </div>
         </div>
 
-        ';
-    
+        <!-- Modal Movie Rendering Tips -->
+        <div class="modal fade" id="modalMovieRenderingTips" tabindex="-1" aria-labelledby="modalMovieRenderingTipsLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold" id="modalMovieRenderingTipsLabel"><i class="bi bi-gear me-2 text-secondary"></i>So renderst du deine Filme richtig</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">';
+                        ob_start();
+                        include_once(MCP_DIR.'/includes/overlays/movie_rendering_tips.php');
+                        $movie_rendering_tips_content = ob_get_clean();
+                        $site .= $movie_rendering_tips_content . '
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schlie&szlig;en</button>
+                    </div>
+                </div>
+            </div>
+        </div>';
+
         if (isset($error) AND !empty($error)) {
-            $site .= '<div class="ui-state-error" style="padding:10px; margin-top:10px;">'.$error.'</div>';
+            $site .= '<div class="alert alert-danger mb-4 shadow-sm">'.$error.'</div>';
             
             if (isset($duplicate_title)) {
                 $rs_dublicate_movie = p4c_query("SELECT * FROM `movies` WHERE `id`='".abs($duplicate_title)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__);
                 if (p4c_num_rows($rs_dublicate_movie) == 1) {
                     $dublicat_ary = p4c_fetch_object($rs_dublicate_movie);
                     $site .= '
-                    <div class="ui-widget-header" style="border-top:none; border-bottom:none; padding:5px 10px">'.$dublicat_ary->title.'</div>
-                    <div class="ui-widget-content" style="padding:10px; margin-bottom:20px;">
-                        <table style="width:100%;">
-                            <tr>
-                                <td style="width:110px; vertical-align:top;">
-                                    <img src="'.MCP_URL.'/PlayerPoster/'.$dublicat_ary->file_id.'&w=100" style="width:100px; height:auto;" />
-                                </td>
-                                <td style="vertical-align:middle;">
-                                    <a href="'.MCP_URL.'/video/'.$dublicat_ary->id.'" target="_blank">Klicke hier um zum Film zu wechseln.</a>
-                                    <div style="margin:10px 0;"><b>ODER</b></div>
-                                    Wenn dieser Film tats&auml;chlich ein anderer ist, benutze hier einen neuen Titel.
-                                </td>
-                            </tr>
-                        </table>
+                    <div class="card shadow-sm border-warning mb-4">
+                        <div class="card-header bg-warning bg-opacity-10 fw-bold">'.$dublicat_ary->title.'</div>
+                        <div class="card-body">
+                            <div class="d-flex align-items-center gap-3">
+                                <img src="'.MCP_URL.'/PlayerPoster/'.$dublicat_ary->file_id.'&w=100" class="rounded shadow-sm" style="width:100px; height:auto;" />
+                                <div>
+                                    <a href="'.MCP_URL.'/video/'.$dublicat_ary->id.'" target="_blank" class="btn btn-sm btn-outline-primary mb-2">Klicke hier um zum Film zu wechseln</a>
+                                    <div class="fw-bold text-muted my-1">ODER</div>
+                                    <small class="text-muted">Wenn dieser Film tats&auml;chlich ein anderer ist, benutze hier einen neuen Titel.</small>
+                                </div>
+                            </div>
+                        </div>
                     </div>';
                 }
             }
-            
         }
+
         $site .= '
         <form action="" method="post">
-            <div class="ui-widget-header" style="padding:5px 10px; margin-top:10px;">Angaben zum Film</div>
-            <div class="ui-widget-content" style="padding:10px; border-top:none;">
-                <div class="edit_title">Gib einen aussagekr&auml;ftigen Filmtitel an. <span id="anzahl_title">(max. 65 Zeichen)</span></div>
-                <div class="edit_content" style="margin-bottom:8px;">
-                    <input type="text" name="title" value="'.$movie['title'].'" onkeyup="jQuery(this).zaehle_zeichen(65, \'anzahl_title\')" placeholder="Gib einen aussagekr&auml;ftigen Filmtitel an." style="font-size:18px;" />
-                </div>
-    
-                <div class="edit_title">Gib eine gute und aussagekr&auml;ftige <b>Beschreibung</b> des Films an.</div>
-                <div class="edit_content" style="margin-bottom:8px;">
-                    <textarea name="description" id="description" >'.$movie['description'].'</textarea>
-                    <script>
-                        CKEDITOR.replace("description", {customConfig: "'.MCP_URL.'/fw/ckeditor/movie_upload_config.js?v=1"});
-                    </script>
-                </div>
-    
-                <div class="edit_title">Ab wann soll der Film fr&uuml;hsten ver&ouml;ffentlicht werden?</div>
-                <div class="edit_content" style="margin-bottom:8px;">
-                    <input class="flatpickr" name="online_at" type="text" value="'.$movie['online_at'].'" />
-                </div>
+            <!-- Zeile 1: Links Angaben zum Film, Rechts Film kategorisieren -->
+            <div class="row g-4 mb-4">
+                <!-- Links: Angaben zum Film -->
+                <div class="col-12 col-lg-6">
+                    <div class="card shadow-sm h-100 mb-0">
+                        <div class="card-header bg-light fw-bold py-3"><i class="bi bi-film me-2"></i>Angaben zum Film</div>
+                        <div class="card-body">
+                            <div class="edit_title fw-bold mb-1">Gib einen aussagekr&auml;ftigen Filmtitel an. <span id="anzahl_title" class="text-muted fw-normal">(max. 65 Zeichen)</span></div>
+                            <div class="edit_content mb-3">
+                                <input type="text" class="form-control form-control-lg" name="title" value="'.$movie['title'].'" onkeyup="jQuery(this).zaehle_zeichen(65, \'anzahl_title\')" placeholder="Gib einen aussagekr&auml;ftigen Filmtitel an." style="font-size:18px;" />
+                            </div>
                 
-                <div class="edit_title">Wieviel soll der Film kosten?</div>
-                <div class="edit_content" style="margin-bottom:8px; font-size: 16px;">
-                    <select id="amount_second" name="amount_second" style="width:170px;">';
-            		$i=0.0;
-            		while($i<=30.1) {
-                            if (strlen($i)<=2) {$i=$i.'.0';}
-                            if (strval($i) == strval($movie['amount_second'])) {
-                                $selected = 'selected="selected"';
-                            } else {
-                                $selected = '';
-                            }
+                            <div class="edit_title fw-bold mb-1">Gib eine gute und aussagekr&auml;ftige <b>Beschreibung</b> des Films an.</div>
+                            <div class="edit_content mb-3">
+                                <textarea class="form-control" name="description" id="description">'.$movie['description'].'</textarea>
+                                <script>
+                                    CKEDITOR.replace("description", {customConfig: "'.MCP_URL.'/fw/ckeditor/movie_upload_config.js?v=1"});
+                                </script>
+                            </div>
+                
+                            <div class="edit_title fw-bold mb-1">Ab wann soll der Film fr&uuml;hsten ver&ouml;ffentlicht werden?</div>
+                            <div class="edit_content mb-3">
+                                <input class="flatpickr form-control" name="online_at" type="text" value="'.$movie['online_at'].'" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rechts: Film kategorisieren -->
+                <div class="col-12 col-lg-6">
+                    <div class="card shadow-sm h-100 mb-0">
+                        <div class="card-header bg-light fw-bold py-3"><i class="bi bi-tags me-2"></i>Film kategorisieren</div>
+                        <div class="card-body p-0">
+                            <div class="p-3 bg-light border-bottom font-weight-bold fw-bold">Hauptkategorie</div>
+                            <div class="p-3 border-bottom">';
+                                if ($movie['category_master'] == 'porn' OR empty($movie['category_master'])) {$checked_porn = 'checked="checked"';} else {$checked_porn='';}
+                                $site .= '
+                                <div class="p-2 border-bottom">
+                                    <div class="fw-bold">
+                                        <label for="porn"><input type="radio" '.$checked_porn.' id="porn" name="category_master" value="porn" /> Porno</label>
+                                    </div>
+                                    <div class="small text-muted ms-4">W&auml;hle diese Kategorie, wenn der Film pornografische Inhalte enth&auml;lt.</div>
+                                </div>';
+                                if ($movie['category_master'] == 'fetish') {$checked_fetish = 'checked="checked"';} else {$checked_fetish='';}
+                                $site .= '
+                                <div class="p-2">
+                                    <div class="fw-bold">
+                                        <label for="fetish"><input type="radio" '.$checked_fetish.' id="fetish" name="category_master" value="fetish" /> Fetisch</label>
+                                    </div>
+                                    <div class="small text-muted ms-4">W&auml;hle diese Kategorie, wenn der Film ein reiner Fetischfilm, wie SM, BDSM usw. ist.</div>
+                                </div>
+                            </div>
+                            <div class="p-3 bg-light border-bottom font-weight-bold fw-bold">W&auml;hle alle Kategorien, die zum Film passen</div>
+                            <div class="p-3 border-bottom text-dark small" style="background-color: #fff6d0; border-color: #ffe8a1;">
+                                <i class="bi bi-info-circle-fill text-warning me-2"></i><strong>Hinweis:</strong> Vom System automatisch vorausgew&auml;hlte Kategorien werden gelb hervorgehoben. Sie k&ouml;nnen diese &uuml;berpr&uuml;fen und bei Bedarf anpassen.
+                            </div>
+                            <div class="p-3">';
                             
-                            $text = $i;
-                            if (strval($i) == '0.0') {$text = 'kostenlos';}
-                            if (strval($i) == '0.8') {$text = $i.' (Empfohlen)';}
-                        
-                            $site .= '<option '.$selected.' value="'.$i.'">'.$text.'</option>';
-                            $i = $i+0.1;
-            		}
-            		unset($i);
-                        $site .= '
-                    </select>
-                    
-                    <select id="amount_second_webmaster" name="" style="width:170px; display:none;">';
-            		$i=0.0;
-            		while($i<=100.0) {
-                            if (strlen($i)<=2) {$i=$i.'.0';}
-                            if (strval($i) == strval($movie['amount_second'])) {
-                                $selected = 'selected="selected"';
-                            } else {
-                                $selected = '';
-                            }
-                        
-                            $text = $i;
-                            if (strval($i) == '0.0') {$text = 'kostenlos';}
-                            if (strval($i) == '0.8') {$text = $i.' (Empfohlen)';}
-                        
-                            $site .= '<option '.$selected.' value="'.$i.'">'.$text.'</option>';
-                            $i = $i+0.1;
-            		}
-            		unset($i);
-                        $site .= '
-                    </select> Cent je Sekunde<br />
-                    <span style="font-size:10px;">Dies ist der Preis f&uuml;r Streaming (zum online anschauen). Den exakten Preis bekommst du auf der n&auml;chsten Seite angezeigt.</span>
-                </div>
-            </div>
-            <div class="ui-widget-header" style="padding:5px 10px; border-top:none;">weitere Einstellungen</div>
-            <div class="ui-widget-content" style="padding:10px; border-top:none;">
-                
-                <div class="edit_title">Welchem Darsteller soll der Film zugeordnet werden?</div>
-                <div class="edit_content" style="margin-bottom:8px;">
-                    <select name="actor_id">';
-                        $rs_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `status`='active' ORDER BY `username` ASC",__FILE__,__LINE__);
-                        if (p4c_num_rows($rs_actors) > 0) {
-                            while($actor_obj = p4c_fetch_object($rs_actors)) {
-                                if ($movie['actor_id'] == $actor_obj->id) {$selected = 'selected';} else {$selected = '';}
-                                $site .= '<option value="'.$actor_obj->id.'" '.$selected.'> '.$actor_obj->username.'</option>';
-                            }
-                        } else {
-                            $site .= '<option value="0">Bitte zun&auml;chst Profil anlegen!</option>';
-                        }
-                        $site .= ' 
-                    </select>
-                </div>
+                                $saved_category_ary = !empty($movie['category_slave']) ? explode(',', $movie['category_slave']) : [];
+                                $actor_categories = [];
+                                if (!empty($movie['actor_id'])) {
+                                    $rs_actor_cat = p4c_query("SELECT `actor_categories` FROM `actors` WHERE `id`='".abs($movie['actor_id'])."';",__FILE__,__LINE__);
+                                    if ($rs_actor_cat AND p4c_num_rows($rs_actor_cat) > 0) {
+                                        $actor_row = p4c_fetch_object($rs_actor_cat);
+                                        $actor_categories = explode(',', $actor_row->actor_categories);
+                                    }
+                                }
 
-                <div class="edit_title">Auf welcher Website soll der Film ver&ouml;ffentlicht werden?</div>
-                <div class="edit_content" style="margin-bottom:8px;">
-                    <select id="visible_for_website" name="visible_for_website">
-                        <option value="public"> alle Partnerwebsites</option>';
-                        $rs_websites = p4c_query("SELECT * FROM `sites` WHERE `partner_id`='". p4c_escape_string($merchant->partner_id())."' AND `status`='1' ORDER BY `domain` ASC;",__FILE__,__LINE__);
-                        if (p4c_num_rows($rs_websites) > 0) {
-                            while($site_obj = p4c_fetch_object($rs_websites)) {
-                                $site .= '<option value="'.$site_obj->domain.'"> '.$site_obj->domain.'</option>';
-                            }
-                        }
-                        $site .= '
-                    </select><br />
-                    <span style="font-size:10px;">Bei der Ver&ouml;ffentlichung auf Partnerwebsites, erh&auml;lst du 25% Provision vom Umsatz dieses Filmes.</span>
-                </div>
+                                $search_text = strtolower(strip_tags($movie['title'] . ' ' . $movie['description']));
 
-                <!--
-                <div class="edit_title">F&uuml;r wieviel Prozent mehr, soll der Film auf unseren Partnerseiten angeboten werden?</div>
-                <div class="edit_content" style="margin-bottom:8px;">
-                    <select name="amount_webmaster">';
-                        foreach($amount_webmaster_ary as $percent) {
-                            
-                            if ($percent == $movie['amount_webmaster']) {
-                                    $selected = 'selected="selected"';
-                            } else {
-                                    $selected = '';
-                            }
-                            
-                            $text = $percent.'%';
-                            if ($percent == 0) {
-                                $text = $percent.'% (selber Preis wie bei mir)';
-                            } else {
-                                $text = '+'.$percent.'%';
-                            }                                    
-                            
-                            $site .= '<option '.$selected.' value="'.$percent.'"> '.$text.'</option>';
-                        }
-                    $site .= '
-                    </select>
-                    <span style="font-size:10px;">Dies ist der Streaming-Preis f&uuml;r Kunden auf Partnerseiten.</span>
-                </div>
-                //-->
-                
-                <div class="edit_title">Darf der Film zum Download angeboten werden?</div>
-                <div class="edit_content" style="margin-bottom:8px;">
-                    <select name="as_download">';
-                        if ($movie['as_download'] == 0) {$selected = 'selected';} else {$selected = '';}
-                        $site .= ' 
-                        <option value="1"> Ja</option>
-                        <option value="0" '.$selected.'> Nein</option>
-                    </select><br />
-                    <span style="font-size:10px;">Empfohlen! Dies steigert Ihren Umsatz.</span>
-                </div>
-                
-                <div class="edit_title">F&uuml;r wieviel Prozent mehr, m&ouml;chtest du den Film als Download anbieten?</div>
-                <div class="edit_content" style="margin-bottom:8px;">
-                    <select name="amount_download">';
-            		for($i=0;$i<=150;$i++) {
-            
-                            if (($movie['amount_download'] == $i)) {
-                                    $selected = 'selected="selected"';
-                            } else {
-                                    $selected = '';
-                            }
+                                $site .= '
+                                <div class="accordion accordion-flush" id="categoryAccordion">';
 
-                            $text = '';
-                            if (strval($i) == '0') {$text = '(genau so teuer wie )';}
-                            if (strval($i) == '10') {$text = '(Empfohlen)';}                    
+                                $cat_groups = [
+                                    ["id" => "cat_people", "title" => "Anzahl der Personen &amp; sexuelle Orientierung", "group" => "number_of_people"],
+                                    ["id" => "cat_body", "title" => "K&ouml;rper und Aussehen", "group" => "look_and_body"],
+                                    ["id" => "cat_fetish", "title" => "Fetisch", "group" => "fetish"],
+                                    ["id" => "cat_other", "title" => "Sonstige", "group" => "porn"]
+                                ];
 
-                            $site .= '<option '.$selected.' value="'.$i.'">+'.$i.'&percnt; '.$text.'</option>';
-            		}
-            		unset($i);
-                    $site .= '
-            		</select>
-                </div>
-    
-            </div>
-            
-            <div class="ui-widget-header" style="padding:5px 10px; margin-top:10px;">Suchmaschinenoptimierung (SEO)</div>
-            <div class="ui-widget-content" style="padding:10px; border-top:none; margin-bottom:10px;">
-                <div class="edit_title">Meta Description <span id="anzahl_meta_description">(max. 165 Zeichen)</span> <b><span style="color:#ff0000;">KEINE einzelnen Worte/Keywords oder Hashtags!</span></b></div>
-                <div class="edit_content" style="margin-bottom:8px;">
-                    <textarea type="text" name="meta_description" placeholder="Gib hier eine kurze aussagekr&auml;ftige Beschreibung des Films an. Keine Stichworte! Diese Kurzbeschreibung wird unteranderem f&uuml;r die Google-Suche benutzt." onkeyup="jQuery(this).zaehle_zeichen(156, \'anzahl_meta_description\')">'.$movie['meta_description'].'</textarea>
-                    <span style="font-size:10px;">Beschreibe den Film so interessant wie m&ouml;glich mit maximal 156 Zeichen.</span>
-                </div>
-                
-                <div class="edit_title">Meta Title <span id="anzahl_meta_title">(max. 65 Zeichen)</span></div>
-                <div class="edit_content" style="margin-bottom:8px;">
-                    <input type="text" name="meta_title" value="'.$movie['meta_title'].'" placeholder="Wird nach dem Speichern automatisch ausgef&uuml;llt" readonly="readonly" />
-                </div>
-               
-                <div class="edit_title">SEO-URL (URL-Name)</div>
-                <div class="edit_content" style="margin-bottom:8px;">
-                    <input type="text" name="seo_url" value="'.$movie['seo_url'].'" placeholder="Wird nach dem Speichern automatisch ausgef&uuml;llt" readonly="readonly" />
-                </div>
-            </div>      
+                                foreach($cat_groups as $cat_g) {
+                                    $rs_count = p4c_query("SELECT * FROM `movie_categories` WHERE `category_group`='".$cat_g['group']."';",__FILE__,__LINE__);
+                                    $selected_count = 0;
+                                    $items_html = '';
 
-            <div style="margin-top:15px; margin-bottom:30px; text-align:right;">
-                <table style="width:100%;">
-                    <tr>
-                        <td style="width:50%; text-align:left;">';
-                            if (isset($_SESSION['upload_movie']['movie_id'])) {
-                                $site .= '                                 
-                                <input type="hidden" name="movie_id" value="'.$movie_id.'" />
-                                <input type="submit" class="content_ruels button" name="delete_movie" value="Film l&ouml;schen" />
-                                ';
-                            }
+                                    while($category_obj = p4c_fetch_object($rs_count)) {
+                                        $is_saved = in_array($category_obj->name_id, $saved_category_ary);
+
+                                        // Check system auto-detection (by title/description keywords or actor categories)
+                                        $is_system_detected = false;
+                                        if (!empty($search_text)) {
+                                            if (strpos($search_text, strtolower($category_obj->name_id)) !== false OR strpos($search_text, strtolower($category_obj->de_name_value)) !== false) {
+                                                $is_system_detected = true;
+                                            } else if (!empty($category_obj->more_search_words)) {
+                                                $words = explode(',', strtolower($category_obj->more_search_words));
+                                                foreach ($words as $w) {
+                                                    $w = trim($w);
+                                                    if (!empty($w) AND strpos($search_text, $w) !== false) {
+                                                        $is_system_detected = true;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        if (!$is_system_detected AND !empty($actor_categories) AND in_array($category_obj->name_id, $actor_categories)) {
+                                            $is_system_detected = true;
+                                        }
+
+                                        // Determine selection state & yellow styling
+                                        if ($is_saved OR $is_system_detected) {
+                                            $checked_cat_slave = 'checked="checked"';
+                                            $selected_count++;
+
+                                            if ($is_system_detected) {
+                                                $card_extra_class = 'border-warning';
+                                                $inline_style = 'style="background-color: #fff6d0; border: 1px solid #ffe8a1;"';
+                                            } else {
+                                                $card_extra_class = 'bg-white border-primary shadow-sm';
+                                                $inline_style = '';
+                                            }
+                                        } else {
+                                            $checked_cat_slave = '';
+                                            $card_extra_class = 'bg-light border-light';
+                                            $inline_style = '';
+                                        }
+
+                                        $items_html .= '
+                                        <div class="col">
+                                            <div class="p-2 rounded h-100 '.$card_extra_class.'" '.$inline_style.'>
+                                                <div class="form-check m-0">
+                                                    <input class="form-check-input" type="checkbox" '.$checked_cat_slave.' id="'.$category_obj->name_id.'" name="category_slave[]" value="'.$category_obj->name_id.'" />
+                                                    <label class="form-check-label fw-bold small text-dark" for="'.$category_obj->name_id.'">'.$category_obj->de_name_value.'</label>
+                                                </div>
+                                                '.(!empty($category_obj->de_name_text) ? '<div class="text-muted ms-4 mt-1" style="font-size: 11px; line-height: 1.2;">'.$category_obj->de_name_text.'</div>' : '').'
+                                            </div>
+                                        </div>';
+                                    }
+
+                                    $badge_html = '';
+                                    if ($selected_count > 0) {
+                                        $badge_html = '<span class="badge bg-primary ms-2">'.$selected_count.' ausgew&auml;hlt</span>';
+                                    }
+
+                                    $site .= '
+                                    <div class="accordion-item border-bottom">
+                                        <h2 class="accordion-header" id="heading_'.$cat_g['id'].'">
+                                            <button class="accordion-button collapsed fw-bold py-2 shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_'.$cat_g['id'].'" aria-expanded="false" aria-controls="collapse_'.$cat_g['id'].'">
+                                                '.$cat_g['title'].' '.$badge_html.'
+                                            </button>
+                                        </h2>
+                                        <div id="collapse_'.$cat_g['id'].'" class="accordion-collapse collapse" aria-labelledby="heading_'.$cat_g['id'].'" data-bs-parent="#categoryAccordion">
+                                            <div class="accordion-body p-2">
+                                                <div class="row row-cols-1 row-cols-md-2 g-2">
+                                                    '.$items_html.'
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>';
+                                }
+
+                                $site .= '
+                                </div>
+                                <script type="text/javascript">
+                                    jQuery(document).ready(function() {
+                                        jQuery("#categoryAccordion .accordion-button").click(function(e) {
+                                            var target = jQuery(this).attr("data-bs-target");
+                                            if (!target) target = jQuery(this).attr("data-target");
+                                            if (target) {
+                                                jQuery(target).collapse("toggle");
+                                            }
+                                        });
+                                    });
+                                </script>';
                             $site .= '
-                        </td>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>';
 
-                        <td style="width:50%">
-                            <input type="button" class="content_ruels button" value="Speichern und weiter mit Schritt 2" />
-                        </td>
-                    </tr>
-                </table>
+            $site .= '
+            <!-- Zeile 2: Links Preise & Download, Rechts Darsteller & Sichtbarkeit -->
+            <div class="row g-4 mb-4">
+                <!-- Links: Preise & Download -->
+                <div class="col-12 col-lg-6">
+                    <div class="card shadow-sm h-100 mb-0">
+                        <div class="card-header bg-light fw-bold py-3"><i class="bi bi-coin me-2"></i>Preise &amp; Download</div>
+                        <div class="card-body">
+                            <div class="edit_title fw-bold mb-1">Wieviel soll der Film kosten?</div>
+                            <div class="edit_content mb-3">
+                                <select id="amount_second" class="form-select mb-2" name="amount_second">';
+                                    $i=0.0;
+                                    while($i<=30.1) {
+                                        if (strlen($i)<=2) {$i=$i.'.0';}
+                                        if (strval($i) == strval($movie['amount_second'])) {
+                                            $selected = 'selected="selected"';
+                                        } else {
+                                            $selected = '';
+                                        }
+                                        
+                                        $text = $i;
+                                        if (strval($i) == '0.0') {$text = 'kostenlos';}
+                                        if (strval($i) == '0.8') {$text = $i.' (Empfohlen)';}
+                                    
+                                        $site .= '<option '.$selected.' value="'.$i.'">'.$text.'</option>';
+                                        $i = $i+0.1;
+                                    }
+                                    unset($i);
+                                    $site .= '
+                                </select>
+                                
+                                <select id="amount_second_webmaster" class="form-select mb-2" name="" style="display:none;">';
+                                    $i=0.0;
+                                    while($i<=100.0) {
+                                        if (strlen($i)<=2) {$i=$i.'.0';}
+                                        if (strval($i) == strval($movie['amount_second'])) {
+                                            $selected = 'selected="selected"';
+                                        } else {
+                                            $selected = '';
+                                        }
+                                        
+                                        $text = $i;
+                                        if (strval($i) == '0.0') {$text = 'kostenlos';}
+                                        if (strval($i) == '0.8') {$text = $i.' (Empfohlen)';}
+                                    
+                                        $site .= '<option '.$selected.' value="'.$i.'">'.$text.'</option>';
+                                        $i = $i+0.1;
+                                    }
+                                    unset($i);
+                                    $site .= '
+                                </select>
+                                <small class="text-muted d-block">Preis in Cent je Sekunde f&uuml;r Streaming. 1 Coin = 1 Cent (0,01 EUR)</small>
+                            </div>
+
+                            <div class="form-check mb-3">
+                                <input type="checkbox" class="form-check-input" name="trailer" id="trailer" />
+                                <label class="form-check-label fw-bold" for="trailer">Der Film ist ein Trailer/ Vorstellungsvideo und soll den Kunden kostenlos angeboten werden.</label>
+                            </div>
+
+                            <div class="edit_title fw-bold mb-1">Darf der Film zum Download angeboten werden?</div>
+                            <div class="edit_content mb-3">
+                                <select class="form-select" name="as_download">';
+                                    if ($movie['as_download'] == 0) {$selected = 'selected';} else {$selected = '';}
+                                    $site .= ' 
+                                    <option value="1"> Ja</option>
+                                    <option value="0" '.$selected.'> Nein</option>
+                                </select>
+                                <small class="text-muted d-block mt-1">Empfohlen! Dies steigert Ihren Umsatz.</small>
+                            </div>
+                            
+                            <div class="edit_title fw-bold mb-1">F&uuml;r wieviel Prozent mehr, m&ouml;chtest du den Film als Download anbieten?</div>
+                            <div class="edit_content mb-3">
+                                <select class="form-select" name="amount_download">';
+                                    for($i=0;$i<=150;$i++) {
+                                        if (($movie['amount_download'] == $i)) {
+                                            $selected = 'selected="selected"';
+                                        } else {
+                                            $selected = '';
+                                        }
+
+                                        $text = '';
+                                        if (strval($i) == '0') {$text = '(genau so teuer wie Streaming)';}
+                                        if (strval($i) == '10') {$text = '(Empfohlen)';}                    
+
+                                        $site .= '<option '.$selected.' value="'.$i.'">+'.$i.'&percnt; '.$text.'</option>';
+                                    }
+                                    unset($i);
+                                    $site .= '
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rechts: Darsteller & Sichtbarkeit -->
+                <div class="col-12 col-lg-6">
+                    <div class="card shadow-sm h-100 mb-0">
+                        <div class="card-header bg-light fw-bold py-3"><i class="bi bi-person-badge me-2"></i>Darsteller &amp; Sichtbarkeit</div>
+                        <div class="card-body">
+                            <div class="edit_title fw-bold mb-1">Welchem Darsteller soll der Film zugeordnet werden?</div>
+                            <div class="edit_content mb-3">
+                                <select class="form-select" name="actor_id">';
+                                    $rs_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `status`='active' ORDER BY `username` ASC",__FILE__,__LINE__);
+                                    if (p4c_num_rows($rs_actors) > 0) {
+                                        while($actor_obj = p4c_fetch_object($rs_actors)) {
+                                            if ($movie['actor_id'] == $actor_obj->id) {$selected = 'selected';} else {$selected = '';}
+                                            $site .= '<option value="'.$actor_obj->id.'" '.$selected.'> '.$actor_obj->username.'</option>';
+                                        }
+                                    } else {
+                                        $site .= '<option value="0">Bitte zun&auml;chst Profil anlegen!</option>';
+                                    }
+                                    $site .= ' 
+                                </select>
+                            </div>
+
+                            <div class="edit_title fw-bold mb-1">Auf welcher Website soll der Film ver&ouml;ffentlicht werden?</div>
+                            <div class="edit_content mb-3">
+                                <select id="visible_for_website" class="form-select" name="visible_for_website">';
+                                    $rs_websites = p4c_query("SELECT * FROM `sites` WHERE `partner_id`='". p4c_escape_string($merchant->partner_id())."' AND `status`='1' ORDER BY `domain` ASC;",__FILE__,__LINE__);
+                                    if (p4c_num_rows($rs_websites) > 0) {
+                                        while($site_obj = p4c_fetch_object($rs_websites)) {
+                                            $site .= '<option value="'.$site_obj->domain.'"> '.$site_obj->domain.'</option>';
+                                        }
+                                    }
+                                    $site .= '
+                                </select>
+                                <small class="text-muted d-block mt-1">Bei der Ver&ouml;ffentlichung auf Partnerwebsites, erh&auml;lst du 25% Provision vom Umsatz dieses Filmes.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Zeile 3: Rechts Suchmaschinenoptimierung (SEO) -->
+            <div class="row g-4 mb-4">
+                <div class="col-12 col-lg-6">
+                    <div class="card shadow-sm h-100 mb-0">
+                        <div class="card-header bg-light fw-bold py-3"><i class="bi bi-search me-2"></i>Suchmaschinenoptimierung (SEO)</div>
+                        <div class="card-body">
+                            <div class="edit_title fw-bold mb-1">Meta Description <span id="anzahl_meta_description" class="text-muted fw-normal">(max. 165 Zeichen)</span> <b class="text-danger">KEINE einzelnen Worte/Keywords oder Hashtags!</b></div>
+                            <div class="edit_content mb-3">
+                                <textarea class="form-control" rows="3" name="meta_description" placeholder="Gib hier eine kurze aussagekr&auml;ftige Beschreibung des Films an. Keine Stichworte! Diese Kurzbeschreibung wird unteranderem f&uuml;r die Google-Suche benutzt." onkeyup="jQuery(this).zaehle_zeichen(156, \'anzahl_meta_description\')">'.$movie['meta_description'].'</textarea>
+                                <small class="text-muted d-block mt-1">Beschreibe den Film so interessant wie m&ouml;glich mit maximal 156 Zeichen.</small>
+                            </div>
+                            
+                            <div class="edit_title fw-bold mb-1">Meta Title <span id="anzahl_meta_title" class="text-muted fw-normal">(max. 65 Zeichen)</span></div>
+                            <div class="edit_content mb-3">
+                                <input type="text" class="form-control" name="meta_title" value="'.$movie['meta_title'].'" placeholder="Wird nach dem Speichern automatisch ausgef&uuml;llt" readonly="readonly" disabled="disabled" />
+                            </div>
+                           
+                            <div class="edit_title fw-bold mb-1">SEO-URL (URL-Name)</div>
+                            <div class="edit_content mb-3">
+                                <input type="text" class="form-control" name="seo_url" value="'.$movie['seo_url'].'" placeholder="Wird nach dem Speichern automatisch ausgef&uuml;llt" readonly="readonly" disabled="disabled" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Bar -->
+            <div class="d-flex justify-content-between align-items-center my-4 p-3 bg-light rounded border shadow-sm">
+                <div>';
+                    if (isset($_SESSION['upload_movie']['movie_id'])) {
+                        $site .= '                                 
+                        <input type="hidden" name="movie_id" value="'.$movie_id.'" />
+                        <input type="submit" class="btn btn-outline-danger content_ruels" name="delete_movie" value="Film l&ouml;schen" />
+                        ';
+                    }
+                    $site .= '
+                </div>
+
+                <div>
+                    <input type="submit" class="btn btn-primary btn-lg content_ruels" name="submit_step1" value="Speichern und weiter mit Schritt 2" />
+                </div>
             </div>';
 
             include_once(MCP_DIR.'/includes/overlays/content_rules.php');
                     
             $site .= '
         </form>
-        ';
-    } else if (isset($_GET['step']) AND $_GET['step'] == 2 AND isset($_GET['movie_id'])) {
+        ';} else if (isset($_GET['step']) AND $_GET['step'] == 2 AND isset($_GET['movie_id'])) {
         $movie_id = abs($_GET['movie_id']);
         
         // Prüfe ob dieser Film existiert
@@ -685,32 +894,7 @@ $site .= '
         $_SESSION['upload_movie']['movie_id'] = $movie_id;
 
         $site .= '
-        <div class="ui-widget-content" style="padding:10px 0;">
-            <table style="width:100%;">
-                <tr>
-                    <td style="width:25%; text-align:center; font-size:15px; color:#008000; font-weight:bold;">
-                        Schritt 1<br />
-                        <a href="?step=1"><i class="material-symbols-outlined md-40 md-ok">subject</i></a><br />
-                        Filminfos angeben
-                    </td>
-                    <td style="width:25%; text-align:center; font-size:15px; color:#FF9900; font-weight:bold;">
-                        Schritt 2<br />
-                        <i class="material-symbols-outlined md-40 md-progress">cloud_upload</i><br />
-                        Film hochladen
-                    </td>
-                    <td style="width:25%; text-align:center; font-size:15px;">
-                        Schritt 3<br />
-                        <i class="material-symbols-outlined md-40">settings</i><br />
-                        Film konvertieren
-                    </td>
-                    <td style="width:25%; text-align:center; font-size:15px;">
-                        Schritt 4<br />
-                        <i class="material-symbols-outlined md-40">cloud_done</i><br />
-                        ver&ouml;ffentlichen
-                    </td>
-                </tr>
-            </table>
-        </div>
+' . get_upload_wizard_html(2) . '
 
         <style>
 
@@ -973,32 +1157,7 @@ $site .= '
         $movie_id = abs($_GET['movie_id']);
         
         $site .= '
-        <div class="ui-widget-content" style="padding:10px 0;">
-            <table style="width:100%;">
-                <tr>
-                    <td style="width:25%; text-align:center; font-size:15px; color:#008000; font-weight:bold;">
-                        Schritt 1<br />
-                        <i class="material-symbols-outlined md-40 md-ok">subject</i><br />
-                        Filminfos angeben
-                    </td>
-                    <td style="width:25%; text-align:center; font-size:15px; color:#008000; font-weight:bold;">
-                        Schritt 2<br />
-                        <i class="material-symbols-outlined md-40 md-ok">cloud_upload</i><br />
-                        Film hochladen
-                    </td>
-                    <td style="width:25%; text-align:center; font-size:15px; color:#FF9900; font-weight:bold;">
-                        Schritt 3<br />
-                        <i class="material-symbols-outlined md-40 md-progress">settings</i><br />
-                        Film konvertieren
-                    </td>
-                    <td style="width:25%; text-align:center; font-size:15px;">
-                        Schritt 4<br />
-                        <i class="material-symbols-outlined md-40">cloud_done</i><br />
-                        ver&ouml;ffentlichen
-                    </td>
-                </tr>
-            </table>
-        </div>
+' . get_upload_wizard_html(3) . '
         
         <div class="ui-widget-content" style="padding:10px 10px 20px 10px; margin-top:10px;">
             <div style="color:#339966; text-align:center;"><i class="material-symbols-outlined md-80">done</i></div>

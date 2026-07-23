@@ -93,6 +93,8 @@ $movie['meta_description'] = $m->field('meta_description');
 $movie['seo_url'] = $m->field('seo_url');
 $movie['actor_id'] = $m->field('actor_id');
 $movie['visible_for_website'] = $m->field('visible_for_website');
+$movie['category_master'] = $m->field('category_master');
+$movie['category_slave'] = $m->field('category_slave');
 
 if ($movie['visible_for_website'] == 'public') {
     $movie['visible_for_website'] = 'alle Partnerwebsites';
@@ -245,6 +247,18 @@ if (isset($_POST['edit_movie']) OR isset($_POST['save_movie'])) {
         } else {
             $movie['preview'] = '0';
         }
+
+        if (!isset($_POST['category_master']) OR empty($_POST['category_master'])) {
+            $error = 'Bitte w&auml;hle eine Hauptkategorie (Porno oder Fetisch) aus.';
+        } else {
+            $movie['category_master'] = trim(strip_tags($_POST['category_master']));
+        }
+
+        if (!isset($_POST['category_slave']) OR !is_array($_POST['category_slave'])) {
+            $movie['category_slave'] = '';
+        } else {
+            $movie['category_slave'] = trim(strip_tags(implode(',', $_POST['category_slave'])));
+        }
         
         /*
         echo '<pre>';
@@ -271,8 +285,17 @@ if (isset($_POST['edit_movie']) OR isset($_POST['save_movie'])) {
             `amount_webmaster` = '".abs($movie['amount_webmaster'])."',
             `as_download` = '".abs($movie['as_download'])."',
             `amount_download` = '".abs($movie['amount_download'])."',
+            `category_master` = '".p4c_escape_string($movie['category_master'])."',
+            `category_slave` = '".p4c_escape_string($movie['category_slave'])."',
             `preview`='".abs($movie['preview'])."'
             WHERE `id`='".abs($movie_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__)) {
+
+            if ($count_movie_online > 0) {
+                p4c_query("UPDATE `movies_online` SET
+                    `category_master` = '".p4c_escape_string($movie['category_master'])."',
+                    `category_slave` = '".p4c_escape_string($movie['category_slave'])."'
+                    WHERE `file_id`='".p4c_escape_string($m->field('file_id'))."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__);
+            }
            
             if (isset($_POST['edit_movie'])) {
                 p4c_query("UPDATE `movies` SET
@@ -317,7 +340,7 @@ $site .= '
 -->
 </style>
 
-<div style="width:600px;">
+<div style="max-width: 1600px;">
     <h1 class="h4">Film bearbeiten</h1>
 
     ';
@@ -410,87 +433,86 @@ $site .= '
         </script>
     
         
-        <div class="ui-widget-content" style="padding:10px 0;">
-            <table style="width:600px">
-                <tr>
-                    <td style="width:25%; text-align:center; color:#008000; font-weight:bold; font-size:15px;">
-                        Schritt 1<br />
-                        <i class="material-symbols-outlined md-40 md-ok">subject</i><br />
-                        Filminfos angeben
-                    </td>
-                    <td style="width:25%; text-align:center; color:#008000; font-weight:bold; font-size:15px;">
-                        Schritt 2<br />
-                        <i class="material-symbols-outlined md-40 md-ok">cloud_upload</i><br />
-                        Film hochladen
-                    </td>
-                    ';
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body p-3">
+                <div class="row text-center g-2">
+                    <div class="col-3">
+                        <div class="p-2 rounded bg-success text-white shadow-sm h-100 d-flex flex-column justify-content-center align-items-center" style="min-height: 70px;">
+                            <span class="badge bg-white text-success rounded-circle mb-1"><i class="bi bi-check-lg"></i></span>
+                            <small class="d-block lh-sm">Schritt 1<br><span class="fw-normal">Filminfos angeben</span></small>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="p-2 rounded bg-success text-white shadow-sm h-100 d-flex flex-column justify-content-center align-items-center" style="min-height: 70px;">
+                            <span class="badge bg-white text-success rounded-circle mb-1"><i class="bi bi-check-lg"></i></span>
+                            <small class="d-block lh-sm">Schritt 2<br><span class="fw-normal">Film hochladen</span></small>
+                        </div>
+                    </div>';
                     if ($m->field('convert_status') <= 1 OR $m->field('convert_status') > 2) {
                         $site .= '
-                        <td style="width:25%; text-align:center; color:#FF9900; font-size:15px;">
-                            Schritt 3<br />
-                            <i class="material-symbols-outlined md-40 md-progress">settings</i><br />
-                            Film wird konvertiert
-                        </td>
-                        ';
+                    <div class="col-3">
+                        <div class="p-2 rounded bg-warning text-dark shadow-sm h-100 d-flex flex-column justify-content-center align-items-center" style="min-height: 70px;">
+                            <span class="badge bg-white text-dark rounded-circle mb-1">3</span>
+                            <small class="fw-bold d-block lh-sm">Schritt 3<br><span class="fw-normal">Konvertiert...</span></small>
+                        </div>
+                    </div>';
                     } else {
                         $site .= '
-                        <td style="width:25%; text-align:center; color:#008000; font-weight:bold; font-size:15px;">
-                            Schritt 3<br />
-                            <i class="material-symbols-outlined md-40 md-ok">settings</i><br />
-                            Film konvertiert
-                        </td>
-                        ';                        
+                    <div class="col-3">
+                        <div class="p-2 rounded bg-success text-white shadow-sm h-100 d-flex flex-column justify-content-center align-items-center" style="min-height: 70px;">
+                            <span class="badge bg-white text-success rounded-circle mb-1"><i class="bi bi-check-lg"></i></span>
+                            <small class="d-block lh-sm">Schritt 3<br><span class="fw-normal">Film konvertiert</span></small>
+                        </div>
+                    </div>';                        
                     }
                     
                     if ($m->field('movie_checked') != '0000-00-00 00:00:00') {
                         $site .= '
-                        <td style="width:25%; text-align:center; color:#008000; font-weight:bold; font-size:15px;">
-                            Schritt 3<br />
-                            <i class="material-symbols-outlined md-40 md-ok">cloud_done</i><br />
-                            Online
-                        </td>
-                        ';    
-                    
-                    // Film zur Prüfung freigegeben
+                    <div class="col-3">
+                        <div class="p-2 rounded bg-success text-white shadow-sm h-100 d-flex flex-column justify-content-center align-items-center" style="min-height: 70px;">
+                            <span class="badge bg-white text-success rounded-circle mb-1"><i class="bi bi-check-lg"></i></span>
+                            <small class="d-block lh-sm">Schritt 4<br><span class="fw-normal">Online</span></small>
+                        </div>
+                    </div>';    
                     } else if ($m->field('movie_checked') == '0000-00-00 00:00:00' AND $m->field('released') == 1) {
                         $site .= '
-                        <td style="width:25%; text-align:center; color:#FF9900; font-size:15px;">
-                            Schritt 3<br />
-                            <i class="material-symbols-outlined md-40 md-progress">cloud_done</i><br />
-                            in Pr&uuml;fung
-                        </td>
-                        ';  
-                        
-                    // Film abgelehnt
+                    <div class="col-3">
+                        <div class="p-2 rounded bg-warning text-dark shadow-sm h-100 d-flex flex-column justify-content-center align-items-center" style="min-height: 70px;">
+                            <span class="badge bg-white text-dark rounded-circle mb-1">4</span>
+                            <small class="fw-bold d-block lh-sm">Schritt 4<br><span class="fw-normal">In Pr&uuml;fung</span></small>
+                        </div>
+                    </div>';  
                     } else if ($m->field('movie_checked') == '0000-00-00 00:00:00' AND $m->field('released') == 2) {
                         $site .= '
-                        <td style="width:25%; text-align:center; color:#ff0000; font-size:15px;">
-                            Schritt 3<br />
-                            <i class="material-symbols-outlined md-40 md-error">cloud_off</i><br />
-                            Abgelehnt!
-                        </td>
-                        ';  
-                        
+                    <div class="col-3">
+                        <div class="p-2 rounded bg-danger text-white shadow-sm h-100 d-flex flex-column justify-content-center align-items-center" style="min-height: 70px;">
+                            <span class="badge bg-white text-danger rounded-circle mb-1">!</span>
+                            <small class="fw-bold d-block lh-sm">Schritt 4<br><span class="fw-normal">Abgelehnt!</span></small>
+                        </div>
+                    </div>';  
                     } else if ($m->field('convert_status') == 2) {
                         $site .= '
-                        <td style="width:25%; text-align:center; color:#FF9900; font-size:15px;">
-                            Schritt 4<br />
-                            <i class="material-symbols-outlined md-40 md-progress">cloud_done</i><br />
-                            ver&ouml;ffentlichen
-                        </td>';
+                    <div class="col-3">
+                        <div class="p-2 rounded bg-warning text-dark shadow-sm h-100 d-flex flex-column justify-content-center align-items-center" style="min-height: 70px;">
+                            <span class="badge bg-white text-dark rounded-circle mb-1">4</span>
+                            <small class="fw-bold d-block lh-sm">Schritt 4<br><span class="fw-normal">Ver&ouml;ffentlichen</span></small>
+                        </div>
+                    </div>';
                     } else {
                         $site .= '
-                        <td style="width:25%; text-align:center; font-size:15px;">
-                            Schritt 4<br />
-                            <i class="material-symbols-outlined md-40">cloud_done</i><br />
-                            ver&ouml;ffentlichen
-                        </td>';
+                    <div class="col-3">
+                        <div class="p-2 rounded bg-light text-muted h-100 d-flex flex-column justify-content-center align-items-center" style="min-height: 70px;">
+                            <span class="badge bg-secondary rounded-circle mb-1">4</span>
+                            <small class="d-block lh-sm">Schritt 4<br><span class="fw-normal">Ver&ouml;ffentlichen</span></small>
+                        </div>
+                    </div>';
                     }
-                    $site .= '
-                </tr>
-            </table>
-        </div>';
                     
+                    $site .= '
+                </div>
+            </div>
+        </div>';
+
         if ($m->field('movie_checked') == '0000-00-00 00:00:00' AND $m->field('released') == 2) {
             $rs_rejection_reason_movie_history = p4c_query("SELECT * FROM `rejection_reason_movie_history` WHERE `movie_file_id`='".p4c_escape_string($m->field('file_id'))."' ORDER BY `datetime` DESC LIMIT 1;",__FILE__,__LINE__);
             $reson_history_obj = p4c_fetch_object($rs_rejection_reason_movie_history);
@@ -553,132 +575,85 @@ $site .= '
                             <tr>
                                 <td style="width:110px; vertical-align:top;">
                                     <img src="'.MCP_URL.'/PlayerPoster/'.$dublicat_ary->file_id.'&w=100" style="width:100px; height:auto;" />
-                                </td>
+                                </div>
                                 <td style="vertical-align:middle;">
                                     <a href="'.MCP_URL.'/video/'.$dublicat_ary->id.'" target="_blank">Klicke hier um zum Film zu wechseln.</a>
                                     <div style="margin:10px 0;"><b>ODER</b></div>
                                     Wenn dieser Film tats&auml;chlich ein anderer ist, benutze hier einen neuen Titel.
-                                </td>
-                            </tr>
-                        </table>
+                                </div>
+                            
+                        
                     </div>';
                 }
             }
         }
                     
-        // Player erst anzeign wenn Film erfolgreich konvertiert wurde
-        if ($m->field('convert_status') > 1) {
-            if ($m->field('resolution') != '') {
-                $explode = explode('x', $m->field('resolution'));
-                $width = $explode[0];
-                $height = $explode[1];
-                
-                // 16:9
-                if ($width=='720' AND $height=='400') {
-                    $width = '600';
-                    $height = '363';
-                // 16:9
-                } elseif ($width=='1024' AND $height=='576') {
-                    $width = '600';
-                    $height = '363';
-                // 16:9
-                } elseif ($width=='1224' AND $height=='720') {
-                    $width = '600';
-                    $height = '363';
-                // 16:9
-                } elseif ($width=='1280' AND $height=='720') {
-                    $width = '600';
-                    $height = '363';
-                // 4:3
-                } elseif ($width=='1280' AND $height=='1024') {
-                    $width = '600';
-                    $height = '450';
-                // 4:3                                    
-                } elseif ($width=='1440' AND $height=='1080') {
-                    $width = '600';
-                    $height = '450';
-                // 16:9
-                } elseif ($width > '1280'){
-                    $width = '600';
-                    $height = '363';
-                // 4:3
-                } elseif ($width=='1000' AND $height=='750') {
-                    $width = '600';
-                    $height = '450';
-                // 4:3
-                } elseif ($width=='320' AND $height=='240') {
-                    $width = '600';
-                    $height = '450';
-                } else {
-                    $width = '600';
-                    $height = '478';
-                }
-            } else {
-                $width = '600';
-                $height = '478';
-            }
-
-            $width = round($width);
-            $height = round($height);
-
-            $site .= '
-            <center>
-                <video id="video_'.$m->field('id').'"
-                    poster="'.MCP_URL.'/PlayerPoster/'.$m->field('file_id').'&w='.$width.'&h='.$height.'"
-                    width="'.$width.'" height="'.$height.'"
-                    preload="auto" controls >
-                    <source src="'.MCP_URL.'/Player/'.$m->field('file_id').'" type="video/mp4" />
-                </video>
-            </center>';
-        }
-        
         $site .= '
         <form id="form_edit" action="" method="post">';
             if ($m->field('convert_status') <= 1 OR $m->field('convert_status') > 2) {
-                $site .= '<div class="ui-state-error" style="margin-top:10px; padding:10px;">Derzeit befindet sich der Film in der Konvertierung. </div>';
+                $site .= '<div class="alert alert-warning shadow-sm mb-4">Derzeit befindet sich der Film in der Konvertierung.</div>';
             } else if ($m->field('convert_status') == 2) {
                 $site .= '
-                <div class="ui-widget-header" style="padding:5px 10px; margin-top:10px;">Vorschaubild ausw&auml;hlen</div>
-                <div class="ui-widget-content" style="padding:10px 0 5px 0px; border-top:none;">
-                    <div style="margin-left:10px;">';
+                <!-- Zeile 1: Links Video-Vorschau, Rechts Vorschaubild auswÃ¤hlen -->
+                <div class="row g-4 mb-4">
+                    <div class="col-12 col-lg-6">
+                        <div class="card shadow-sm h-100 mb-0">
+                            <div class="card-header bg-light fw-bold py-3"><i class="bi bi-play-btn me-2"></i>Video-Vorschau</div>
+                            <div class="card-body text-center bg-dark rounded-bottom p-3 d-flex align-items-center justify-content-center">
+                                <video id="video_'.$m->field('id').'"
+                                    poster="'.MCP_URL.'/PlayerPoster/'.$m->field('file_id').'&w=1280&h=720"
+                                    width="100%"
+                                    preload="auto" controls class="w-100 h-auto rounded shadow-sm" style="max-height: 650px;">
+                                    <source src="'.MCP_URL.'/Player/'.$m->field('file_id').'" type="video/mp4" />
+                                </video>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-12 col-lg-6">
+                        <div class="card shadow-sm h-100 mb-0">
+                            <div class="card-header bg-light fw-bold py-3"><i class="bi bi-image me-2"></i>Vorschaubild ausw&auml;hlen</div>
+                        <div class="card-body">
+                            <div class="row row-cols-2 row-cols-md-3 g-2 mb-3">';
                         for($i=1;$i<=10;$i++) {
+                            $thumb_base = MOVIES_PATH.'/'.$m->field('storage_location').'/'.$m->field('merchant_id').'/'.$m->field('id').'/thumb_'.substr($m->field('filename'),0,-4).'_'.$i;
+                            if (!file_exists($thumb_base.'.jpg') AND !file_exists($thumb_base.'.jpeg') AND !file_exists($thumb_base.'.png')) {
+                                continue;
+                            }
+
                             if ($movie['fsk16'] == $i) {$selected_fsk16 = 'checked="checked"';} else {$selected_fsk16 = '';}
                             if ($movie['fsk18'] == $i) {$selected_fsk18 = 'checked="checked"';} else {$selected_fsk18 = '';}
                             $site .= '
-                            <div style="float:left; padding:0px 10px 5px 0px; position: relative;">
-                                <img src="'.MCP_URL.'/thumb.php?movie_id='.$m->field('file_id').'&thumb_number='.$i.'&w=186" alt="" style="width:186px; height:auto;" />
-                                <div class="ui-widget-header" style="border:none; color:rgb(111, 111, 111);">
-                                    <table style="width:100%">
-                                        <tr>
-                                            <td style="width:50px; text-align:center;">
-                                                <label for="fsk16_'.$i.'">FSK16 <input type="radio" name="fsk16" '.$selected_fsk16.' value="'.$i.'" id="fsk16_'.$i.'" /></label>
-                                            </td>
-                                            <td style="width:50px; text-align:center;">
-                                                <label for="fsk18_'.$i.'"><input type="radio" name="fsk18" '.$selected_fsk18.' value="'.$i.'" id="fsk18_'.$i.'" /> FSK18</label>
-                                            </td>
-                                        </tr>
-                                    </table>
+                            <div class="col">
+                                <div class="border rounded p-2 text-center bg-light h-100 shadow-sm">
+                                    <img src="'.MCP_URL.'/thumb.php?movie_id='.$m->field('file_id').'&thumb_number='.$i.'&w=186" alt="" class="img-fluid rounded mb-2" style="aspect-ratio: 16/9; object-fit: cover; width: 100%;" />
+                                    <div class="d-flex justify-content-around small">
+                                        <label for="fsk16_'.$i.'">FSK16 <input type="radio" name="fsk16" '.$selected_fsk16.' value="'.$i.'" id="fsk16_'.$i.'" /></label>
+                                        <label for="fsk18_'.$i.'">FSK18 <input type="radio" name="fsk18" '.$selected_fsk18.' value="'.$i.'" id="fsk18_'.$i.'" /></label>
+                                    </div>
                                 </div>
                             </div>';
                         }
                         if ($movie['fsk16'] == 11) {$selected_fsk16 = 'checked="checked"';} else {$selected_fsk16 = '';}
                         if ($movie['fsk18'] == 12) {$selected_fsk18 = 'checked="checked"';} else {$selected_fsk18 = '';}
                         $site .= '
-                        <div style="float:left; padding:0px 10px 5px 0px; position: relative;">
-                            <img src="'.MCP_URL.'/thumb.php?movie_id='.$m->field('file_id').'&thumb_number=11&w=186&'.time().'" alt="" style="width:186px; height:auto;" />
-                            <div class="ui-widget-header" style="text-align:center; border:none; color:rgb(111, 111, 111);">
-                                <label for="fsk16_11"><input type="radio" name="fsk16" '.$selected_fsk16.' value="11" id="fsk16_11" /> individuelles FSK16</label>
-                            </div> 
-                        </div>
-                        <div style="float:left; padding:0px 10px 5px 0px; position: relative;">
-                            <img src="'.MCP_URL.'/thumb.php?movie_id='.$m->field('file_id').'&thumb_number=12&w=186&'.time().'" alt="" style="width:186px; height:auto;" />
-                            <div class="ui-widget-header" style="text-align:center; border:none; color:rgb(111, 111, 111);">
-                                <label for="fsk18_12"><input type="radio" name="fsk18" '.$selected_fsk18.' value="12" id="fsk18_12" /> individuelles FSK18</label>
+                        <div class="col">
+                            <div class="border rounded p-2 text-center bg-light h-100 shadow-sm">
+                                <img src="'.MCP_URL.'/thumb.php?movie_id='.$m->field('file_id').'&thumb_number=11&w=186&'.time().'" alt="" class="img-fluid rounded mb-2" style="aspect-ratio: 16/9; object-fit: cover; width: 100%;" />
+                                <div class="small">
+                                    <label for="fsk16_11"><input type="radio" name="fsk16" '.$selected_fsk16.' value="11" id="fsk16_11" /> eigenes FSK16</label>
+                                </div>
                             </div>
                         </div>
-
-                        <div style="clear:both"></div>
-                    </div>
+                        <div class="col">
+                            <div class="border rounded p-2 text-center bg-light h-100 shadow-sm">
+                                <img src="'.MCP_URL.'/thumb.php?movie_id='.$m->field('file_id').'&thumb_number=12&w=186&'.time().'" alt="" class="img-fluid rounded mb-2" style="aspect-ratio: 16/9; object-fit: cover; width: 100%;" />
+                                <div class="small">
+                                    <label for="fsk18_12"><input type="radio" name="fsk18" '.$selected_fsk18.' value="12" id="fsk18_12" /> eigenes FSK18</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div> <!-- End thumb grid row -->
         
                     <script type="text/javascript">
                         // <![CDATA[
@@ -730,32 +705,34 @@ $site .= '
                     // ]]>
                     </script>
 
-                    <div class="ui-widget-header" style="padding:5px 10px; border-left:none; border-right:none;">Hier kannst du individuelle Vorschaubilder hochladen.</div>
-                    <div class="ui-widget-content" style="padding:10px; border:none;">
-                        <div style="margin-bottom:15px;">
-                            Erlaubte Dateiformate: jpg & png<br />
-                            Maximale Dateigr&ouml;&szlig;e: 5 MB
-                        </div>
-                        <div id="uploader_fsk16_preview_image">FSK16 Vorschaubild hochladen</div>
-                        <div id="uploader_fsk18_preview_image" style="margin-top:10px;">FSK18 Vorschaubild hochladen</div>
+                    <hr class="my-3">
+                    <h6 class="fw-bold mb-2 small"><i class="bi bi-cloud-upload me-1"></i>Individuelle Vorschaubilder hochladen</h6>
+                    <div class="text-muted small mb-2">
+                        Erlaubte Dateiformate: jpg &amp; png | Max: 5 MB
                     </div>
-
-                </div>';
+                    <div id="uploader_fsk16_preview_image" class="mb-2">FSK16 Vorschaubild hochladen</div>
+                    <div id="uploader_fsk18_preview_image">FSK18 Vorschaubild hochladen</div>
+                </div></div></div></div> <!-- End Zeile 1 Row & Col -->';
             }
             
             $site .= '
-            <div class="ui-widget-header" style="padding:5px 10px; margin-top:10px;">Angaben zum Film</div>
-            <div class="ui-widget-content" style="padding:10px; border-top:none;">
+            
+        <!-- Zeile 2: Links Angaben zum Film, Rechts Film kategorisieren -->
+        <div class="row g-4 mb-4">
+            <div class="col-12 col-lg-6">
+                <div class="card shadow-sm h-100 mb-0">
+                    <div class="card-header bg-light fw-bold py-3"><i class="bi bi-film me-2"></i>Angaben zum Film</div>
+                    <div class="card-body">
                 <div class="edit_title">Gib einen aussagekr&auml;ftigen Filmtitel an. <span id="anzahl_title">(max. 65 Zeichen)</span></div>
                 <div class="edit_content" style="margin-bottom:8px;">
-                    <input type="text" name="title" value="'.$movie['title'].'" onkeyup="jQuery(this).zaehle_zeichen(65, \'anzahl_title\')" placeholder="Gib einen aussagekr&auml;ftigen Filmtitel an." style="font-size:18px;" />
+                    <input type="text" class="form-control form-control-lg" name="title" value="'.$movie['title'].'" onkeyup="jQuery(this).zaehle_zeichen(65, \'anzahl_title\')" placeholder="Gib einen aussagekr&auml;ftigen Filmtitel an." style="font-size:18px;" />
                 </div>
     
                 <div class="edit_title">Gib eine gute und aussagekr&auml;ftige <b>Beschreibung</b> des Films an.</div>
                 <div class="edit_content" style="margin-bottom:8px;">
                     <textarea name="description" id="description">'.$movie['description'].'</textarea>
                     <script>
-                        CKEDITOR.replace("description", {customConfig: "'.MCP_URL.'/fw/ckeditor/movie_upload_config.js?v=1"});
+                        CKEDITOR.replace("description", {customConfig: "'.MCP_URL.'/fw/ckeditor/movie_upload_config.js"});
                     </script>
                 </div>
                 ';
@@ -765,13 +742,13 @@ $site .= '
                     $site .= '
                     <div class="edit_title">Ab wann soll der Film fr&uuml;hsten ver&ouml;ffentlicht werden?</div>
                     <div class="edit_content" style="margin-bottom:8px;">
-                        <input class="flatpickr" name="online_at" type="text" value="'.$movie['online_at'].'" />
+                        <input class="flatpickr form-control" name="online_at" type="text" value="'.$movie['online_at'].'" />
                     </div>';
                 } else {
                     $site .= '
                     <div class="edit_title">Der Film wurde ver&ouml;ffentlicht am:</div>
                     <div class="edit_content" style="margin-bottom:8px;">
-                        <input name="online_at" type="text" value="'.$movie['online_at'].'" readonly="readonly" disabled="disapled" />
+                        <input class="form-control" name="online_at" type="text" value="'.$movie['online_at'].'" readonly="readonly" disabled="disapled" />
                     </div>';
                     
                 }
@@ -811,13 +788,172 @@ $site .= '
                 <div style="padding:5px;">
                     <label for="trailer" ><input type="checkbox" name="trailer" id="trailer" /> Der Film ist ein Trailer/ Vorstellungsvideo und soll den Kunden kostenlos angeboten werden.</label>
                 </div>
+            </div></div></div> <!-- End Angaben zum Film card & col -->
+            
+            <div class="col-12 col-lg-6">
+                <div class="card shadow-sm h-100 mb-0">
+                    <div class="card-header bg-light fw-bold py-3"><i class="bi bi-tags me-2"></i>Film kategorisieren</div>
+                    <div class="card-body p-0">
+                        <div class="p-3 bg-light border-bottom font-weight-bold fw-bold">Hauptkategorie</div>
+                        <div class="p-3 border-bottom">';
+                if ($movie['category_master'] == 'porn') {$checked_porn = 'checked="checked"';} else {$checked_porn='';}
+                $site .= '
+                <div style="padding:5px; border-bottom:1px solid #ccc;">
+                    <div style="font-weight:bold;">
+                        <label for="porn"><input type="radio" '.$checked_porn.' id="porn" name="category_master" value="porn" /> Porno</label>
+                    </div>
+                    <div style="padding-left:20px;">
+                        W&auml;hle diese Kategorie, wenn der Film pornografische Inhalte enth&auml;lt.
+                    </div>
+                </div>';
+                if ($movie['category_master'] == 'fetish') {$checked_fetish = 'checked="checked"';} else {$checked_fetish='';}
+                $site .= '
+                <div style="padding:5px;">
+                    <div style="font-weight:bold;">
+                        <label for="fetish"><input type="radio" '.$checked_fetish.' id="fetish" name="category_master" value="fetish" /> Fetisch</label>
+                    </div>
+                    <div style="padding-left:20px;">
+                        W&auml;hle diese Kategorie, wenn der Film ein reiner Fetischfilm, wie SM, BDSM usw. ist.
+                    </div>
+                </div>
             </div>
-            <div class="ui-widget-header" style="padding:5px 10px; border-top:none;">weitere Einstellungen</div>
-            <div class="ui-widget-content" style="padding:10px; border-top:none;">
+
+            </div>
+            <div class="p-3 bg-light border-bottom font-weight-bold fw-bold">W&auml;hle alle Kategorien, die zum Film passen</div>
+            <div class="p-3 border-bottom text-dark small" style="background-color: #fff6d0; border-color: #ffe8a1;">
+                <i class="bi bi-info-circle-fill text-warning me-2"></i><strong>Hinweis:</strong> Vom System automatisch vorausgew&auml;hlte Kategorien werden gelb hervorgehoben. Sie k&ouml;nnen diese &uuml;berpr&uuml;fen und bei Bedarf anpassen.
+            </div>
+            <div class="p-3">';
+            
+                $saved_category_ary = !empty($movie['category_slave']) ? explode(',', $movie['category_slave']) : [];
+                $actor_categories = [];
+                if (!empty($movie['actor_id'])) {
+                    $rs_actor_cat = p4c_query("SELECT `actor_categories` FROM `actors` WHERE `id`='".abs($movie['actor_id'])."';",__FILE__,__LINE__);
+                    if ($rs_actor_cat AND p4c_num_rows($rs_actor_cat) > 0) {
+                        $actor_row = p4c_fetch_object($rs_actor_cat);
+                        $actor_categories = explode(',', $actor_row->actor_categories);
+                    }
+                }
+
+                $search_text = strtolower(strip_tags($movie['title'] . ' ' . $movie['description']));
+
+                $site .= '
+                <div class="accordion accordion-flush" id="categoryAccordion">';
+
+                $cat_groups = [
+                    ["id" => "cat_people", "title" => "Anzahl der Personen &amp; sexuelle Orientierung", "group" => "number_of_people"],
+                    ["id" => "cat_body", "title" => "K&ouml;rper und Aussehen", "group" => "look_and_body"],
+                    ["id" => "cat_fetish", "title" => "Fetisch", "group" => "fetish"],
+                    ["id" => "cat_other", "title" => "Sonstige", "group" => "porn"]
+                ];
+
+                foreach($cat_groups as $cat_g) {
+                    $rs_count = p4c_query("SELECT * FROM `movie_categories` WHERE `category_group`='".$cat_g['group']."';",__FILE__,__LINE__);
+                    $selected_count = 0;
+                    $items_html = '';
+
+                    while($category_obj = p4c_fetch_object($rs_count)) {
+                        $is_saved = in_array($category_obj->name_id, $saved_category_ary);
+
+                        // Check system auto-detection (by title/description keywords or actor categories)
+                        $is_system_detected = false;
+                        if (!empty($search_text)) {
+                            if (strpos($search_text, strtolower($category_obj->name_id)) !== false OR strpos($search_text, strtolower($category_obj->de_name_value)) !== false) {
+                                $is_system_detected = true;
+                            } else if (!empty($category_obj->more_search_words)) {
+                                $words = explode(',', strtolower($category_obj->more_search_words));
+                                foreach ($words as $w) {
+                                    $w = trim($w);
+                                    if (!empty($w) AND strpos($search_text, $w) !== false) {
+                                        $is_system_detected = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        if (!$is_system_detected AND !empty($actor_categories) AND in_array($category_obj->name_id, $actor_categories)) {
+                            $is_system_detected = true;
+                        }
+
+                        // Determine selection state & yellow styling
+                        if ($is_saved OR $is_system_detected) {
+                            $checked_cat_slave = 'checked="checked"';
+                            $selected_count++;
+
+                            if ($is_system_detected) {
+                                $card_extra_class = 'border-warning';
+                                $inline_style = 'style="background-color: #fff6d0; border: 1px solid #ffe8a1;"';
+                            } else {
+                                $card_extra_class = 'bg-white border-primary shadow-sm';
+                                $inline_style = '';
+                            }
+                        } else {
+                            $checked_cat_slave = '';
+                            $card_extra_class = 'bg-light border-light';
+                            $inline_style = '';
+                        }
+
+                        $items_html .= '
+                        <div class="col">
+                            <div class="p-2 rounded h-100 '.$card_extra_class.'" '.$inline_style.'>
+                                <div class="form-check m-0">
+                                    <input class="form-check-input" type="checkbox" '.$checked_cat_slave.' id="'.$category_obj->name_id.'" name="category_slave[]" value="'.$category_obj->name_id.'" />
+                                    <label class="form-check-label fw-bold small text-dark" for="'.$category_obj->name_id.'">'.$category_obj->de_name_value.'</label>
+                                </div>
+                                '.(!empty($category_obj->de_name_text) ? '<div class="text-muted ms-4 mt-1" style="font-size: 11px; line-height: 1.2;">'.$category_obj->de_name_text.'</div>' : '').'
+                            </div>
+                        </div>';
+                    }
+
+                    $badge_html = '';
+                    if ($selected_count > 0) {
+                        $badge_html = '<span class="badge bg-primary ms-2">'.$selected_count.' ausgew&auml;hlt</span>';
+                    }
+
+                    $site .= '
+                    <div class="accordion-item border-bottom">
+                        <h2 class="accordion-header" id="heading_'.$cat_g['id'].'">
+                            <button class="accordion-button collapsed fw-bold py-2 shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_'.$cat_g['id'].'" aria-expanded="false" aria-controls="collapse_'.$cat_g['id'].'">
+                                '.$cat_g['title'].' '.$badge_html.'
+                            </button>
+                        </h2>
+                        <div id="collapse_'.$cat_g['id'].'" class="accordion-collapse collapse" aria-labelledby="heading_'.$cat_g['id'].'" data-bs-parent="#categoryAccordion">
+                            <div class="accordion-body p-2">
+                                <div class="row row-cols-1 row-cols-md-2 g-2">
+                                    '.$items_html.'
+                                </div>
+                            </div>
+                        </div>
+                    </div>';
+                }
+
+                $site .= '
+                </div>
+                <script type="text/javascript">
+                    jQuery(document).ready(function() {
+                        jQuery("#categoryAccordion .accordion-button").click(function(e) {
+                            var target = jQuery(this).attr("data-bs-target");
+                            if (!target) target = jQuery(this).attr("data-target");
+                            if (target) {
+                                jQuery(target).collapse("toggle");
+                            }
+                        });
+                    });
+                </script>
+                </div></div></div> <!-- End Film kategorisieren card & col -->
+        </div> <!-- End Zeile 2 Row -->';
+
+        $site .= '
+        <!-- Zeile 3: Links Weitere Einstellungen, Rechts SEO -->
+        <div class="row g-4 mb-4">
+            <div class="col-12 col-lg-6">
+                <div class="card shadow-sm h-100 mb-0">
+                    <div class="card-header bg-light fw-bold py-3"><i class="bi bi-sliders me-2"></i>Weitere Einstellungen</div>
+                    <div class="card-body">
                 
                 <div class="edit_title">Welchem Darsteller soll der Film zugeordnet werden?</div>
                 <div class="edit_content" style="margin-bottom:8px;">
-                    <select name="actor_id">';
+                    <select class="form-select" name="actor_id">';
                         $rs_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `status`='active' ORDER BY `username` ASC",__FILE__,__LINE__);
                         if (p4c_num_rows($rs_actors) > 0) {
                             while($actor_obj = p4c_fetch_object($rs_actors)) {
@@ -829,28 +965,25 @@ $site .= '
                     </select>
                 </div>
 
-                <div class="edit_title">Auf welcher Website soll der Film ver&ouml;ffentlicht werden?</div>
-                <div class="edit_content" style="margin-bottom:8px;">
-                    <!--
-                    <select name="visible_for_website">
-                        <option value="public"> alle Partnerwebsites</option>';
+                <div class="edit_title fw-bold mb-1">Auf welcher Website soll der Film ver&ouml;ffentlicht werden?</div>
+                <div class="edit_content mb-3">
+                    <select id="visible_for_website" class="form-select" name="visible_for_website">';
                         $rs_websites = p4c_query("SELECT * FROM `sites` WHERE `partner_id`='". p4c_escape_string($merchant->partner_id())."' AND `status`='1' ORDER BY `domain` ASC;",__FILE__,__LINE__);
                         if (p4c_num_rows($rs_websites) > 0) {
                             while($site_obj = p4c_fetch_object($rs_websites)) {
-                                $site .= '<option value="'.$site_obj->domain.'"> '.$site_obj->domain.'</option>';
+                                $selected = ($movie['visible_for_website'] == $site_obj->domain) ? 'selected="selected"' : '';
+                                $site .= '<option value="'.$site_obj->domain.'" '.$selected.'> '.$site_obj->domain.'</option>';
                             }
                         }
                         $site .= '
-                    </select><br />
-                    //-->
-                    <input type="text" value="'.$movie['visible_for_website'].'" readonly="readonly" disabled="disapled" />
-                    <span style="font-size:10px;">Bei der Ver&ouml;ffentlichung auf Partnerwebsites, erh&auml;lst du 25% Provision vom Umsatz dieses Filmes.</span>
+                    </select>
+                    <small class="text-muted d-block mt-1">Bei der Ver&ouml;ffentlichung auf Partnerwebsites, erh&auml;lst du 25% Provision vom Umsatz dieses Filmes.</small>
                 </div>
 
                 <!--
                 <div class="edit_title">F&uuml;r wieviel Prozent mehr, soll der Film auf unseren Partnerseiten angeboten werden?</div>
                 <div class="edit_content" style="margin-bottom:8px;">
-                    <select name="amount_webmaster">';
+                    <select class="form-select" name="amount_webmaster">';
                         foreach($amount_webmaster_ary as $percent) {
                             
                             if ($percent == $movie['amount_webmaster']) {
@@ -876,7 +1009,7 @@ $site .= '
                 
                 <div class="edit_title">Darf der Film zum Download angeboten werden?</div>
                 <div class="edit_content" style="margin-bottom:8px;">
-                    <select name="as_download">';
+                    <select class="form-select" name="as_download">';
                         if ($movie['as_download'] == 0) {$selected = 'selected';} else {$selected = '';}
                         $site .= ' 
                         <option value="1"> Ja</option>
@@ -887,7 +1020,7 @@ $site .= '
                 
                 <div class="edit_title">F&uuml;r wieviel Prozent mehr, m&ouml;chtest du den Film als Download anbieten?</div>
                 <div class="edit_content" style="margin-bottom:8px;">
-                    <select name="amount_download">';
+                    <select class="form-select" name="amount_download">';
             		for($i=0;$i<=150;$i++) {
             
                             if (($movie['amount_download'] == $i)) {
@@ -906,53 +1039,53 @@ $site .= '
                     $site .= '
             		</select>
                 </div>
-    
-            </div>
+            </div></div></div> <!-- End Weitere Einstellungen card & col -->
             
-            <div class="ui-widget-header" style="padding:5px 10px; margin-top:10px;">Suchmaschinenoptimierung (SEO)</div>
-            <div class="ui-widget-content" style="padding:10px; border-top:none; margin-bottom:10px;">
+            <div class="col-12 col-lg-6">
+                <div class="card shadow-sm h-100 mb-0">
+                    <div class="card-header bg-light fw-bold py-3"><i class="bi bi-search me-2"></i>Suchmaschinenoptimierung (SEO)</div>
+                    <div class="card-body">
                 <div class="edit_title">Meta Description <span id="anzahl_meta_description">(max. 165 Zeichen)</span></div>
                 <div class="edit_content" style="margin-bottom:8px;">
-                    <textarea type="text" name="meta_description" onkeyup="jQuery(this).zaehle_zeichen(156, \'anzahl_meta_description\')">'.$movie['meta_description'].'</textarea>
+                    <textarea class="form-control" rows="3" name="meta_description" onkeyup="jQuery(this).zaehle_zeichen(156, \'anzahl_meta_description\')">'.$movie['meta_description'].'</textarea>
                     <span style="font-size:10px;">Beschreibe den Film so interessant wie m&ouml;glich mit maximal 156 Zeichen.</span>
                 </div>
                 
                 <div class="edit_title">Meta Title <span id="anzahl_meta_title">(max. 65 Zeichen)</span></div>
                 <div class="edit_content" style="margin-bottom:8px;">
-                    <input type="text" name="meta_title" value="'.$movie['meta_title'].'" readonly="readonly" disabled="disapled" />
+                    <input class="form-control" name="meta_title" value="'.$movie['meta_title'].'" readonly="readonly" disabled="disapled" />
                 </div>
                 
                 <div class="edit_title">SEO-URL (URL-Name)</div>
                 <div class="edit_content" style="margin-bottom:8px;">
-                    <input type="text" name="seo_url" value="'.$movie['seo_url'].'" readonly="readonly" disabled="disapled" />
+                    <input class="form-control" name="seo_url" value="'.$movie['seo_url'].'" readonly="readonly" disabled="disapled" />
                 </div>
-            </div>      
+            </div></div></div> <!-- End SEO card & col -->
+        </div> <!-- End Zeile 3 Row -->
             
-            <input type="hidden" id="submit_param" name="edit_movie" />
+        <input type="hidden" id="submit_param" name="edit_movie" />
 
-            <div style="margin-top:15px; margin-bottom:30px;">
-                <table style="width:100%">
-                    <tr>';
+            <div class="d-flex justify-content-between align-items-center my-4 p-3 bg-light rounded border shadow-sm">';
                         if ($m->field('movie_checked') == '0000-00-00 00:00:00' AND $m->field('released') != 1 AND $count_movie_online == 0) {
                             $site .= '             
-                            <td style="width:200px; text-align:left; vertical-align:middle;">
+                            <div>
                                 <form action="'.MCP_URL.'/Movie-Upload?step=1" method="post">
                                     <input type="hidden" name="movie_id" value="'.$movie_id.'" />
-                                    <input type="submit" class="content_ruels button" name="delete_movie" value="Film l&ouml;schen" />
+                                    <input type="submit" class="btn btn-outline-danger" name="delete_movie" value="Film l&ouml;schen" />
                                 </form>
-                            </td>';
+                            </div>';
                         }
                         $site .= '
-                        <td style="width:auto; text-align:right;  vertical-align:middle;">';
+                        <div class="ms-auto">';
                             if ($m->field('convert_status') == 2 AND $m->field('released') == 0) {
-                                $site .= '<input type="button" id="save_movie" class="button" value="Jetzt in der '.PROJECTNAME.' ver&ouml;ffentlichen" />';
+                                $site .= '<button type="button" id="save_movie" class="btn btn-success btn-lg px-4"><i class="bi bi-check-circle me-2"></i>Jetzt in der '.PROJECTNAME.' ver&ouml;ffentlichen</button>';
                             } else {
-                                $site .= '<input type="button" id="edit_movie" class="button" value="Film erneut zur Pr&uuml;fung einreichen" />';
+                                $site .= '<button type="button" id="edit_movie" class="btn btn-primary btn-lg px-4"><i class="bi bi-send me-2"></i>Film erneut zur Pr&uuml;fung einreichen</button>';
                             }
                             $site .= '
-                        </td>
-                    </tr>
-                </table>
+                        </div>
+                    
+                
             </div>
         </form>
 

@@ -49,9 +49,6 @@ require valid-user
     allow from 84.187.
     allow from 91.10.
 
-    # Thilo
-    allow from 89.244.
-
     # Martin
     BrowserMatch "(Linux; Android 7.0; HTC One A9 Build/NRD90M)" allowed
     BrowserMatch "(Linux; Android 6.0.1; SM-G900F Build/MMB29M)" allowed

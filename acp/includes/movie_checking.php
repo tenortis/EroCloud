@@ -47,6 +47,7 @@ $movie['status'] = $m->field('status');
 $movie['visible_for_website'] = $m->field('visible_for_website');
 $movie['admin_infos'] = $m->field('admin_infos');
 
+
 $merchant = new Merchant($mysql,$m->field('merchant_id'));
 
 include_once(SOURCEDIR.'/includes/klassen/actor.inc.php');
@@ -409,27 +410,15 @@ $fetish_categories = '';
 while($category_obj = p4c_fetch_object($rs_movie_categories)) {
     if (in_array($category_obj->name_id, $category_ary)) {
         $checked_cat_slave = 'checked="checked"';
-        $style = 'background-color: #fff6d0;';
-        
         if ($category_obj->name_id == 'poppers') {
             $finded_poppers = true;
         }
-        
-    } else if (find_categorie_in_string($category_obj) === true) {
-        $checked_cat_slave = 'checked="checked"';
-        $style = 'background-color: #fff6d0;';
-        
-        if ($category_obj->name_id == 'poppers') {
-            $finded_poppers = true;
-        }
-        
     } else {
-        $checked_cat_slave='';
-        $style = '';
+        $checked_cat_slave = '';
     }
 
     $fetish_categories .= '
-    <div style="padding:5px 5px 5px 20px; border-bottom:1px solid; '.$style.'">
+    <div style="padding:5px 5px 5px 20px; border-bottom:1px solid;">
         <div style="font-weight:bold;">
             <label for="'.$category_obj->name_id.'"><input type="checkbox" '.$checked_cat_slave.' id="'.$category_obj->name_id.'" name="category_slave[]" value="'.$category_obj->name_id.'" /> '.$category_obj->de_name_value.'</label>
         </div>
@@ -1250,13 +1239,13 @@ $site .= '
                     $checked_cat_slave = 'checked="checked"';
                     $style = 'background-color: #fff6d0;';
                 /*
-                } else if (find_categorie_in_string($category_obj) === true) {
+                } else if ($is_first_check AND find_categorie_in_string($category_obj) === true) {
                     $checked_cat_slave = 'checked="checked"';
                     $style = 'background-color: #fff6d0;';
                 */
                 } else {
                     // Wenn nichts gewählt wurde
-                    if ($category_obj->name_id == 'solo_girl') {
+                    if ($is_first_check AND $category_obj->name_id == 'solo_girl') {
                         $checked_cat_slave = 'checked="checked"';
                         $style = 'background-color: #fff6d0;';
                     } else {
@@ -1266,7 +1255,7 @@ $site .= '
                 }
                 
                 $site .= '
-                <div style="padding:5px 5px 5px 20px; border-bottom:1px solid; '.$style.'">
+                <div style="padding:5px 5px 5px 20px; border-bottom:1px solid;">
                     <div style="font-weight:bold;">
                         <label for="'.$category_obj->name_id.'"><input type="checkbox" '.$checked_cat_slave.' id="'.$category_obj->name_id.'" name="category_slave[]" value="'.$category_obj->name_id.'" /> '.$category_obj->de_name_value.'</label>
                     </div>
@@ -1281,20 +1270,15 @@ $site .= '
             $rs_movie_categories = p4c_query("SELECT * FROM `movie_categories` WHERE `category_group`='look_and_body' ORDER BY `name_id` ASC;",__FILE__,__LINE__);
 
             while($category_obj = p4c_fetch_object($rs_movie_categories)) {
-                if (in_array($category_obj->name_id, $category_ary) OR in_array($category_obj->name_id, $actor_categories) OR (in_array('hair_darkblonde', $actor_categories) AND $category_obj->name_id == 'blonde')) {
+                if (in_array($category_obj->name_id, $category_ary)) {
                     $checked_cat_slave = 'checked="checked"';
-                    $style = 'background-color: #fff6d0;';
-                } else if (find_categorie_in_string($category_obj) === true) {
-                    $checked_cat_slave = 'checked="checked"';
-                    $style = 'background-color: #fff6d0;';
                 } else {
-                    $checked_cat_slave='';
-                    $style = '';
+                    $checked_cat_slave = '';
                 }
                 
 
                 $site .= '
-                <div style="padding:5px 5px 5px 20px; border-bottom:1px solid; '.$style.'">
+                <div style="padding:5px 5px 5px 20px; border-bottom:1px solid;">
                     <div style="font-weight:bold;">
                         <label for="'.$category_obj->name_id.'"><input type="checkbox" '.$checked_cat_slave.' id="'.$category_obj->name_id.'" name="category_slave[]" value="'.$category_obj->name_id.'" /> '.$category_obj->de_name_value.'</label>
                     </div>
@@ -1314,17 +1298,12 @@ $site .= '
             while($category_obj = p4c_fetch_object($rs_movie_categories)) {
                 if (in_array($category_obj->name_id, $category_ary)) {
                     $checked_cat_slave = 'checked="checked"';
-                    $style = 'background-color: #fff6d0;';
-                } else if (find_categorie_in_string($category_obj) === true) {
-                    $checked_cat_slave = 'checked="checked"';
-                    $style = 'background-color: #fff6d0;';
                 } else {
-                    $checked_cat_slave='';
-                    $style = '';
+                    $checked_cat_slave = '';
                 }
 
                 $site .= '
-                <div style="padding:5px 5px 5px 20px; border-bottom:1px solid; '.$style.'">
+                <div style="padding:5px 5px 5px 20px; border-bottom:1px solid;">
                     <div style="font-weight:bold;">
                         <label for="'.$category_obj->name_id.'"><input type="checkbox" '.$checked_cat_slave.' id="'.$category_obj->name_id.'" name="category_slave[]" value="'.$category_obj->name_id.'" /> '.$category_obj->de_name_value.'</label>
                     </div>

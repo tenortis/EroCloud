@@ -260,12 +260,27 @@ $site .= '
     box-shadow: 0 0 5px rgba(0,0,0,0.15);
     border-width: 2px;
 }
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+.custom-spinner {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #1c94c4;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
 </style>
 
 <div id="content_cleanup_tabs" style="margin-top: 10px;">
     <ul>
         <li><a href="#tab-cleanup-preview">Lösch-Vorschau</a></li>
         <li><a href="#tab-cleanup-history">Lösch-Historie</a></li>
+        <li><a href="#tab-orphan-scan">Dateileichen-Suche</a></li>
     </ul>
 
     <!-- Tab 1: Lösch-Vorschau -->
@@ -354,12 +369,149 @@ $site .= '
             </tbody>
         </table>
     </div>
+
+    <!-- Tab 3: Dateileichen-Suche -->
+    <div id="tab-orphan-scan">
+        <div class="ui-widget-header" style="padding:10px; font-size:20px; margin-bottom:20px;">Dateileichen-Suche</div>
+        
+        <div id="orphan-scan-init-box" class="ui-widget-content" style="padding: 20px; text-align: center; border-radius: 4px; border: 1px solid #D1D1D1; background: #fcfdfd;">
+            <p style="font-size: 16px; margin-bottom: 20px;">
+                Hier können Sie prüfen, ob sich im Cloud-Speicher Verzeichnisse oder Dateien befinden, die nicht in der Datenbank hinterlegt sind.
+            </p>
+            <div style="background: #FFF9E6; border: 1px solid #FFE0B2; padding: 15px; margin-bottom: 25px; border-radius: 4px; color: #B78103; font-size: 14px; text-align: left; display: inline-block; max-width: 600px; line-height: 1.5;">
+                <strong>Hinweis:</strong> Dieser Vorgang durchsucht das gesamte Cloud-Verzeichnis auf dem Webserver und gleicht die Daten mit der Datenbank ab. Je nach Anzahl der vorhandenen Dateien kann dieser Vorgang einige Sekunden dauern.
+            </div>
+            <div>
+                <button type="button" id="btn-start-orphan-scan" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only" style="padding: 12px 25px; font-size: 15px; font-weight: bold; cursor: pointer;">
+                    <span class="ui-button-text">Suche jetzt starten</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Ladeanzeige -->
+        <div id="orphan-scan-loading" style="display: none; padding: 40px; text-align: center; border: 1px solid #D1D1D1; background: #fcfdfd; border-radius: 4px;">
+            <div style="font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #1c94c4;">Suche läuft...</div>
+            <div style="color: #666; font-size: 14px; margin-bottom: 20px;">Das Verzeichnis wird analysiert und mit der Datenbank abgeglichen. Bitte haben Sie einen Moment Geduld.</div>
+            <div>
+                <div class="custom-spinner"></div>
+            </div>
+        </div>
+
+        <!-- Ergebnisse -->
+        <div id="orphan-scan-result-container" style="display: none;">
+            <div class="ui-widget-content" style="padding: 15px; margin-bottom: 20px; border-radius: 4px; border: 1px solid #D1D1D1; background: #fcfdfd;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                    <tr>
+                        <td style="width: 25%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2;">Gefundene Dateileichen:</td>
+                        <td style="width: 25%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2; font-weight: bold; color: #ff0000;" id="orphan-stat-count">-</td>
+                        <td style="width: 25%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2;">Gesamter Speicherverbrauch:</td>
+                        <td style="width: 25%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2; font-weight: bold; color: #d05c00;" id="orphan-stat-size">-</td>
+                    </tr>
+                    <tr>
+                        <td style="width: 25%; padding: 8px 5px;">Benötigte Zeit für Analyse:</td>
+                        <td style="width: 25%; padding: 8px 5px; font-weight: bold;" id="orphan-stat-time">-</td>
+                        <td style="width: 25%; padding: 8px 5px;">Scan-Status:</td>
+                        <td style="width: 25%; padding: 8px 5px; font-weight: bold; color: #008000;">Erfolgreich abgeschlossen</td>
+                    </tr>
+                </table>
+            </div>
+
+            <table id="table_orphan_scan" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Pfad (relativ)</th>
+                        <th style="width: 180px;">Typ</th>
+                        <th>Grund / Details</th>
+                        <th style="width: 120px;">Größe</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
 <script type="text/javascript">
 // <![CDATA[
     jQuery(document).ready(function() {
         jQuery("#content_cleanup_tabs").tabs();
+        
+        var orphanTable = null;
+
+        jQuery("#btn-start-orphan-scan").click(function() {
+            if (!confirm("Möchten Sie den Cloud-Speicher jetzt nach Dateileichen scannen? Dies kann einige Momente dauern.")) {
+                return;
+            }
+
+            jQuery("#orphan-scan-init-box").hide();
+            jQuery("#orphan-scan-loading").show();
+
+            jQuery.ajax({
+                url: "'.ACP_URL.'/Ajax/orphan_scan.php",
+                type: "GET",
+                dataType: "json",
+                success: function(response) {
+                    jQuery("#orphan-scan-loading").hide();
+                    if (response.error) {
+                        alert("Fehler bei der Analyse: " + response.error);
+                        jQuery("#orphan-scan-init-box").show();
+                        return;
+                    }
+
+                    // Show stats
+                    jQuery("#orphan-stat-count").text(response.total_count + " Objekte");
+                    jQuery("#orphan-stat-size").text(response.total_size_formatted);
+                    jQuery("#orphan-stat-time").text(response.duration_ms + " ms");
+
+                    // Populate table
+                    var tbody = jQuery("#table_orphan_scan tbody");
+                    tbody.empty();
+
+                    if (response.data && response.data.length > 0) {
+                        jQuery.each(response.data, function(index, item) {
+                            var tr = jQuery("<tr>");
+                            tr.append(jQuery("<td>").text(item.path));
+                            tr.append(jQuery("<td>").text(item.type));
+                            tr.append(jQuery("<td>").text(item.reason));
+                            tr.append(jQuery("<td>").html(\'<span style="display:none;">\' + item.size + \'</span>\' + item.size_formatted));
+                            tbody.append(tr);
+                        });
+                    }
+
+                    jQuery("#orphan-scan-result-container").show();
+
+                    // Initialize DataTable
+                    if (orphanTable) {
+                        orphanTable.fnDestroy();
+                    }
+                    orphanTable = jQuery("#table_orphan_scan").dataTable({
+                        "bJQueryUI": true,
+                        "iDisplayLength": 25,
+                        "aaSorting": [[ 3, "desc" ]],
+                        "oLanguage": {
+                            "sSearch": "Suchen:",
+                            "sLengthMenu": "_MENU_ Einträge anzeigen",
+                            "sInfo": "Zeige _START_ bis _END_ von _TOTAL_ Einträgen",
+                            "sInfoEmpty": "Keine Einträge vorhanden",
+                            "sInfoFiltered": "(gefiltert aus _MAX_ Einträgen)",
+                            "sZeroRecords": "Keine Dateileichen gefunden",
+                            "oPaginate": {
+                                "sFirst": "Erste",
+                                "sLast": "Letzte",
+                                "sNext": "Nächste",
+                                "sPrevious": "Zurück"
+                            }
+                        }
+                    });
+                },
+                error: function(xhr, status, error) {
+                    jQuery("#orphan-scan-loading").hide();
+                    alert("Es ist ein Systemfehler aufgetreten: " + error);
+                    jQuery("#orphan-scan-init-box").show();
+                }
+            });
+        });
         
 
         
