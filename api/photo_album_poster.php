@@ -6,8 +6,14 @@ include_once("../config.inc.php");
 include_once(API_DIR."/common.inc.php");
 
 function send_fallback_and_exit() {
-    $fallback = MCP_DIR.'/images/movie_poster_nopic.jpg';
+    $fallback = SOURCEDIR . '/mcp/images/movie_poster_nopic.jpg';
+    if (!is_file($fallback)) {
+        $fallback = SOURCEDIR . '/acp/images/movie_poster_nopic.jpg';
+    }
     while (ob_get_level() > 0) { @ob_end_clean(); }
+    header("Pragma: cache");
+    header('Cache-control: max-age=31536000, public');
+    header('Expires: '.gmdate(DATE_RFC1123, time() + 31536000));
     header('Content-type: image/jpeg');
     if (is_file($fallback)) {
         header('Content-length: '.filesize($fallback));
@@ -26,11 +32,11 @@ function output_raw_file_and_exit($bild, $mime_type) {
 
 $album_param = '';
 if (isset($_GET['album_id']) && !empty($_GET['album_id'])) {
-    $album_param = $_GET['album_id'];
+    $album_param = trim($_GET['album_id']);
 } elseif (isset($_GET['file_id']) && !empty($_GET['file_id'])) {
-    $album_param = $_GET['file_id'];
+    $album_param = trim($_GET['file_id']);
 } elseif (isset($_GET['id']) && !empty($_GET['id'])) {
-    $album_param = $_GET['id'];
+    $album_param = trim($_GET['id']);
 }
 
 if (empty($album_param)) {
@@ -43,7 +49,12 @@ if (isset($_GET['fsk']) && abs($_GET['fsk']) == 18) {
 }
 
 $escaped_id = p4c_escape_string($album_param);
-$rs_album = p4c_query("SELECT * FROM `photo_albums` WHERE `album_id`='".$escaped_id."' OR `file_id`='".$escaped_id."' OR `id`='".abs($album_param)."' LIMIT 1;",__FILE__,__LINE__);
+
+// Query photo_albums FIRST by valid columns (album_id or numeric id)
+$rs_album = p4c_query("SELECT * FROM `photo_albums` WHERE `album_id`='".$escaped_id."' OR `id`='".abs($album_param)."' LIMIT 1;",__FILE__,__LINE__);
+if (p4c_num_rows($rs_album) == 0) {
+    $rs_album = p4c_query("SELECT * FROM `photo_albums_online` WHERE `album_id`='".$escaped_id."' OR `id`='".abs($album_param)."' LIMIT 1;",__FILE__,__LINE__);
+}
 
 if (p4c_num_rows($rs_album) == 0) {
     send_fallback_and_exit();
@@ -69,7 +80,7 @@ if (!$filename) {
 
 // 3. Check first photo in album from photo_albums_photos database table
 if (!$filename) {
-    $rs_first_photo = p4c_query("SELECT `filename` FROM `photo_albums_photos` WHERE `album_id`='".p4c_escape_string($album_ary->album_id)."' OR `album_id`='".$album_ary->id."' ORDER BY `id` ASC LIMIT 1;",__FILE__,__LINE__);
+    $rs_first_photo = p4c_query("SELECT `filename` FROM `photo_albums_photos` WHERE `album_id`='".$escaped_id."' OR `album_id`='".$album_ary->id."' ORDER BY `id` ASC LIMIT 1;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_first_photo) > 0) {
         $photo_obj = p4c_fetch_object($rs_first_photo);
         $candidate = $album_folder . 'images/' . $photo_obj->filename;
@@ -81,7 +92,7 @@ if (!$filename) {
 
 // 4. Glob search in images subfolder
 if (!$filename) {
-    $files = glob($album_folder . 'images/*.{jpg,jpeg,png,gif}', GLOB_BRACE);
+    $files = glob($album_folder . 'images/*.{jpg,jpeg,png,gif,JPG,JPEG,PNG,GIF}', GLOB_BRACE);
     if (!empty($files)) {
         $filename = $files[0];
     }
@@ -89,7 +100,7 @@ if (!$filename) {
 
 // 5. Glob search in main album folder
 if (!$filename) {
-    $files = glob($album_folder . '*.{jpg,jpeg,png,gif}', GLOB_BRACE);
+    $files = glob($album_folder . '*.{jpg,jpeg,png,gif,JPG,JPEG,PNG,GIF}', GLOB_BRACE);
     if (!empty($files)) {
         $filename = $files[0];
     }
