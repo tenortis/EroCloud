@@ -1,4 +1,4 @@
-<?php
+ï»¿<?php
 
 define('SAFE_INC', 1);
 
@@ -79,7 +79,7 @@ function to_thumb($bild, $size=0) {
     } else if ($movie_ary->quality == '6k') { 
         $logo = '6k.png';
     
-    // Wenn keine Qualität angegeben wurde nimm die Auflösung
+    // Wenn keine QualitÃ¤t angegeben wurde nimm die AuflÃ¶sung
     } else if ($movie_ary->resolution == '1280x720') {
         $logo = 'hd.png';
     } else if ($movie_ary->resolution == '1920x1080' OR $movie_ary->resolution == '1440x1080') {
@@ -162,7 +162,7 @@ if (!file_exists($filename)) {
         readfile($filename);
     }
 
-// Wenn Datei leer ist dann löschen
+// Wenn Datei leer ist dann lÃ¶schen
 } elseif(filesize($filename) == 0) {
     @unlink($filename);
     $filename = MCP_DIR.'/images/movie_poster_nopic.jpg';

@@ -2,34 +2,26 @@
 
 define('SAFE_INC', 1);
 
-include_once("../../config.inc.php");
-include_once(MCP_DIR."/common.inc.php");
+session_cache_limiter('none');
 
-function no_image() {
-    $filename = MCP_DIR.'/images/movie_poster_nopic.jpg';
-    header('Content-type: image/jpeg');
-    header('Content-transfer-encoding: binary');
-    header('Content-length: '.filesize($filename));
-    readfile($filename);
-    
-    // Garbage Collection
-    p4c_close(DB_HOST);
-    
-    // PHP Fehlermeldung loggen
-    p4c_errorlog(error_get_last());
+include_once("../../config.inc.php");
+include_once(ACP_DIR."/common.inc.php");
+
+if (is_logged_in('mcp') === false) {
+    exit;
 }
 
-if (!isset($_GET['photo_id']) OR is_logged_in('mcp') === false) {
+if (!isset($_GET['photo_id']) || empty($_GET['photo_id'])) {
     no_image();
     exit;
 }
 
 $photo_id = $_GET['photo_id'];
 
-$rs_photo = p4c_query("SELECT `photo_albums`.`id` AS `id`, `photo_albums`.`storage_location`, `photo_albums_photos`.`merchant_id`, `photo_albums_photos`.`filename`
-    FROM `photo_albums_photos`INNER JOIN `photo_albums` ON `photo_albums_photos`.`album_id`=`photo_albums`.`album_id` WHERE
+$rs_photo = p4c_query("SELECT `photo_albums`.`id` AS `album_id`, `photo_albums`.`storage_location`, `photo_albums_photos`.`merchant_id`, `photo_albums_photos`.`filename`
+    FROM `photo_albums_photos` INNER JOIN `photo_albums` ON `photo_albums_photos`.`album_id`=`photo_albums`.`album_id` WHERE
         `file_id`='".p4c_escape_string($photo_id)."' AND
-        `photo_albums_photos`.`merchant_id`='".$_SESSION['merchant_id']."'
+        `photo_albums_photos`.`merchant_id`='".abs($_SESSION['merchant_id'])."'
     LIMIT 1;",__FILE__,__LINE__);
 
 if (p4c_num_rows($rs_photo) == 0) {
@@ -39,7 +31,19 @@ if (p4c_num_rows($rs_photo) == 0) {
 
 $photo_obj = p4c_fetch_object($rs_photo);
 
-$filename = PHOTO_ALBUMS_PATH.'/'.$photo_obj->storage_location.'/'.$photo_obj->merchant_id.'/'.$photo_obj->id.'/images/'.$photo_obj->filename;
+$filename = PHOTO_ALBUMS_PATH.'/'.$photo_obj->storage_location.'/'.$photo_obj->merchant_id.'/'.$photo_obj->album_id.'/images/'.$photo_obj->filename;
+
+function no_image() {
+    $filename = MCP_DIR.'/images/movie_poster_nopic.jpg';
+    header("Pragma: cache");
+    header('Cache-control: max-age=31536000, public');
+    header('Expires: '.gmdate(DATE_RFC1123, time() + 31536000));
+    header('Content-type: image/jpeg');
+    if (is_file($filename)) {
+        header('Content-length: '.filesize($filename));
+        readfile($filename);
+    }
+}
 
 function getRequestHeaders() {
     if (function_exists("apache_request_headers")) {
@@ -48,86 +52,123 @@ function getRequestHeaders() {
         }
     }
     $headers = array();
-    // Grab the IF_MODIFIED_SINCE header
     if (isset($_SERVER['HTTP_IF_MODIFIED_SINCE'])) {
         $headers['If-Modified-Since'] = $_SERVER['HTTP_IF_MODIFIED_SINCE'];
     }
     return $headers;
 }
 
-function to_thumb($bild, $size=0) {
-    global $album_ary;
+function to_thumb($bild, $size = 0) {
+    if (!is_file($bild) || filesize($bild) == 0) {
+        no_image();
+        return;
+    }
 
-    # Bilddaten feststellen
-    $image = new Imagick($bild);
-    $mime_type = $image->getImageMimeType();
-    $resolution_ary = $image->getImageResolution();
+    $image_info = @getimagesize($bild);
+    if (!$image_info) {
+        $mime_type = @mime_content_type($bild);
+        if (!$mime_type) { $mime_type = 'image/jpeg'; }
+        header('Content-type: '.$mime_type);
+        header('Content-length: '.filesize($bild));
+        readfile($bild);
+        return;
+    }
 
-    $breite = $image->getImageWidth();
-    $hoehe = $image->getImageHeight();
+    $mime_type = $image_info['mime'];
+    $breite = $image_info[0];
+    $hoehe = $image_info[1];
 
-    if ($size == 0) {
+    if ($breite <= 0 || $hoehe <= 0) {
+        no_image();
+        return;
+    }
+
+    if ($size == 0 || $size > 900) {
         $size = 800;
     }
 
-    $prop = $hoehe / $breite;
-    $neueBreite = $size;
-    $neueHoehe = $size * $prop;
-
-    $neue_wHoehe = $breite / 100 * 15;
-    $neue_wBreite = $neue_wHoehe;
-
-    # Exif-Daten überprüfen und Bild ausrichten (nur für JPEG)
-    if ($mime_type == 'image/jpeg') {
-        $exif = @exif_read_data($bild);
-        if (!empty($exif['Orientation'])) {
-            switch ($exif['Orientation']) {
-                case 3:
-                    $image->rotateImage("#000", 180);
-                    break;
-                case 6:
-                    $image->rotateImage("#000", 90);
-                    break;
-                case 8:
-                    $image->rotateImage("#000", -90);
-                    break;
-            }
-        }
+    if ($size >= $breite) {
+        header('Content-type: '.$mime_type);
+        header('Content-length: '.filesize($bild));
+        readfile($bild);
+        return;
     }
 
-    # Bildgröße ändern und ausgeben
-    $image->resizeImage($neueBreite, $neueHoehe, Imagick::FILTER_LANCZOS, 1);
-    $image->setImageCompressionQuality(100);
+    $prop = $hoehe / $breite;
+    $neueBreite = (int)$size;
+    $neueHoehe = (int)round($size * $prop);
 
-    header("Content-Type: $mime_type");
-    echo $image;
+    $altesBild = null;
+    if ($mime_type == 'image/jpeg' || $mime_type == 'image/jpg') {
+        $image_data = @file_get_contents($bild);
+        if ($image_data) {
+            $altesBild = @imagecreatefromstring($image_data);
+            if ($altesBild) {
+                $exif = @exif_read_data($bild);
+                if (!empty($exif['Orientation'])) {
+                    switch ($exif['Orientation']) {
+                        case 3:
+                            $altesBild = @imagerotate($altesBild, 180, 0);
+                            break;
+                        case 6:
+                            $altesBild = @imagerotate($altesBild, -90, 0);
+                            break;
+                        case 8:
+                            $altesBild = @imagerotate($altesBild, 90, 0);
+                            break;
+                    }
+                }
+            }
+        }
+    } elseif ($mime_type == 'image/png') {
+        $altesBild = @imagecreatefrompng($bild);
+    } elseif ($mime_type == 'image/gif') {
+        $altesBild = @imagecreatefromgif($bild);
+    }
 
-    # Speicher freigeben
-    $image->clear();
-    $image->destroy();
+    if (!$altesBild) {
+        header('Content-type: '.$mime_type);
+        header('Content-length: '.filesize($bild));
+        readfile($bild);
+        return;
+    }
+
+    $neuesBild = imagecreatetruecolor($neueBreite, $neueHoehe);
+    if ($mime_type == 'image/png' || $mime_type == 'image/gif') {
+        imagealphablending($neuesBild, false);
+        imagesavealpha($neuesBild, true);
+    }
+
+    imagecopyresampled($neuesBild, $altesBild, 0, 0, 0, 0, $neueBreite, $neueHoehe, $breite, $hoehe);
+
+    header('Content-type: '.$mime_type);
+    ob_start();
+    if ($mime_type == 'image/png') {
+        imagepng($neuesBild, null, 9);
+    } elseif ($mime_type == 'image/gif') {
+        imagegif($neuesBild, null);
+    } else {
+        imagejpeg($neuesBild, null, 90);
+    }
+    $length = ob_get_length();
+    header('Content-length: '.$length);
+    ob_end_flush();
+
+    imagedestroy($neuesBild);
+    imagedestroy($altesBild);
 }
 
 $headers = getRequestHeaders();
 
-// Wenn Datei nicht existiert
-if (!is_file($filename)) {
+if (!is_file($filename) || filesize($filename) == 0) {
     no_image();
     exit;
-
-// Wenn Datei leer ist dann löschen
-} elseif(filesize($filename) == 0) {
-    @unlink($filename);
-    $filename = MCP_DIR.'/images/movie_poster_nopic.jpg';
-    no_image();
-    exit;
-
 } else {
-
     $mime_content_type = mime_content_type($filename);
     
     header("Pragma: cache");
-    header('Cache-control: max-age='.(60*60*24*360).', public');
-    header('Expires: '.gmdate(DATE_RFC1123,time()+60*60*24*365));
+    header('Cache-control: max-age=31536000, public');
+    header('Expires: '.gmdate(DATE_RFC1123, time() + 31536000));
     header('Content-type: '.$mime_content_type);
    
     $width = 0;
@@ -138,44 +179,17 @@ if (!is_file($filename)) {
     if ($width > 900) {$width = 900;}
     if ($width < 50) {$width = 50;}
    
-    if ($mime_content_type == 'image/gif') {
-        if (isset($_GET['stop']) AND $_GET['stop'] == 'gif') {    
-
-            if (isset($headers['If-Modified-Since']) && (strtotime($headers['If-Modified-Since']) == filemtime($filename))) {
-                header('Last-Modified: '.gmdate('D, d M Y H:i:s', filemtime($filename)).' GMT', true, 304);
-            } else {
-                header('Last-Modified: '.gmdate('D, d M Y H:i:s', filemtime($filename)).' GMT', true, 200);
-                header('Content-transfer-encoding: binary');
-                to_thumb($filename, $width);
-            }
-
-        } else {
-            
-            if (isset($headers['If-Modified-Since']) && (strtotime($headers['If-Modified-Since']) == filemtime($filename))) {
-                header('Last-Modified: '.gmdate('D, d M Y H:i:s', filemtime($filename)).' GMT', true, 304);
-            } else {
-                header('Last-Modified: '.gmdate('D, d M Y H:i:s', filemtime($filename)).' GMT', true, 200);
-                header('Content-transfer-encoding: binary');
-                header('Content-length: '.filesize($filename));
-                readfile($filename);
-            }
-        }
-    
+    if (isset($headers['If-Modified-Since']) && (strtotime($headers['If-Modified-Since']) == filemtime($filename))) {
+        header('Last-Modified: '.gmdate('D, d M Y H:i:s', filemtime($filename)).' GMT', true, 304);
     } else {
-        if (isset($headers['If-Modified-Since']) && (strtotime($headers['If-Modified-Since']) == filemtime($filename))) {
-            header('Last-Modified: '.gmdate('D, d M Y H:i:s', filemtime($filename)).' GMT', true, 304);
-        } else {
-            header('Last-Modified: '.gmdate('D, d M Y H:i:s', filemtime($filename)).' GMT', true, 200);
-            header('Content-transfer-encoding: binary');
-            to_thumb($filename, $width);
-        }
+        header('Last-Modified: '.gmdate('D, d M Y H:i:s', filemtime($filename)).' GMT', true, 200);
+        header('Content-transfer-encoding: binary');
+        to_thumb($filename, $width);
     }
 }
 
-// Garbage Collection
 p4c_close(DB_HOST);
-	
-// PHP Fehlermeldung loggen
+
 p4c_errorlog(error_get_last());
 
 ?>

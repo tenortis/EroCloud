@@ -1,4 +1,4 @@
-<?php
+ï»¿<?php
 
 /**
  * @author		Martin Zimmermann
@@ -10,7 +10,7 @@ if (!defined('SAFE_INC')) {
     die("Hacking attempt...");
 }
 
-// Session erstellen und prüfen
+// Session erstellen und prÃ¼fen
 function p4c_session_start($session_write_close=false) {
     
     // Session starten
@@ -26,7 +26,7 @@ function p4c_session_start($session_write_close=false) {
         $_SESSION['initiated'] = true;
     }
  
-    // prüfe ob Session fehlerhaft ist. Wenn nicht, neue session generieren 
+    // prÃ¼fe ob Session fehlerhaft ist. Wenn nicht, neue session generieren 
     if(!$ok){
         session_regenerate_id(true);
     }
@@ -35,7 +35,7 @@ function p4c_session_start($session_write_close=false) {
 function is_logged_in($area) {
     /** $area => "acp" AdminControlPanel **/ 
     
-    /** Passwort verschlüsseln 
+    /** Passwort verschlÃ¼sseln 
     $salt 		= mt_rand();
     $saltedHash	= saltPassword('ganh6HzC%BN%', $salt);
     $password   = $saltedHash.':'.$salt;
@@ -86,7 +86,7 @@ function hash_password($new_password) {
     return $saltedHash.':'.$salt;
 }
 
-/** Prüfen ob Merchant existiert **/
+/** PrÃ¼fen ob Merchant existiert **/
 function check_merchant_exists($merchant_id,$file,$line) {
     $rs_merchant = p4c_query("SELECT * FROM `merchants` WHERE `id`='".abs($merchant_id)."' LIMIT 1;",$file,$line);
     if (p4c_num_rows($rs_merchant) == 0) {die("Merchant nicht bekannt.");}
@@ -147,7 +147,7 @@ function p4c_result($string, $row, $field=0) {
 }
 
 
-// Zufallscode $len = länge zb. 5 
+// Zufallscode $len = lÃ¤nge zb. 5 
 function make_seed(){ 
     list($usec , $sec) = explode (' ', microtime()); 
     return (float) $sec + ((float) $usec * 100000); 
@@ -155,7 +155,7 @@ function make_seed(){
 function randomString($len) { 
     srand(make_seed());  
 
-    //Der String $possible enthält alle Zeichen, die verwendet werden sollen 
+    //Der String $possible enthÃ¤lt alle Zeichen, die verwendet werden sollen 
     $possible="ABCDEFGHJKLMNPRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"; 
     $str=""; 
     while(strlen($str)<$len) { 
@@ -261,16 +261,16 @@ function seo_url($string) {
         
         $string = iconv('UTF-8', 'ISO-8859-1//TRANSLIT//IGNORE', $string);
 
-        $search = array("ä", "ö", "ü", "ß", "Ä", "Ö", "Ñ",
-                        "Ü", "&", "é", "á", "ó", "ñ",
+        $search = array("Ã¤", "Ã¶", "Ã¼", "ÃŸ", "Ã„", "Ã–", "Ã‘",
+                        "Ãœ", "&", "Ã©", "Ã¡", "Ã³", "Ã±",
                         " :)", " :D", " :-)", " :P",
                         " :O", " ;D", " ;)", " ^^", 
                         " :|", " :-/", ":)", ":D", 
                         ":-)", ":P", ":O", ";D", ";)", 
                         "^^", ":|", ":-/", "(", ")", "[", "]", 
-                        "<", ">", "!", "\"", "§", "$", "%", "&", 
+                        "<", ">", "!", "\"", "Â§", "$", "%", "&", 
                         "/", "(", ")", "=", "?", "`", "?", "*", "'", 
-                        "_", ":", ";", "²", "³", "{", "}", 
+                        "_", ":", ";", "Â²", "Â³", "{", "}", 
                         "\\", "~", "#", "+", ".", ",", 
                         "=", ":", "=)");
         $replace = array("ae", "oe", "ue", "ss", "Ae", "Oe", "N",
@@ -288,15 +288,15 @@ function seo_url($string) {
         
         $string = str_replace($search, $replace, $string);  
 
-        $string = str_replace(array('&#8364;','&euro;','Â€','€','â‚¬','&#x20AC;'), "EUR", $string);
+        $string = str_replace(array('&#8364;','&euro;','Ã‚Â€','Â€','Ã¢Â‚Â¬','&#x20AC;'), "EUR", $string);
         $string = str_replace(array(" ", "_", "_-_"), "-", $string);
-        $string = str_replace(array("&auml;", "&Auml;", "ä"), "ae", $string);
+        $string = str_replace(array("&auml;", "&Auml;", "Ã¤"), "ae", $string);
         $string = str_replace(array("&ouml;", "&Ouml;"), "oe", $string);
         $string = str_replace(array("&uuml;", "&Uuml;"), "ue", $string);
         $string = str_replace(array("&szlig;"), "ss", $string);
-        $string = str_replace(array("`", "´", "'"), "", $string);    
+        $string = str_replace(array("`", "Â´", "'"), "", $string);    
         $string = str_replace("_&_", "-", $string);
-        $string = str_replace(array(":", "°", "^", "!", '"', "§", "$", "%", "&", "/", "(", ")", "=", "?", "{", "}", "[", "]", ",", ".", ">", "<", "|", "*", "+", "~", "#", "@", "µ"), "-", $string);
+        $string = str_replace(array(":", "Â°", "^", "!", '"', "Â§", "$", "%", "&", "/", "(", ")", "=", "?", "{", "}", "[", "]", ",", ".", ">", "<", "|", "*", "+", "~", "#", "@", "Âµ"), "-", $string);
 
         // Wenn alles entfernt wurde, bleiben vermutlich mehrere - (Minus) in Reihe zurueck. Diese muessen bis auf eins reduziert werden. 
         $string = preg_replace('~([-]{2,})~', '-', $string);
@@ -411,7 +411,7 @@ function print_xml($api) {
 
 // Der Streaming-Key erstellt sich wie folgt:
 function generate_user_streaming_key($array) {
-    /** IN DIESER FUNKTION NICHTS ÄNDERN !!! **/
+    /** IN DIESER FUNKTION NICHTS Ã„NDERN !!! **/
     $param = array(
         "movie_id"      => $array['movie_id'],
         "user_id"       => $array['user_id'],
@@ -427,7 +427,7 @@ function generate_user_streaming_key($array) {
 }
 
 function generate_user_album_key($array) {
-    /** IN DIESER FUNKTION NICHTS ÄNDERN !!! **/
+    /** IN DIESER FUNKTION NICHTS Ã„NDERN !!! **/
     $param = array(
         "album_id"      => $array['album_id'],
         "user_id"       => $array['user_id'],
