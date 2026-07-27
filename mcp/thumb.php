@@ -11,23 +11,9 @@ define('SAFE_INC', 1);
 include_once("../config.inc.php");
 include_once(MCP_DIR."/common.inc.php");
 
-if (!isset($_GET['movie_id']) || empty($_GET['movie_id'])) {
+function send_fallback_and_exit() {
     $fallback = MCP_DIR.'/images/movie_poster_nopic.jpg';
-    if (is_file($fallback)) {
-        header('Content-type: image/jpeg');
-        header('Content-length: '.filesize($fallback));
-        readfile($fallback);
-    }
-    exit;
-}
-
-$movie_id_param = p4c_escape_string($_GET['movie_id']);
-$thumb_num = isset($_GET['thumb_number']) ? abs($_GET['thumb_number']) : 1;
-
-$rs_movie = p4c_query("SELECT `id`, `file_id`, `merchant_id`, `filename`, `storage_location` FROM `movies` WHERE `file_id`='".$movie_id_param."' LIMIT 1;",__FILE__,__LINE__);
-
-if (p4c_num_rows($rs_movie) == 0) {
-    $fallback = MCP_DIR.'/images/movie_poster_nopic.jpg';
+    while (ob_get_level() > 0) { @ob_end_clean(); }
     header("Pragma: cache");
     header('Cache-control: max-age=31536000, public');
     header('Expires: '.gmdate(DATE_RFC1123, time() + 31536000));
@@ -39,10 +25,23 @@ if (p4c_num_rows($rs_movie) == 0) {
     exit;
 }
 
+if (!isset($_GET['movie_id']) || empty($_GET['movie_id'])) {
+    send_fallback_and_exit();
+}
+
+$movie_id_param = p4c_escape_string($_GET['movie_id']);
+$thumb_num = isset($_GET['thumb_number']) ? abs($_GET['thumb_number']) : 1;
+
+$rs_movie = p4c_query("SELECT `id`, `file_id`, `merchant_id`, `filename`, `storage_location` FROM `movies` WHERE `file_id`='".$movie_id_param."' LIMIT 1;",__FILE__,__LINE__);
+
+if (p4c_num_rows($rs_movie) == 0) {
+    send_fallback_and_exit();
+}
+
 $movie_ary = p4c_fetch_object($rs_movie);
 $folder_path = MOVIES_PATH.'/'.$movie_ary->storage_location.'/'.$movie_ary->merchant_id.'/'.$movie_ary->id.'/';
 
-// Try primary pattern: thumb_[id]_[file_id]_[thumb_num]
+// Try patterns for thumbnail files
 $filename_patterns = array(
     $folder_path . 'thumb_' . $movie_ary->id . '_' . $movie_ary->file_id . '_' . $thumb_num,
     $folder_path . 'thumb_' . substr($movie_ary->filename, 0, -4) . '_' . $thumb_num,
@@ -73,25 +72,24 @@ function getRequestHeaders() {
     return $headers;
 }
 
+function output_raw_file_and_exit($bild, $mime_type) {
+    while (ob_get_level() > 0) { @ob_end_clean(); }
+    header('Content-type: '.$mime_type);
+    header('Content-length: '.filesize($bild));
+    readfile($bild);
+    exit;
+}
+
 function to_thumb($bild, $size = 0) {
     if (!is_file($bild) || filesize($bild) == 0) {
-        $fallback = MCP_DIR.'/images/movie_poster_nopic.jpg';
-        if (is_file($fallback)) {
-            header('Content-type: image/jpeg');
-            header('Content-length: '.filesize($fallback));
-            readfile($fallback);
-        }
-        return;
+        send_fallback_and_exit();
     }
 
     $image_info = @getimagesize($bild);
     if (!$image_info) {
         $mime_type = @mime_content_type($bild);
         if (!$mime_type) { $mime_type = 'image/jpeg'; }
-        header('Content-type: '.$mime_type);
-        header('Content-length: '.filesize($bild));
-        readfile($bild);
-        return;
+        output_raw_file_and_exit($bild, $mime_type);
     }
 
     $mime_type = $image_info['mime'];
@@ -99,12 +97,7 @@ function to_thumb($bild, $size = 0) {
     $hoehe = $image_info[1];
 
     if ($breite <= 0 || $hoehe <= 0) {
-        $fallback = MCP_DIR.'/images/movie_poster_nopic.jpg';
-        if (is_file($fallback)) {
-            header('Content-type: image/jpeg');
-            readfile($fallback);
-        }
-        return;
+        send_fallback_and_exit();
     }
 
     if ($size == 0 || $size > 1024) {
@@ -112,10 +105,7 @@ function to_thumb($bild, $size = 0) {
     }
 
     if ($size >= $breite) {
-        header('Content-type: '.$mime_type);
-        header('Content-length: '.filesize($bild));
-        readfile($bild);
-        return;
+        output_raw_file_and_exit($bild, $mime_type);
     }
 
     $prop = $hoehe / $breite;
@@ -151,10 +141,7 @@ function to_thumb($bild, $size = 0) {
     }
 
     if (!$altesBild) {
-        header('Content-type: '.$mime_type);
-        header('Content-length: '.filesize($bild));
-        readfile($bild);
-        return;
+        output_raw_file_and_exit($bild, $mime_type);
     }
 
     $neuesBild = imagecreatetruecolor($neueBreite, $neueHoehe);
@@ -164,6 +151,9 @@ function to_thumb($bild, $size = 0) {
     }
 
     imagecopyresampled($neuesBild, $altesBild, 0, 0, 0, 0, $neueBreite, $neueHoehe, $breite, $hoehe);
+
+    // Clean any prior output buffers before rendering binary image data
+    while (ob_get_level() > 0) { @ob_end_clean(); }
 
     header('Content-type: '.$mime_type);
     ob_start();
@@ -180,21 +170,13 @@ function to_thumb($bild, $size = 0) {
 
     imagedestroy($neuesBild);
     imagedestroy($altesBild);
+    exit;
 }
 
 $headers = getRequestHeaders();
 
-// Wenn Datei nicht existiert oder leer ist
 if (!$target_file || !is_file($target_file) || filesize($target_file) == 0) {
-    $fallback = MCP_DIR.'/images/movie_poster_nopic.jpg';
-    header("Pragma: cache");
-    header('Cache-control: max-age=31536000, public');
-    header('Expires: '.gmdate(DATE_RFC1123, time() + 31536000));
-    header('Content-type: image/jpeg');
-    if (is_file($fallback)) {
-        header('Content-length: '.filesize($fallback));
-        readfile($fallback);
-    }
+    send_fallback_and_exit();
 } else {
     $mime_content_type = mime_content_type($target_file);
     
@@ -213,17 +195,12 @@ if (!$target_file || !is_file($target_file) || filesize($target_file) == 0) {
    
     if (isset($headers['If-Modified-Since']) && (strtotime($headers['If-Modified-Since']) == filemtime($target_file))) {
         header('Last-Modified: '.gmdate('D, d M Y H:i:s', filemtime($target_file)).' GMT', true, 304);
+        exit;
     } else {
         header('Last-Modified: '.gmdate('D, d M Y H:i:s', filemtime($target_file)).' GMT', true, 200);
         header('Content-transfer-encoding: binary');
         to_thumb($target_file, $width);
     }
 }
-
-// Garbage Collection
-p4c_close(DB_HOST);
-
-// PHP Fehlermeldung loggen
-p4c_errorlog(error_get_last());
 
 ?>
