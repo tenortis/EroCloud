@@ -5,19 +5,43 @@ define('SAFE_INC', 1);
 include_once("../config.inc.php");
 include_once(API_DIR."/common.inc.php");
 
-if (!isset($_GET['file_id']) || empty($_GET['file_id'])) {
-    header('HTTP/1.1 404 Not Found');
-    echo 'album id not exists';
+function send_fallback_and_exit() {
+    $fallback = MCP_DIR.'/images/movie_poster_nopic.jpg';
+    while (ob_get_level() > 0) { @ob_end_clean(); }
+    header('Content-type: image/jpeg');
+    if (is_file($fallback)) {
+        header('Content-length: '.filesize($fallback));
+        readfile($fallback);
+    }
     exit;
 }
 
-$file_id = $_GET['file_id'];
+function output_raw_file_and_exit($bild, $mime_type) {
+    while (ob_get_level() > 0) { @ob_end_clean(); }
+    header('Content-type: '.$mime_type);
+    header('Content-length: '.filesize($bild));
+    readfile($bild);
+    exit;
+}
 
-$rs_album = p4c_query("SELECT * FROM `photo_albums` WHERE `file_id`='".p4c_escape_string($file_id)."' LIMIT 1;",__FILE__,__LINE__);
+$album_param = '';
+if (isset($_GET['album_id']) && !empty($_GET['album_id'])) {
+    $album_param = $_GET['album_id'];
+} elseif (isset($_GET['file_id']) && !empty($_GET['file_id'])) {
+    $album_param = $_GET['file_id'];
+} elseif (isset($_GET['id']) && !empty($_GET['id'])) {
+    $album_param = $_GET['id'];
+}
+
+if (empty($album_param)) {
+    send_fallback_and_exit();
+}
+
+$escaped_id = p4c_escape_string($album_param);
+$rs_album = p4c_query("SELECT * FROM `photo_albums` WHERE `album_id`='".$escaped_id."' OR `file_id`='".$escaped_id."' OR `id`='".abs($album_param)."' LIMIT 1;",__FILE__,__LINE__);
+
 if (p4c_num_rows($rs_album) == 0) {
-    header('HTTP/1.1 404 Not Found');
-    echo 'album id not exists';
-    exit;   
+    send_fallback_and_exit();
 }
 
 $album_ary = p4c_fetch_object($rs_album);
@@ -52,23 +76,14 @@ function getRequestHeaders() {
 
 function to_thumb($bild, $size = 0) {
     if (!is_file($bild) || filesize($bild) == 0) {
-        $fallback = MCP_DIR.'/images/movie_poster_nopic.jpg';
-        if (is_file($fallback)) {
-            header('Content-type: image/jpeg');
-            header('Content-length: '.filesize($fallback));
-            readfile($fallback);
-        }
-        return;
+        send_fallback_and_exit();
     }
 
     $image_info = @getimagesize($bild);
     if (!$image_info) {
         $mime_type = @mime_content_type($bild);
         if (!$mime_type) { $mime_type = 'image/jpeg'; }
-        header('Content-type: '.$mime_type);
-        header('Content-length: '.filesize($bild));
-        readfile($bild);
-        return;
+        output_raw_file_and_exit($bild, $mime_type);
     }
 
     $mime_type = $image_info['mime'];
@@ -76,12 +91,7 @@ function to_thumb($bild, $size = 0) {
     $hoehe = $image_info[1];
 
     if ($breite <= 0 || $hoehe <= 0) {
-        $fallback = MCP_DIR.'/images/movie_poster_nopic.jpg';
-        if (is_file($fallback)) {
-            header('Content-type: image/jpeg');
-            readfile($fallback);
-        }
-        return;
+        send_fallback_and_exit();
     }
 
     if ($size == 0 || $size > 900) {
@@ -89,10 +99,7 @@ function to_thumb($bild, $size = 0) {
     }
 
     if ($size >= $breite) {
-        header('Content-type: '.$mime_type);
-        header('Content-length: '.filesize($bild));
-        readfile($bild);
-        return;
+        output_raw_file_and_exit($bild, $mime_type);
     }
 
     $prop = $hoehe / $breite;
@@ -128,10 +135,7 @@ function to_thumb($bild, $size = 0) {
     }
 
     if (!$altesBild) {
-        header('Content-type: '.$mime_type);
-        header('Content-length: '.filesize($bild));
-        readfile($bild);
-        return;
+        output_raw_file_and_exit($bild, $mime_type);
     }
 
     $neuesBild = imagecreatetruecolor($neueBreite, $neueHoehe);
@@ -141,6 +145,8 @@ function to_thumb($bild, $size = 0) {
     }
 
     imagecopyresampled($neuesBild, $altesBild, 0, 0, 0, 0, $neueBreite, $neueHoehe, $breite, $hoehe);
+
+    while (ob_get_level() > 0) { @ob_end_clean(); }
 
     header('Content-type: '.$mime_type);
     ob_start();
@@ -157,18 +163,13 @@ function to_thumb($bild, $size = 0) {
 
     imagedestroy($neuesBild);
     imagedestroy($altesBild);
+    exit;
 }
 
 $headers = getRequestHeaders();
 
-// Wenn Datei nicht existiert oder leer ist
 if (!$found_file || !is_file($filename) || filesize($filename) == 0) {
-    $fallback = MCP_DIR.'/images/movie_poster_nopic.jpg';
-    header('Content-type: image/jpeg');
-    if (is_file($fallback)) {
-        header('Content-length: '.filesize($fallback));
-        readfile($fallback);
-    }
+    send_fallback_and_exit();
 } else {
     $mime_content_type = mime_content_type($filename);
     
@@ -187,17 +188,12 @@ if (!$found_file || !is_file($filename) || filesize($filename) == 0) {
    
     if (isset($headers['If-Modified-Since']) && (strtotime($headers['If-Modified-Since']) == filemtime($filename))) {
         header('Last-Modified: '.gmdate('D, d M Y H:i:s', filemtime($filename)).' GMT', true, 304);
+        exit;
     } else {
         header('Last-Modified: '.gmdate('D, d M Y H:i:s', filemtime($filename)).' GMT', true, 200);
         header('Content-transfer-encoding: binary');
         to_thumb($filename, $width);
     }
 }
-
-// Garbage Collection
-p4c_close(DB_HOST);
-	
-// PHP Fehlermeldung loggen
-p4c_errorlog(error_get_last());
 
 ?>
