@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 /**
  * @author		Martin Zimmermann
@@ -42,7 +42,7 @@ function upload_file($album) {
     $album_id = $album->field('id');
     $path = PHOTO_ALBUMS_PATH.'/'.PHOTO_ALBUMS_DEFAULT_DIR.'/'.$_SESSION['merchant_id'].'/'.$album_id.'/images';
 
-    // erstelle Speicher f�r Albumbilder
+    // erstelle Speicher für Albumbilder
     if (!file_exists($path)) {
         mkdir($path, 0777, true);
     } 

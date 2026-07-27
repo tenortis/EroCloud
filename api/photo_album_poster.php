@@ -37,6 +37,11 @@ if (empty($album_param)) {
     send_fallback_and_exit();
 }
 
+$fsk = 'preview_image_fsk16';
+if (isset($_GET['fsk']) && abs($_GET['fsk']) == 18) {
+    $fsk = 'preview_image_fsk18';
+}
+
 $escaped_id = p4c_escape_string($album_param);
 $rs_album = p4c_query("SELECT * FROM `photo_albums` WHERE `album_id`='".$escaped_id."' OR `file_id`='".$escaped_id."' OR `id`='".abs($album_param)."' LIMIT 1;",__FILE__,__LINE__);
 
@@ -45,20 +50,53 @@ if (p4c_num_rows($rs_album) == 0) {
 }
 
 $album_ary = p4c_fetch_object($rs_album);
+$album_folder = PHOTO_ALBUMS_PATH.'/'.$album_ary->storage_location.'/'.$album_ary->merchant_id.'/'.$album_ary->id.'/';
 
-$base_path = PHOTO_ALBUMS_PATH.'/'.$album_ary->storage_location.'/'.$album_ary->merchant_id.'/'.$album_ary->id.'/images/';
-$filename = $base_path . 'poster.jpg';
-$found_file = false;
+$filename = false;
 
-if (file_exists($filename)) {
-    $found_file = true;
-} else {
-    // Search first image if poster.jpg doesn't exist
-    $files = glob($base_path . '*.{jpg,jpeg,png,gif}', GLOB_BRACE);
+// 1. Check DB stored preview image (preview_image_fsk16 or preview_image_fsk18)
+if (!empty($album_ary->$fsk) && file_exists($album_folder . $album_ary->$fsk)) {
+    $filename = $album_folder . $album_ary->$fsk;
+}
+
+// 2. Check alternative FSK preview image if specific FSK preview doesn't exist
+if (!$filename) {
+    $alt_fsk = ($fsk == 'preview_image_fsk18') ? 'preview_image_fsk16' : 'preview_image_fsk18';
+    if (!empty($album_ary->$alt_fsk) && file_exists($album_folder . $album_ary->$alt_fsk)) {
+        $filename = $album_folder . $album_ary->$alt_fsk;
+    }
+}
+
+// 3. Check first photo in album from photo_albums_photos database table
+if (!$filename) {
+    $rs_first_photo = p4c_query("SELECT `filename` FROM `photo_albums_photos` WHERE `album_id`='".p4c_escape_string($album_ary->album_id)."' OR `album_id`='".$album_ary->id."' ORDER BY `id` ASC LIMIT 1;",__FILE__,__LINE__);
+    if (p4c_num_rows($rs_first_photo) > 0) {
+        $photo_obj = p4c_fetch_object($rs_first_photo);
+        $candidate = $album_folder . 'images/' . $photo_obj->filename;
+        if (file_exists($candidate)) {
+            $filename = $candidate;
+        }
+    }
+}
+
+// 4. Glob search in images subfolder
+if (!$filename) {
+    $files = glob($album_folder . 'images/*.{jpg,jpeg,png,gif}', GLOB_BRACE);
     if (!empty($files)) {
         $filename = $files[0];
-        $found_file = true;
     }
+}
+
+// 5. Glob search in main album folder
+if (!$filename) {
+    $files = glob($album_folder . '*.{jpg,jpeg,png,gif}', GLOB_BRACE);
+    if (!empty($files)) {
+        $filename = $files[0];
+    }
+}
+
+if (!$filename || !is_file($filename)) {
+    send_fallback_and_exit();
 }
 
 function getRequestHeaders() {
@@ -168,7 +206,7 @@ function to_thumb($bild, $size = 0) {
 
 $headers = getRequestHeaders();
 
-if (!$found_file || !is_file($filename) || filesize($filename) == 0) {
+if (!is_file($filename) || filesize($filename) == 0) {
     send_fallback_and_exit();
 } else {
     $mime_content_type = mime_content_type($filename);

@@ -1,4 +1,4 @@
-<?php
+ï»¿<?php
 
 /**
  * @author		Martin Zimmermann
@@ -59,7 +59,7 @@ function upload_file($album, $fsk) {
         
         $file_path = $path.'/'.$file_name;
 	
-        // erstelle Speicher für Profilbilder
+        // erstelle Speicher fÃ¼r Profilbilder
         if (!file_exists($path)) {
             mkdir($path, 0777, true);
         }
@@ -75,7 +75,7 @@ function upload_file($album, $fsk) {
                 $file_name_delete = $album->field('preview_image_fsk18');
             }
             
-            // Allte Profilbilder löschen
+            // Allte Profilbilder lÃ¶schen
             if (file_exists($path.'/'.$file_name_delete)) {
                 if (is_file($path.'/'.$file_name_delete)) {
                     @unlink($path.'/'.$file_name_delete);
