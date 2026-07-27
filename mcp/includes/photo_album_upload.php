@@ -1,4 +1,4 @@
-<?php
+ï»¿<?php
 
 if (!defined('SAFE_INC'))
     die ("Hacking attempt...");
@@ -101,7 +101,7 @@ $album['seo_url'] = '';
 $album['actor_id'] = '';
 
 $amount_webmaster_ary = array(0, 5, 10, 15, 20, 25);
-$replace_title_ary = array('°','^','²','§','§','$','%','{','[',']','}','´','`','~',"'",'_',';','<','>');
+$replace_title_ary = array('Â°','^','Â²','Â§','Â§','$','%','{','[',']','}','Â´','`','~',"'",'_',';','<','>');
 
 if (isset($_POST['upload_content'])) {
     
@@ -114,7 +114,7 @@ if (isset($_POST['upload_content'])) {
         } 
     }
 
-    $album['title'] = str_replace(array('&#8364;','&euro;','Â€','€','â‚¬','&#x20AC;'), "EUR", $album['title']);
+    $album['title'] = str_replace(array('&#8364;','&euro;','Ã‚Â€','Â€','Ã¢Â‚Â¬','&#x20AC;'), "EUR", $album['title']);
 
     if (strlen(utf8_decode($album['title'])) > 65) {
         $error = 'Der Albumtitel ist leider zu lang.';
@@ -169,14 +169,14 @@ if (isset($_POST['upload_content'])) {
         $album_id = abs($_SESSION['upload_album']['album_id']);
     }
     
-    // Prüfe ob bei diesem Kunden bereichts ein Fotoalbum mit diesem Title existiert
+    // PrÃ¼fe ob bei diesem Kunden bereichts ein Fotoalbum mit diesem Title existiert
     $rs_check_album_exists = p4c_query("SELECT `id`  FROM `photo_albums` WHERE `title`='".p4c_escape_string($album['title'])."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `id`!='".abs($album_id)."' LIMIT 1;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_check_album_exists) == 1) {
         $error = 'Du hast bereits eine Fotoalbum mit diesem Titel hochgeladen.';
         $duplicate_title = p4c_result($rs_check_album_exists, 0);
     }
 
-    // Prüfe ob bei diesem Kunden exakt dieses Album schon existiert -> dann updaten nicht neu anlegen
+    // PrÃ¼fe ob bei diesem Kunden exakt dieses Album schon existiert -> dann updaten nicht neu anlegen
     $rs_check_album_exists = p4c_query("SELECT `id`, `album_id`  FROM `photo_albums` WHERE `title`='".p4c_escape_string($album['title'])."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `id`='".abs($album_id)."' LIMIT 1;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_check_album_exists) == 1) {
         $album_exists = true;  
@@ -515,13 +515,13 @@ $site .= '
 
         $album_exists = true;
         
-        // Prüfe ob dieses Album existiert
+        // PrÃ¼fe ob dieses Album existiert
         $rs_check_album_exists = p4c_query("SELECT `id`  FROM `photo_albums` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `id`='".abs($album_id)."' LIMIT 1;",__FILE__,__LINE__);
         if (p4c_num_rows($rs_check_album_exists) == 0) {
             $album_exists = false;
         }
 
-        // Prüfen ob dieser Album noch nicht veröffentlicht wurde.
+        // PrÃ¼fen ob dieser Album noch nicht verÃ¶ffentlicht wurde.
         $rs_check_photo_albums_online_exists = p4c_query("SELECT `id`  FROM `photo_albums_online` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `album_id`='".abs($album_id)."' LIMIT 1;",__FILE__,__LINE__);        
         if (p4c_num_rows($rs_check_photo_albums_online_exists) == 1) {
             $album_exists = true;

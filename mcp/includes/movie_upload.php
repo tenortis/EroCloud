@@ -75,18 +75,23 @@ $movie['meta_title'] = '';
 $movie['meta_description'] = '';
 $movie['seo_url'] = '';
 $movie['actor_id'] = '';
+$movie['category_master'] = 'porn';
+$movie['category_slave'] = '';
+$movie['visible_for_website'] = 'public';
 
 $amount_webmaster_ary = array(0, 5, 10, 15, 20, 25);
-$replace_title_ary = array('°','^','²','§','§','$','%','{','[',']','}','´','`','~',"'",'_',';','<','>');
+$replace_title_ary = array('Â°','^','Â²','Â§','Â§','$','%','{','[',']','}','Â´','`','~',"'",'_',';','<','>');
 
-if (isset($_POST['upload_content'])) {
+if (isset($_POST['upload_content']) OR isset($_POST['submit_step1'])) {
     
+    $errors = array();
+
     if(!isset($_POST['title']) OR trim($_POST['title']) == '') {
-        $error = 'Gib einen aussagekr&auml;ftigen Filmtitel an.';
+        $errors[] = 'Geben Sie bitte einen aussagekr&auml;ftigen Filmtitel an.';
     } else {
         $movie['title'] = trim(str_replace($replace_title_ary, '', $_POST['title']));
         if (empty($movie['title'])) {
-            $error = 'Gib einen aussagekr&auml;ftigen Filmtitel an.';    
+            $errors[] = 'Geben Sie bitte einen aussagekr&auml;ftigen Filmtitel an.';    
         } 
     }
 
@@ -97,20 +102,20 @@ if (isset($_POST['upload_content'])) {
     $movie['title'] = str_replace(["#?", "?en"], ["#", "en"], $movie['title']);
     
     // Euro-Zeichen in Text umwandeln
-    $movie['title'] = str_replace(array('&#8364;','&euro;','Â€','€','â‚¬','&#x20AC;'), "EUR", $movie['title']);
+    $movie['title'] = str_replace(array('&#8364;','&euro;','Ã‚â‚¬','â‚¬','Ã¢â€šÂ¬','&#x20AC;'), "EUR", $movie['title']);
 
     
     if (strlen(utf8_decode($movie['title'])) > 65) {
-        $error = 'Der Filmtitel ist leider zu lang.';
+        $errors[] = 'Der Filmtitel darf maximal 65 Zeichen lang sein.';
     }
     
     if(!isset($_POST['description'])) {
-        $error = 'Gib eine gute und aussagekr&auml;ftige Beschreibung des Films an.';
+        $errors[] = 'Geben Sie bitte eine gute und aussagekr&auml;ftige Beschreibung des Films an.';
     } else {
         $allowed_tags = '<ul><ol><li><u><em><strong><h1 class="h4"><h2><h3><h4><h5><h6><pre><address><p>';
         $movie['description'] = trim(strip_tags($_POST['description'], $allowed_tags));
         if (empty($movie['description'])) {
-            $error = 'Gib eine gute und aussagekr&auml;ftige Beschreibung des Films an.';    
+            $errors[] = 'Geben Sie bitte eine gute und aussagekr&auml;ftige Beschreibung des Films an.';    
         }
     }
     
@@ -125,8 +130,9 @@ if (isset($_POST['upload_content'])) {
         $movie['category_master'] = 'porn';
     }
 
-    if (!isset($_POST['category_slave']) OR !is_array($_POST['category_slave'])) {
-        $error = 'W&auml;hle alle Kategorien die zum Film passen.';
+    if (!isset($_POST['category_slave']) OR !is_array($_POST['category_slave']) OR count($_POST['category_slave']) < 1) {
+        $errors[] = 'W&auml;hlen Sie bitte mindestens 1 passende Unterkategorie f&uuml;r den Film aus.';
+        $movie['category_slave'] = '';
     } else {
         $movie['category_slave'] = trim(strip_tags(implode(',', $_POST['category_slave'])));
     }
@@ -136,15 +142,15 @@ if (isset($_POST['upload_content'])) {
     }
     
     if ($movie['actor_id'] <= 0) {
-        $error = 'Bitte zun&auml;chst eine Profil anlegen.';
+        $errors[] = 'Bitte w&auml;hlen Sie ein Darsteller-Profil aus (oder legen Sie zuerst ein neues Profil an).';
     }
     
     if(isset($_POST['online_at'])) {
         $movie['online_at'] = date("Y-m-d H:i", strtotime($_POST['online_at']));
     }
 
-    if(!isset($_POST['amount_second'])) {
-        $error = 'Bitte gib an, wieviel der Film kosten soll.';
+    if(!isset($_POST['amount_second']) OR trim($_POST['amount_second']) === '') {
+        $errors[] = 'Geben Sie bitte an, wie viel der Film kosten soll.';
     } else {
         $movie['amount_second'] = number_format($_POST['amount_second'], 1, '.', '');
     }
@@ -209,15 +215,15 @@ if (isset($_POST['upload_content'])) {
         $movie_id = abs($_SESSION['upload_movie']['movie_id']);
     }
     
-    // Prüfe ob bei diesem Kunden bereichts ein Film mit diesem Title existiert
+    // PrÃ¼fe ob bei diesem Kunden bereichts ein Film mit diesem Title existiert
     $rs_check_movie_exists = p4c_query("SELECT `id` FROM `movies` WHERE `title`='".p4c_escape_string($movie['title'])."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `id`!='".abs($movie_id)."' LIMIT 1;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_check_movie_exists) == 1) {
-        $error = 'Du hast bereits einen Film mit dem Titel hochgeladen.';
+        $errors[] = 'Sie haben bereits einen Film mit diesem Titel hochgeladen.';
         $duplicate_title = p4c_result($rs_check_movie_exists, 0);
         
     }
 
-    // Prüfe ob bei diesem Kunden exakt dieser Film schon existiert -> dann updaten nicht neu anlegen
+    // PrÃ¼fe ob bei diesem Kunden exakt dieser Film schon existiert -> dann updaten nicht neu anlegen
     $rs_check_movie_exists = p4c_query("SELECT `id`  FROM `movies` WHERE `title`='".p4c_escape_string($movie['title'])."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `id`='".abs($movie_id)."' LIMIT 1;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_check_movie_exists) == 1) {
         $movie_exists = true;  
@@ -225,6 +231,14 @@ if (isset($_POST['upload_content'])) {
     
     $_SESSION['upload_movie'] = $movie;
     $_SESSION['upload_movie']['movie_id'] = $movie_id;
+    
+    if (!empty($errors)) {
+        $error = '<strong>Bitte korrigieren Sie die folgenden Eingaben:</strong><ul class="mb-0 mt-2 ps-3">';
+        foreach ($errors as $err_msg) {
+            $error .= '<li>' . $err_msg . '</li>';
+        }
+        $error .= '</ul>';
+    }
     
     /*
     echo '<pre>';
@@ -343,13 +357,13 @@ function get_upload_wizard_html($active_step = 1) {
 
         if ($is_completed) {
             $box_class = 'bg-success text-white shadow-sm';
-            $badge_html = '<span class="badge bg-white text-success rounded-circle mb-1"><i class="bi bi-check-lg"></i></span>';
+            $badge_html = '<span class="d-inline-flex align-items-center justify-content-center bg-white text-success rounded-circle mb-1 p-0 shadow-sm" style="width:24px; height:24px; font-size:14px;"><i class="bi bi-check-lg"></i></span>';
         } else if ($is_current) {
             $box_class = 'bg-success text-white shadow-sm fw-bold';
-            $badge_html = '<span class="badge bg-white text-success rounded-circle mb-1">'.$step_num.'</span>';
+            $badge_html = '<span class="d-inline-flex align-items-center justify-content-center bg-white text-success rounded-circle mb-1 p-0 shadow-sm" style="width:24px; height:24px; font-size:12px; font-weight:bold;">'.$step_num.'</span>';
         } else {
             $box_class = 'bg-light text-muted';
-            $badge_html = '<span class="badge bg-secondary rounded-circle mb-1">'.$step_num.'</span>';
+            $badge_html = '<span class="d-inline-flex align-items-center justify-content-center bg-secondary text-white rounded-circle mb-1 p-0" style="width:24px; height:24px; font-size:12px; font-weight:bold;">'.$step_num.'</span>';
         }
 
         $html .= '
@@ -430,10 +444,10 @@ function get_upload_wizard_html($active_step = 1) {
         <!-- Buttons for Quality & Rendering Modals -->
         <div class="d-flex flex-wrap gap-2 mb-4">
             <button type="button" class="btn btn-outline-info shadow-sm" data-bs-toggle="modal" data-bs-target="#modalMovieTips">
-                <i class="bi bi-info-circle me-1"></i> Hinweise zur Qualit&auml;t deiner Filme
+                <i class="bi bi-info-circle me-1"></i> Hinweise zur Qualit&auml;t Ihrer Filme
             </button>
             <button type="button" class="btn btn-outline-secondary shadow-sm" data-bs-toggle="modal" data-bs-target="#modalMovieRenderingTips">
-                <i class="bi bi-gear me-1"></i> So renderst du deine Filme richtig
+                <i class="bi bi-gear me-1"></i> So rendern Sie Ihre Filme richtig
             </button>
         </div>
 
@@ -442,7 +456,7 @@ function get_upload_wizard_html($active_step = 1) {
             <div class="modal-dialog modal-lg modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title fw-bold" id="modalMovieTipsLabel"><i class="bi bi-info-circle me-2 text-info"></i>Hinweise zur Qualit&auml;t deiner Filme</h5>
+                        <h5 class="modal-title fw-bold" id="modalMovieTipsLabel"><i class="bi bi-info-circle me-2 text-info"></i>Hinweise zur Qualit&auml;t Ihrer Filme</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">';
@@ -463,7 +477,7 @@ function get_upload_wizard_html($active_step = 1) {
             <div class="modal-dialog modal-lg modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title fw-bold" id="modalMovieRenderingTipsLabel"><i class="bi bi-gear me-2 text-secondary"></i>So renderst du deine Filme richtig</h5>
+                        <h5 class="modal-title fw-bold" id="modalMovieRenderingTipsLabel"><i class="bi bi-gear me-2 text-secondary"></i>So rendern Sie Ihre Filme richtig</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">';
@@ -493,9 +507,9 @@ function get_upload_wizard_html($active_step = 1) {
                             <div class="d-flex align-items-center gap-3">
                                 <img src="'.MCP_URL.'/PlayerPoster/'.$dublicat_ary->file_id.'&w=100" class="rounded shadow-sm" style="width:100px; height:auto;" />
                                 <div>
-                                    <a href="'.MCP_URL.'/video/'.$dublicat_ary->id.'" target="_blank" class="btn btn-sm btn-outline-primary mb-2">Klicke hier um zum Film zu wechseln</a>
+                                    <a href="'.MCP_URL.'/video/'.$dublicat_ary->id.'" target="_blank" class="btn btn-sm btn-outline-primary mb-2">Klicken Sie hier, um zum Film zu wechseln</a>
                                     <div class="fw-bold text-muted my-1">ODER</div>
-                                    <small class="text-muted">Wenn dieser Film tats&auml;chlich ein anderer ist, benutze hier einen neuen Titel.</small>
+                                    <small class="text-muted">Wenn dieser Film tats&auml;chlich ein anderer ist, verwenden Sie bitte einen neuen Titel.</small>
                                 </div>
                             </div>
                         </div>
@@ -513,12 +527,12 @@ function get_upload_wizard_html($active_step = 1) {
                     <div class="card shadow-sm h-100 mb-0">
                         <div class="card-header bg-light fw-bold py-3"><i class="bi bi-film me-2"></i>Angaben zum Film</div>
                         <div class="card-body">
-                            <div class="edit_title fw-bold mb-1">Gib einen aussagekr&auml;ftigen Filmtitel an. <span id="anzahl_title" class="text-muted fw-normal">(max. 65 Zeichen)</span></div>
+                            <div class="edit_title fw-bold mb-1">Geben Sie einen aussagekr&auml;ftigen Filmtitel an. <span id="anzahl_title" class="text-muted fw-normal">(max. 65 Zeichen)</span></div>
                             <div class="edit_content mb-3">
-                                <input type="text" class="form-control form-control-lg" name="title" value="'.$movie['title'].'" onkeyup="jQuery(this).zaehle_zeichen(65, \'anzahl_title\')" placeholder="Gib einen aussagekr&auml;ftigen Filmtitel an." style="font-size:18px;" />
+                                <input type="text" class="form-control form-control-lg" name="title" value="'.$movie['title'].'" onkeyup="jQuery(this).zaehle_zeichen(65, \'anzahl_title\')" placeholder="Geben Sie einen aussagekr&auml;ftigen Filmtitel an." style="font-size:18px;" />
                             </div>
                 
-                            <div class="edit_title fw-bold mb-1">Gib eine gute und aussagekr&auml;ftige <b>Beschreibung</b> des Films an.</div>
+                            <div class="edit_title fw-bold mb-1">Geben Sie eine gute und aussagekr&auml;ftige <b>Beschreibung</b> des Films an.</div>
                             <div class="edit_content mb-3">
                                 <textarea class="form-control" name="description" id="description">'.$movie['description'].'</textarea>
                                 <script>
@@ -547,7 +561,7 @@ function get_upload_wizard_html($active_step = 1) {
                                     <div class="fw-bold">
                                         <label for="porn"><input type="radio" '.$checked_porn.' id="porn" name="category_master" value="porn" /> Porno</label>
                                     </div>
-                                    <div class="small text-muted ms-4">W&auml;hle diese Kategorie, wenn der Film pornografische Inhalte enth&auml;lt.</div>
+                                    <div class="small text-muted ms-4">W&auml;hlen Sie diese Kategorie, wenn der Film pornografische Inhalte enth&auml;lt.</div>
                                 </div>';
                                 if ($movie['category_master'] == 'fetish') {$checked_fetish = 'checked="checked"';} else {$checked_fetish='';}
                                 $site .= '
@@ -555,12 +569,12 @@ function get_upload_wizard_html($active_step = 1) {
                                     <div class="fw-bold">
                                         <label for="fetish"><input type="radio" '.$checked_fetish.' id="fetish" name="category_master" value="fetish" /> Fetisch</label>
                                     </div>
-                                    <div class="small text-muted ms-4">W&auml;hle diese Kategorie, wenn der Film ein reiner Fetischfilm, wie SM, BDSM usw. ist.</div>
+                                    <div class="small text-muted ms-4">W&auml;hlen Sie diese Kategorie, wenn der Film ein reiner Fetischfilm, wie SM, BDSM usw. ist.</div>
                                 </div>
                             </div>
-                            <div class="p-3 bg-light border-bottom font-weight-bold fw-bold">W&auml;hle alle Kategorien, die zum Film passen</div>
+                            <div class="p-3 bg-light border-bottom font-weight-bold fw-bold">W&auml;hlen Sie alle Kategorien, die zum Film passen</div>
                             <div class="p-3 border-bottom text-dark small" style="background-color: #fff6d0; border-color: #ffe8a1;">
-                                <i class="bi bi-info-circle-fill text-warning me-2"></i><strong>Hinweis:</strong> Vom System automatisch vorausgew&auml;hlte Kategorien werden gelb hervorgehoben. Sie k&ouml;nnen diese &uuml;berpr&uuml;fen und bei Bedarf anpassen.
+                                <i class="bi bi-info-circle-fill text-warning me-2"></i><strong>Hinweis:</strong> Vom System automatisch vorausgew&auml;hlte Kategorien werden gelb hervorgehoben. Bitte w&auml;hlen Sie mindestens 1 passende Unterkategorie aus (empfohlen: 2â€“4 Unterkategorien fÃ¼r optimale Auffindbarkeit in der Suche).
                             </div>
                             <div class="p-3">';
                             
@@ -756,7 +770,7 @@ function get_upload_wizard_html($active_step = 1) {
                                 <small class="text-muted d-block mt-1">Empfohlen! Dies steigert Ihren Umsatz.</small>
                             </div>
                             
-                            <div class="edit_title fw-bold mb-1">F&uuml;r wieviel Prozent mehr, m&ouml;chtest du den Film als Download anbieten?</div>
+                            <div class="edit_title fw-bold mb-1">F&uuml;r wie viel Prozent Aufpreis m&ouml;chten Sie den Film als Download anbieten?</div>
                             <div class="edit_content mb-3">
                                 <select class="form-select" name="amount_download">';
                                     for($i=0;$i<=150;$i++) {
@@ -795,7 +809,7 @@ function get_upload_wizard_html($active_step = 1) {
                                             $site .= '<option value="'.$actor_obj->id.'" '.$selected.'> '.$actor_obj->username.'</option>';
                                         }
                                     } else {
-                                        $site .= '<option value="0">Bitte zun&auml;chst Profil anlegen!</option>';
+                                        $site .= '<option value="0">Bitte legen Sie zuerst ein Profil an!</option>';
                                     }
                                     $site .= ' 
                                 </select>
@@ -812,7 +826,7 @@ function get_upload_wizard_html($active_step = 1) {
                                     }
                                     $site .= '
                                 </select>
-                                <small class="text-muted d-block mt-1">Bei der Ver&ouml;ffentlichung auf Partnerwebsites, erh&auml;lst du 25% Provision vom Umsatz dieses Filmes.</small>
+                                <small class="text-muted d-block mt-1">Bei der Ver&ouml;ffentlichung auf Partnerwebsites erhalten Sie 25% Provision vom Umsatz dieses Films.</small>
                             </div>
                         </div>
                     </div>
@@ -827,8 +841,8 @@ function get_upload_wizard_html($active_step = 1) {
                         <div class="card-body">
                             <div class="edit_title fw-bold mb-1">Meta Description <span id="anzahl_meta_description" class="text-muted fw-normal">(max. 165 Zeichen)</span> <b class="text-danger">KEINE einzelnen Worte/Keywords oder Hashtags!</b></div>
                             <div class="edit_content mb-3">
-                                <textarea class="form-control" rows="3" name="meta_description" placeholder="Gib hier eine kurze aussagekr&auml;ftige Beschreibung des Films an. Keine Stichworte! Diese Kurzbeschreibung wird unteranderem f&uuml;r die Google-Suche benutzt." onkeyup="jQuery(this).zaehle_zeichen(156, \'anzahl_meta_description\')">'.$movie['meta_description'].'</textarea>
-                                <small class="text-muted d-block mt-1">Beschreibe den Film so interessant wie m&ouml;glich mit maximal 156 Zeichen.</small>
+                                <textarea class="form-control" rows="3" name="meta_description" placeholder="Geben Sie hier eine kurze aussagekr&auml;ftige Beschreibung des Films an. Keine Stichworte! Diese Kurzbeschreibung wird unter anderem f&uuml;r die Google-Suche verwendet." onkeyup="jQuery(this).zaehle_zeichen(156, \'anzahl_meta_description\')">'.$movie['meta_description'].'</textarea>
+                                <small class="text-muted d-block mt-1">Beschreiben Sie den Film so interessant wie m&ouml;glich mit maximal 156 Zeichen.</small>
                             </div>
                             
                             <div class="edit_title fw-bold mb-1">Meta Title <span id="anzahl_meta_title" class="text-muted fw-normal">(max. 65 Zeichen)</span></div>
@@ -869,7 +883,7 @@ function get_upload_wizard_html($active_step = 1) {
         ';} else if (isset($_GET['step']) AND $_GET['step'] == 2 AND isset($_GET['movie_id'])) {
         $movie_id = abs($_GET['movie_id']);
         
-        // Prüfe ob dieser Film existiert
+        // PrÃ¼fe ob dieser Film existiert
         $rs_check_movie_exists = p4c_query("SELECT `id`  FROM `movies` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `id`='".abs($movie_id)."' LIMIT 1;",__FILE__,__LINE__);
        
         if (p4c_num_rows($rs_check_movie_exists) == 0) {
@@ -884,7 +898,7 @@ function get_upload_wizard_html($active_step = 1) {
             exit;
         }
         
-        // Prüfen ob dieser Film noch nicht veröffentlicht wurde.
+        // PrÃ¼fen ob dieser Film noch nicht verÃ¶ffentlicht wurde.
         $rs_check_movie_online_exists = p4c_query("SELECT `id`  FROM `movies_online` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `file_id`='". p4c_escape_string($m->field('file_id'))."' LIMIT 1;",__FILE__,__LINE__);        
         if (p4c_num_rows($rs_check_movie_online_exists) == 1) {
             header('Location: '.MCP_URL.'/Movies');
@@ -897,137 +911,98 @@ function get_upload_wizard_html($active_step = 1) {
 ' . get_upload_wizard_html(2) . '
 
         <style>
-
-        #upload_file {position: absolute; cursor: pointer; top: 0px; width: 100%; height: 100%; left: 0px; z-index: 100; opacity: 0;}
-
-        .abort_upload {
-            position: relative;
-            display:none;
-            width:120px;
-            padding:5px 10px;
-            cursor:pointer !important;
-            font-size: 14px !important;
-            text-align:center;
-            float:left;
-        }
-
-        .upload_movie {
-            position: relative;
-            background-color:#2f8ab9;
-            color:#fff;
-            width:120px;
-            padding:5px 10px;
-            cursor:pointer !important;
-            font-size: 14px !important;
-            font-weight: bold;
-            text-align:center;
-        }
-
-        .upload_error {display:none; padding:5px; margin-top:5px;}
-
-        .progress {
-            border-top: 1px solid #008000;
-            border-right: 1px solid #008000;
-            border-bottom: 1px solid #008000;
-            position:relative;
-            margin-left:142px;
-            display:none;
-            width:auto;
-            box-sizing:border-box;
-        }
-
-        .bar { background-color: #B4F5B4; width:0%; height:26px; border-radius: 3px; }
-        .percent { position:absolute; display:inline-block; top:5px; left:48%; }
-        
-        .info_box {
-            margin-top:0;
-            border-top:none;
-        }
-        
-        .info_box li,
-        .info_box div {
-            font-size:12px;
-        }
-        
+            #upload_file {position: absolute; cursor: pointer; top: 0px; width: 100%; height: 100%; left: 0px; z-index: 100; opacity: 0;}
+            .progress { display: none; }
+            .abort_upload { display: none; }
+            .upload_error { display: none; }
         </style>
 
+        <div class="row g-4 mb-4">
+            <!-- Left Column: Upload Box -->
+            <div class="col-12 col-lg-6">
+                <div class="card shadow-sm h-100 mb-0">
+                    <div class="card-header bg-light fw-bold py-3"><i class="bi bi-cloud-arrow-up me-2"></i>Film hochladen</div>
+                    <div class="card-body">
+                        <div class="alert alert-info py-2 px-3 small mb-3 shadow-sm">
+                            <i class="bi bi-info-circle-fill me-2"></i>Nach dem Upload k&ouml;nnen Sie den Film noch einmal bearbeiten und ein Vorschaubild ausw&auml;hlen oder ein eigenes Vorschaubild hochladen.
+                        </div>
 
-        <div class="ui-widget-header" style="padding:5px 10px; margin-top:10px;">So renderst du deine Filme richtig</div>
-        <div class="info_box">
-            <div style="margin-bottom:10px; line-height:1.4">
-                Immer wenn ein Film fertig gestellt wurde, kommt die Frage nach den richtigen Einstellungen zum Rendern.
-                Die optimale Render-Einstellung gibt es leider nicht. Mit den folgenden Settings sollte es dir aber gelingen einen Film vern&uuml;nfig in mp4 zu Rendern.
+                        <div class="form-check form-switch mb-3 p-3 bg-light rounded border">
+                            <input class="form-check-input ms-0 me-2" type="checkbox" id="upload_movie_released" style="cursor:pointer;" /> 
+                            <label class="form-check-label fw-bold text-dark" for="upload_movie_released" style="cursor:pointer;">
+                                Den Film direkt nach dem Upload zur Pr&uuml;fung freigeben und in der EroCloud ver&ouml;ffentlichen.
+                            </label>
+                        </div>
+
+                        <div class="p-3 bg-light rounded border mb-4 small text-muted">
+                            <div class="mb-1"><i class="bi bi-file-earmark-play me-2 text-primary"></i><strong>Erlaubte Dateiformate:</strong> avi, flv, m4v, mkv, mov, mp4, mpg, wmv</div>
+                            <div><i class="bi bi-hdd me-2 text-primary"></i><strong>Maximale Dateigr&ouml;&szlig;e:</strong> 2000 MB (2,0 GB)</div>
+                        </div>
+
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="upload_movie btn btn-primary btn-lg position-relative overflow-hidden px-4 shadow-sm">
+                                <i class="bi bi-upload me-2"></i>Film hochladen
+                                <form id="form_upload_movie" action="'.MCP_URL.'/includes/uploader/upload_movie.php?movie_id='.$movie_id.'" method="post" enctype="multipart/form-data">
+                                    <input type="file" id="upload_file" name="movie" accept="video/*">
+                                </form>
+                            </div>
+                            <button type="button" class="abort_upload btn btn-outline-danger btn-lg shadow-sm">
+                                <i class="bi bi-x-circle me-1"></i>Abbrechen
+                            </button>
+                        </div>
+
+                        <div class="progress mt-3 shadow-sm" style="height: 25px;">
+                            <div class="bar progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: 0%;">
+                                <span class="percent fw-bold text-dark">0%</span>
+                            </div>
+                        </div>
+
+                        <div class="upload_error alert alert-danger mt-3 mb-0 shadow-sm"></div>
+                        <div id="status" class="mt-2"></div>
+                    </div>
+                </div>
             </div>
 
-            <div style="margin-bottom:5px;">
-                <ul style="list-style-type:square; margin-left:40px; line-height:1.4">
-                    <li>Video-Codec: AVC / H.264</li>
-                    <li>Audio-Codec: AAC</li>
-                    <li>Aufl&uuml;sung: 1920x1080 (FullHD / 1080p)</li>
-                    <li>Profil: Hoch</li>
-                    <li>Framerate: 25,000 (PAL)</li>
-                    <li>Keine Halbbilder: Progressive Scan</li>
-                    <li>Variable Bitrate, 10.000.000 Bit/s</li>
-                    <li>Audio: 192kBit/s</li>
-                </ul>
-            </div>
-            
-            <a class="movie_tips" href="javascript:;">Beachte bitte auch die allgemeinen Hinweise zur Qualit&auml;t deiner Filme.</a>
-            
-            <div class="movie_tips_popup">
-                <div style="text-align:right; top:20px; right:10px; position:absolute;">
-                    <a href="#" class="close_overlay"><b>&#x2715;</b></a>
-                </div>';        
-                include_once(MCP_DIR.'/includes/overlays/movie_tips.php');
-                $site .= '
-                <div style="text-align:right; float:right;">
-                    <a href="#" class="close_overlay"><b>&#x2715;</b> Schlie&szlig;en</a>
+            <!-- Right Column: Render Hints -->
+            <div class="col-12 col-lg-6">
+                <div class="card shadow-sm h-100 mb-0">
+                    <div class="card-header bg-light fw-bold py-3"><i class="bi bi-gear me-2"></i>So rendern Sie Ihre Filme richtig</div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">
+                            Immer wenn ein Film fertig gestellt wurde, kommt die Frage nach den richtigen Einstellungen zum Rendern.
+                            Die optimale Render-Einstellung gibt es leider nicht. Mit den folgenden Einstellungen sollte es Ihnen aber gelingen, einen Film vern&uuml;nftig in mp4 zu rendern.
+                        </p>
+                        
+                        <ul class="small mb-3 ps-3 text-secondary" style="line-height: 1.6;">
+                            <li><strong>Video-Codec:</strong> AVC / H.264</li>
+                            <li><strong>Audio-Codec:</strong> AAC</li>
+                            <li><strong>Aufl&ouml;sung:</strong> 1920x1080 (FullHD / 1080p)</li>
+                            <li><strong>Profil:</strong> Hoch</li>
+                            <li><strong>Framerate:</strong> 25,000 (PAL)</li>
+                            <li><strong>Scan-Typ:</strong> Progressive Scan (Keine Halbbilder)</li>
+                            <li><strong>Bitrate:</strong> Variable Bitrate, 10.000.000 Bit/s</li>
+                            <li><strong>Audio Bitrate:</strong> 192 kBit/s</li>
+                        </ul>
+                        
+                        <button type="button" class="btn btn-sm btn-outline-info shadow-sm" data-bs-toggle="modal" data-bs-target="#modalMovieTips">
+                            <i class="bi bi-info-circle me-1"></i> Hinweise zur Qualit&auml;t Ihrer Filme anzeigen
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
-
-        <div class="ui-widget-header" style="padding:5px 10px; margin-top:10px;">Film hochladen</div>
-        <div class="ui-widget-content" style="position:relative; padding:10px; border-top:none;">
-
-            <div style="margin-bottom:8px;">
-                Nach dem Upload kannst du den Film noch einmal bearbeiten und ein Vorschaubild ausw&auml;hlen oder ein eigenes Vorschaubild hochladen.
-            </div>
-
-            <div style="margin-bottom:8px;">
-                <input style="position:relative; vertical-align:middle;" type="checkbox" id="upload_movie_released" /> 
-                <label for="upload_movie_released"><b>ODER:</b> Den Film direkt nach dem Upload zur Pr&uuml;fung freigeben und in der EroCloud ver&ouml;ffentlichen.</label>
-            </div>
-
-            <div style="margin-bottom:15px;">
-                Erlaubte Dateiformate: avi, flv, m4v, mkv, mov, mp4, mpg, wmv<br />
-                Maximale Dateigr&ouml;&szlig;e: 2000 MB (2,0 GB)
-            </div>
-
-            <div class="upload_movie">
-                Film hochladen
-                <form id="form_upload_movie" action="'.MCP_URL.'/includes/uploader/upload_movie.php?movie_id='.$movie_id.'" method="post" enctype="multipart/form-data">
-                    <input type="file" id="upload_file" name="movie" accept="video/*">
+        
+        <!-- Action Bar -->
+        <div class="d-flex justify-content-between align-items-center my-4 p-3 bg-light rounded border shadow-sm">
+            <div>
+                <form action="'.MCP_URL.'/Movie-Upload?step=1" method="post">
+                    <input type="hidden" name="movie_id" value="'.$movie_id.'" />
+                    <input type="submit" class="btn btn-outline-danger content_ruels" name="delete_movie" value="Film l&ouml;schen" />
                 </form>
             </div>
-            <div class="abort_upload ui-state-error">Abbrechen</div>
+        </div>';
 
-            <div class="progress">
-                <div class="bar"></div >
-                <div class="percent">0%</div >
-            </div>
-
-            <div class="upload_error ui-state-error"></div>
-            <div id="status"></div>
-
-        </div>
-        
-        <div style="margin-top:15px; margin-bottom:30px; text-align:right;">
-            <form action="'.MCP_URL.'/Movie-Upload?step=1" method="post">
-                <input type="hidden" name="movie_id" value="'.$movie_id.'" />
-                <input type="submit" class="content_ruels button" name="delete_movie" value="Film l&ouml;schen" />
-            </form>
-        </div>
-
+        $site .= '
         <script type="text/javascript">
             // <![CDATA[
             jQuery(document).ready(function() {
@@ -1159,13 +1134,26 @@ function get_upload_wizard_html($active_step = 1) {
         $site .= '
 ' . get_upload_wizard_html(3) . '
         
-        <div class="ui-widget-content" style="padding:10px 10px 20px 10px; margin-top:10px;">
-            <div style="color:#339966; text-align:center;"><i class="material-symbols-outlined md-80">done</i></div>
-            <div style="font-size:80px; color:#339966; font-weight:bold; margin-bottom:15px; text-align:center;">Fertig!</div>
-            <div style="text-align:center">
-                Der Film wird in K&uuml;rze konvertiert.<br />
-                <div style="font-size:15px; margin-top:10px;"><a href="'.MCP_URL.'/video/'.$movie_id.'">Film zum Bearbeiten anzeigen</a></div>
-            </div>    
+        <div class="card shadow-sm border-0 my-4 text-center py-5">
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-inline-flex align-items-center justify-content-center bg-success bg-opacity-10 text-success rounded-circle p-4" style="width: 90px; height: 90px;">
+                        <i class="bi bi-check-lg display-4"></i>
+                    </div>
+                </div>
+                <h2 class="fw-bold text-success display-6 mb-3">Fertig!</h2>
+                <p class="lead text-muted mb-4">
+                    Der Film wurde erfolgreich hochgeladen und wird in K&uuml;rze konvertiert.
+                </p>
+                <div class="d-flex flex-wrap justify-content-center gap-3">
+                    <a href="'.MCP_URL.'/video/'.$movie_id.'" class="btn btn-primary btn-lg shadow-sm">
+                        <i class="bi bi-pencil-square me-2"></i>Film zum Bearbeiten anzeigen
+                    </a>
+                    <a href="'.MCP_URL.'/Movie-Upload" class="btn btn-outline-secondary btn-lg shadow-sm">
+                        <i class="bi bi-plus-lg me-2"></i>Weiteren Film hochladen
+                    </a>
+                </div>
+            </div>
         </div>
         ';
     }

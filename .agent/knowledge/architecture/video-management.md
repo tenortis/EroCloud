@@ -29,7 +29,7 @@ Der Creator (Händler/Merchant) lädt ein Video über das **Merchant Control Pan
 ### UI- & Layout-Standard (Upload & Bearbeitung)
 * **Dynamischer Fortschritts-Wizard**:
   * 4-Schritte-Navigation (*Schritt 1: Filminfos angeben*, *Schritt 2: Film hochladen*, *Schritt 3: Film konvertiert*, *Schritt 4: Veröffentlichen*).
-  * **Grünes Status-Design (`bg-success text-white shadow-sm`)**: Sowohl der aktuelle Schritt als auch alle bereits beendeten Schritte leuchten in grün und zeigen im runden Badge ein Häkchen-Icon (`<i class="bi bi-check-lg"></i>`). Inaktive Schritte bleiben grau.
+  * **Grünes Status-Design (`bg-success text-white shadow-sm`)**: Sowohl der aktuelle Schritt als auch alle bereits beendeten Schritte leuchten in grün und zeigen im runden Badge ein Häkchen-Icon (`<i class="bi bi-check-lg"></i>`). Inaktive Schritte bleiben grau. Die Badges werden mittels `d-inline-flex align-items-center justify-content-center p-0 rounded-circle` mit exakter Abmessung (`24px x 24px`) auf allen Geräten exakt kreisrund gerendert.
 * **Qualitäts- & Render-Hinweise**:
   * Linksbündige Modals (*"Hinweise zur Qualität deiner Filme"* & *"So renderst du deine Filme richtig"*), aufrufbar über Bootstrap 5 Modals (`#modalMovieTips` & `#modalMovieRenderingTips`).
 * **Symmetrisches 3-Zeilen Desktop-Grid**:

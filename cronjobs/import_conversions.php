@@ -23,7 +23,7 @@ function getConversionsData($url, $site_obj) {
         CURLOPT_USERAGENT  => "EroCloud-Bot ".date("Y")." / https://erocloud.net",
         CURLOPT_FRESH_CONNECT => true,
         CURLOPT_NOSIGNAL => true,
-        CURLOPT_RETURNTRANSFER => true, // Antwort aus cURL-Aufruf zur�ckgeben
+        CURLOPT_RETURNTRANSFER => true, // Antwort aus cURL-Aufruf zurückgeben
         #CURLOPT_FOLLOWLOCATION => true, // Weiterleitungen automatisch folgen
         #CURLOPT_MAXREDIRS => 3, // Maximale Anzahl von Weiterleitungen festlegen
     );
@@ -40,7 +40,7 @@ function getConversionsData($url, $site_obj) {
         CURLOPT_USERAGENT => "EroCloud-Bot ".date("Y")." / https://erocloud.net",
         CURLOPT_FRESH_CONNECT => true,
         CURLOPT_NOSIGNAL => true,
-        CURLOPT_RETURNTRANSFER => true, // Antwort aus cURL-Aufruf zur�ckgeben
+        CURLOPT_RETURNTRANSFER => true, // Antwort aus cURL-Aufruf zurückgeben
         //CURLOPT_FOLLOWLOCATION => true, // Weiterleitungen automatisch folgen
         //CURLOPT_MAXREDIRS => 3, // Maximale Anzahl von Weiterleitungen festlegen
     );
@@ -57,9 +57,9 @@ function getConversionsData($url, $site_obj) {
     $max_wait_time = 2; // Maximale Wartezeit in Sekunden
     $file_get_contents = null;
     
-    // F�hren Sie die Schleife solange aus, bis eine Antwort empfangen wurde oder die maximale Wartezeit �berschritten wurde
+    // Führen Sie die Schleife solange aus, bis eine Antwort empfangen wurde oder die maximale Wartezeit überschritten wurde
     while (!$file_get_contents && microtime(true) - $start_time < $max_wait_time) {
-        // F�hren Sie cURL aus und speichern Sie die Antwort
+        // Führen Sie cURL aus und speichern Sie die Antwort
         $file_get_contents = curl_exec($ch);
     }
     
@@ -72,7 +72,7 @@ function getConversionsData($url, $site_obj) {
         $errno = curl_errno($ch);
         curl_close($ch);	
         
-        mail(TECHSUPPORT_EMAIL, 'EroADS - Conversion-Error', "Bitte Domain pr�fen!
+        mail(TECHSUPPORT_EMAIL, 'EroADS - Conversion-Error', "Bitte Domain prüfen!
 Folgende URL ist zum angegebenen Zeitpunkt nicht erreichbar gewesen.
 
 Domain: ".$url."
@@ -91,7 +91,7 @@ Curl errno: ".$errno."
 
         curl_close($ch);
         
-        // Pr�fen ob Logs als XML gesendet werden    
+        // Prüfen ob Logs als XML gesendet werden    
         preg_match_all('/<log>(.*)<\/log>/smU',$file_get_contents, $xml_logs);
         if (isset($xml_logs[1]) AND !empty($xml_logs[1])) {
                    
@@ -112,7 +112,7 @@ Curl errno: ".$errno."
                     [gutschrift_payment] => 0.00
                     [storno_payment] => 0.00
                     [timestamp] => 2018-09-19 13:39:14
-                    [username] => webmaster3öß
+                    [username] => webmaster3Ã¶Ã
                  **/
                 
                 if (count($array) > 5) {
@@ -129,7 +129,7 @@ Curl errno: ".$errno."
                     $timestamp = date("Y-m-d H:i:s", strtotime($timestamp));
                     
                     if(!isset($member_id)) {
-                        mail(TECHSUPPORT_EMAIL, 'EroADS - Conversion Error', "Bitte Domain pr�fen!
+                        mail(TECHSUPPORT_EMAIL, 'EroADS - Conversion Error', "Bitte Domain prüfen!
 Es wurden keine Daten gefunden. Eventuell existiert die Domain nicht mehr.
 Domain: ".$site_obj->domain."
 
@@ -197,14 +197,19 @@ Zeile: ".__LINE__, 'From: EroADS-Bot <no-replay@erocloud.net>');
 
                 // Wenn API-Key falsch
                 if (trim($file_get_contents) == 'false key') {
-                    $class_errorlog->log("Conversions konnten nicht abgefragt werden!\nURL :".$url."\nError: ".$file_get_contents,__FILE__,__LINE__);    
+                    $class_errorlog->log("Conversions konnten nicht abgefragt werden! API-Key ungültig. URL: ".$url, __FILE__, __LINE__);    
                     return false;
                 }
                 
                 preg_match_all('/<eroads>(.*)<\/eroads>/smU',$file_get_contents, $xml_logs);
 
                 if (!isset($xml_logs[1]) OR empty($xml_logs[1])) {
-                    $class_errorlog->log("Conversions konnten nicht abgefragt werden!\nURL :".$url."\nError :<pre>".$file_get_contents."</pre>",__FILE__,__LINE__);    
+                    // HTML-Tags entfernen und auf max. 250 Zeichen kürzen, um das Logfile nicht zu überfluten
+                    $clean_error = trim(preg_replace('/\s+/', ' ', strip_tags($file_get_contents)));
+                    if (strlen($clean_error) > 250) {
+                        $clean_error = substr($clean_error, 0, 247) . '...';
+                    }
+                    $class_errorlog->log("Conversions konnten nicht abgefragt werden! URL: ".$url." | Server-Antwort: ".$clean_error, __FILE__, __LINE__);    
                     return false;
                 }
                 

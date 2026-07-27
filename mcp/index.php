@@ -319,16 +319,7 @@ $site = '<!DOCTYPE html>
                                 $number_of_chats = ' <b>('.$count_chats.')</b>';
                             }
 
-                            $site .= '
-                            <a onclick="jQuery(this).checkMessengerIsOpen(\''.MCP_URL.'/Messenger\');return false;" href="javascript:;" target="EroMessenger">
-                                <i class="material-symbols-outlined md-30">forum</i>
-                                <span>Messenger'.$number_of_chats.'</span>
-                            </a>
-                            
-                            <a class="'.$navHotline.'" href="'.MCP_URL.'/Hotline">
-                                <i class="material-symbols-outlined md-30">phone</i>
-                                <span>09005-Hotline</span>
-                            </a>';                            
+                            /* Hotline wurde im Juli 2026 eingestellt */                            
 
                         }
 
@@ -495,90 +486,7 @@ $site = '<!DOCTYPE html>
                             $site .= ' 
                             </div>';
                             
-                            if ($count_actors > 0) {
-                                $site .= '
-                                <a class="'.$navGroups.'" href="'.MCP_URL.'/Groups">
-                                    <i class="material-symbols-outlined md-30">group</i>
-                                    <span>Gruppen</span>
-                                </a>';
-                                
-                                if (isset($_GET['mod']) AND (
-                                    $_GET['mod'] == 'statistics_actors_sales' OR
-                                    $_GET['mod'] == 'statistics_actor_sales' OR
-                                    $_GET['mod'] == 'statistics_actor_sales_day' OR
-                                    $_GET['mod'] == 'statistics_total_sales'
-                                )) {
-                                    $site .= '
-                                    <script>
-                                        jQuery(document).ready(function() {
-                                            jQuery(this).open_submenu("submenu_statistics");
-                                        })
-                                    </script>';
-                                }                                
-
-                                
-                                $site .= '
-                                <a class="'.$navStatistics.' submenu" data-submenu="submenu_statistics">
-                                    <i class="material-symbols-outlined arrow">arrow_right</i>
-                                    <i class="material-symbols-outlined md-30">monetization_on</i>
-                                    <span>Ums&auml;tze</span>
-                                </a>
-
-                                <div class="submenu_statistics">
-                                    <a class="'.$navStatistics_total_sales.'" href="'.MCP_URL.'/Statistics/TotalSales">
-                                        <i class="material-symbols-outlined md-30">monetization_on</i>
-                                        <span>nach Tage</span>
-                                    </a>
-                                    <a class="'.$navStatistics_actors_sales.'" href="'.MCP_URL.'/Statistics/TotalActorsSales">
-                                        <i class="material-symbols-outlined md-30">group</i>
-                                        <span>nach Profile</span>
-                                    </a>
-                                </div>';
-                                
-                            }
-                            
-                            if (isset($_GET['mod']) AND (
-                                $_GET['mod'] == 'webmaster_newads' OR
-                                $_GET['mod'] == 'webmaster_ads' OR
-                                $_GET['mod'] == 'webmaster_ads_domain' OR
-                                $_GET['mod'] == 'webmaster_stats') OR
-                                $_GET['mod'] == 'webmaster_new_campaign' OR
-                                $_GET['mod'] == 'webmaster_edit_campaign' OR
-                                $_GET['mod'] == 'webmaster_advertise_partner'
-                            ) {
-                                $site .= '
-                                <script>
-                                    jQuery(document).ready(function() {
-                                        jQuery(this).open_submenu("submenu_webmaster");
-                                    })
-                                </script>';
-                            }
-
-                            $site .= '
-                            <a class="'.$navWebmaster.' submenu" data-submenu="submenu_webmaster">
-                                <i class="material-symbols-outlined arrow">arrow_right</i>
-                                <i class="material-symbols-outlined md-30">attach_money</i>
-                                <span>Partnerprogramm</span>
-                            </a>
-
-                            <div class="submenu_webmaster">
-                                <a class="'.$navWebmasterAds.'" href="'.MCP_URL.'/Webmaster/Ads">
-                                    <i class="material-symbols-outlined md-30">layers</i>
-                                    <span>Kunden werben</span>
-                                </a>
-                                <a class="'.$navWebmasterNewAds.'" href="'.MCP_URL.'/Webmaster/NewAds">
-                                    <i class="material-symbols-outlined md-30">layers</i>
-                                    <span>alle Banner</span>
-                                </a>
-                                <a class="'.$navWebmasterStats.'" href="'.MCP_URL.'/Webmaster/Statistics">
-                                    <i class="material-symbols-outlined md-30">show_chart</i>
-                                    <span>Statistiken</span>
-                                </a>
-                                <a class="'.$navWebmasterAdPartner.'" href="'.MCP_URL.'/Webmaster/Advertise-Partner">
-                                    <i class="material-symbols-outlined md-30">layers</i>
-                                    <span>Darsteller werben</span>
-                                </a>
-                            </div>';
+                            /* Gruppen, Umsätze und Partnerprogramm wurden im Juli 2026 eingestellt */
 
                             
                             

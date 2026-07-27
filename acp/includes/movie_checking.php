@@ -1,4 +1,4 @@
-<?php
+ï»¿<?php
 
 /**
  * @author		Martin Zimmermann
@@ -69,7 +69,7 @@ if ($actor->get("id") == '') {
                 `datetime`      = '".date("Y-m-d H:i:s")."'
             ",__FILE__,__LINE__);
 
-            // Status des Film auf "Abgelehnt" setzten (0 = noch nicht vom Amateur freigegeben / 1 = zur Prüfung freigegeben / 2 = Abgelehnt
+            // Status des Film auf "Abgelehnt" setzten (0 = noch nicht vom Amateur freigegeben / 1 = zur PrÃ¼fung freigegeben / 2 = Abgelehnt
             p4c_query("UPDATE `movies` SET `released`='2' WHERE `file_id`='".p4c_escape_string($m->field('file_id'))."' LIMIT 1;",__FILE__,__LINE__);
         }
     }
@@ -93,7 +93,7 @@ if (isset($_POST['btn']['submit_rejection_reason_movie'])) {
             `datetime`      = '".date("Y-m-d H:i:s")."'
         ",__FILE__,__LINE__);
 
-        // Status des Film auf "Abgelehnt" setzten (0 = noch nicht vom Amateur freigegeben / 1 = zur Prüfung freigegeben / 2 = Abgelehnt
+        // Status des Film auf "Abgelehnt" setzten (0 = noch nicht vom Amateur freigegeben / 1 = zur PrÃ¼fung freigegeben / 2 = Abgelehnt
         p4c_query("UPDATE `movies` SET `released`='2' WHERE `file_id`='".p4c_escape_string($m->field('file_id'))."' LIMIT 1;",__FILE__,__LINE__);
 
         header('Location: '.ACP_URL.'/Filme-pruefen');
@@ -104,7 +104,7 @@ if (isset($_POST['btn']['submit_rejection_reason_movie'])) {
 $streaming_preis = round($movie['playtime_seconds'] * $movie['amount_second']);
 
 $amount_webmaster_ary = array(0, 5, 10, 15, 20, 25);
-$replace_title_ary = array('°','^','²','§','§','$','%','{','[',']','}','´','`','~',"'",'_',';','<','>');
+$replace_title_ary = array('Â°','^','Â²','Â§','Â§','$','%','{','[',']','}','Â´','`','~',"'",'_',';','<','>');
 
 if (isset($_POST['btn']['save_movie'])) {
         
@@ -139,7 +139,7 @@ if (isset($_POST['btn']['save_movie'])) {
     $movie['title'] = str_replace(["#?", "?en"], ["#", "en"], $movie['title']);
     
     // Euro-Zeichen in Text umwandeln
-    $movie['title'] = str_replace(array('&#8364;','&euro;','Â€','€','â‚¬','&#x20AC;'), "EUR", $movie['title']);
+    $movie['title'] = str_replace(array('&#8364;','&euro;','Ã‚Â€','Â€','Ã¢Â‚Â¬','&#x20AC;'), "EUR", $movie['title']);
 
     
     if(!isset($_POST['description'])) {
@@ -204,7 +204,7 @@ if (isset($_POST['btn']['save_movie'])) {
         $movie['meta_title'] = substr(trim(str_replace($movie['title'])), 0, 65);
     } else {
         $movie['meta_title'] = substr(trim(str_replace($replace_title_ary, '', $_POST['meta_title'])), 0, 65);
-        $movie['meta_title'] = str_replace(array('&#8364;','&euro;','Â€','€','â‚¬','&#x20AC;'), "EUR", $movie['meta_title']);
+        $movie['meta_title'] = str_replace(array('&#8364;','&euro;','Ã‚Â€','Â€','Ã¢Â‚Â¬','&#x20AC;'), "EUR", $movie['meta_title']);
         $movie['meta_title'] = str_replace(array("\n", "\r"), '', $movie['meta_title']);
         if (empty($movie['meta_title'])) {$movie['meta_title'] = substr(trim($movie['title']), 0, 65);}   
     }
@@ -294,7 +294,7 @@ if (isset($_POST['btn']['save_movie'])) {
             `released_datetime` = '".date("Y-m-d H:i:s")."'
             WHERE `id`='".abs($movie_id)."' LIMIT 1;",__FILE__,__LINE__)) {
             
-            // Prüfe ob Film schon online in der Cloud existiert
+            // PrÃ¼fe ob Film schon online in der Cloud existiert
             $rs_movie_online = p4c_query("SELECT * FROM `movies_online` WHERE `file_id`='".p4c_escape_string($m->field('file_id'))."' LIMIT 1;",__FILE__,__LINE__);
             // Wenn Film existiert - aktualisieren
             if (p4c_num_rows($rs_movie_online) > 0) {
@@ -332,7 +332,7 @@ if (isset($_POST['btn']['save_movie'])) {
             else {
                 
                 
-                // Nur Film zur Online Datenbank hinzufügen wenn er aktiviert/ freigeschaltet wurde
+                // Nur Film zur Online Datenbank hinzufÃ¼gen wenn er aktiviert/ freigeschaltet wurde
                 if ($status == 'active') {
 
                     p4c_query("INSERT INTO `movies_online` SET
@@ -374,7 +374,7 @@ if (isset($_POST['btn']['save_movie'])) {
 
 
                     /**
-                     * Punktesystem - Für Upload von kostenpflichtigen Album
+                     * Punktesystem - FÃ¼r Upload von kostenpflichtigen Album
                      */
                     if ($movie['amount_second'] > 0) {
                         include_once(SOURCEDIR.'/includes/klassen/PointsSystem.inc.php');
@@ -898,7 +898,7 @@ $site .= '
         <div class="ui-widget-content" style="padding:10px; border-top:none;">
             <div class="edit_title">Gib einen aussagekr&auml;ftigen Filmtitel an. <span id="anzahl_title">(max. 65 Zeichen)</span></div>
             <div class="edit_content" style="margin-bottom:8px;">
-                <input type="text" name="title" value="'.$movie['title'].'" onkeyup="jQuery(this).zaehle_zeichen(65, \'anzahl_title\')" placeholder="Geben Sie einen aussagekräftigen Filmtitel an." style="font-size:18px;" />
+                <input type="text" name="title" value="'.$movie['title'].'" onkeyup="jQuery(this).zaehle_zeichen(65, \'anzahl_title\')" placeholder="Geben Sie einen aussagekrÃ¤ftigen Filmtitel an." style="font-size:18px;" />
             </div>
 
             <div class="edit_title">Geben Sie eine gute und aussagekr&auml;ftige <b>Beschreibung</b> des Films an.</div>
@@ -1082,7 +1082,7 @@ $site .= '
         <div class="ui-widget-content radioset" style="font-size:12px; padding:10px; border-top:none; margin-bottom:10px;">';
         
             // gesperrt = Film nicht sichtbar. Bereits gekaufter Content weiterhin online.
-            // gelöscht = Sofern der Film noch nicht gekauft wurde, wird er gelöscht. Ansonsten ist er nur nicht sichbar. Für Kunden die Ihn gesehen haben trotzdem weiterhin online
+            // gelÃ¶scht = Sofern der Film noch nicht gekauft wurde, wird er gelÃ¶scht. Ansonsten ist er nur nicht sichbar. FÃ¼r Kunden die Ihn gesehen haben trotzdem weiterhin online
 
             if ($movie['status'] == 'active') {
                 $staus1 = 'checked="checked"';
@@ -1244,7 +1244,7 @@ $site .= '
                     $style = 'background-color: #fff6d0;';
                 */
                 } else {
-                    // Wenn nichts gewählt wurde
+                    // Wenn nichts gewÃ¤hlt wurde
                     if ($is_first_check AND $category_obj->name_id == 'solo_girl') {
                         $checked_cat_slave = 'checked="checked"';
                         $style = 'background-color: #fff6d0;';

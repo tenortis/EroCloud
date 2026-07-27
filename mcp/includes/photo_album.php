@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 if (!defined('SAFE_INC'))
     die ("Hacking attempt...");
@@ -16,7 +16,7 @@ if ($a->field('id') == '') {
 
 
 $amount_webmaster_ary = array(0, 5, 10, 15, 20, 25);
-$replace_title_ary = array('�','^','�','�','�','$','%','{','[',']','}','�','`','~',"'",'_',';','<','>');
+$replace_title_ary = array('°','^','²','§','§','$','%','{','[',']','}','´','`','~',"'",'_',';','<','>');
 
 if (isset($_POST['edit_album'])) {
     
@@ -29,13 +29,13 @@ if (isset($_POST['edit_album'])) {
         } 
     }
 
-    $album['title'] = str_replace(array('&#8364;','&euro;','','�','€','&#x20AC;'), "EUR", $album['title']);
+    $album['title'] = str_replace(array('&#8364;','&euro;','Â','','â¬','&#x20AC;'), "EUR", $album['title']);
 
     if (strlen(utf8_decode($album['title'])) > 65) {
         $error = 'Der Albumtitel ist leider zu lang.';
     }
     
-    // Pr�fe ob bei diesem Kunden bereichts ein Fotoalbum mit diesem Title existiert
+    // Prüfe ob bei diesem Kunden bereichts ein Fotoalbum mit diesem Title existiert
     $rs_check_album_exists = p4c_query("SELECT `id`  FROM `photo_albums` WHERE `title`='".p4c_escape_string($album['title'])."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `id`!='".abs($album_id)."' LIMIT 1;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_check_album_exists) == 1) {
         $error = 'Du hast bereits eine Fotoalbum mit diesem Titel hochgeladen.';
@@ -164,7 +164,7 @@ $site .= '
                     Fotos hochladen
                 </td>
                 ';
-                // Album zur Pr�fung freigegeben
+                // Album zur Prüfung freigegeben
                 if ($album['album_checked'] == '0000-00-00 00:00:00' AND $album['released'] == 1) {
                     $site .= '
                     <td style="width:33.3%; text-align:center; color:#FF9900; font-size:15px;">

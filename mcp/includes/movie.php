@@ -113,7 +113,7 @@ $rs_movie_online = p4c_query("SELECT * FROM `movies_online` WHERE `file_id`='".p
 $count_movie_online = p4c_num_rows($rs_movie_online);
 
 $amount_webmaster_ary = array(0, 5, 10, 15, 20, 25);
-$replace_title_ary = array('�','^','�','�','�','$','%','{','[',']','}','�','`','~',"'",'_',';','<','>');
+$replace_title_ary = array('°','^','²','§','§','$','%','{','[',']','}','´','`','~',"'",'_',';','<','>');
 
 if (isset($_POST['edit_movie']) OR isset($_POST['save_movie'])) {
 
@@ -133,9 +133,9 @@ if (isset($_POST['edit_movie']) OR isset($_POST['save_movie'])) {
     $movie['title'] = str_replace(["#?", "?en"], ["#", "en"], $movie['title']);
     
     // Euro-Zeichen in Text umwandeln
-    $movie['title'] = str_replace(array('&#8364;','&euro;','','�','€','&#x20AC;'), "EUR", $movie['title']);
+    $movie['title'] = str_replace(array('&#8364;','&euro;','Â','','â¬','&#x20AC;'), "EUR", $movie['title']);
     
-    // Pr�fe ob bei diesem Kunden bereichts ein Film mit diesem Title existiert
+    // Prüfe ob bei diesem Kunden bereichts ein Film mit diesem Title existiert
     $rs_check_movie_exists = p4c_query("SELECT `id`  FROM `movies` WHERE `title`='".p4c_escape_string($movie['title'])."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `id`!='".abs($movie_id)."' LIMIT 1;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_check_movie_exists) == 1) {
         $error = 'Du hast bereits einen Film mit dem Titel hochgeladen.';
@@ -220,7 +220,7 @@ if (isset($_POST['edit_movie']) OR isset($_POST['save_movie'])) {
             $movie['meta_title'] = substr(trim($movie['title']), 0, 65);
         } else {
             $movie['meta_title'] = substr(trim(str_replace($replace_title_ary, '', $_POST['meta_title'])), 0, 65);
-            $movie['meta_title'] = str_replace(array('&#8364;','&euro;','','�','€','&#x20AC;'), "EUR", $movie['meta_title']);
+            $movie['meta_title'] = str_replace(array('&#8364;','&euro;','Â','','â¬','&#x20AC;'), "EUR", $movie['meta_title']);
             $movie['meta_title'] = str_replace(array("\n", "\r"), '', $movie['meta_title']);
             if (empty($movie['meta_title'])) {$movie['meta_title'] = substr(trim($movie['title']), 0, 65);}   
         }
@@ -438,13 +438,13 @@ $site .= '
                 <div class="row text-center g-2">
                     <div class="col-3">
                         <div class="p-2 rounded bg-success text-white shadow-sm h-100 d-flex flex-column justify-content-center align-items-center" style="min-height: 70px;">
-                            <span class="badge bg-white text-success rounded-circle mb-1"><i class="bi bi-check-lg"></i></span>
+                            <span class="d-inline-flex align-items-center justify-content-center bg-white text-success rounded-circle mb-1 p-0 shadow-sm" style="width:24px; height:24px; font-size:14px;"><i class="bi bi-check-lg"></i></span>
                             <small class="d-block lh-sm">Schritt 1<br><span class="fw-normal">Filminfos angeben</span></small>
                         </div>
                     </div>
                     <div class="col-3">
                         <div class="p-2 rounded bg-success text-white shadow-sm h-100 d-flex flex-column justify-content-center align-items-center" style="min-height: 70px;">
-                            <span class="badge bg-white text-success rounded-circle mb-1"><i class="bi bi-check-lg"></i></span>
+                            <span class="d-inline-flex align-items-center justify-content-center bg-white text-success rounded-circle mb-1 p-0 shadow-sm" style="width:24px; height:24px; font-size:14px;"><i class="bi bi-check-lg"></i></span>
                             <small class="d-block lh-sm">Schritt 2<br><span class="fw-normal">Film hochladen</span></small>
                         </div>
                     </div>';
@@ -452,7 +452,7 @@ $site .= '
                         $site .= '
                     <div class="col-3">
                         <div class="p-2 rounded bg-warning text-dark shadow-sm h-100 d-flex flex-column justify-content-center align-items-center" style="min-height: 70px;">
-                            <span class="badge bg-white text-dark rounded-circle mb-1">3</span>
+                            <span class="d-inline-flex align-items-center justify-content-center bg-white text-dark rounded-circle mb-1 p-0 shadow-sm" style="width:24px; height:24px; font-size:12px; font-weight:bold;">3</span>
                             <small class="fw-bold d-block lh-sm">Schritt 3<br><span class="fw-normal">Konvertiert...</span></small>
                         </div>
                     </div>';
@@ -460,7 +460,7 @@ $site .= '
                         $site .= '
                     <div class="col-3">
                         <div class="p-2 rounded bg-success text-white shadow-sm h-100 d-flex flex-column justify-content-center align-items-center" style="min-height: 70px;">
-                            <span class="badge bg-white text-success rounded-circle mb-1"><i class="bi bi-check-lg"></i></span>
+                            <span class="d-inline-flex align-items-center justify-content-center bg-white text-success rounded-circle mb-1 p-0 shadow-sm" style="width:24px; height:24px; font-size:14px;"><i class="bi bi-check-lg"></i></span>
                             <small class="d-block lh-sm">Schritt 3<br><span class="fw-normal">Film konvertiert</span></small>
                         </div>
                     </div>';                        
@@ -470,7 +470,7 @@ $site .= '
                         $site .= '
                     <div class="col-3">
                         <div class="p-2 rounded bg-success text-white shadow-sm h-100 d-flex flex-column justify-content-center align-items-center" style="min-height: 70px;">
-                            <span class="badge bg-white text-success rounded-circle mb-1"><i class="bi bi-check-lg"></i></span>
+                            <span class="d-inline-flex align-items-center justify-content-center bg-white text-success rounded-circle mb-1 p-0 shadow-sm" style="width:24px; height:24px; font-size:14px;"><i class="bi bi-check-lg"></i></span>
                             <small class="d-block lh-sm">Schritt 4<br><span class="fw-normal">Online</span></small>
                         </div>
                     </div>';    
@@ -478,7 +478,7 @@ $site .= '
                         $site .= '
                     <div class="col-3">
                         <div class="p-2 rounded bg-warning text-dark shadow-sm h-100 d-flex flex-column justify-content-center align-items-center" style="min-height: 70px;">
-                            <span class="badge bg-white text-dark rounded-circle mb-1">4</span>
+                            <span class="d-inline-flex align-items-center justify-content-center bg-white text-dark rounded-circle mb-1 p-0 shadow-sm" style="width:24px; height:24px; font-size:12px; font-weight:bold;">4</span>
                             <small class="fw-bold d-block lh-sm">Schritt 4<br><span class="fw-normal">In Pr&uuml;fung</span></small>
                         </div>
                     </div>';  
@@ -486,7 +486,7 @@ $site .= '
                         $site .= '
                     <div class="col-3">
                         <div class="p-2 rounded bg-danger text-white shadow-sm h-100 d-flex flex-column justify-content-center align-items-center" style="min-height: 70px;">
-                            <span class="badge bg-white text-danger rounded-circle mb-1">!</span>
+                            <span class="d-inline-flex align-items-center justify-content-center bg-white text-danger rounded-circle mb-1 p-0 shadow-sm" style="width:24px; height:24px; font-size:12px; font-weight:bold;">!</span>
                             <small class="fw-bold d-block lh-sm">Schritt 4<br><span class="fw-normal">Abgelehnt!</span></small>
                         </div>
                     </div>';  
@@ -494,7 +494,7 @@ $site .= '
                         $site .= '
                     <div class="col-3">
                         <div class="p-2 rounded bg-warning text-dark shadow-sm h-100 d-flex flex-column justify-content-center align-items-center" style="min-height: 70px;">
-                            <span class="badge bg-white text-dark rounded-circle mb-1">4</span>
+                            <span class="d-inline-flex align-items-center justify-content-center bg-white text-dark rounded-circle mb-1 p-0 shadow-sm" style="width:24px; height:24px; font-size:12px; font-weight:bold;">4</span>
                             <small class="fw-bold d-block lh-sm">Schritt 4<br><span class="fw-normal">Ver&ouml;ffentlichen</span></small>
                         </div>
                     </div>';
@@ -502,7 +502,7 @@ $site .= '
                         $site .= '
                     <div class="col-3">
                         <div class="p-2 rounded bg-light text-muted h-100 d-flex flex-column justify-content-center align-items-center" style="min-height: 70px;">
-                            <span class="badge bg-secondary rounded-circle mb-1">4</span>
+                            <span class="d-inline-flex align-items-center justify-content-center bg-secondary text-white rounded-circle mb-1 p-0" style="width:24px; height:24px; font-size:12px; font-weight:bold;">4</span>
                             <small class="d-block lh-sm">Schritt 4<br><span class="fw-normal">Ver&ouml;ffentlichen</span></small>
                         </div>
                     </div>';
@@ -594,7 +594,7 @@ $site .= '
                 $site .= '<div class="alert alert-warning shadow-sm mb-4">Derzeit befindet sich der Film in der Konvertierung.</div>';
             } else if ($m->field('convert_status') == 2) {
                 $site .= '
-                <!-- Zeile 1: Links Video-Vorschau, Rechts Vorschaubild auswählen -->
+                <!-- Zeile 1: Links Video-Vorschau, Rechts Vorschaubild auswÃ¤hlen -->
                 <div class="row g-4 mb-4">
                     <div class="col-12 col-lg-6">
                         <div class="card shadow-sm h-100 mb-0">
