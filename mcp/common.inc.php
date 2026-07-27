@@ -14,10 +14,14 @@ include_once(SOURCEDIR."/includes/functions.inc.php");
 
 // SESSION starten
 ##############################################
-session_save_path(TEMP_DIR.'/');
-ini_set('session.gc_probability', 1);
-ini_set('session.gc_maxlifetime', 10800);
-if(!isset($_SESSION)) {p4c_session_start();}
+if (!headers_sent()) {
+    session_save_path(TEMP_DIR.'/');
+    ini_set('session.gc_probability', 1);
+    ini_set('session.gc_maxlifetime', 10800);
+}
+if(!isset($_SESSION) && session_status() !== PHP_SESSION_ACTIVE && !headers_sent()) {
+    p4c_session_start();
+}
 
 
 // Error-Handler einbinden

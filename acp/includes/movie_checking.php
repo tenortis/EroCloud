@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 /**
  * @author		Martin Zimmermann
@@ -1245,7 +1245,7 @@ $site .= '
                 */
                 } else {
                     // Wenn nichts gewählt wurde
-                    if ($is_first_check AND $category_obj->name_id == 'solo_girl') {
+                    if (!empty($is_first_check) AND $category_obj->name_id == 'solo_girl') {
                         $checked_cat_slave = 'checked="checked"';
                         $style = 'background-color: #fff6d0;';
                     } else {

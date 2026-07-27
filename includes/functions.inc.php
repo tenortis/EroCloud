@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 /**
  * @author		Martin Zimmermann
@@ -12,23 +12,28 @@ if (!defined('SAFE_INC')) {
 
 // Session erstellen und prüfen
 function p4c_session_start($session_write_close=false) {
+    if (headers_sent() || session_status() === PHP_SESSION_ACTIVE) {
+        return;
+    }
     
     // Session starten
     if ($session_write_close === true) {
-        $ok = session_start(['read_and_close' => true]);
+        $ok = @session_start(['read_and_close' => true]);
     } else {
-        $ok = session_start();
+        $ok = @session_start();
     }
   
     /** Schutz vor Session Hijacking **/
     if (!isset($_SESSION['initiated'])){  
-        session_regenerate_id(true);
+        if (session_status() === PHP_SESSION_ACTIVE && !headers_sent()) {
+            @session_regenerate_id(true);
+        }
         $_SESSION['initiated'] = true;
     }
  
     // prüfe ob Session fehlerhaft ist. Wenn nicht, neue session generieren 
-    if(!$ok){
-        session_regenerate_id(true);
+    if(!$ok && session_status() === PHP_SESSION_ACTIVE && !headers_sent()){
+        @session_regenerate_id(true);
     }
 }
 
