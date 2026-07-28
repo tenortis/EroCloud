@@ -40,7 +40,8 @@ $get_avatar_url = filter_input(INPUT_GET, 'avatar_url', FILTER_VALIDATE_URL);
 if ($get_avatar_url === 0) {$get_avatar_url = '';}
 
 $get_email = filter_input(INPUT_GET, 'email', FILTER_VALIDATE_EMAIL);
-if ($get_email === 0) {$get_email = '';}
+if ($get_email === 0 || $get_email === false) {$get_email = '';}
+$get_email = substr($get_email, 0, 250);
 
 $get_username = filter_input(INPUT_GET, 'username', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_HIGH);
 
@@ -191,8 +192,8 @@ if (isset($member_id) AND $member_id != '') {
                 // sdp_description an remote peer senden. (Antworten)
                 $cam_members_obj = p4c_fetch_object($rs_cam_members);
                 
-                // Wenn Datum in Datenbank älter als eine Minute, war Verbindung abgebrochen und muss neu aufgebaut werden.
-                // Alten eintrag löschen
+                // Wenn Datum in Datenbank Ã¤lter als eine Minute, war Verbindung abgebrochen und muss neu aufgebaut werden.
+                // Alten eintrag lÃ¶schen
                 if ($cam_members_obj->datetime <= date("Y-m-d H:i:s", strtotime("-10 Seconds"))) {
                     p4c_query("UPDATE `member_cams` SET
                         `ice_candidates_transmitter`  = '',
