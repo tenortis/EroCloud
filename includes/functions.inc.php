@@ -260,62 +260,33 @@ function utf8decodeArray($array) {
 
 
 function seo_url($string) {
-    global $class_errorlog;
-
-    if (!empty($string)) {
-        
-        $string = iconv('UTF-8', 'ISO-8859-1//TRANSLIT//IGNORE', $string);
-
-        $search = array("ä", "ö", "ü", "ß", "Ä", "Ö", "Ñ",
-                        "Ü", "&", "é", "á", "ó", "ñ",
-                        " :)", " :D", " :-)", " :P",
-                        " :O", " ;D", " ;)", " ^^", 
-                        " :|", " :-/", ":)", ":D", 
-                        ":-)", ":P", ":O", ";D", ";)", 
-                        "^^", ":|", ":-/", "(", ")", "[", "]", 
-                        "<", ">", "!", "\"", "§", "$", "%", "&", 
-                        "/", "(", ")", "=", "?", "`", "?", "*", "'", 
-                        "_", ":", ";", "²", "³", "{", "}", 
-                        "\\", "~", "#", "+", ".", ",", 
-                        "=", ":", "=)");
-        $replace = array("ae", "oe", "ue", "ss", "Ae", "Oe", "N",
-                         "Ue", "und", "e", "a", "o", "n",
-                         "", "", "", "",
-                         "", "", "", "",
-                         "", "", "", "",
-                         "", "", "", "", "",
-                         "", "", "", "", "", "", "",
-                         "", "", "", "", "", "", "", "",
-                         "", "", "", "", "", "", "", "", "",
-                         "", "", "", "", "", "", "",
-                         "", "", "", "", "", "",
-                         "", "", "",);
-        
-        $string = str_replace($search, $replace, $string);  
-
-        $string = str_replace(array('&#8364;','&euro;','Â','','â¬','&#x20AC;'), "EUR", $string);
-        $string = str_replace(array(" ", "_", "_-_"), "-", $string);
-        $string = str_replace(array("&auml;", "&Auml;", "ä"), "ae", $string);
-        $string = str_replace(array("&ouml;", "&Ouml;"), "oe", $string);
-        $string = str_replace(array("&uuml;", "&Uuml;"), "ue", $string);
-        $string = str_replace(array("&szlig;"), "ss", $string);
-        $string = str_replace(array("`", "´", "'"), "", $string);    
-        $string = str_replace("_&_", "-", $string);
-        $string = str_replace(array(":", "°", "^", "!", '"', "§", "$", "%", "&", "/", "(", ")", "=", "?", "{", "}", "[", "]", ",", ".", ">", "<", "|", "*", "+", "~", "#", "@", "µ"), "-", $string);
-
-        // Wenn alles entfernt wurde, bleiben vermutlich mehrere - (Minus) in Reihe zurueck. Diese muessen bis auf eins reduziert werden. 
-        $string = preg_replace('~([-]{2,})~', '-', $string);
-
-        // Wenn erstes zeichen ein "-", dann abschneiden
-        if (substr($string, 0, 1) == '-') {$string = substr($string, 1);}
-
-        // Wenn letztes zeichen ein "-", dann abschneiden 
-        if (substr($string, -1) == '-') {$string = substr($string, 0, -1);}
-
-        // leerzeichen am Anfang und Ende entfernen 
-        $string = trim($string);
+    if (empty($string)) {
+        return '';
     }
-	
+
+    // HTML-Entities dekodieren
+    $string = html_entity_decode($string, ENT_QUOTES, 'UTF-8');
+
+    // Euro-Zeichen ersetzen
+    $string = str_replace(array('€', '&euro;'), 'EUR', $string);
+
+    // Deutsche Umlaute und Sonderzeichen vorab in ASCII-Zeichen umwandeln
+    $search = array("ä", "ö", "ü", "ß", "Ä", "Ö", "Ü", "Ñ", "ñ", "é", "á", "ó", "&");
+    $replace = array("ae", "oe", "ue", "ss", "Ae", "Oe", "Ue", "N", "n", "e", "a", "o", "und");
+    $string = str_replace($search, $replace, $string);
+
+    // Leerzeichen und Unterstriche durch Bindestrich ersetzen
+    $string = str_replace(array(' ', '_'), '-', $string);
+
+    // Alle verbleibenden Sonderzeichen entfernen
+    $string = preg_replace('/[^a-zA-Z0-9\-]/', '', $string);
+
+    // Mehrere aufeinanderfolgende Bindestriche auf einen reduzieren
+    $string = preg_replace('/-+/', '-', $string);
+
+    // Bindestriche am Anfang und Ende entfernen
+    $string = trim($string, '-');
+
     return $string;
 }
 
