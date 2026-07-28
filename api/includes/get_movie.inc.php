@@ -19,27 +19,27 @@ $movie_id = preg_replace('/[^a-zA-Z0-9]/', '', $_GET['movie_id']);
 
 
 /*
- * Pfad zur tempor‰ren Datei
+ * Pfad zur tempor√§ren Datei
  * =======================================
  * Um die DB zu entlasten wird eine Datei erstellt in der die Ausgabe gespeichert und ausgelesen wird.
- * Die Datei wird in regelm‰ﬂigen abst‰nden automatisch aktualisiert.
+ * Die Datei wird in regelm√§√üigen abst√§nden automatisch aktualisiert.
  */
 $temp_file = API_DIR.'/temp/get_movie/'.$movie_id.'.tmp';
 
-// ƒnderungszeitpunkt der tempor‰ren Datei
-if (file_exists($temp_file)) {
-    $temp_file_time = filemtime($temp_file);
+// √Ñnderungszeitpunkt der tempor√§ren Datei
+if (is_file($temp_file)) {
+    $temp_file_time = @filemtime($temp_file);
 } else {
     $temp_file_time = 0;
 }
 
-// tempfile lˆschen wenn letztes Update zu alt ist
-if (file_exists($temp_file) AND $temp_file_time < strtotime("-7 hours")) {
-    unlink($temp_file);
+// tempfile l√∂schen wenn letztes Update zu alt ist
+if (is_file($temp_file) AND $temp_file_time < strtotime("-7 hours")) {
+    @unlink($temp_file);
 }
 
-// Wenn tempfile nicht existiert oder die letzte ƒnderung der Datei ‰lter ist als 50 Minuten
-if (!file_exists($temp_file) OR $temp_file_time < strtotime("-50 Minutes")) {
+// Wenn tempfile nicht existiert oder die letzte √Ñnderung der Datei √§lter ist als 50 Minuten
+if (!is_file($temp_file) OR $temp_file_time < strtotime("-50 Minutes")) {
     
     // Film n vom Amateur aus DB holen
     /*
@@ -96,17 +96,17 @@ if (!file_exists($temp_file) OR $temp_file_time < strtotime("-50 Minutes")) {
             $api['status'] = 'deleted';
         }   
         
-        // Tempor‰re Datei erstellen
+        // Tempor√§re Datei erstellen
         file_put_contents($temp_file,json_encode($api));
 
-        // Wenn Film zur Domain gehˆrt
+        // Wenn Film zur Domain geh√∂rt
         if ($domain == $m->field('visible_for_website')) {
             $api['domain'] = $domain;
             $api['status'] = $m->field('status');
         }
         
     }    
-// Wenn tempor‰re Datei existiert
+// Wenn tempor√§re Datei existiert
 } else {
     $api = json_decode(file_get_contents($temp_file), true);
 
@@ -124,5 +124,5 @@ if (!file_exists($temp_file) OR $temp_file_time < strtotime("-50 Minutes")) {
 
 }
 
-// Auss Array entfernen um es nicht zu verˆffentlichen. Nur f¸r interne Verarbeitung
+// Auss Array entfernen um es nicht zu ver√∂ffentlichen. Nur f√ºr interne Verarbeitung
 unset($api['visible_for_website']);    

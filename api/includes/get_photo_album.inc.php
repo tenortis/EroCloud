@@ -19,22 +19,22 @@ if(!isset($_GET['album_id'])) {
 $album_id = preg_replace('/[^a-zA-Z0-9]/', '', $_GET['album_id']);
 
 /*
- * Pfad zur tempor‰ren Datei
+ * Pfad zur tempor√§ren Datei
  * =======================================
  * Um die DB zu entlasten wird eine Datei erstellt in der die Ausgabe gespeichert und ausgelesen wird.
- * Die Datei wird in regelm‰ﬂigen abst‰nden automatisch aktualisiert.
+ * Die Datei wird in regelm√§√üigen abst√§nden automatisch aktualisiert.
  */
 $temp_file = API_DIR.'/temp/get_photo_album/'.$album_id.'.tmp';
 
-// ƒnderungszeitpunkt der tempor‰ren Datei
-if (file_exists($temp_file)) {
-    $temp_file_time = filemtime($temp_file);
+// √Ñnderungszeitpunkt der tempor√§ren Datei
+if (is_file($temp_file)) {
+    $temp_file_time = @filemtime($temp_file);
 } else {
     $temp_file_time = 0;
 }
 
-// Wenn Datei nicht existiert oder die letzte ƒnderung der Datei ‰lter ist als 50 Minuten
-if (!file_exists($temp_file) OR $temp_file_time  < strtotime("-50 minutes")) {
+// Wenn Datei nicht existiert oder die letzte √Ñnderung der Datei √§lter ist als 50 Minuten
+if (!is_file($temp_file) OR $temp_file_time  < strtotime("-50 minutes")) {
 
     // Alle Fotoalben vom Amateur holen
     $rs_album = p4c_query("SELECT `id` FROM `photo_albums_online` WHERE `album_id`='". p4c_escape_string($album_id)."' LIMIT 1; ",__FILE__,__LINE__);
@@ -69,10 +69,10 @@ if (!file_exists($temp_file) OR $temp_file_time  < strtotime("-50 minutes")) {
         $api['number_of_photos']= $a->field('number_of_photos');
         $api['status']          = $a->field('status');
         
-        // Tempor‰re Datei erstellen
+        // Tempor√§re Datei erstellen
         file_put_contents($temp_file,json_encode($api));
     }    
-// Wenn tempor‰re Datei existiert
+// Wenn tempor√§re Datei existiert
 } else {
     $api = json_decode(file_get_contents($temp_file), true);    
 }

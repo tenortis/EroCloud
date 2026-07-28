@@ -10,7 +10,7 @@ if (!defined('SAFE_INC'))
 header('Content-Type: text/html; charset=utf-8');
 
 // Wenn eine Darsteller angegeben wurde
-    // Die Anfrage an GET "actor" kann Ende 2018 gelöscht werdn
+    // Die Anfrage an GET "actor" kann Ende 2018 gelÃ¶scht werdn
 if(isset($_GET['actor']) AND $_GET['actor'] == 'me') {
     /*
     $merchant_id = p4c_result($rs_merchant, 0);
@@ -40,22 +40,22 @@ if(isset($_GET['actor']) AND $_GET['actor'] == 'me') {
 
     
     /*
-     * Pfad zur temporären Datei
+     * Pfad zur temporÃ¤ren Datei
      * =======================================
      * Um die DB zu entlasten wird eine Datei erstellt in der die Ausgabe gespeichert und ausgelesen wird.
-     * Die Datei wird in regelmäßigen abständen automatisch aktualisiert.
+     * Die Datei wird in regelmÃ¤ÃŸigen abstÃ¤nden automatisch aktualisiert.
      */
     $temp_file = API_DIR.'/temp/get_movies_by_actor_id/'.$actor_id.'.tmp';
 
-    // Änderungszeitpunkt der temporären Datei
-    if (file_exists($temp_file)) {
-        $temp_file_time = filemtime($temp_file);
+    // Ã„nderungszeitpunkt der temporÃ¤ren Datei
+    if (is_file($temp_file)) {
+        $temp_file_time = @filemtime($temp_file);
     } else {
         $temp_file_time = 0;
     }
 
-    // Wenn Datei nicht existiert oder die letzte Änderung der Datei älter ist als 50 Minuten
-    if (!file_exists($temp_file) OR $temp_file_time  < strtotime("-50 minutes")) {
+    // Wenn Datei nicht existiert oder die letzte Ã„nderung der Datei Ã¤lter ist als 50 Minuten
+    if (!is_file($temp_file) OR $temp_file_time  < strtotime("-50 minutes")) {
 
         // Alle Filme vom Amateur holen
         #$rs_movies_online = p4c_query("SELECT `checksum`, `file_id`, `actor_id`, `online_at` FROM `movies_online` WHERE `status`!='deleted' AND `actor_id`='".abs($actor_id)."';",__FILE__,__LINE__);
@@ -74,7 +74,7 @@ if(isset($_GET['actor']) AND $_GET['actor'] == 'me') {
         $number_of_movies = p4c_num_rows($rs_movies_online);
         if($number_of_movies == 0) {
             $api['error'] = 'no movies found';
-            // Temporäre Datei erstellen
+            // TemporÃ¤re Datei erstellen
             file_put_contents($temp_file,json_encode($api));
             print_xml($api);
         } else {
@@ -104,10 +104,10 @@ if(isset($_GET['actor']) AND $_GET['actor'] == 'me') {
                 }
             }
         
-            // Temporäre Datei erstellen
+            // TemporÃ¤re Datei erstellen
             file_put_contents($temp_file,json_encode($api));
         }    
-    // Wenn temporäre Datei existiert
+    // Wenn temporÃ¤re Datei existiert
     } else {
         $api = json_decode(file_get_contents($temp_file), true);    
     }
