@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 if (!defined('SAFE_INC'))
     die ("Hacking attempt...");

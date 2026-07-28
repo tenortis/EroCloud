@@ -38,7 +38,7 @@ if ((isset($_GET['actor_id']) OR isset($_GET['merchant_id']) OR isset($_GET['all
             $remote_actor_id = $site_obj->remote_actor_id;
             $domain = $site_obj->domain;
 
-            // Prüfen ob Website aktiv ist. Wenn nicht, mache mit nächster website weiter
+            // PrÃ¼fen ob Website aktiv ist. Wenn nicht, mache mit nÃ¤chster website weiter
             $rs_sites = p4c_query("SELECT * FROM `sites` WHERE `domain`='". p4c_escape_string($domain)."' AND `status`='1';",__FILE__,__LINE__);
             if (p4c_num_rows($rs_sites) == 0) {
                 continue;
@@ -57,7 +57,7 @@ if ((isset($_GET['actor_id']) OR isset($_GET['merchant_id']) OR isset($_GET['all
                 $param = array_merge($param, array('date'=> date("Y-m-d", strtotime($_GET['date']))));
             };
 
-            $param = array_filter($param, "strlen"); // leere Einträge Entfernen
+            $param = array_filter($param, "strlen"); // leere EintrÃ¤ge Entfernen
             ksort($param); // Alphabetische Sortierung
             $query = http_build_query($param, '&amp;');
 
