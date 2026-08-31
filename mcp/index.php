@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 /**
  * @author		Martin Zimmermann
@@ -486,9 +486,52 @@ $site = '<!DOCTYPE html>
                             $site .= ' 
                             </div>';
                             
-                            /* Gruppen, Umsätze und Partnerprogramm wurden im Juli 2026 eingestellt */
+                            /* Gruppen und UmsÃ¤tze wurden im Juli 2026 eingestellt */
+                            /* Partnerprogramm reaktiviert fÃ¼r aktive Partner (lÃ¤uft aus) */
+                            if (in_array($merchant->partner_id(), ['ABPP2HNMDG', 'KJDJEEESAX', 'CCRVWMVD67', '9SN2XTH2TU'])) {
+                                if (isset($_GET['mod']) AND (
+                                    $_GET['mod'] == 'webmaster_newads' OR
+                                    $_GET['mod'] == 'webmaster_ads' OR
+                                    $_GET['mod'] == 'webmaster_ads_domain' OR
+                                    $_GET['mod'] == 'webmaster_stats') OR
+                                    $_GET['mod'] == 'webmaster_new_campaign' OR
+                                    $_GET['mod'] == 'webmaster_edit_campaign' OR
+                                    $_GET['mod'] == 'webmaster_advertise_partner'
+                                ) {
+                                    $site .= '
+                                    <script>
+                                        jQuery(document).ready(function() {
+                                            jQuery(this).open_submenu("submenu_webmaster");
+                                        })
+                                    </script>';
+                                }
 
-                            
+                                $site .= '
+                                <a class="'.$navWebmaster.' submenu" data-submenu="submenu_webmaster">
+                                    <i class="material-symbols-outlined arrow">arrow_right</i>
+                                    <i class="material-symbols-outlined md-30">attach_money</i>
+                                    <span>Partnerprogramm</span>
+                                </a>
+
+                                <div class="submenu_webmaster">
+                                    <a class="'.$navWebmasterAds.'" href="'.MCP_URL.'/Webmaster/Ads">
+                                        <i class="material-symbols-outlined md-30">layers</i>
+                                        <span>Kunden werben</span>
+                                    </a>
+                                    <a class="'.$navWebmasterNewAds.'" href="'.MCP_URL.'/Webmaster/NewAds">
+                                        <i class="material-symbols-outlined md-30">layers</i>
+                                        <span>alle Banner</span>
+                                    </a>
+                                    <a class="'.$navWebmasterStats.'" href="'.MCP_URL.'/Webmaster/Statistics">
+                                        <i class="material-symbols-outlined md-30">show_chart</i>
+                                        <span>Statistiken</span>
+                                    </a>
+                                    <a class="'.$navWebmasterAdPartner.'" href="'.MCP_URL.'/Webmaster/Advertise-Partner">
+                                        <i class="material-symbols-outlined md-30">layers</i>
+                                        <span>Darsteller werben</span>
+                                    </a>
+                                </div>';
+                            }
                             
                             $site .= ' 
                             <div style="margin-top:15px; text-align:center; color:rgba(0,0,0,.38);">

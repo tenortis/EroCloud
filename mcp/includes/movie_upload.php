@@ -77,7 +77,12 @@ $movie['seo_url'] = '';
 $movie['actor_id'] = '';
 $movie['category_master'] = 'porn';
 $movie['category_slave'] = '';
-$movie['visible_for_website'] = 'public';
+
+$public_upload_allowed_partners = ['CCRVWMVD67'];
+$public_upload_allowed_merchants = [10061];
+$is_public_allowed = (isset($merchant) && in_array($merchant->partner_id(), $public_upload_allowed_partners)) || (isset($_SESSION['merchant_id']) && in_array((int)$_SESSION['merchant_id'], $public_upload_allowed_merchants));
+
+$movie['visible_for_website'] = $is_public_allowed ? 'public' : '';
 
 $amount_webmaster_ary = array(0, 5, 10, 15, 20, 25);
 $replace_title_ary = array('°','^','²','§','§','$','%','{','[',']','}','´','`','~',"'",'_',';','<','>');
@@ -156,11 +161,15 @@ if (isset($_POST['upload_content']) OR isset($_POST['submit_step1'])) {
     }
 
     if(!isset($_POST['visible_for_website'])) {
-        $movie['visible_for_website'] = 'public';
+        $movie['visible_for_website'] = $is_public_allowed ? 'public' : '';
     } else {
         $movie['visible_for_website'] = trim(strip_tags($_POST['visible_for_website']));
         
-        if ($movie['visible_for_website'] != 'public') {
+        if ($movie['visible_for_website'] == 'public') {
+            if (!$is_public_allowed) {
+                $movie['visible_for_website'] = '';
+            }
+        } else {
             // Wenn Website nicht existiert
             $rs_websites = p4c_query("SELECT * FROM `sites` WHERE
                 `partner_id`='". p4c_escape_string($merchant->partner_id())."' AND
@@ -168,9 +177,13 @@ if (isset($_POST['upload_content']) OR isset($_POST['submit_step1'])) {
                 `status`='1'
             LIMIT 1;",__FILE__,__LINE__);
             if (p4c_num_rows($rs_websites) == 0) {
-                $movie['visible_for_website'] = 'public';
+                $movie['visible_for_website'] = $is_public_allowed ? 'public' : '';
             }
         }        
+    }
+
+    if (empty($movie['visible_for_website'])) {
+        $errors[] = 'W&auml;hlen Sie bitte eine Website f&uuml;r die Ver&ouml;ffentlichung aus.';
     }
 
     
@@ -422,7 +435,7 @@ function get_upload_wizard_html($active_step = 1) {
                     "locale": "de"
                 });
                 
-                jQuery("#visible_for_website").change(function(){
+                function updatePricingVisibility() {
                     if (jQuery("#visible_for_website").val() == "public") {
                         jQuery("#amount_second").show().attr("name", "amount_second");
                         jQuery("#amount_second_webmaster").hide().attr("name", "");
@@ -430,7 +443,9 @@ function get_upload_wizard_html($active_step = 1) {
                         jQuery("#amount_second").hide().attr("name", "");
                         jQuery("#amount_second_webmaster").show().attr("name", "amount_second");
                     }
-                })
+                }
+                jQuery("#visible_for_website").on("change", updatePricingVisibility);
+                updatePricingVisibility();
                 
             })
             
@@ -818,10 +833,15 @@ function get_upload_wizard_html($active_step = 1) {
                             <div class="edit_title fw-bold mb-1">Auf welcher Website soll der Film ver&ouml;ffentlicht werden?</div>
                             <div class="edit_content mb-3">
                                 <select id="visible_for_website" class="form-select" name="visible_for_website">';
+                                    if ($is_public_allowed) {
+                                        $selected = ($movie['visible_for_website'] == 'public') ? 'selected="selected"' : '';
+                                        $site .= '<option value="public" '.$selected.'> alle Partnerwebsites</option>';
+                                    }
                                     $rs_websites = p4c_query("SELECT * FROM `sites` WHERE `partner_id`='". p4c_escape_string($merchant->partner_id())."' AND `status`='1' ORDER BY `domain` ASC;",__FILE__,__LINE__);
                                     if (p4c_num_rows($rs_websites) > 0) {
                                         while($site_obj = p4c_fetch_object($rs_websites)) {
-                                            $site .= '<option value="'.$site_obj->domain.'"> '.$site_obj->domain.'</option>';
+                                            $selected = ($movie['visible_for_website'] == $site_obj->domain) ? 'selected="selected"' : '';
+                                            $site .= '<option value="'.$site_obj->domain.'" '.$selected.'> '.$site_obj->domain.'</option>';
                                         }
                                     }
                                     $site .= '

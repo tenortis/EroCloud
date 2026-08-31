@@ -37,7 +37,8 @@ Der Creator (Händler/Merchant) lädt ein Video über das **Merchant Control Pan
   * **Zeile 2**: Links *Preise & Download* (Stream-Preis in Coins, Trailer-Option, Download-Optionen) | Rechts *Darsteller & Sichtbarkeit* (Darstellerzuweisung & Partnerwebsite-Dropdown).
   * **Zeile 3**: Links *Suchmaschinenoptimierung (SEO)* (Meta Description, Meta Title, SEO-URL).
 * **Partnerwebsite-Zuordnung**:
-  * Aus dem Dropdown *"Auf welcher Website soll der Film veröffentlicht werden?"* wurde die pauschale Option *"alle Partnerwebsites"* (`value="public"`) entfernt. Filme werden gezielt konkreten Partnerdomains zugewiesen.
+  * Aus dem Dropdown *"Auf welcher Website soll der Film veröffentlicht werden?"* ist die pauschale Option *"alle Partnerwebsites"* (`value="public"`) für reguläre Creator standardmäßig deaktiviert, um Filme gezielt konkreten Partnerdomains zuzuweisen.
+  * **Partner-Whitelist**: Für berechtigte Partner (Partner-ID `CCRVWMVD67` / Merchant-ID `10061`) ist die Option *"alle Partnerwebsites"* (`value="public"`) über eine Whitelist freigeschaltet.
 
 ### Workflow bei der Neuerstellung:
 * **Schritt 1 (Metadaten & Kategorisierung)**: Eingabe aller Filminfos, Festlegen von `category_master` (*Porno* / *Fetisch*) und `category_slave` (Kommagetrennte Kategorien-IDs), Darsteller-Zuweisung, Preise und SEO.
