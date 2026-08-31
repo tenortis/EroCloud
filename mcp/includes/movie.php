@@ -964,6 +964,9 @@ $site .= '
                 <div class="edit_title fw-bold mb-1">Auf welcher Website soll der Film ver&ouml;ffentlicht werden?</div>
                 <div class="edit_content mb-3">
                     <select id="visible_for_website" class="form-select" name="visible_for_website">';
+                        // [LEGACY / SUNSET-PHASE]:
+                        // 'alle Partnerwebsites' ('public') ist ein Legacy-Feature auf dem Sunset-Pfad.
+                        // Für aktive Bestandspartner wird eine temporäre Übergangs-Whitelist gepflegt.
                         $public_upload_allowed_partners = ['CCRVWMVD67'];
                         $public_upload_allowed_merchants = [10061];
                         $is_public_allowed = (isset($merchant) && in_array($merchant->partner_id(), $public_upload_allowed_partners)) || (isset($_SESSION['merchant_id']) && in_array((int)$_SESSION['merchant_id'], $public_upload_allowed_merchants)) || $m->field('visible_for_website') == 'public';

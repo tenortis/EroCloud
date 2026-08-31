@@ -78,6 +78,11 @@ $movie['actor_id'] = '';
 $movie['category_master'] = 'porn';
 $movie['category_slave'] = '';
 
+// [LEGACY / SUNSET-PHASE]:
+// Das pauschale Veröffentlichen auf 'alle Partnerwebsites' ('public') ist ein Legacy-Syndication-Feature.
+// Da Webmaster-/Affiliate-Syndication-Features sukzessive auslaufen und eingestellt werden, ist 'public'
+// im MCP standardmäßig deaktiviert. Für Übergangsphasen ausgewählter Partner wird eine temporäre Whitelist
+// (Partner-ID / Merchant-ID) vorgehalten, bis die Funktionalität vollständig entfernt wird.
 $public_upload_allowed_partners = ['CCRVWMVD67'];
 $public_upload_allowed_merchants = [10061];
 $is_public_allowed = (isset($merchant) && in_array($merchant->partner_id(), $public_upload_allowed_partners)) || (isset($_SESSION['merchant_id']) && in_array((int)$_SESSION['merchant_id'], $public_upload_allowed_merchants));

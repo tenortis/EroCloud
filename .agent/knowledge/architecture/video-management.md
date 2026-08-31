@@ -36,9 +36,10 @@ Der Creator (Händler/Merchant) lädt ein Video über das **Merchant Control Pan
   * **Zeile 1**: Links *Angaben zum Film* (Titel, Beschreibung, Veröffentlichungsdatum) | Rechts *Film kategorisieren* (Hauptkategorie & Accordion).
   * **Zeile 2**: Links *Preise & Download* (Stream-Preis in Coins, Trailer-Option, Download-Optionen) | Rechts *Darsteller & Sichtbarkeit* (Darstellerzuweisung & Partnerwebsite-Dropdown).
   * **Zeile 3**: Links *Suchmaschinenoptimierung (SEO)* (Meta Description, Meta Title, SEO-URL).
-* **Partnerwebsite-Zuordnung**:
-  * Aus dem Dropdown *"Auf welcher Website soll der Film veröffentlicht werden?"* ist die pauschale Option *"alle Partnerwebsites"* (`value="public"`) für reguläre Creator standardmäßig deaktiviert, um Filme gezielt konkreten Partnerdomains zuzuweisen.
-  * **Partner-Whitelist**: Für berechtigte Partner (Partner-ID `CCRVWMVD67` / Merchant-ID `10061`) ist die Option *"alle Partnerwebsites"* (`value="public"`) über eine Whitelist freigeschaltet.
+* **Partnerwebsite-Zuordnung (Legacy Syndication & Sunset)**:
+  * **Hintergrund**: Das pauschale Verteilen von Content auf alle Partnerseiten (`visible_for_website = 'public'`) ist historisch gewachsen (Webmaster-/Affiliate-Syndication). Da diese alten Webmaster-Funktionen schrittweise abgelöst und bereinigt werden sollen, ist die Option *"alle Partnerwebsites"* im MCP standardmäßig für Creator deaktiviert.
+  * **Temporäre Whitelist (Übergangsphase)**: Für bestimmte aktive Bestandspartner, die diese Funktionalität während der Sunset-Phase weiterhin zwingend benötigen (aktuell Partner-ID `CCRVWMVD67` / Merchant-ID `10061`), wird eine temporäre Whitelist in `mcp/includes/movie_upload.php` und `mcp/includes/movie.php` gepflegt.
+  * **Endgültige Bereinigung**: Sobald alle verbleibenden Webmaster-/Syndication-Prozesse eingestellt werden, kann diese Whitelist mitsamt der `public`-Option im Creator-Portal vollständig entfernt werden. Filme werden dann ausschließlich expliziten Partnerdomains zugeordnet.
 
 ### Workflow bei der Neuerstellung:
 * **Schritt 1 (Metadaten & Kategorisierung)**: Eingabe aller Filminfos, Festlegen von `category_master` (*Porno* / *Fetisch*) und `category_slave` (Kommagetrennte Kategorien-IDs), Darsteller-Zuweisung, Preise und SEO.
