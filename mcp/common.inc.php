@@ -31,7 +31,7 @@ $class_errorlog = new p4c_errorlog();
 // MYSQLi-Klasse einbinden 
 include(SOURCEDIR.'/includes/klassen/mysqli.inc.php');
 $mysql = new p4c_mysqli(DB_HOST, $config['db_user'], $config['db_pass'], $config['db_name']);
-p4c_query("SET NAMES 'utf8';",__FILE__,__LINE__);
+p4c_query("SET NAMES 'utf8mb4';",__FILE__,__LINE__);
 
 // Merchant-Klasse einbinden 
 include(SOURCEDIR.'/includes/klassen/merchant.inc.php');

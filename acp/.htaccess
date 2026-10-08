@@ -43,12 +43,11 @@ require valid-user
     allow from 88.24.
     allow from 88.25.
     allow from 82.207.
-
-    # Daniel
-    allow from 85.54.
-    allow from 84.187.
+    # DE
+    allow from 79.198.
     allow from 91.10.
 
+    
     # Martin
     BrowserMatch "(Linux; Android 7.0; HTC One A9 Build/NRD90M)" allowed
     BrowserMatch "(Linux; Android 6.0.1; SM-G900F Build/MMB29M)" allowed
