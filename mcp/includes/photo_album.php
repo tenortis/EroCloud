@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 if (!defined('SAFE_INC'))
     die ("Hacking attempt...");
@@ -54,24 +54,36 @@ if (isset($_POST['edit_album'])) {
 
         if(isset($_POST['actor_id'])) {
             $album['actor_id'] = abs($_POST['actor_id']);
+        } else {
+            $album['actor_id'] = abs($a->field('actor_id'));
         }
 
         if(isset($_POST['online_at'])) {
             $album['online_at'] = date("Y-m-d H:i", strtotime($_POST['online_at']));
+        } else {
+            $album['online_at'] = $a->field('online_at');
         }
 
         if(isset($_POST['amount_download'])) {
             $amount_download = abs($_POST['amount_download']);
             if ($amount_download <= 5000 AND $amount_download >= 0) {
                 $album['amount_download'] = $amount_download;
+            } else {
+                $album['amount_download'] = abs($a->field('amount_download'));
             }
+        } else {
+            $album['amount_download'] = abs($a->field('amount_download'));
         }
         
         if(isset($_POST['amount_webmaster'])) {
             $amount_webmaster = abs($_POST['amount_webmaster']);
             if (in_array($amount_webmaster, $amount_webmaster_ary)) {
                 $album['amount_webmaster'] = $amount_webmaster;
+            } else {
+                $album['amount_webmaster'] = abs($a->field('amount_webmaster'));
             }
+        } else {
+            $album['amount_webmaster'] = abs($a->field('amount_webmaster'));
         }
 
         $album['meta_title'] = substr($_POST['title'], 0, 65);

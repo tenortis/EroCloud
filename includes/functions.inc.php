@@ -292,38 +292,44 @@ function seo_url($string) {
 
 
 function movie_checksum($movie) {
+    $fsk16 = isset($movie['fsk16']) ? $movie['fsk16'] : (isset($movie['preview_image_fsk16']) ? $movie['preview_image_fsk16'] : '');
+    $fsk18 = isset($movie['fsk18']) ? $movie['fsk18'] : (isset($movie['preview_image_fsk18']) ? $movie['preview_image_fsk18'] : '');
+
     return md5(
-        $movie['merchant_id'].
-        $movie['fsk16'].
-        $movie['fsk18'].
-        $movie['title'].
-        $movie['description'].
-        $movie['meta_title'].
-        $movie['meta_description'].
-        $movie['seo_url'].
-        $movie['online_at'].
-        $movie['amount_second'].
-        $movie['amount_own'].
-        $movie['amount_webmaster'].
-        $movie['as_download'].
-        $movie['amount_download']
+        (isset($movie['merchant_id']) ? $movie['merchant_id'] : '').
+        $fsk16.
+        $fsk18.
+        (isset($movie['title']) ? $movie['title'] : '').
+        (isset($movie['description']) ? $movie['description'] : '').
+        (isset($movie['meta_title']) ? $movie['meta_title'] : '').
+        (isset($movie['meta_description']) ? $movie['meta_description'] : '').
+        (isset($movie['seo_url']) ? $movie['seo_url'] : '').
+        (isset($movie['online_at']) ? $movie['online_at'] : '').
+        (isset($movie['amount_second']) ? $movie['amount_second'] : '').
+        (isset($movie['amount_own']) ? $movie['amount_own'] : '').
+        (isset($movie['amount_webmaster']) ? $movie['amount_webmaster'] : '').
+        (isset($movie['as_download']) ? $movie['as_download'] : '').
+        (isset($movie['amount_download']) ? $movie['amount_download'] : '')
     );
 }
 
 function photo_album_checksum($album) {
+    $fsk16 = isset($album['fsk16']) ? $album['fsk16'] : (isset($album['preview_image_fsk16']) ? $album['preview_image_fsk16'] : '');
+    $fsk18 = isset($album['fsk18']) ? $album['fsk18'] : (isset($album['preview_image_fsk18']) ? $album['preview_image_fsk18'] : '');
+
     return md5(
-        $album['merchant_id'].
-        $album['number_of_photos'].
-        $album['fsk16'].
-        $album['fsk18'].
-        $album['title'].
-        $album['description'].
-        $album['meta_title'].
-        $album['meta_description'].
-        $album['seo_url'].
-        $album['online_at'].
-        $album['amount_webmaster'].
-        $album['amount_download']
+        (isset($album['merchant_id']) ? $album['merchant_id'] : '').
+        (isset($album['number_of_photos']) ? $album['number_of_photos'] : '').
+        $fsk16.
+        $fsk18.
+        (isset($album['title']) ? $album['title'] : '').
+        (isset($album['description']) ? $album['description'] : '').
+        (isset($album['meta_title']) ? $album['meta_title'] : '').
+        (isset($album['meta_description']) ? $album['meta_description'] : '').
+        (isset($album['seo_url']) ? $album['seo_url'] : '').
+        (isset($album['online_at']) ? $album['online_at'] : '').
+        (isset($album['amount_webmaster']) ? $album['amount_webmaster'] : '').
+        (isset($album['amount_download']) ? $album['amount_download'] : '')
     );
 }
 

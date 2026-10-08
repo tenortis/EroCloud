@@ -139,7 +139,9 @@ if (isset($_POST['btn']['save_album'])) {
             `amount_download` = '".p4c_escape_string($album['amount_download'])."',
             `album_checked` = '".date("Y-m-d H:i:s")."',
             `status`='".$status."',
-            `admin_infos` ='".$admin_infos."'
+            `admin_infos` ='".$admin_infos."',
+            `last_updated_by` = '".abs($_SESSION['employee_id'])."',
+            `last_updated_datetime` = '".date("Y-m-d H:i:s")."'
             WHERE `id`='".abs($album_id)."' LIMIT 1;",__FILE__,__LINE__)
         ) {
 
@@ -157,7 +159,9 @@ if (isset($_POST['btn']['save_album'])) {
                 `amount_download` = '".p4c_escape_string($album['amount_download'])."',
                 `album_checked` = '".date("Y-m-d H:i:s")."',
                 `status`='".$status."',
-                `admin_infos` ='".$admin_infos."'
+                `admin_infos` ='".$admin_infos."',
+                `last_updated_by` = '".abs($_SESSION['employee_id'])."',
+                `last_updated_datetime` = '".date("Y-m-d H:i:s")."'
                 WHERE `album_id`='".p4c_escape_string($a->field('album_id'))."' LIMIT 1;",__FILE__,__LINE__)
             ) {
                 header('Location: '.ACP_URL.'/Fotoalbum-bearbeiten/'.$album_id);
@@ -190,6 +194,24 @@ $album['category_master'] = $a->field('category_master');
 $album['category_slave'] = $a->field('category_slave');
 $album['admin_infos'] = $a->field('admin_infos');
 $album['status'] = $a->field('status');
+
+$album['released_date'] = $a->field('released_datetime');
+$album['released_from'] = $a->field('released_from');
+$album['last_updated_date'] = $a->field('last_updated_datetime');
+
+if ($a->field('last_updated_by') != 0) {
+    $rs_employee = p4c_query("SELECT `username` FROM `employee` WHERE `id`='".abs($a->field('last_updated_by'))."' LIMIT 1;", __FILE__, __LINE__);
+    $album['last_updated_by'] = p4c_result($rs_employee, 0);
+} else {
+    $album['last_updated_by'] = '-';
+}
+
+if ($a->field('released_from') != 0) {
+    $rs_employee = p4c_query("SELECT `username` FROM `employee` WHERE `id`='".abs($a->field('released_from'))."' LIMIT 1;", __FILE__, __LINE__);
+    $album['released_from'] = p4c_result($rs_employee, 0);
+} else {
+    $album['released_from'] = '-';
+}
 
 
 $site .= ' 
