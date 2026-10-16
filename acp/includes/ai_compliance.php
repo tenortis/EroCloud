@@ -5,7 +5,7 @@
  * @copyright   (C) 2016 adult net applications UG
  * @email       erocms@gmail.com
  *
- * ACP Frontend: Lokales KI-Testlabor & Visa/Mastercard BRAM-Compliance-Cockpit (/KI-Analyse)
+ * ACP Frontend: Lokales KI-Testlabor, Batch-/Cronjob-Steuerung & Visa/Mastercard BRAM-Compliance-Cockpit (/KI-Analyse)
  */
 
 if (!defined('SAFE_INC'))
@@ -142,6 +142,16 @@ $site .= '
     .aic-btn-success:hover {
         background: #218838;
     }
+    .aic-btn-danger {
+        background: #dc3545;
+        color: #fff;
+        border: 1px solid #bd2130;
+        padding: 8px 15px;
+        border-radius: 4px;
+        font-weight: bold;
+        cursor: pointer;
+        font-size: 13px;
+    }
     .aic-btn-secondary {
         background: #f4f4f4;
         color: #333;
@@ -166,13 +176,41 @@ $site .= '
         font-size: 11px;
         font-family: Consolas, monospace;
     }
+    .aic-progress-outer {
+        width: 100%;
+        height: 22px;
+        background: #e9ecef;
+        border-radius: 4px;
+        overflow: hidden;
+        border: 1px solid #ced4da;
+        position: relative;
+    }
+    .aic-progress-inner {
+        height: 100%;
+        background: linear-gradient(90deg, #1c94c4, #28a745);
+        width: 0%;
+        transition: width 0.3s ease;
+    }
+    .aic-progress-label {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        line-height: 22px;
+        text-align: center;
+        font-size: 12px;
+        font-weight: bold;
+        color: #222;
+        text-shadow: 0 0 3px #fff;
+    }
 </style>
 
 <div id="ai_compliance_tabs">
     <ul>
-        <li><a href="#tab-aic-lab">1. Einzel-Video-Testlabor (Audio, Untertitel &amp; BRAM-Check)</a></li>
-        <li><a href="#tab-aic-rules">2. Visa/Mastercard BRAM-Regelwerk &amp; KI-Prompt</a></li>
-        <li><a href="#tab-aic-history">3. Analyse-Historie (<span id="aic-hist-count">0</span>)</a></li>
+        <li><a href="#tab-aic-lab">1. Einzel-Video-Testlabor</a></li>
+        <li><a href="#tab-aic-batch">2. Batch- &amp; Cronjob-Steuerung (Alle Videos)</a></li>
+        <li><a href="#tab-aic-rules">3. Visa/Mastercard BRAM-Regelwerk &amp; Prompt</a></li>
+        <li><a href="#tab-aic-history">4. Analyse-Historie &amp; Filter (<span id="aic-hist-count">0</span>)</a></li>
     </ul>
 
     <!-- KOPF-STATISTIKEN & SYSTEM-STATUS -->
@@ -181,26 +219,26 @@ $site .= '
             <div class="aic-card">
                 <div class="aic-card-title">Konvertierte Videos (Bestand)</div>
                 <div class="aic-card-value" id="aic-stat-total">-</div>
-                <div class="aic-card-sub">Bereit f&uuml;r nachtr&auml;gliche Audio- &amp; KI-Analyse (<code>convert_status = 2</code>)</div>
+                <div class="aic-card-sub">Bereit f&uuml;r Audio- &amp; KI-Analyse (<code>convert_status = 2</code>)</div>
             </div>
             <div class="aic-card">
                 <div class="aic-card-title">1. Audio &amp; Untertitel (Whisper)</div>
-                <div class="aic-card-value" id="aic-stat-subtitled">-</div>
+                <div class="aic-card-value"><span id="aic-stat-subtitled">-</span> <small style="font-size: 13px; color: #666;">(<span id="aic-stat-sub-pct">0</span>%)</small></div>
                 <div class="aic-card-sub">Noch offen: <strong id="aic-stat-sub-rem">-</strong> Videos ohne <code>.vtt</code> / Transkript</div>
             </div>
             <div class="aic-card">
                 <div class="aic-card-title">2. BRAM- &amp; Text-Compliance</div>
-                <div class="aic-card-value" id="aic-stat-checked">-</div>
-                <div class="aic-card-sub">Titel, Beschreibung &amp; gesprochener Video-Text gepr&uuml;ft</div>
+                <div class="aic-card-value"><span id="aic-stat-checked">-</span> <small style="font-size: 13px; color: #666;">(<span id="aic-stat-txt-pct">0</span>%)</small></div>
+                <div class="aic-card-sub">Noch ungepr&uuml;ft: <strong id="aic-stat-txt-rem">-</strong> Videos</div>
             </div>
             <div class="aic-card" style="border-color: #c3e6cb; background: #f8fff9;">
                 <div class="aic-card-title" style="color: #155724;">Compliance-Bilanz (Gepr&uuml;fte Filme)</div>
                 <div style="font-size: 14px; font-weight: bold; margin-top: 6px; line-height: 1.7;">
-                    <span class="aic-badge" style="background: #28a745;">OK: <span id="aic-stat-ok">0</span></span>
-                    <span class="aic-badge" style="background: #e0a800; margin-left: 5px;">Pr&uuml;fhinweis: <span id="aic-stat-warn">0</span></span>
-                    <span class="aic-badge" style="background: #dc3545; margin-left: 5px;">Versto&szlig;: <span id="aic-stat-viol">0</span></span>
+                    <span class="aic-badge" style="background: #28a745; cursor: pointer;" onclick="jQuery(\'#ai_compliance_tabs\').tabs(\'option\', \'active\', 3); jQuery(\'#aic-filter-comp\').val(\'ok\').trigger(\'change\');" title="Klicken zum Filtern">OK: <span id="aic-stat-ok">0</span></span>
+                    <span class="aic-badge" style="background: #e0a800; color: #111; margin-left: 5px; cursor: pointer;" onclick="jQuery(\'#ai_compliance_tabs\').tabs(\'option\', \'active\', 3); jQuery(\'#aic-filter-comp\').val(\'warning\').trigger(\'change\');" title="Klicken zum Filtern">Gelb (Ohne KK): <span id="aic-stat-warn">0</span></span>
+                    <span class="aic-badge" style="background: #dc3545; margin-left: 5px; cursor: pointer;" onclick="jQuery(\'#ai_compliance_tabs\').tabs(\'option\', \'active\', 3); jQuery(\'#aic-filter-comp\').val(\'violation\').trigger(\'change\');" title="Klicken zum Filtern">Rot (Versto&szlig;): <span id="aic-stat-viol">0</span></span>
                 </div>
-                <div class="aic-card-sub" style="margin-top: 6px;">Ergebnisse aus <code>movies_ai_analysis</code></div>
+                <div class="aic-card-sub" style="margin-top: 6px;">Klicken Sie auf ein Badge, um die Liste zu filtern</div>
             </div>
         </div>
 
@@ -212,6 +250,7 @@ $site .= '
                 <span id="aic-env-ffmpeg" class="aic-badge" style="background: #6c757d; margin-left: 6px;">FFmpeg: Pr&uuml;fe...</span>
                 <span id="aic-env-whisper" class="aic-badge" style="background: #6c757d; margin-left: 6px;">whisper.cpp: Pr&uuml;fe...</span>
                 <span id="aic-env-llm" class="aic-badge" style="background: #6c757d; margin-left: 6px;">Lokale KI (llama.cpp): Pr&uuml;fe...</span>
+                <span id="aic-env-cron" class="aic-badge" style="background: #6c757d; margin-left: 6px;">Hintergrund-Cronjob: Pr&uuml;fe...</span>
             </div>
             <div>
                 <button type="button" id="btn-aic-reload-dash" class="aic-btn-secondary">&#x21bb; Status aktualisieren</button>
@@ -243,7 +282,7 @@ $site .= '
                 </div>
                 <div>
                     <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px;">Oder gezielte Movie-ID:</label>
-                    <input type="number" id="aic-input-movie-id" class="aic-input" placeholder="z. B. 12540" style="width: 120px;" />
+                    <input type="number" id="aic-input-movie-id" class="aic-input" placeholder="z. B. 8613" style="width: 120px;" />
                 </div>
                 <div>
                     <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px;">Oder H&auml;ndler-ID:</label>
@@ -253,7 +292,7 @@ $site .= '
                     <button type="button" id="btn-aic-load-movie" class="aic-btn-primary">Video laden</button>
                 </div>
                 <div>
-                    <button type="button" id="btn-aic-load-untested" class="aic-btn-secondary">N&auml;chstes ungepr&uuml;ftes Video</button>
+                    <button type="button" id="btn-aic-load-untested" class="aic-btn-secondary">N&auml;chstes Video ohne Untertitel</button>
                 </div>
                 <div>
                     <button type="button" id="btn-aic-find-interesting" class="aic-btn-secondary" style="border-color: #e0a800; background: #fff9e6; color: #856404;" title="Sucht in der Datenbank nach einem echten Video, dessen Titel oder Beschreibung einen BRAM-Pr&uuml;fbegriff enth&auml;lt">
@@ -324,7 +363,7 @@ $site .= '
                         <select id="aic-sim-scenario" class="aic-select">
                             <option value="clean">Live-Audio aus echter MP4 auswerten (whisper.cpp)</option>
                             <option value="bram_violation">Test-Szenario ROT: Gesprochener BRAM-Versto&szlig; im Video (K.O.-Tropfen / Kinderzimmer / PayPal)</option>
-                            <option value="bram_warning">Test-Szenario GELB: Gesprochene Grauzone im Video (Stiefmutter / Fesselung / Natursekt)</option>
+                            <option value="bram_warning">Test-Szenario GELB: Gesprochene Grauzone im Video (Stiefmutter / KV / Natursekt)</option>
                             <option value="english_clean">Test-Szenario EN: Englischer Video-Dialog (Spracherkennung Englisch)</option>
                         </select>
                     </div>
@@ -419,7 +458,192 @@ $site .= '
     </div>
 
     <!-- ================================================================== -->
-    <!-- TAB 2: VISA/MASTERCARD BRAM-REGELWERK & KI-SYSTEM-PROMPT           -->
+    <!-- TAB 2: BATCH- & CRONJOB-STEUERUNG (ALLE >5.500 VIDEOS)             -->
+    <!-- ================================================================== -->
+    <div id="tab-aic-batch" style="display: none;">
+        <div class="ui-widget-header" style="padding:10px; font-size:18px; margin-bottom:15px;">
+            Automatische Katalog-Verarbeitung: Untertitel-Generierung (<code>.vtt</code>) &amp; BRAM-Compliance f&uuml;r alle Videos
+        </div>
+
+        <!-- FORTSCHRITTSBALKEN FUER STUFE 1 UND STUFE 2 -->
+        <div class="aic-step-box" style="background: #fcfdfd;">
+            <div class="aic-step-header">
+                <div class="aic-step-title">&#x1F4CA; Gesamtfortschritt des Videokatalogs</div>
+                <div id="aic-worker-live-badge">
+                    <span class="aic-badge" style="background: #6c757d;">Worker: Bereit</span>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 18px;">
+                <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: bold; margin-bottom: 5px;">
+                    <span>Stufe 1: Audio-Transkription, Spracherkennung &amp; <code>.vtt</code>-Untertitel (<code>whisper.cpp</code>)</span>
+                    <span id="aic-prog-sub-text">0 / 0 Videos (0%)</span>
+                </div>
+                <div class="aic-progress-outer">
+                    <div class="aic-progress-inner" id="aic-prog-sub-bar" style="width: 0%;"></div>
+                    <div class="aic-progress-label" id="aic-prog-sub-label">0%</div>
+                </div>
+                <div style="font-size: 12px; color: #555; margin-top: 5px; display: flex; gap: 18px; flex-wrap: wrap;">
+                    <span>&#x2705; Mit <code>.vtt</code> &amp; Transkript: <strong id="aic-det-sub-ok">0</strong></span>
+                    <span>&#x1F507; Stummfilm (Kein Audio): <strong id="aic-det-sub-noaudio">0</strong></span>
+                    <span>&#x26A0; MP4 fehlt / Fehler: <strong id="aic-det-sub-err">0</strong></span>
+                    <span>&#x23F3; Noch offen: <strong id="aic-det-sub-rem">0</strong></span>
+                </div>
+            </div>
+
+            <div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: bold; margin-bottom: 5px;">
+                    <span>Stufe 2: BRAM- &amp; Rechts-Textpr&uuml;fung (Titel, Beschreibung, SEO &amp; Transkript)</span>
+                    <span id="aic-prog-txt-text">0 / 0 Videos (0%)</span>
+                </div>
+                <div class="aic-progress-outer">
+                    <div class="aic-progress-inner" id="aic-prog-txt-bar" style="width: 0%; background: linear-gradient(90deg, #28a745, #20c997);"></div>
+                    <div class="aic-progress-label" id="aic-prog-txt-label">0%</div>
+                </div>
+                <div style="font-size: 12px; color: #555; margin-top: 5px;">
+                    Letzte Worker-Aktivit&auml;t: <strong id="aic-worker-last-msg">-</strong> (<span id="aic-worker-last-time">-</span>)
+                </div>
+            </div>
+        </div>
+
+        <!-- AKTION A: SCHNELLER VORAB-SCAN ALLER TEXT-METADATEN -->
+        <div class="aic-step-box" style="border-left: 4px solid #e0a800;">
+            <div class="aic-step-header">
+                <div class="aic-step-title">&#x26A1; Schnell-Scan: Alle >5.500 Video-Titel, Beschreibungen &amp; vorhandene Transkripte sofort pr&uuml;fen</div>
+                <div style="font-size: 12px; color: #666;">Dauert f&uuml;r den gesamten Katalog nur ca. 15 Sekunden (250 Filme pro Paket)</div>
+            </div>
+            <p style="font-size: 13px; color: #444; margin-top: 0; line-height: 1.5;">
+                Mit dieser Funktion k&ouml;nnen Sie <strong>sofort alle bestehenden Videos</strong> anhand ihrer Titel, Beschreibungen, SEO-Angaben und bereits vorhandenen Audio-Transkripte gegen das aktuelle BRAM-Regelwerk pr&uuml;fen – ohne darauf warten zu m&uuml;ssen, bis Whisper alle Videodateien transkribiert hat. Sobald Whisper sp&auml;ter f&uuml;r ein Video die Audiospur transkribiert, wird die Pr&uuml;fung automatisch inklusive des gesprochenen Textes aktualisiert.
+            </p>
+            <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+                <button type="button" id="btn-aic-bulk-precheck" class="aic-btn-primary" style="background: #e0a800; border-color: #c69500; color: #111;">
+                    &#x26A1; Alle noch offenen Video-Texte jetzt im Schnelllauf pr&uuml;fen
+                </button>
+                <button type="button" id="btn-aic-bulk-recheck-all" class="aic-btn-secondary" title="Pr&uuml;ft alle bereits analysierten Filme noch einmal mit den aktuell gespeicherten BRAM-Regeln (z. B. nach &Auml;nderung der Wortliste)">
+                    &#x1F504; Gesamten Katalog mit aktuellem BRAM-Regelwerk neu bewerten
+                </button>
+                <span id="aic-bulk-precheck-status" style="font-size: 13px; font-weight: bold; color: #155724;"></span>
+            </div>
+        </div>
+
+        <!-- AKTION B: LIVE-BROWSER-BATCH & SERVER-CRONJOB KONFIGURATION -->
+        <div style="display: flex; flex-wrap: wrap; gap: 20px;">
+
+            <!-- LINKE SPALTE: LIVE-BATCH IM BROWSER -->
+            <div class="aic-step-box" style="flex: 1 1 440px; border-left: 4px solid #1c94c4;">
+                <div class="aic-step-header">
+                    <div class="aic-step-title">&#x25B6; Modus 1: Live-Whisper-Batch hier im Browser</div>
+                </div>
+                <p style="font-size: 13px; color: #444; margin-top: 0; line-height: 1.5;">
+                    Verarbeitet ein offenes Video nach dem anderen (Audio-Extraktion &rarr; <code>whisper.cpp</code> &rarr; <code>.vtt</code>-Untertitel &rarr; BRAM-Pr&uuml;fung) und zeigt den Fortschritt live im Protokollfenster an. Sie k&ouml;nnen den Durchlauf jederzeit pausieren.
+                </p>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
+                    <button type="button" id="btn-aic-start-live-batch" class="aic-btn-success">
+                        &#x25B6; Live-Batch starten (Auto-Loop)
+                    </button>
+                    <button type="button" id="btn-aic-stop-live-batch" class="aic-btn-danger" style="display: none;">
+                        &#x23F8; Nach aktuellem Video pausieren
+                    </button>
+                    <button type="button" id="btn-aic-step-live-batch" class="aic-btn-secondary">
+                        &#x23ED; Nur 1 n&auml;chstes Video jetzt abarbeiten
+                    </button>
+                </div>
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 5px;">Live-Verarbeitungsprotokoll:</label>
+                <textarea id="aic-live-batch-log" class="aic-textarea-mono" rows="9" readonly="readonly" style="background: #1e2227; color: #a6e22e;" placeholder="Bereit. Klicken Sie auf &bdquo;Live-Batch starten&ldquo; oder &bdquo;Nur 1 n&auml;chstes Video jetzt abarbeiten&ldquo;..."></textarea>
+            </div>
+
+            <!-- RECHTE SPALTE: HINTERGRUND-CRONJOB EINSTELLUNGEN -->
+            <div class="aic-step-box" style="flex: 1 1 480px; border-left: 4px solid #28a745;">
+                <div class="aic-step-header">
+                    <div class="aic-step-title">&#x2699; Modus 2: Automatischer Hintergrund-Cronjob (Server)</div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 12px; font-size: 13px;">
+                    <div style="background: #f4f8fb; padding: 10px 12px; border-radius: 4px; border: 1px solid #c5dbec;">
+                        <label style="font-weight: bold; cursor: pointer;">
+                            <input type="checkbox" id="aic-cfg-cron-enabled" />
+                            Hintergrund-Cronjob aktivieren (<code>cronjobs/ai_compliance_worker.php</code>)
+                        </label>
+                    </div>
+
+                    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                        <div style="flex: 1 1 200px;">
+                            <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px;">Whisper-Sprachmodell:</label>
+                            <select id="aic-cfg-model" class="aic-select" style="width: 100%;">
+                                <option value="small">ggml-small-q5_1.bin (Empfohlen: ~20s / Video, 430 MB RAM)</option>
+                                <option value="turbo">ggml-large-v3-turbo-q5_0.bin (Maximal: ~110s / Video, 900 MB RAM)</option>
+                            </select>
+                        </div>
+                        <div style="flex: 1 1 200px;">
+                            <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px;">Audio-Umfang f&uuml;r Batch &amp; <code>.vtt</code>:</label>
+                            <select id="aic-cfg-audiolimit" class="aic-select" style="width: 100%;">
+                                <option value="0">Komplettes Video (Vollst&auml;ndige .vtt-Untertitel)</option>
+                                <option value="300">Erste 5 Minuten (300 Sek.)</option>
+                                <option value="180">Erste 3 Minuten (180 Sek.)</option>
+                                <option value="120">Erste 2 Minuten (120 Sek.)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                        <div style="flex: 1 1 140px;">
+                            <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px;">CPU-Threads (von 40):</label>
+                            <select id="aic-cfg-threads" class="aic-select" style="width: 100%;">
+                                <option value="8">8 Threads (Sehr sanft)</option>
+                                <option value="12">12 Threads (Empfohlen)</option>
+                                <option value="16">16 Threads (Schnell)</option>
+                                <option value="20">20 Threads (Maximal)</option>
+                            </select>
+                        </div>
+                        <div style="flex: 1 1 140px;">
+                            <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px;">Videos pro Cron-Lauf:</label>
+                            <select id="aic-cfg-maxruns" class="aic-select" style="width: 100%;">
+                                <option value="1">1 Video pro Aufruf</option>
+                                <option value="2">2 Videos pro Aufruf</option>
+                                <option value="3">3 Videos pro Aufruf</option>
+                                <option value="5">5 Videos pro Aufruf</option>
+                            </select>
+                        </div>
+                        <div style="flex: 1 1 160px;">
+                            <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px;">Reihenfolge:</label>
+                            <select id="aic-cfg-order" class="aic-select" style="width: 100%;">
+                                <option value="DESC">Neueste Videos zuerst</option>
+                                <option value="ASC">&Auml;lteste Videos zuerst</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="display: block; cursor: pointer; margin-bottom: 5px;">
+                            <input type="checkbox" id="aic-cfg-pause-ffmpeg" />
+                            Automatisch pausieren, solange <code>convert_movie.php</code> gerade ein neues Video konvertiert (<code>convert_status = 1</code>)
+                        </label>
+                        <label style="display: block; cursor: pointer;">
+                            <input type="checkbox" id="aic-cfg-sync-lang" />
+                            Erkannte Sprache (<code>de</code>, <code>en</code>, ...) automatisch in <code>movies.movie_language</code> eintragen, falls dort noch leer
+                        </label>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                        <span id="aic-save-batch-msg" style="font-size: 12px; font-weight: bold;"></span>
+                        <button type="button" id="btn-aic-save-batch-cfg" class="aic-btn-primary">
+                            &#x1F4BE; Batch- &amp; Cronjob-Einstellungen speichern
+                        </button>
+                    </div>
+
+                    <div style="background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px; padding: 10px; font-size: 11px; color: #444; margin-top: 5px;">
+                        <strong>Befehl zum einmaligen Testen auf der Server-Konsole:</strong><br/>
+                        <code style="display: block; background: #fff; padding: 4px 6px; border: 1px solid #ccc; margin: 4px 0;">/usr/bin/php /var/www/web1/htdocs/cronjobs/ai_compliance_worker.php --force --limit=1</code>
+                        <strong>Eintrag f&uuml;r die Server-Crontab (alle 2 Minuten im Hintergrund):</strong><br/>
+                        <code style="display: block; background: #fff; padding: 4px 6px; border: 1px solid #ccc; margin: 4px 0;">*/2 * * * * /usr/bin/php /var/www/web1/htdocs/cronjobs/ai_compliance_worker.php &gt;/dev/null 2&gt;&amp;1</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- TAB 3: VISA/MASTERCARD BRAM-REGELWERK & KI-SYSTEM-PROMPT           -->
     <!-- ================================================================== -->
     <div id="tab-aic-rules" style="display: none;">
         <div class="ui-widget-header" style="padding:10px; font-size:18px; margin-bottom:15px;">
@@ -427,9 +651,9 @@ $site .= '
         </div>
 
         <div style="background: #fcfdfd; border: 1px solid #d1d1d1; border-radius: 4px; padding: 15px; margin-bottom: 18px; font-size: 13px; line-height: 1.5;">
-            <strong>Hintergrund zu den Visa- &amp; Mastercard-Richtlinien (BRAM / AN 5196 / GBPP):</strong><br/>
-            Kreditkartenorganisationen verlangen von Adult-Plattformen eine dokumentierte, aktive Vorab- und Nachkontrolle aller Video-Titel, Beschreibungen und Inhalte auf <strong>7 absolute Verbotskategorien (Hard-Block / Rot)</strong> sowie sensible <strong>Grauzonen &amp; Plattform-Abwerbung (Pr&uuml;fhinweis / Gelb)</strong>.
-            Dieses Regelwerk ist zweistufig in <code>includes/ai_rules/</code> abgelegt, damit sowohl die schnelle PHP-Vorpr&uuml;fung als auch das lokale Sprachmodell (<code>llama.cpp</code>) jederzeit darauf zugreifen k&ouml;nnen.
+            <strong>Einstufungs-Logik f&uuml;r EroCloud &amp; Partnerportale:</strong><br/>
+            &#x1F534; <strong>ROT (<code>violation</code> / Hard-Block):</strong> Absolut verbotene Inhalte auf <strong>allen</strong> Portalen (Minderj&auml;hrige/CSAM, Vergewaltigung/Zwang, K.O.-Tropfen/Tiefschlaf, echter Inzest, Blut/Waffen/Atemkontrolle, Tiersex).<br/>
+            &#x1F7E1; <strong>GELB (<code>warning</code> / Pr&uuml;fhinweis):</strong> Verst&ouml;&szlig;t zwar gegen Visa/Mastercard BRAM, ist aber auf Portalen <strong>ohne Kreditkartenabrechnung</strong> zul&auml;ssig (insbesondere <strong>KV / Kaviar / Schei&szlig;e</strong>, <strong>NS / Natursekt</strong>, <strong>Poppers</strong>, <strong>Hypnose</strong> sowie Stief-Familien-Rollenspiele) oder erfordert eine kurze Sichtung (PayPal/Telegram-Abwerbung).
         </div>
 
         <h3 style="font-size: 15px; margin: 15px 0 8px 0;">Aktive Pr&uuml;fkategorien &amp; hinterlegte Schl&uuml;sselbegriffe (DE / EN)</h3>
@@ -437,7 +661,7 @@ $site .= '
             <thead>
                 <tr>
                     <th style="width: 260px;">Kategorie</th>
-                    <th style="width: 120px;">Stufe &amp; Score</th>
+                    <th style="width: 140px;">Stufe &amp; Score</th>
                     <th style="width: 280px;">Beschreibung</th>
                     <th>Hinterlegte Pr&uuml;fbegriffe / Wortst&auml;mme</th>
                 </tr>
@@ -471,11 +695,44 @@ $site .= '
     </div>
 
     <!-- ================================================================== -->
-    <!-- TAB 3: ANALYSE-HISTORIE (MOVIES_AI_ANALYSIS)                       -->
+    <!-- TAB 4: ANALYSE-HISTORIE & FILTER (MOVIES_AI_ANALYSIS)              -->
     <!-- ================================================================== -->
     <div id="tab-aic-history" style="display: none;">
         <div class="ui-widget-header" style="padding:10px; font-size:18px; margin-bottom:15px;">
             Bereits analysierte Videos in der Datenbank (<code>movies_ai_analysis</code>)
+        </div>
+
+        <!-- FILTER-LEISTE -->
+        <div class="aic-step-box" style="background: #fcfdfd; padding: 12px 15px; margin-bottom: 15px;">
+            <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
+                <div>
+                    <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px;">Filter nach BRAM-Ampel:</label>
+                    <select id="aic-filter-comp" class="aic-select">
+                        <option value="all">Alle Status anzeigen</option>
+                        <option value="violation">&#x1F534; Nur ROT (Hard-Block / Versto&szlig;)</option>
+                        <option value="warning">&#x1F7E1; Nur GELB (Pr&uuml;fhinweis / Nur ohne KK)</option>
+                        <option value="ok">&#x1F7E2; Nur GR&Uuml;N (Unbedenklich / OK)</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px;">Filter nach Untertitel / Audio:</label>
+                    <select id="aic-filter-sub" class="aic-select">
+                        <option value="all">Alle anzeigen</option>
+                        <option value="has_sub">&#x1F3A4; Mit .vtt-Untertitel &amp; Transkript</option>
+                        <option value="no_audio">&#x1F507; Stummfilm (Kein Audio)</option>
+                        <option value="open">&#x23F3; Noch ohne Audio-Transkript (Nur Text gepr&uuml;ft)</option>
+                        <option value="error">&#x26A0; MP4 fehlt / Fehler</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px;">Suche (Movie-ID, H&auml;ndler-ID, Begriff im Text/Audio):</label>
+                    <input type="text" id="aic-filter-search" class="aic-input" placeholder="z. B. 8613 oder KV oder PayPal..." style="width: 240px;" />
+                </div>
+                <div>
+                    <button type="button" id="btn-aic-apply-filter" class="aic-btn-primary">Filtern</button>
+                    <button type="button" id="btn-aic-reset-filter" class="aic-btn-secondary">Zur&uuml;cksetzen</button>
+                </div>
+            </div>
         </div>
 
         <table class="aic-table">
@@ -484,8 +741,8 @@ $site .= '
                     <th style="width: 80px;">Movie-ID</th>
                     <th style="width: 90px;">H&auml;ndler-ID</th>
                     <th>Filmtitel &amp; Dauer</th>
-                    <th style="width: 140px;">Audio / Untertitel</th>
-                    <th style="width: 140px;">BRAM-Status</th>
+                    <th style="width: 165px;">Audio / Untertitel</th>
+                    <th style="width: 155px;">BRAM-Status</th>
                     <th>KI-Zusammenfassung / Befund</th>
                     <th style="width: 130px;">Gepr&uuml;ft am</th>
                     <th style="width: 120px;">Aktion</th>
@@ -505,6 +762,7 @@ jQuery(document).ready(function() {
     jQuery("#ai_compliance_tabs").tabs();
 
     var currentMovieId = 0;
+    var liveBatchRunning = false;
 
     function escHtml(str) {
         if (str === null || str === undefined) return "";
@@ -520,11 +778,58 @@ jQuery(document).ready(function() {
         if (status === "ok") {
             return "<span class=\"aic-badge\" style=\"background:#28a745;\">OK / Unbedenklich" + s + "</span>";
         } else if (status === "warning") {
-            return "<span class=\"aic-badge\" style=\"background:#e0a800; color:#111;\">Pr&uuml;fhinweis (Gelb)" + s + "</span>";
+            return "<span class=\"aic-badge\" style=\"background:#e0a800; color:#111;\">Gelb / Ohne KK" + s + "</span>";
         } else if (status === "violation") {
             return "<span class=\"aic-badge\" style=\"background:#dc3545;\">BRAM-Versto&szlig; (Rot)" + s + "</span>";
         }
         return "<span class=\"aic-badge\" style=\"background:#6c757d;\">Noch ungepr&uuml;ft</span>";
+    }
+
+    function updateStatsUI(stats, workerStatus, batchCfg) {
+        if (!stats) return;
+        jQuery("#aic-stat-total").text(stats.total_converted);
+        jQuery("#aic-stat-subtitled").text(stats.total_subtitled);
+        jQuery("#aic-stat-sub-pct").text(stats.pct_subtitles);
+        jQuery("#aic-stat-sub-rem").text(stats.remaining_subtitles);
+        jQuery("#aic-stat-checked").text(stats.total_text_checked);
+        jQuery("#aic-stat-txt-pct").text(stats.pct_text);
+        jQuery("#aic-stat-txt-rem").text(stats.remaining_text);
+        jQuery("#aic-stat-ok").text(stats.cnt_ok);
+        jQuery("#aic-stat-warn").text(stats.cnt_warn);
+        jQuery("#aic-stat-viol").text(stats.cnt_viol);
+
+        // Fortschrittsbalken in Tab 2
+        jQuery("#aic-prog-sub-text").text(stats.sub_processed_total + " / " + stats.total_converted + " Videos (" + stats.pct_subtitles + "%)");
+        jQuery("#aic-prog-sub-bar").css("width", stats.pct_subtitles + "%");
+        jQuery("#aic-prog-sub-label").text(stats.pct_subtitles + "%");
+        jQuery("#aic-det-sub-ok").text(stats.sub_created);
+        jQuery("#aic-det-sub-noaudio").text(stats.sub_no_audio);
+        jQuery("#aic-det-sub-err").text(stats.sub_error);
+        jQuery("#aic-det-sub-rem").text(stats.remaining_subtitles);
+
+        jQuery("#aic-prog-txt-text").text(stats.total_text_checked + " / " + stats.total_converted + " Videos (" + stats.pct_text + "%)");
+        jQuery("#aic-prog-txt-bar").css("width", stats.pct_text + "%");
+        jQuery("#aic-prog-txt-label").text(stats.pct_text + "%");
+
+        if (workerStatus) {
+            jQuery("#aic-worker-last-msg").text(workerStatus.last_message || "-");
+            jQuery("#aic-worker-last-time").text(workerStatus.last_run_at || "-");
+            if (workerStatus.state === "running") {
+                jQuery("#aic-worker-live-badge").html("<span class=\"aic-badge\" style=\"background:#28a745;\">&#x2699; Verarbeitet Video #" + workerStatus.current_movie_id + "</span>");
+            } else if (workerStatus.state === "waiting_for_ffmpeg") {
+                jQuery("#aic-worker-live-badge").html("<span class=\"aic-badge\" style=\"background:#e0a800; color:#111;\">Wartet auf Video-Konvertierung</span>");
+            } else {
+                jQuery("#aic-worker-live-badge").html("<span class=\"aic-badge\" style=\"background:#1c94c4;\">Bereit (Gesamt-Durchl&auml;ufe: " + (workerStatus.total_processed_runs || 0) + ")</span>");
+            }
+        }
+
+        if (batchCfg) {
+            if (batchCfg.cron_enabled) {
+                jQuery("#aic-env-cron").css("background", "#28a745").text("Hintergrund-Cronjob: Aktiv");
+            } else {
+                jQuery("#aic-env-cron").css("background", "#6c757d").text("Hintergrund-Cronjob: Pausiert");
+            }
+        }
     }
 
     function renderRuleCategories(parsed) {
@@ -557,15 +862,22 @@ jQuery(document).ready(function() {
     function renderHistoryTable(rows) {
         jQuery("#aic-hist-count").text(rows ? rows.length : 0);
         if (!rows || !rows.length) {
-            jQuery("#aic-tbody-history").html("<tr><td colspan=\"8\" style=\"text-align:center; color:#666;\">Noch keine Videos im Testlabor analysiert.</td></tr>");
+            jQuery("#aic-tbody-history").html("<tr><td colspan=\"8\" style=\"text-align:center; color:#666;\">Keine Videos f&uuml;r die gew&auml;hlten Filterkriterien gefunden.</td></tr>");
             return;
         }
         var html = "";
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
-            var subBadge = r.subtitle_status === 2
-                ? "<span class=\"aic-badge\" style=\"background:#1c94c4;\">Sprache: " + escHtml(r.detected_language.toUpperCase()) + " (" + r.language_confidence + "%)</span><br/><small><code>" + escHtml(r.subtitle_filename) + "</code></small>"
-                : "<span class=\"aic-badge\" style=\"background:#6c757d;\">Offen</span>";
+            var subBadge = "";
+            if (r.subtitle_status === 2) {
+                subBadge = "<span class=\"aic-badge\" style=\"background:#1c94c4;\">Sprache: " + escHtml(r.detected_language.toUpperCase()) + " (" + r.whisper_duration_sec + "s)</span><br/><small><code>" + escHtml(r.subtitle_filename) + "</code></small>";
+            } else if (r.subtitle_status === 3) {
+                subBadge = "<span class=\"aic-badge\" style=\"background:#6c757d;\">Stummfilm (Kein Audio)</span>";
+            } else if (r.subtitle_status === 4) {
+                subBadge = "<span class=\"aic-badge\" style=\"background:#dc3545;\" title=\"" + escHtml(r.last_error) + "\">MP4 fehlt / Fehler</span>";
+            } else {
+                subBadge = "<span class=\"aic-badge\" style=\"background:#6c757d;\">Audio noch offen</span>";
+            }
             html += "<tr>"
                 + "<td><strong>#" + r.movie_id + "</strong></td>"
                 + "<td>" + r.merchant_id + "</td>"
@@ -589,13 +901,19 @@ jQuery(document).ready(function() {
             success: function(res) {
                 if (!res || res.status !== "ok") return;
 
-                jQuery("#aic-stat-total").text(res.stats.total_converted);
-                jQuery("#aic-stat-subtitled").text(res.stats.total_subtitled);
-                jQuery("#aic-stat-sub-rem").text(res.stats.remaining_subtitles);
-                jQuery("#aic-stat-checked").text(res.stats.total_text_checked);
-                jQuery("#aic-stat-ok").text(res.stats.cnt_ok);
-                jQuery("#aic-stat-warn").text(res.stats.cnt_warn);
-                jQuery("#aic-stat-viol").text(res.stats.cnt_viol);
+                updateStatsUI(res.stats, res.worker_status, res.batch_config);
+
+                // Batch-Konfiguration in Formularfelder laden
+                if (res.batch_config) {
+                    jQuery("#aic-cfg-cron-enabled").prop("checked", !!res.batch_config.cron_enabled);
+                    jQuery("#aic-cfg-model").val(res.batch_config.whisper_model_pref || "small");
+                    jQuery("#aic-cfg-audiolimit").val(String(res.batch_config.audio_limit_sec || 0));
+                    jQuery("#aic-cfg-threads").val(String(res.batch_config.whisper_threads || 12));
+                    jQuery("#aic-cfg-maxruns").val(String(res.batch_config.max_movies_per_run || 2));
+                    jQuery("#aic-cfg-order").val(res.batch_config.order_direction || "DESC");
+                    jQuery("#aic-cfg-pause-ffmpeg").prop("checked", !!res.batch_config.pause_on_ffmpeg_convert);
+                    jQuery("#aic-cfg-sync-lang").prop("checked", !!res.batch_config.sync_empty_movie_lang);
+                }
 
                 // System-Badges
                 if (res.env.ffmpeg_ready) {
@@ -680,6 +998,12 @@ jQuery(document).ready(function() {
             jQuery("#aic-out-subfile").text(m.ai.subtitle_filename);
             jQuery("#aic-edit-transcript").val(m.ai.spoken_transcript);
             jQuery("#aic-out-vtt").val(m.ai.vtt_preview);
+        } else if (m.ai && m.ai.subtitle_status === 3) {
+            jQuery("#aic-step1-badge-wrap").html("<span class=\"aic-badge\" style=\"background:#6c757d;\">Stummfilm (Keine Tonspur im Video)</span>");
+            jQuery("#aic-out-lang").text("-");
+            jQuery("#aic-out-subfile").text("-");
+            jQuery("#aic-edit-transcript").val(m.ai.spoken_transcript);
+            jQuery("#aic-out-vtt").val("");
         } else {
             jQuery("#aic-step1-badge-wrap").html("<span class=\"aic-badge\" style=\"background:#6c757d;\">Noch kein Untertitel / Audio-Transkript erstellt</span>");
             jQuery("#aic-out-lang").text("Noch nicht ermittelt");
@@ -713,10 +1037,10 @@ jQuery(document).ready(function() {
             statusTitle.html("&#x2705; FREIGABE-EMPFEHLUNG: UNBEDENKLICH (KEINE BRAM-VERST&Ouml;SSE ERKANNT)");
         } else if (rep.compliance_status === "warning") {
             banner.css({ background: "#fff3cd", border: "1px solid #ffeeba", color: "#856404" });
-            statusTitle.html("&#x26A0; PR&Uuml;FHINWEIS (GELB): SENSIBLE BEGRIFFE / GRAUZONE ERKANNT – MANUELLE SICHTUNG ERFORDERLICH");
+            statusTitle.html("&#x26A0; PR&Uuml;FHINWEIS (GELB): NUR AUF PORTALEN OHNE KREDITKARTE ZUL&Auml;SSIG / MANUELLE SICHTUNG");
         } else {
             banner.css({ background: "#f8d7da", border: "1px solid #f5c6cb", color: "#721c24" });
-            statusTitle.html("&#x1F6D1; STOPP: KRITISCHER VISA/MASTERCARD BRAM- ODER RECHTS-VERSTOSS ERKANNT!");
+            statusTitle.html("&#x1F6D1; STOPP (ROT): KRITISCHER VISA/MASTERCARD BRAM- ODER RECHTS-VERSTOSS ERKANNT!");
         }
 
         jQuery("#aic-report-summary").text(rep.summary_de || "");
@@ -765,7 +1089,131 @@ jQuery(document).ready(function() {
         });
     }
 
-    // Event-Handler
+    function applyHistoryFilter() {
+        jQuery.ajax({
+            url: "' . ACP_URL . '/includes/ajax/ai_compliance_action.php",
+            type: "GET",
+            data: {
+                action: "filter_history",
+                compliance_filter: jQuery("#aic-filter-comp").val(),
+                subtitle_filter: jQuery("#aic-filter-sub").val(),
+                search_query: jQuery("#aic-filter-search").val()
+            },
+            dataType: "json",
+            success: function(res) {
+                if (!res || res.status !== "ok") return;
+                renderHistoryTable(res.history);
+                updateStatsUI(res.stats, null, null);
+            }
+        });
+    }
+
+    function appendBatchLog(line) {
+        var box = jQuery("#aic-live-batch-log");
+        var now = new Date().toLocaleTimeString("de-DE");
+        var prev = box.val();
+        box.val((prev ? prev + "\n" : "") + "[" + now + "] " + line);
+        box.scrollTop(box[0].scrollHeight);
+    }
+
+    function executeNextLiveBatchStep(autoContinue) {
+        if (autoContinue && !liveBatchRunning) {
+            appendBatchLog("Live-Batch wurde vom Administrator pausiert.");
+            jQuery("#btn-aic-start-live-batch").show().prop("disabled", false);
+            jQuery("#btn-aic-stop-live-batch").hide();
+            jQuery("#btn-aic-step-live-batch").prop("disabled", false);
+            return;
+        }
+
+        appendBatchLog("Starte nächstes offenes Video (Whisper Audio-Extraktion + .vtt + BRAM-Check)...");
+        jQuery("#btn-aic-step-live-batch").prop("disabled", true);
+
+        jQuery.ajax({
+            url: "' . ACP_URL . '/includes/ajax/ai_compliance_action.php",
+            type: "POST",
+            data: { action: "run_batch_step" },
+            dataType: "json",
+            success: function(res) {
+                if (!res || res.status !== "ok") {
+                    appendBatchLog("FEHLER: " + (res && res.message ? res.message : "Unbekannter Fehler."));
+                    liveBatchRunning = false;
+                    jQuery("#btn-aic-start-live-batch").show().prop("disabled", false);
+                    jQuery("#btn-aic-stop-live-batch").hide();
+                    jQuery("#btn-aic-step-live-batch").prop("disabled", false);
+                    return;
+                }
+
+                appendBatchLog(res.message);
+                updateStatsUI(res.stats, res.worker_status, null);
+
+                if (!res.has_more) {
+                    appendBatchLog("FERTIG! Alle konvertierten Videos wurden verarbeitet.");
+                    liveBatchRunning = false;
+                    jQuery("#btn-aic-start-live-batch").show().prop("disabled", false);
+                    jQuery("#btn-aic-stop-live-batch").hide();
+                    jQuery("#btn-aic-step-live-batch").prop("disabled", false);
+                    applyHistoryFilter();
+                    return;
+                }
+
+                if (autoContinue && liveBatchRunning) {
+                    setTimeout(function() {
+                        executeNextLiveBatchStep(true);
+                    }, 600);
+                } else {
+                    jQuery("#btn-aic-step-live-batch").prop("disabled", false);
+                    applyHistoryFilter();
+                }
+            },
+            error: function() {
+                appendBatchLog("Netzwerk- oder Timeout-Fehler beim Batch-Schritt. Pausiere.");
+                liveBatchRunning = false;
+                jQuery("#btn-aic-start-live-batch").show().prop("disabled", false);
+                jQuery("#btn-aic-stop-live-batch").hide();
+                jQuery("#btn-aic-step-live-batch").prop("disabled", false);
+            }
+        });
+    }
+
+    function runBulkPrecheckLoop(forceRecheck, lastId, totalProcessedSoFar) {
+        jQuery("#btn-aic-bulk-precheck, #btn-aic-bulk-recheck-all").prop("disabled", true);
+        jQuery("#aic-bulk-precheck-status").text("Prüfe Katalog-Paket... (" + totalProcessedSoFar + " Filme geprüft)");
+
+        jQuery.ajax({
+            url: "' . ACP_URL . '/includes/ajax/ai_compliance_action.php",
+            type: "POST",
+            data: {
+                action: "run_bulk_text_precheck",
+                chunk_size: 250,
+                force_recheck: forceRecheck ? 1 : 0,
+                last_id: lastId || 0
+            },
+            dataType: "json",
+            success: function(res) {
+                if (!res || res.status !== "ok") {
+                    jQuery("#btn-aic-bulk-precheck, #btn-aic-bulk-recheck-all").prop("disabled", false);
+                    jQuery("#aic-bulk-precheck-status").css("color", "#dc3545").text("Fehler beim Schnell-Scan.");
+                    return;
+                }
+                var newTotal = totalProcessedSoFar + (res.processed_in_chunk || 0);
+                updateStatsUI(res.stats, null, null);
+
+                if (res.has_more && res.processed_in_chunk > 0) {
+                    runBulkPrecheckLoop(forceRecheck, res.last_id, newTotal);
+                } else {
+                    jQuery("#btn-aic-bulk-precheck, #btn-aic-bulk-recheck-all").prop("disabled", false);
+                    jQuery("#aic-bulk-precheck-status").css("color", "#155724").text("✔ Katalog-Schnellscan abgeschlossen! (" + newTotal + " Videos in diesem Durchlauf bewertet)");
+                    applyHistoryFilter();
+                }
+            },
+            error: function() {
+                jQuery("#btn-aic-bulk-precheck, #btn-aic-bulk-recheck-all").prop("disabled", false);
+                jQuery("#aic-bulk-precheck-status").css("color", "#dc3545").text("Netzwerkfehler beim Schnell-Scan.");
+            }
+        });
+    }
+
+    // Event-Handler Tab 1
     jQuery("#aic-select-recent").on("change", function() {
         var val = jQuery(this).val();
         if (val) {
@@ -796,6 +1244,89 @@ jQuery(document).ready(function() {
         var mid = jQuery(this).data("id");
         jQuery("#ai_compliance_tabs").tabs("option", "active", 0);
         loadMovieIntoLab({ movie_id: mid });
+    });
+
+    // Event-Handler Tab 2 (Batch & Cronjob)
+    jQuery("#btn-aic-bulk-precheck").on("click", function() {
+        runBulkPrecheckLoop(false, 0, 0);
+    });
+
+    jQuery("#btn-aic-bulk-recheck-all").on("click", function() {
+        runBulkPrecheckLoop(true, 0, 0);
+    });
+
+    jQuery("#btn-aic-start-live-batch").on("click", function() {
+        liveBatchRunning = true;
+        jQuery(this).hide();
+        jQuery("#btn-aic-stop-live-batch").show();
+        appendBatchLog("=== LIVE-BATCH AUTO-LOOP GESTARTET ===");
+        executeNextLiveBatchStep(true);
+    });
+
+    jQuery("#btn-aic-stop-live-batch").on("click", function() {
+        liveBatchRunning = false;
+        appendBatchLog("Stopp angefordert – warte auf Abschluss des aktuell laufenden Videos...");
+    });
+
+    jQuery("#btn-aic-step-live-batch").on("click", function() {
+        liveBatchRunning = false;
+        executeNextLiveBatchStep(false);
+    });
+
+    jQuery("#btn-aic-save-batch-cfg").on("click", function() {
+        var btn = jQuery(this);
+        btn.prop("disabled", true);
+        jQuery("#aic-save-batch-msg").css("color", "#555").text("Speichere...");
+
+        jQuery.ajax({
+            url: "' . ACP_URL . '/includes/ajax/ai_compliance_action.php",
+            type: "POST",
+            data: {
+                action: "save_batch_config",
+                cron_enabled: jQuery("#aic-cfg-cron-enabled").is(":checked") ? 1 : 0,
+                whisper_model_pref: jQuery("#aic-cfg-model").val(),
+                audio_limit_sec: jQuery("#aic-cfg-audiolimit").val(),
+                whisper_threads: jQuery("#aic-cfg-threads").val(),
+                max_movies_per_run: jQuery("#aic-cfg-maxruns").val(),
+                order_direction: jQuery("#aic-cfg-order").val(),
+                pause_on_ffmpeg_convert: jQuery("#aic-cfg-pause-ffmpeg").is(":checked") ? 1 : 0,
+                sync_empty_movie_lang: jQuery("#aic-cfg-sync-lang").is(":checked") ? 1 : 0
+            },
+            dataType: "json",
+            success: function(res) {
+                btn.prop("disabled", false);
+                if (!res || res.status !== "ok") {
+                    jQuery("#aic-save-batch-msg").css("color", "#dc3545").text("Fehler beim Speichern.");
+                    return;
+                }
+                jQuery("#aic-save-batch-msg").css("color", "#28a745").text(res.message);
+                updateStatsUI(null, null, res.batch_config);
+            },
+            error: function() {
+                btn.prop("disabled", false);
+                jQuery("#aic-save-batch-msg").css("color", "#dc3545").text("Netzwerkfehler.");
+            }
+        });
+    });
+
+    // Event-Handler Tab 4 (Filter in Analyse-Historie)
+    jQuery("#btn-aic-apply-filter").on("click", function() {
+        applyHistoryFilter();
+    });
+    jQuery("#aic-filter-comp, #aic-filter-sub").on("change", function() {
+        applyHistoryFilter();
+    });
+    jQuery("#aic-filter-search").on("keypress", function(e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            applyHistoryFilter();
+        }
+    });
+    jQuery("#btn-aic-reset-filter").on("click", function() {
+        jQuery("#aic-filter-comp").val("all");
+        jQuery("#aic-filter-sub").val("all");
+        jQuery("#aic-filter-search").val("");
+        applyHistoryFilter();
     });
 
     // Schritt 1: Whisper starten
@@ -867,7 +1398,7 @@ jQuery(document).ready(function() {
         });
     });
 
-    // Tab 2: Regelwerk speichern
+    // Tab 3: Regelwerk speichern
     jQuery("#btn-aic-save-rules").on("click", function() {
         var btn = jQuery(this);
         btn.prop("disabled", true);

@@ -1,0 +1,11 @@
+{
+    "cron_enabled": false,
+    "task_mode": "whisper_and_text",
+    "whisper_model_pref": "small",
+    "whisper_threads": 12,
+    "audio_limit_sec": 0,
+    "order_direction": "DESC",
+    "pause_on_ffmpeg_convert": true,
+    "max_movies_per_run": 2,
+    "sync_empty_movie_lang": false
+}
