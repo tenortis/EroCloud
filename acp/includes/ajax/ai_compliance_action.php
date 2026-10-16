@@ -123,10 +123,10 @@ function aic_check_environment() {
         '/usr/local/bin/whisper-cli'
     );
     $whisper_model_candidates = array(
-        $ai_base_dir . '/models/ggml-large-v3-turbo-q5_0.bin',
-        $ai_base_dir . '/models/ggml-medium-q5_0.bin',
-        $ai_base_dir . '/models/ggml-base.bin',
-        '/opt/erocloud_ai/models/ggml-large-v3-turbo-q5_0.bin'
+        'small' => $ai_base_dir . '/models/ggml-small-q5_1.bin',
+        'turbo' => $ai_base_dir . '/models/ggml-large-v3-turbo-q5_0.bin',
+        'medium'=> $ai_base_dir . '/models/ggml-medium-q5_0.bin',
+        'base'  => $ai_base_dir . '/models/ggml-base.bin'
     );
 
     $found_whisper_bin = $whisper_bin_candidates[0];
@@ -137,24 +137,33 @@ function aic_check_environment() {
         }
     }
 
-    $found_whisper_model = $whisper_model_candidates[0];
-    foreach ($whisper_model_candidates as $cand_mod) {
+    $found_whisper_model = $whisper_model_candidates['turbo'];
+    $available_whisper_models = array();
+    foreach ($whisper_model_candidates as $m_key => $cand_mod) {
         if (@file_exists($cand_mod)) {
-            $found_whisper_model = $cand_mod;
-            break;
+            $available_whisper_models[$m_key] = $cand_mod;
+            if ($found_whisper_model === $whisper_model_candidates['turbo'] && !@file_exists($found_whisper_model)) {
+                $found_whisper_model = $cand_mod;
+            }
         }
+    }
+    if (isset($available_whisper_models['small'])) {
+        $found_whisper_model = $available_whisper_models['small'];
+    } elseif (isset($available_whisper_models['turbo'])) {
+        $found_whisper_model = $available_whisper_models['turbo'];
     }
 
     $env = array(
-        'ai_base_dir'      => $ai_base_dir,
-        'ffmpeg_bin'       => defined('FFMPEG_PATH') ? rtrim(FFMPEG_PATH, '/') . '/ffmpeg' : '/usr/bin/ffmpeg',
-        'ffmpeg_ready'     => false,
-        'whisper_bin'      => $found_whisper_bin,
-        'whisper_model'    => $found_whisper_model,
-        'whisper_ready'    => false,
-        'llm_endpoint'     => 'http://127.0.0.1:8080/v1/chat/completions',
-        'llm_ready'        => false,
-        'llm_model_name'   => 'Nicht verbunden (Regel- & Keyword-Engine aktiv)'
+        'ai_base_dir'              => $ai_base_dir,
+        'ffmpeg_bin'               => defined('FFMPEG_PATH') ? rtrim(FFMPEG_PATH, '/') . '/ffmpeg' : '/usr/bin/ffmpeg',
+        'ffmpeg_ready'             => false,
+        'whisper_bin'              => $found_whisper_bin,
+        'whisper_model'            => $found_whisper_model,
+        'available_whisper_models' => $available_whisper_models,
+        'whisper_ready'            => false,
+        'llm_endpoint'             => 'http://127.0.0.1:8080/v1/chat/completions',
+        'llm_ready'                => false,
+        'llm_model_name'           => 'Nicht verbunden (Regel- & Keyword-Engine aktiv)'
     );
 
     if (@file_exists($env['ffmpeg_bin']) || @file_exists('/usr/bin/ffmpeg') || @file_exists('/usr/local/bin/ffmpeg')) {
@@ -756,7 +765,9 @@ if ($action === 'run_whisper') {
 
     // Pruefen, ob physische MP4 UND whisper.cpp auf dem Live-Server bereitstehen
     if ($details['mp4_exists'] && $env['ffmpeg_ready'] && $env['whisper_ready']) {
-        $mode_used = 'Live-Server (FFmpeg WAV -> whisper.cpp)';
+        @set_time_limit(600);
+        $model_label = basename($env['whisper_model']);
+        $mode_used = 'Live-Server (FFmpeg WAV -> whisper.cpp [' . $model_label . '])';
         $tmp_dir   = (defined('TEMP_DIR') && @is_dir(TEMP_DIR) && @is_writable(TEMP_DIR)) ? rtrim(TEMP_DIR, '/') : rtrim(sys_get_temp_dir(), '/');
         $wav_tmp   = $tmp_dir . '/erocloud_ai_audio_' . $details['id'] . '_' . time() . '.wav';
         $json_base = $tmp_dir . '/erocloud_ai_out_' . $details['id'] . '_' . time();
@@ -769,7 +780,7 @@ if ($action === 'run_whisper') {
             $cmd_wh = 'nice -n 15 ' . escapeshellcmd($env['whisper_bin'])
                 . ' -m ' . escapeshellarg($env['whisper_model'])
                 . ' -f ' . escapeshellarg($wav_tmp)
-                . ' -l auto -t 12 -oj -ovtt -of ' . escapeshellarg($json_base) . ' 2>&1';
+                . ' -l auto -bs 1 -bo 1 -t 16 -oj -ovtt -of ' . escapeshellarg($json_base) . ' 2>&1';
             @exec($cmd_wh, $out_wh, $ret_wh);
             @unlink($wav_tmp);
 
