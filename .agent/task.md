@@ -45,7 +45,9 @@
     - [x] Research physical storage structure (`MOVIES_PATH`, `MOVIES_DEFAULT_DIR`, `storage_location`), FFmpeg conversion formats (`cronjobs/convert_movie.php`), and player delivery (`api/get_movie_url.php`, `api/movie_player.php`)
     - [x] Add route `/Speicher-Analyse` (`acp/.htaccess`) and sidebar navigation entry *"Speicher & Traffic"* under *"Content Online"* (`acp/index.php`)
     - [x] Implement backend scanner `acp/includes/ajax/storage_analytics_scan.php` with 24h JSON cache, physical `filesize()` + local bitrate-fallback mode, video format breakdown (`desktop_mp4`, `mobile_mp4`, `mobile_webm`, `mobile_ogv`, `thumbnails`), and 6-month `movies_access` streaming/download traffic calculator
+    - [x] Implement 3-stage server partition check (`sa_get_disk_metrics`) with `df -P -k` and physical sum + `disk_free_space()` fallback when `disk_total_space()` is disabled in `php.ini`
     - [x] Build ACP frontend `acp/includes/storage_analytics.php` with 3 jQuery-UI tabs (Speicher-Übersicht & Video-Formate, Streaming & Traffic-Analyse, Konvertierungs-Analyse & Cloud-Kalkulator) in polite Sie-Form
-    - [x] Document storage architecture, FFmpeg conversion pipeline, and redundant mobile format findings in `.agent/knowledge/architecture/video-management.md`
+    - [x] Document storage architecture, FFmpeg conversion pipeline, and redundant mobile format findings in `.agent/knowledge/architecture/video-management.md` and `.agent/knowledge/architecture/storage-and-traffic-analytics.md`
     - [ ] Clean up redundant `.webm` / `.ogv` conversion steps and existing files (scheduled for next phase)
+
 
