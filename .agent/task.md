@@ -55,13 +55,19 @@
 - [ ] **Local AI Compliance & Subtitle Pipeline (Whisper.cpp + Llama.cpp)**
     - [x] Analyze server hardware (Dell PowerEdge R720, 2x Xeon E5-2690 v2, 64 GB RAM, Debian 10) and define resource-safe CPU inference architecture
     - [x] Document 4-phase concept & database architecture in `.agent/knowledge/architecture/ai-compliance-and-subtitle-pipeline.md`
+    - [x] Document complete Debian 10 server setup, compiler patches & LiveConfig runbook in `.agent/knowledge/architecture/ai-server-installation-guide.md`
     - [x] **Phase 1: ACP Single-Video Test Lab (`/KI-Analyse`), BRAM Rulebook & Database Setup**
         - [x] Research Visa GBPP & Mastercard BRAM (AN 5196) + StGB compliance rules and build 2-stage AI rulebook (`includes/ai_rules/bram_system_prompt.md` & `includes/ai_rules/bram_keyword_rules.json`)
+        - [x] Refine business logic: classify KV/Scat, NS/Watersports, Poppers, and Hypnose as **GELB (`warning`)** for partner portals without credit card billing, while keeping CSAM, Non-Consensual, Incapacitation/KO-Drops, Real Incest, Extreme Violence/Blood/Breathplay, and Bestiality as **ROT (`violation` / universal hard-block)**
         - [x] Auto-create database table `movies_ai_analysis` for tracking subtitle, transcript, text-compliance, and vision states across all 5,500+ movies
         - [x] Build ACP Test Cockpit (`acp/includes/ai_compliance.php` & `acp/includes/ajax/ai_compliance_action.php` under `/KI-Analyse`) to select a single Creator video and test audio extraction, Whisper subtitle/language detection, and BRAM text checking step by step
-    - [ ] **Phase 2: Debian 10 Server Setup (`whisper.cpp` + `llama.cpp`) & Background Cronjob (`cronjobs/ai_process_movies.php`)**
-        - [ ] Compile `whisper.cpp` and `llama.cpp` natively (`-DGGML_NATIVE=ON`) for Xeon E5-2690 v2 on Debian 10
-        - [ ] Implement priority queue (newly converted movies first, then 5,500+ existing catalog movies) with CPU thread/nice throttling
+    - [x] **Phase 2A: Debian 10 Server Setup (`whisper.cpp`) & Background Cronjob (`cronjobs/ai_compliance_worker.php`)**
+        - [x] Configure Debian 10 Buster EOL archive repositories (`archive.debian.org`) and compile `whisper.cpp` natively (`-DGGML_NATIVE=ON -DBUILD_SHARED_LIBS=OFF` + `-lstdc++fs`) for Dual Xeon E5-2690 v2 in `/var/www/web1/priv/ai/`
+        - [x] Download and verify `ggml-small-q5_1.bin` (~3.2s/chunk, 430 MB RAM) and `ggml-large-v3-turbo-q5_0.bin`
+        - [x] Extract shared pipeline core (`includes/ai_compliance_core.inc.php`) with LiveConfig `open_basedir` fallback (`aic_file_or_exec_exists`), HTML entity decoding (`aic_clean_html_text`), and silent/missing-MP4 resilience
+        - [x] Implement background worker (`cronjobs/ai_compliance_worker.php`), ACP Batch & Cronjob Control Center (Tab 2), 15-second Catalog Metadata Quick-Scan, Live Browser Batch with 2-second status poller, and History Filtering (Tab 4)
+    - [ ] **Phase 2B: Optional Local Text LLM (`llama.cpp` Server + Uncensored GGUF Model) for Semantic Context Checking**
     - [ ] **Phase 3: ACP Movie Checking (`acp/includes/movie_checking.php`) & Player Subtitle Integration**
     - [ ] **Phase 4: Separate Video Frame / Sprite-Grid Vision AI Analysis**
+
 

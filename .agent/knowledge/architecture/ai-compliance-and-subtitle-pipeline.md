@@ -150,15 +150,31 @@ Die lokale KI wird über ein striktes System-Prompt-Regelwerk angewiesen, sowohl
 
 ---
 
-## 6. 📍 Implementierte Dateien & Routing (Phase 1: ACP-Testcockpit & BRAM-Regelwerk)
+## 6. 📍 Implementierte Dateien, Workflows & Server-Integration (Stand: Phase 1 & Phase 2 aktiv)
 
-1. **BRAM-Regelwerk & KI-System-Prompt (`includes/ai_rules/`)**:
-   * [`includes/ai_rules/bram_system_prompt.md`](file:///c:/xampp/htdocs/EroCloud/includes/ai_rules/bram_system_prompt.md): Vollständiger Markdown-System-Prompt für die lokale Prüf-KI (`llama.cpp` / `Ollama`), strukturiert nach Visa GBPP, Mastercard BRAM (AN 5196), §§ 184 ff. StGB und Plattform-Regeln inkl. striktem JSON-Ausgabe-Schema.
-   * [`includes/ai_rules/bram_keyword_rules.json`](file:///c:/xampp/htdocs/EroCloud/includes/ai_rules/bram_keyword_rules.json): Strukturierter Regel- und Keyword-Katalog (DE/EN) mit 10 Prüfkategorien (`violation` / Hard-Block vs. `warning` / Prüfhinweis) und Basis-Risikoscores für das millisekundenschnelle Vorab-Scanning aller Textquellen inkl. exakter Zeitstempel-Zuordnung.
-2. **ACP-Routing & Navigation**:
-   * [`acp/.htaccess`](file:///c:/xampp/htdocs/EroCloud/acp/.htaccess): Route `RewriteRule ^KI-Analyse$ index.php?mod=ai_compliance&%{QUERY_STRING}` (erreichbar unter `/KI-Analyse`).
-   * [`acp/index.php`](file:///c:/xampp/htdocs/EroCloud/acp/index.php): Menüpunkt **„KI-Analyse & BRAM“** unter **Content Prüfen** (`submenu_checking`).
-3. **ACP-Testlabor Frontend & AJAX-Backend**:
-   * [`acp/includes/ai_compliance.php`](file:///c:/xampp/htdocs/EroCloud/acp/includes/ai_compliance.php): 3-Tab-Cockpit in höflicher Sie-Form (*1. Einzel-Video-Testlabor*, *2. Visa/Mastercard BRAM-Regelwerk & KI-Prompt*, *3. Analyse-Historie*).
-   * [`acp/includes/ajax/ai_compliance_action.php`](file:///c:/xampp/htdocs/EroCloud/acp/includes/ajax/ai_compliance_action.php): Erstellt automatisch die Datenbanktabelle `movies_ai_analysis`, prüft die Server-Umgebung (`FFmpeg`, `whisper.cpp`, `llama.cpp`), führt Schritt 1 (Audio/Whisper/VTT) und Schritt 2 (BRAM-Text- & Transkript-Prüfung) für ein einzelnes Video aus und ermöglicht das direkte Bearbeiten und Speichern des BRAM-Regelwerks im ACP.
+> **Server-Installations-Details:** Alle Linux-/Debian-10-spezifischen Kompilierungsschritte (`whisper.cpp`, CMake/GCC-Patches, Modell-Pfade unter `/var/www/web1/priv/ai/`) sind im Detail in `@ai-server-installation-guide.md` dokumentiert.
+
+1. **Zentrale Kern-Bibliothek (`includes/ai_compliance_core.inc.php`)**:
+   * [`includes/ai_compliance_core.inc.php`](file:///c:/xampp/htdocs/EroCloud/includes/ai_compliance_core.inc.php): Gemeinsame Funktionsbibliothek für das ACP-Cockpit und den Hintergrund-Cronjob:
+     * `aic_ensure_table()`: Erstellt und verwaltet automatisch die Datenbanktabelle `movies_ai_analysis`.
+     * `aic_check_environment()`: Prüft den Live-Status von `FFmpeg`, `whisper.cpp` (`ggml-small-q5_1.bin` & `ggml-large-v3-turbo-q5_0.bin`) sowie `llama.cpp` / `Ollama` (inkl. `open_basedir`-Fallback `aic_file_or_exec_exists()`).
+     * `aic_process_single_movie_pipeline()`: Extrahiert temporär die 16kHz-Mono-WAV aus der bestehenden `.mp4`, führt `whisper-cli` mit `nice -n 15 -bs 1 -bo 1` aus, schreibt die `.vtt`-Untertiteldatei (`sub_{id}_{file_id}.vtt`) in den Filmordner, löscht die temporäre `.wav`-Datei sofort wieder, speichert das gesprochene Transkript mit Zeitstempeln in `movies_ai_analysis` und führt direkt im Anschluss die BRAM-Textprüfung aus.
+     * `aic_analyze_texts()`: Kombiniert Filmtitel, Beschreibung, SEO-Metadaten und das gesprochene Video-Transkript (nach HTML-/Entity-Bereinigung durch `aic_clean_html_text()`) und prüft sie gegen das BRAM-Regelwerk sowie optional gegen das lokale Sprachmodell (`llama.cpp`).
+2. **BRAM-Regelwerk, Prompt & Batch-Konfiguration (`includes/ai_rules/`)**:
+   * [`includes/ai_rules/bram_system_prompt.md`](file:///c:/xampp/htdocs/EroCloud/includes/ai_rules/bram_system_prompt.md): Vollständiger Markdown-System-Prompt für die lokale Prüf-KI (`llama.cpp`), unterteilt in **Kategorie 1: ROT (`violation` / Universeller Hard-Block)** und **Kategorie 2: GELB (`warning` / Nur auf Portalen ohne Kreditkartenabrechnung zulässig: KV, Scheiße, NS, Natursekt, Poppers, Hypnose + Grauzonen/Abwerbung)**.
+   * [`includes/ai_rules/bram_keyword_rules.json`](file:///c:/xampp/htdocs/EroCloud/includes/ai_rules/bram_keyword_rules.json): Strukturierter DE/EN Keyword- & Wortstamm-Katalog inkl. `fetish_no_creditcard` (`warning`, Basis-Score 70).
+   * [`includes/ai_rules/batch_config.json`](file:///c:/xampp/htdocs/EroCloud/includes/ai_rules/batch_config.json): Persistente Konfiguration für den Hintergrund-Cronjob (`cron_enabled`, `whisper_model_pref`, `whisper_threads`, `audio_limit_sec`, `order_direction`, `pause_on_ffmpeg_convert`, `max_movies_per_run`, `sync_empty_movie_lang`).
+   * `includes/ai_rules/batch_status.json`: Laufzeit-Heartbeat des Workers (aktuell verarbeitete `movie_id`, letzte Meldung, Zeitstempel, Gesamtzähler).
+3. **Hintergrund-Cronjob (`cronjobs/ai_compliance_worker.php`)**:
+   * [`cronjobs/ai_compliance_worker.php`](file:///c:/xampp/htdocs/EroCloud/cronjobs/ai_compliance_worker.php) (dokumentiert in [`cronjobs/jobs.txt`](file:///c:/xampp/htdocs/EroCloud/cronjobs/jobs.txt)):
+     * Wird über LiveConfig / Crontab alle 2 Minuten aufgerufen (`*/2 * * * * /usr/bin/php /var/www/web1/htdocs/cronjobs/ai_compliance_worker.php >/dev/null 2>&1`).
+     * Verhindert Überlappungen durch `flock()` auf `/var/www/web1/priv/tmp/erocloud_ai_worker.lock` und pausiert automatisch, sobald `convert_movie.php` aktiv Videos konvertiert (`convert_status = 1`).
+4. **ACP-Routing, Navigation & 4-Tab-Cockpit (`/KI-Analyse`)**:
+   * [`acp/.htaccess`](file:///c:/xampp/htdocs/EroCloud/acp/.htaccess) & [`acp/index.php`](file:///c:/xampp/htdocs/EroCloud/acp/index.php): Route `/KI-Analyse` unter **Content Prüfen → KI-Analyse & BRAM**.
+   * [`acp/includes/ai_compliance.php`](file:///c:/xampp/htdocs/EroCloud/acp/includes/ai_compliance.php) & [`acp/includes/ajax/ai_compliance_action.php`](file:///c:/xampp/htdocs/EroCloud/acp/includes/ajax/ai_compliance_action.php):
+     * **Tab 1:** Einzel-Video-Testlabor (Auswahl eines Videos, Live-Whisper-Test mit wählbarem Audio-Umfang, editierbare Vorschau von Transkript & `.vtt`, detaillierter BRAM-Prüfbericht).
+     * **Tab 2:** Batch- & Cronjob-Steuerung (Fortschrittsbalken für alle >5.500 Videos, 15-Sekunden-Katalog-Schnellscan für alle Video-Titel/Beschreibungen in 250er-Paketen, Live-Browser-Batch mit 2-Sekunden-Status-Ticker und Server-Cronjob-Konfiguration).
+     * **Tab 3:** Live-Editor für `bram_system_prompt.md` und `bram_keyword_rules.json`.
+     * **Tab 4:** Analyse-Historie mit Schnellfiltern nach BRAM-Ampel (`Rot`, `Gelb / Ohne KK`, `Grün`), Untertitel-Status (`.vtt vorhanden`, `Stummfilm`, `Offen`, `Fehler`) und Volltext-/ID-Suche.
+
 
