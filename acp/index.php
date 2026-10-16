@@ -204,6 +204,7 @@ $site = '<!DOCTYPE html>
                     $navSites = '';
                     $navContentCleanup = '';
                     $navStorageAnalytics = '';
+                    $navAiCompliance = '';
                     $navMoviesDrafts = '';
                     $navWMPartner = '';
                     $navBanners = '';
@@ -277,6 +278,9 @@ $site = '<!DOCTYPE html>
                     } elseif (isset($_GET['mod']) AND $_GET['mod']=='storage_analytics') {
                         $navStorageAnalytics = 'class="active"';
                         $main = 'storage_analytics.php';
+                    } elseif (isset($_GET['mod']) AND $_GET['mod']=='ai_compliance') {
+                        $navAiCompliance = 'class="active"';
+                        $main = 'ai_compliance.php';
                         
                     } elseif (isset($_GET['mod']) AND $_GET['mod']=='photo_albums_checking') {
                         $navFotoalben = 'class="active"';
@@ -348,6 +352,11 @@ $site = '<!DOCTYPE html>
                             <a '.$navMoviesBlocked.' href="'.ACP_URL.'/gesperrte-Filme">
                                 <i class="material-symbols-outlined md-30">add_box</i>
                                 <span>Filme abgelehnt ('.$count_movies_blocked.')</span>
+                            </a>
+
+                            <a '.$navAiCompliance.' href="'.ACP_URL.'/KI-Analyse">
+                                <i class="material-symbols-outlined md-30">psychology</i>
+                                <span>KI-Analyse &amp; BRAM</span>
                             </a>
                         </div>
                         ';
@@ -533,7 +542,7 @@ $site = '<!DOCTYPE html>
         }
                 
                 
-        if (isset($_GET['mod']) AND ($_GET['mod'] == 'movies_blocked' OR $_GET['mod'] == 'movies_checking' OR $_GET['mod'] == 'movie_checking' OR $_GET['mod'] == 'photo_albums_checking' OR $_GET['mod'] == 'photo_album_checking')) {
+        if (isset($_GET['mod']) AND ($_GET['mod'] == 'movies_blocked' OR $_GET['mod'] == 'movies_checking' OR $_GET['mod'] == 'movie_checking' OR $_GET['mod'] == 'photo_albums_checking' OR $_GET['mod'] == 'photo_album_checking' OR $_GET['mod'] == 'ai_compliance')) {
             $site .= '
             <script>
                 jQuery(document).ready(function() {

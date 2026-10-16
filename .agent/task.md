@@ -55,10 +55,12 @@
 - [ ] **Local AI Compliance & Subtitle Pipeline (Whisper.cpp + Llama.cpp)**
     - [x] Analyze server hardware (Dell PowerEdge R720, 2x Xeon E5-2690 v2, 64 GB RAM, Debian 10) and define resource-safe CPU inference architecture
     - [x] Document 4-phase concept & database architecture in `.agent/knowledge/architecture/ai-compliance-and-subtitle-pipeline.md`
-    - [ ] **Phase 1: ACP Single-Video Test Lab (`/KI-Analyse`) & Database Setup**
-        - [ ] Create database table `movies_ai_analysis` for tracking subtitle, transcript, text-compliance, and vision states across all 5,500+ movies
-        - [ ] Build ACP Test Cockpit (`acp/includes/ai_compliance_lab.php`) to select a single Creator video and test audio extraction, Whisper subtitle/language detection, and local LLM BRAM text checking step by step
-    - [ ] **Phase 2: Controlled Batch Processing & Background Cronjob (`cronjobs/ai_process_movies.php`)**
+    - [x] **Phase 1: ACP Single-Video Test Lab (`/KI-Analyse`), BRAM Rulebook & Database Setup**
+        - [x] Research Visa GBPP & Mastercard BRAM (AN 5196) + StGB compliance rules and build 2-stage AI rulebook (`includes/ai_rules/bram_system_prompt.md` & `includes/ai_rules/bram_keyword_rules.json`)
+        - [x] Auto-create database table `movies_ai_analysis` for tracking subtitle, transcript, text-compliance, and vision states across all 5,500+ movies
+        - [x] Build ACP Test Cockpit (`acp/includes/ai_compliance.php` & `acp/includes/ajax/ai_compliance_action.php` under `/KI-Analyse`) to select a single Creator video and test audio extraction, Whisper subtitle/language detection, and BRAM text checking step by step
+    - [ ] **Phase 2: Debian 10 Server Setup (`whisper.cpp` + `llama.cpp`) & Background Cronjob (`cronjobs/ai_process_movies.php`)**
+        - [ ] Compile `whisper.cpp` and `llama.cpp` natively (`-DGGML_NATIVE=ON`) for Xeon E5-2690 v2 on Debian 10
         - [ ] Implement priority queue (newly converted movies first, then 5,500+ existing catalog movies) with CPU thread/nice throttling
     - [ ] **Phase 3: ACP Movie Checking (`acp/includes/movie_checking.php`) & Player Subtitle Integration**
     - [ ] **Phase 4: Separate Video Frame / Sprite-Grid Vision AI Analysis**

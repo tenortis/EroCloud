@@ -145,3 +145,18 @@ Die lokale KI wird über ein striktes System-Prompt-Regelwerk angewiesen, sowohl
 4. **Inzest / Blutsverwandtschaft:** Direkte familiäre Bezeichnungen (*Vater, Mutter, Bruder, Schwester, Tochter, Sohn* – auch mit „Stief-“ als Warnstufe `warning` zur manuellen Admin-Sichtung).
 5. **Extreme Praktiken (Hard-BRAM-Filter):** Blut, Wunden, Waffen, Fäkalien/Urin (Scat/Watersports je nach Zahlungsanbieter-Richtlinie), Ersticken/Strangulation, Tier-Bezug (Zoophilie).
 6. **Unerlaubte Eigenwerbung / Abwerbung:** Gesprochene oder geschriebene Hinweise auf externe Bezahlmethoden, PayPal, Telegram, OnlyFans oder private Treffen/Escort.
+
+---
+
+## 6. 📍 Implementierte Dateien & Routing (Phase 1: ACP-Testcockpit & BRAM-Regelwerk)
+
+1. **BRAM-Regelwerk & KI-System-Prompt (`includes/ai_rules/`)**:
+   * [`includes/ai_rules/bram_system_prompt.md`](file:///c:/xampp/htdocs/EroCloud/includes/ai_rules/bram_system_prompt.md): Vollständiger Markdown-System-Prompt für die lokale Prüf-KI (`llama.cpp` / `Ollama`), strukturiert nach Visa GBPP, Mastercard BRAM (AN 5196), §§ 184 ff. StGB und Plattform-Regeln inkl. striktem JSON-Ausgabe-Schema.
+   * [`includes/ai_rules/bram_keyword_rules.json`](file:///c:/xampp/htdocs/EroCloud/includes/ai_rules/bram_keyword_rules.json): Strukturierter Regel- und Keyword-Katalog (DE/EN) mit 10 Prüfkategorien (`violation` / Hard-Block vs. `warning` / Prüfhinweis) und Basis-Risikoscores für das millisekundenschnelle Vorab-Scanning aller Textquellen inkl. exakter Zeitstempel-Zuordnung.
+2. **ACP-Routing & Navigation**:
+   * [`acp/.htaccess`](file:///c:/xampp/htdocs/EroCloud/acp/.htaccess): Route `RewriteRule ^KI-Analyse$ index.php?mod=ai_compliance&%{QUERY_STRING}` (erreichbar unter `/KI-Analyse`).
+   * [`acp/index.php`](file:///c:/xampp/htdocs/EroCloud/acp/index.php): Menüpunkt **„KI-Analyse & BRAM“** unter **Content Prüfen** (`submenu_checking`).
+3. **ACP-Testlabor Frontend & AJAX-Backend**:
+   * [`acp/includes/ai_compliance.php`](file:///c:/xampp/htdocs/EroCloud/acp/includes/ai_compliance.php): 3-Tab-Cockpit in höflicher Sie-Form (*1. Einzel-Video-Testlabor*, *2. Visa/Mastercard BRAM-Regelwerk & KI-Prompt*, *3. Analyse-Historie*).
+   * [`acp/includes/ajax/ai_compliance_action.php`](file:///c:/xampp/htdocs/EroCloud/acp/includes/ajax/ai_compliance_action.php): Erstellt automatisch die Datenbanktabelle `movies_ai_analysis`, prüft die Server-Umgebung (`FFmpeg`, `whisper.cpp`, `llama.cpp`), führt Schritt 1 (Audio/Whisper/VTT) und Schritt 2 (BRAM-Text- & Transkript-Prüfung) für ein einzelnes Video aus und ermöglicht das direkte Bearbeiten und Speichern des BRAM-Regelwerks im ACP.
+
