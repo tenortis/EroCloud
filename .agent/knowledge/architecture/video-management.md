@@ -106,9 +106,9 @@ Ein Hintergrund-Cronjob kümmert sich um die automatische Aufbereitung der hochg
 ### 🔍 Technische Befunde & Optimierungspotenzial bei Konvertierung & Auslieferung
 Bei der Analyse des Zusammenspiels zwischen `cronjobs/convert_movie.php`, `api/get_movie_url.php` und `api/movie_player.php` wurden folgende wichtige Punkte festgestellt:
 
-1. **Veraltete Formate `m_*.mp4`, `m_*.webm` und `m_*.ogv` sind ungenutzter Ballast (Konvertierung deaktiviert)**:
-   * Obwohl `api/get_movie_url.php` die URLs `movie_url_mobil_mp4`, `movie_url_mobil_webm` und `movie_url_mobil_ogg` im JSON ausgibt, wertet `api/movie_player.php` den Parameter `$_GET['mobile']` **überhaupt nicht aus**.
+1. **Veraltete Formate `m_*.mp4`, `m_*.webm` und `m_*.ogv` sind ungenutzter Ballast (Konvertierung & API-Ausgabe bereinigt)**:
    * `api/movie_player.php` streamt über die Klasse `VideoStream` (`includes/klassen/VideoStream.inc.php`) **immer ausschließlich die Desktop-MP4** (`$movie_ary->filename`).
+   * Die veralteten JSON-Felder `movie_url_mobil_mp4`, `movie_url_mobil_webm` und `movie_url_mobil_ogg` wurden aus `api/get_movie_url.php` entfernt (und `mobi/modules/videothek/video.php` im EroCMS auf `movie_url` umgestellt).
    * Da moderne Desktop- und Mobilbrowser (iOS, Android, Chrome, Safari, Firefox, Edge) zu 100 % nativ H.264/MP4 unterstützen, wurden die Konvertierungsschritte für `m_*.mp4`, `m_*.webm` und `m_*.ogv` in `cronjobs/convert_movie.php` entfernt. Die bestehenden Altdateien belegen bei ~5.550 Filmen rund **1,24 TB Speicherplatz** (davon 819,16 GB für `.webm`/`.ogv` und ~420 GB für `m_*.mp4`) und können physisch bereinigt werden.
 2. **Encoding-Optimierung für zukünftige Desktop-MP4s**:
    * Statt einer festen Bitrate von `-b:v 8000k -preset veryslow` und separatem `qt-faststart`-Kopierlauf empfiehlt sich zukünftig ein qualitätsbasiertes CRF-Encoding (`-crf 22 -maxrate 5000k -bufsize 10000k -preset slow -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart`). Dies spart ~35–40 % Dateigröße und Streaming-Traffic bei gleichbleibender visueller Qualität.

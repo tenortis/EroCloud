@@ -101,7 +101,7 @@ Die physischen Videodateien verbleiben permanent in der EroCloud-Infrastruktur u
       <movie_url>https://api.erocloud.net/Downloader/{user_streaming_key}/{movie_id}/{access_token}</movie_url>
       <!-- Für Streaming -->
       <movie_url>https://api.erocloud.net/Player/{user_streaming_key}/{movie_id}/{access_token}</movie_url>
-      <movie_url_mobil_mp4>https://api.erocloud.net/Player/{user_streaming_key}/{movie_id}/{access_token}&amp;mobile=mp4</movie_url_mobil_mp4>
+      <poster_url_fsk16>https://api.erocloud.net/PlayerPoster/FSK16/{movie_id}</poster_url_fsk16>
       <poster_url_fsk18>https://api.erocloud.net/PlayerPoster/FSK18/{movie_id}</poster_url_fsk18>
       <width>1920</width>
       <height>1080</height>
