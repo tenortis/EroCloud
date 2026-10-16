@@ -5,7 +5,8 @@
  * @copyright	(C) 2016 adult net applications UG
  * @email 		erocms@gmail.com
  *
- * Sichere Einzel-Video-Vorschau & Bereinigung für veraltete Mobil-Formate (m_*.mp4, m_*.webm, m_*.ogv)
+ * Sichere Einzel-Video-Vorschau, Einzel-Bereinigung & Kontrollierte Stapel-Bereinigung
+ * für veraltete Mobil-Formate (m_*.mp4, m_*.webm, m_*.ogv)
  */
 
 define('SAFE_INC', 1);
@@ -24,6 +25,8 @@ if (is_logged_in('acp') === false) {
     echo json_encode(array('error' => 'Nicht autorisiert. Bitte melden Sie sich im Adminbereich an.'));
     exit;
 }
+
+@set_time_limit(120);
 
 if (!function_exists('sa_safe_utf8')) {
     function sa_safe_utf8($str) {
@@ -208,6 +211,80 @@ function sa_inspect_movie_folder($m) {
     );
 }
 
+/**
+ * Hilfsfunktion: Löscht die verifizierten m_*-Dateien eines einzelnen Films
+ * und prüft unmittelbar danach, ob die Desktop-MP4 weiterhin exakt unverändert existiert.
+ */
+function sa_execute_safe_movie_cleanup($m, $before_info) {
+    $desktop_size_before = $before_info['desktop_size_bytes'];
+    $desktop_realpath    = @realpath($before_info['desktop_full_path']);
+
+    $deleted_log = array();
+    $failed_log  = array();
+    $freed_bytes = 0.0;
+
+    foreach ($before_info['deletable_files'] as $del_item) {
+        $target_path = $del_item['full_path'];
+        $target_name = $del_item['filename'];
+        $target_real = @realpath($target_path);
+
+        // Letzte unmittelbare Sicherheitsbarriere direkt vor unlink():
+        // 1. Basename muss mit "m_" beginnen
+        // 2. Darf nicht dem Desktop-Dateinamen entsprechen
+        // 3. Realpath darf nicht dem Desktop-Realpath entsprechen
+        if (
+            strpos(strtolower(basename($target_path)), 'm_') === 0 &&
+            strtolower(basename($target_path)) !== strtolower($before_info['desktop_filename']) &&
+            $target_real !== false &&
+            $desktop_realpath !== false &&
+            $target_real !== $desktop_realpath &&
+            is_file($target_path)
+        ) {
+            if (@unlink($target_path)) {
+                clearstatcache(true, $target_path);
+                $still_exists = file_exists($target_path);
+                $deleted_log[] = array(
+                    'filename'       => $target_name,
+                    'full_path'      => $target_path,
+                    'size_formatted' => $del_item['size_formatted'],
+                    'size_bytes'     => $del_item['size_bytes'],
+                    'verified_gone'  => !$still_exists
+                );
+                $freed_bytes += $del_item['size_bytes'];
+            } else {
+                $failed_log[] = array(
+                    'filename'  => $target_name,
+                    'full_path' => $target_path,
+                    'reason'    => 'unlink() fehlgeschlagen (Dateiberechtigungen prüfen)'
+                );
+            }
+        } else {
+            $failed_log[] = array(
+                'filename'  => $target_name,
+                'full_path' => $target_path,
+                'reason'    => 'Durch Sicherheitsbarriere blockiert'
+            );
+        }
+    }
+
+    clearstatcache();
+    $after_info = sa_inspect_movie_folder($m);
+
+    $desktop_verified_intact = (
+        $after_info['desktop_exists'] === true &&
+        $after_info['desktop_size_bytes'] === $desktop_size_before &&
+        $after_info['desktop_size_bytes'] > 0
+    );
+
+    return array(
+        'deleted_log'             => $deleted_log,
+        'failed_log'              => $failed_log,
+        'freed_bytes'             => $freed_bytes,
+        'after_info'              => $after_info,
+        'desktop_verified_intact' => $desktop_verified_intact
+    );
+}
+
 $action = isset($_REQUEST['action']) ? trim($_REQUEST['action']) : 'preview';
 
 // =============================================================================
@@ -382,60 +459,8 @@ if ($action === 'delete_single') {
         exit;
     }
 
-    $desktop_size_before = $before_info['desktop_size_bytes'];
-    $desktop_realpath    = @realpath($before_info['desktop_full_path']);
-
-    $deleted_log = array();
-    $failed_log  = array();
-    $freed_bytes = 0.0;
-
-    foreach ($before_info['deletable_files'] as $del_item) {
-        $target_path = $del_item['full_path'];
-        $target_name = $del_item['filename'];
-        $target_real = @realpath($target_path);
-
-        // Letzte unmittelbare Sicherheitsbarriere direkt vor unlink():
-        // 1. Basename muss mit "m_" beginnen
-        // 2. Darf nicht dem Desktop-Dateinamen entsprechen
-        // 3. Realpath darf nicht dem Desktop-Realpath entsprechen
-        if (
-            strpos(strtolower(basename($target_path)), 'm_') === 0 &&
-            strtolower(basename($target_path)) !== strtolower($before_info['desktop_filename']) &&
-            $target_real !== false &&
-            $desktop_realpath !== false &&
-            $target_real !== $desktop_realpath &&
-            is_file($target_path)
-        ) {
-            if (@unlink($target_path)) {
-                clearstatcache(true, $target_path);
-                $still_exists = file_exists($target_path);
-                $deleted_log[] = array(
-                    'filename'       => $target_name,
-                    'full_path'      => $target_path,
-                    'size_formatted' => $del_item['size_formatted'],
-                    'size_bytes'     => $del_item['size_bytes'],
-                    'verified_gone'  => !$still_exists
-                );
-                $freed_bytes += $del_item['size_bytes'];
-            } else {
-                $failed_log[] = array(
-                    'filename'  => $target_name,
-                    'full_path' => $target_path,
-                    'reason'    => 'unlink() fehlgeschlagen (Dateiberechtigungen prüfen)'
-                );
-            }
-        } else {
-            $failed_log[] = array(
-                'filename'  => $target_name,
-                'full_path' => $target_path,
-                'reason'    => 'Durch Sicherheitsbarriere blockiert'
-            );
-        }
-    }
-
-    // Stat-Cache leeren und Nachher-Zustand des Ordners prüfen
-    clearstatcache();
-    $after_info = sa_inspect_movie_folder($m);
+    $exec_res = sa_execute_safe_movie_cleanup($m, $before_info);
+    $after_info = $exec_res['after_info'];
 
     // 24h-Speicher-Analyse-Cache invalidieren, damit bei Neuberechnung aktuelle Werte geladen werden
     $cache_file = sys_get_temp_dir() . '/erocloud_storage_analytics_cache.json';
@@ -443,26 +468,211 @@ if ($action === 'delete_single') {
         @unlink($cache_file);
     }
 
-    $desktop_verified_intact = (
-        $after_info['desktop_exists'] === true &&
-        $after_info['desktop_size_bytes'] === $desktop_size_before &&
-        $after_info['desktop_size_bytes'] > 0
-    );
-
     echo json_encode(array(
         'success'                 => true,
         'movie_id'                => $movie_id,
         'online_id'               => $after_info['online_id'],
-        'deleted_count'           => count($deleted_log),
-        'deleted_files'           => $deleted_log,
-        'failed_files'            => $failed_log,
-        'freed_bytes'             => $freed_bytes,
-        'freed_formatted'         => sa_format_bytes($freed_bytes),
-        'desktop_verified_intact' => $desktop_verified_intact,
+        'deleted_count'           => count($exec_res['deleted_log']),
+        'deleted_files'           => $exec_res['deleted_log'],
+        'failed_files'            => $exec_res['failed_log'],
+        'freed_bytes'             => $exec_res['freed_bytes'],
+        'freed_formatted'         => sa_format_bytes($exec_res['freed_bytes']),
+        'desktop_verified_intact' => $exec_res['desktop_verified_intact'],
         'desktop_full_path'       => $after_info['desktop_full_path'],
         'desktop_size_formatted'  => $after_info['desktop_size_formatted'],
         'thumbnails_count_after'  => $after_info['thumbnails_count'],
         'movie_after'             => $after_info
+    ));
+    p4c_close(DB_HOST);
+    exit;
+}
+
+// =============================================================================
+// AKTION 3: KONTROLLIERTE STAPEL-BEREINIGUNG (BATCH-MODUS MIT 7-STUFEN-PRÜFUNG)
+// =============================================================================
+if ($action === 'delete_batch') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        echo json_encode(array('error' => 'Ungültige Anfrage-Methode. Stapel-Löschungen sind nur per POST erlaubt.'));
+        p4c_close(DB_HOST);
+        exit;
+    }
+
+    $batch_limit     = isset($_POST['batch_limit']) ? abs((int)$_POST['batch_limit']) : 10;
+    if ($batch_limit < 1) {
+        $batch_limit = 1;
+    } elseif ($batch_limit > 250) {
+        $batch_limit = 250;
+    }
+
+    $filter_merchant_id = isset($_POST['merchant_id']) ? abs((int)$_POST['merchant_id']) : 0;
+    $cursor_movie_id    = isset($_POST['cursor_movie_id']) ? abs((int)$_POST['cursor_movie_id']) : 0;
+
+    $where_parts = array("`m`.`convert_status` = '2'");
+    if ($filter_merchant_id > 0) {
+        $where_parts[] = "`m`.`merchant_id` = '" . $filter_merchant_id . "'";
+    }
+    if ($cursor_movie_id > 0) {
+        $where_parts[] = "`m`.`id` < '" . $cursor_movie_id . "'";
+    }
+
+    $where_sql = implode(' AND ', $where_parts);
+
+    // Gesamtanzahl der Kandidaten in der DB für Fortschrittsanzeige ermitteln
+    $where_total_parts = array("`m`.`convert_status` = '2'");
+    if ($filter_merchant_id > 0) {
+        $where_total_parts[] = "`m`.`merchant_id` = '" . $filter_merchant_id . "'";
+    }
+    $rs_total_cnt = p4c_query("SELECT COUNT(*) AS `cnt` FROM `movies` AS `m` WHERE " . implode(' AND ', $where_total_parts) . ";", __FILE__, __LINE__);
+    $total_db_candidates = (int)p4c_fetch_object($rs_total_cnt)->cnt;
+
+    // Wir prüfen pro Request maximal 500 Ordner am Stück, damit der Request immer schnell antwortet
+    $max_scan_per_call = 500;
+
+    $rs_movies = p4c_query("
+        SELECT 
+            `m`.`id`,
+            `mo`.`id` AS `online_id`,
+            `m`.`file_id`,
+            `m`.`merchant_id`,
+            `m`.`actor_id`,
+            `m`.`storage_location`,
+            `m`.`filename`,
+            IFNULL(`mo`.`title`, `m`.`title`) AS `title`,
+            `m`.`status`,
+            `m`.`resolution`,
+            `m`.`playtime_string`,
+            `a`.`username` AS `actor_username`
+        FROM `movies` AS `m`
+        LEFT JOIN `movies_online` AS `mo` ON `m`.`file_id` = `mo`.`file_id`
+        LEFT JOIN `actors` AS `a` ON `m`.`actor_id` = `a`.`id`
+        WHERE " . $where_sql . "
+        ORDER BY `m`.`id` DESC
+        LIMIT " . $max_scan_per_call . ";
+    ", __FILE__, __LINE__);
+
+    $rows_fetched = p4c_num_rows($rs_movies);
+
+    $cleaned_movies      = array();
+    $skipped_movies      = array();
+    $scanned_in_call     = 0;
+    $deleted_files_total = 0;
+    $freed_bytes_total   = 0.0;
+    $last_seen_movie_id  = $cursor_movie_id;
+    $emergency_stop      = false;
+    $emergency_message   = '';
+
+    while ($m = p4c_fetch_object($rs_movies)) {
+        $scanned_in_call++;
+        $last_seen_movie_id = (int)$m->id;
+
+        $before_info = sa_inspect_movie_folder($m);
+
+        // Falls der physische Ordner auf dem Server gar nicht existiert -> weiter
+        if (!$before_info['folder_exists']) {
+            continue;
+        }
+
+        // Falls der Ordner bereits bereinigt ist (keine m_*-Dateien mehr vorhanden) -> weiter
+        if ($before_info['deletable_count'] === 0) {
+            continue;
+        }
+
+        // Falls m_*-Dateien existieren, aber die Desktop-MP4 fehlt oder 0 Bytes hat -> SICHERHEITS-SKIP!
+        if (!$before_info['desktop_exists'] || $before_info['desktop_size_bytes'] <= 0) {
+            $skipped_movies[] = array(
+                'movie_id'    => (int)$m->id,
+                'online_id'   => $before_info['online_id'],
+                'merchant_id' => (int)$m->merchant_id,
+                'title'       => $before_info['title'],
+                'folder_path' => $before_info['folder_path'],
+                'reason'      => 'Desktop-MP4 fehlt oder hat 0 Bytes – Ordner zu 100 % unberührt übersprungen!'
+            );
+            continue;
+        }
+
+        // Sichere Löschung der m_*-Dateien für dieses Video durchführen
+        $exec_res = sa_execute_safe_movie_cleanup($m, $before_info);
+
+        $file_names_deleted = array();
+        foreach ($exec_res['deleted_log'] as $dl) {
+            $file_names_deleted[] = $dl['filename'];
+        }
+
+        $deleted_cnt = count($exec_res['deleted_log']);
+        $deleted_files_total += $deleted_cnt;
+        $freed_bytes_total   += $exec_res['freed_bytes'];
+
+        $cleaned_movies[] = array(
+            'movie_id'                => (int)$m->id,
+            'online_id'               => $before_info['online_id'],
+            'merchant_id'             => (int)$m->merchant_id,
+            'title'                   => $before_info['title'],
+            'folder_path'             => $before_info['folder_path'],
+            'deleted_count'           => $deleted_cnt,
+            'deleted_filenames'       => implode(', ', $file_names_deleted),
+            'freed_bytes'             => $exec_res['freed_bytes'],
+            'freed_formatted'         => sa_format_bytes($exec_res['freed_bytes']),
+            'desktop_filename'        => $before_info['desktop_filename'],
+            'desktop_size_formatted'  => $exec_res['after_info']['desktop_size_formatted'],
+            'desktop_verified_intact' => $exec_res['desktop_verified_intact']
+        );
+
+        // NOT-AUS: Falls jemals nach dem Löschen die Desktop-MP4 nicht mehr 1:1 verifiziert werden kann, sofort abbrechen!
+        if (!$exec_res['desktop_verified_intact']) {
+            $emergency_stop = true;
+            $emergency_message = 'SICHERHEITS-STOPP bei Video #' . (int)$m->id . ': Nachprüfung der Desktop-MP4 fehlgeschlagen. Stapellauf wurde sofort angehalten!';
+            break;
+        }
+
+        // Sobald die gewünschte Anzahl Videos ($batch_limit) bereinigt wurde, Schleife beenden
+        if (count($cleaned_movies) >= $batch_limit) {
+            break;
+        }
+    }
+
+    // Prüfen, ob es noch weitere Filme mit kleinerer ID in der Datenbank gibt
+    $has_more_in_db = false;
+    if (!$emergency_stop && $last_seen_movie_id > 0) {
+        $where_rem_parts = array("`m`.`convert_status` = '2'", "`m`.`id` < '" . $last_seen_movie_id . "'");
+        if ($filter_merchant_id > 0) {
+            $where_rem_parts[] = "`m`.`merchant_id` = '" . $filter_merchant_id . "'";
+        }
+        $rs_rem = p4c_query("SELECT COUNT(*) AS `cnt` FROM `movies` AS `m` WHERE " . implode(' AND ', $where_rem_parts) . ";", __FILE__, __LINE__);
+        $remaining_db_rows = (int)p4c_fetch_object($rs_rem)->cnt;
+        $has_more_in_db = ($remaining_db_rows > 0);
+    } else {
+        $remaining_db_rows = 0;
+    }
+
+    // Wenn Dateien gelöscht wurden, 24h-Caches invalidieren
+    if ($deleted_files_total > 0) {
+        $cache_file_sa = sys_get_temp_dir() . '/erocloud_storage_analytics_cache.json';
+        if (file_exists($cache_file_sa)) {
+            @unlink($cache_file_sa);
+        }
+        $cache_file_mo = sys_get_temp_dir() . '/erocloud_online_movies_size_cache.txt';
+        if (file_exists($cache_file_mo)) {
+            @unlink($cache_file_mo);
+        }
+    }
+
+    echo json_encode(array(
+        'success'               => !$emergency_stop,
+        'emergency_stop'        => $emergency_stop,
+        'emergency_message'     => $emergency_message,
+        'batch_limit'           => $batch_limit,
+        'scanned_in_call'       => $scanned_in_call,
+        'cleaned_movies_count'  => count($cleaned_movies),
+        'cleaned_movies'        => $cleaned_movies,
+        'skipped_movies_count'  => count($skipped_movies),
+        'skipped_movies'        => $skipped_movies,
+        'deleted_files_count'   => $deleted_files_total,
+        'freed_bytes'           => $freed_bytes_total,
+        'freed_formatted'       => sa_format_bytes($freed_bytes_total),
+        'next_cursor_movie_id'  => $last_seen_movie_id,
+        'has_more'              => $has_more_in_db,
+        'total_db_candidates'   => $total_db_candidates,
+        'remaining_db_rows'     => $remaining_db_rows
     ));
     p4c_close(DB_HOST);
     exit;

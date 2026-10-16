@@ -205,12 +205,12 @@ $site .= '
             <tbody></tbody>
         </table>
 
-        <!-- 1.2b SICHERE EINZEL-VIDEO-TESTBEREINIGUNG -->
-        <h3 style="font-size: 16px; margin: 28px 0 10px 0; color: #333;">1.2b Sichere Einzel-Video-Testbereinigung (<code>m_*.mp4</code>, <code>m_*.webm</code>, <code>m_*.ogv</code>)</h3>
+        <!-- 1.2b SICHERE BEREINIGUNG VERALTETER MOBIL-DATEIEN (EINZEL- & STAPEL-MODUS) -->
+        <h3 style="font-size: 16px; margin: 28px 0 10px 0; color: #333;">1.2b Sichere Bereinigung veralteter Mobil-Dateien (<code>m_*.mp4</code>, <code>m_*.webm</code>, <code>m_*.ogv</code>)</h3>
         <div class="ui-widget-content" style="padding: 16px; margin-bottom: 22px; border-radius: 4px; border: 2px solid #1c94c4; background: #fbfdff; font-size: 13px; line-height: 1.5;">
             <div style="margin-bottom: 12px;">
-                <strong style="font-size: 14px; color: #0c5460;">&#x1f6e1; 7-Stufen-Sicherheitsmodus (Einzel-Video-Test):</strong><br />
-                Hier k&ouml;nnen Sie die Bereinigung der nicht mehr ben&ouml;tigten Mobil-Dateien (<code>m_*.mp4</code>, <code>m_*.webm</code>, <code>m_*.ogv</code>) zun&auml;chst gezielt an <strong>einem einzigen Video</strong> testen und die exakten Server-Pfade vor und nach dem L&ouml;schen kontrollieren. <strong>Es wird nichts automatisch gel&ouml;scht.</strong> Eine Datei wird nur dann zur L&ouml;schung freigegeben, wenn die Desktop-Hauptdatei (<code>{id}_{file_id}.mp4</code>) physisch existiert, gr&ouml;&szlig;er als 0 Bytes ist und die zu l&ouml;schende Datei eindeutig mit dem Pr&auml;fix <code>m_</code> beginnt.
+                <strong style="font-size: 14px; color: #0c5460;">&#x1f6e1; 7-Stufen-Sicherheitsmodus (Einzel-Video-Pr&uuml;fung &amp; Kontrollierte Stapel-Bereinigung):</strong><br />
+                Hier k&ouml;nnen Sie die nicht mehr ben&ouml;tigten Mobil-Dateien (<code>m_*.mp4</code>, <code>m_*.webm</code>, <code>m_*.ogv</code>) wahlweise f&uuml;r <strong>ein einzelnes Video</strong> oder kontrolliert im <strong>Stapel-Modus (10 / 50 / 100 Videos oder Auto-Durchlauf)</strong> bereinigen. F&uuml;r jedes einzelne Video greift zwingend die 7-Stufen-Sicherheitspr&uuml;fung: Eine Datei wird nur dann gel&ouml;scht, wenn die Desktop-Hauptdatei (<code>{id}_{file_id}.mp4</code>) physisch existiert, gr&ouml;&szlig;er als 0 Bytes ist und die zu l&ouml;schende Datei eindeutig mit dem Pr&auml;fix <code>m_</code> beginnt. Unmittelbar nach jedem Video wird die Unversehrtheit der Desktop-MP4 live auf dem Server nachgepr&uuml;ft.
             </div>
 
             <!-- Such- & Filterleiste für das Einzel-Video -->
@@ -242,7 +242,7 @@ $site .= '
             <div id="sa-cleanup-result-box" style="display: none; padding: 15px; border-radius: 4px; border: 2px solid #28a745; background: #f3fff5; margin-bottom: 15px;"></div>
 
             <!-- Detail-Vorschau für das EINE ausgewählte Video -->
-            <div id="sa-cleanup-preview-card" style="display: none; border: 1px solid #ccc; border-radius: 4px; background: #fff; padding: 15px;">
+            <div id="sa-cleanup-preview-card" style="display: none; border: 1px solid #ccc; border-radius: 4px; background: #fff; padding: 15px; margin-bottom: 18px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid #e5e5e5; padding-bottom: 12px; margin-bottom: 14px;">
                     <div>
                         <div style="font-size: 15px; font-weight: bold; color: #222; margin-bottom: 4px;">
@@ -314,6 +314,96 @@ $site .= '
                         <button type="button" id="btn-sa-delete-single" style="background: #c00000; color: #fff; border: 1px solid #900000; border-radius: 4px; padding: 8px 16px; font-size: 13px; font-weight: bold; cursor: pointer;">
                             &#x1f5d1; Jetzt NUR f&uuml;r dieses 1 Video (#<span id="sa-btn-movie-id">-</span>) die <span id="sa-btn-del-count">0</span> markierten m_*-Dateien l&ouml;schen
                         </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KONTROLLIERTE STAPEL-BEREINIGUNG (BATCH-MODUS) -->
+            <div style="border-top: 2px dashed #b8d3e6; padding-top: 16px; margin-top: 6px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+                    <div>
+                        <strong style="font-size: 14px; color: #0c5460;">&#x2699; Kontrollierte Stapel-Bereinigung (Paketweise mit 7-Stufen-Pr&uuml;fung &amp; Not-Aus-Schutz):</strong><br />
+                        <span style="font-size: 12px; color: #555;">
+                            Bereinigt mehrere Film-Ordner nacheinander. Wenn Sie oben im Feld <strong>H&auml;ndler-/Creator-ID (MID)</strong> eine ID eingetragen haben, wird ausschlie&szlig;lich dieser Creator bereinigt; ist das Feld leer, werden alle Creator gepr&uuml;ft. Sollte bei irgendeinem Video eine Sicherheitspr&uuml;fung fehlschlagen, stoppt der Vorgang sofort automatisch.
+                        </span>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 12px; background: #fff8f0; border: 1px solid #f0d8b8; border-radius: 4px; margin-bottom: 14px;">
+                    <button type="button" class="btn-sa-batch-run" data-limit="10" data-auto="0" style="background: #e67e22; color: #fff; border: 1px solid #b95d0b; border-radius: 4px; padding: 7px 14px; font-size: 12px; font-weight: bold; cursor: pointer;">
+                        &#x1f5d1; 10 Videos bereinigen
+                    </button>
+                    <button type="button" class="btn-sa-batch-run" data-limit="50" data-auto="0" style="background: #d35400; color: #fff; border: 1px solid #a04000; border-radius: 4px; padding: 7px 14px; font-size: 12px; font-weight: bold; cursor: pointer;">
+                        &#x1f5d1; 50 Videos bereinigen
+                    </button>
+                    <button type="button" class="btn-sa-batch-run" data-limit="100" data-auto="0" style="background: #c00000; color: #fff; border: 1px solid #900000; border-radius: 4px; padding: 7px 14px; font-size: 12px; font-weight: bold; cursor: pointer;">
+                        &#x1f5d1; 100 Videos bereinigen
+                    </button>
+                    <button type="button" id="btn-sa-batch-auto" data-limit="50" data-auto="1" class="btn-sa-batch-run" style="background: #0f6826; color: #fff; border: 1px solid #094719; border-radius: 4px; padding: 7px 14px; font-size: 12px; font-weight: bold; cursor: pointer;">
+                        &#x25b6; Auto-Durchlauf starten (in 50er-Paketen)
+                    </button>
+                    <button type="button" id="btn-sa-batch-stop" style="display: none; background: #333; color: #fff; border: 1px solid #000; border-radius: 4px; padding: 7px 14px; font-size: 12px; font-weight: bold; cursor: pointer;">
+                        &#x23f8; Nach aktuellem Paket anhalten (Stopp)
+                    </button>
+                    <button type="button" id="btn-sa-batch-reset" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only" style="padding: 6px 12px; font-size: 12px; cursor: pointer; margin-left: auto;">
+                        <span class="ui-button-text">&#x21ba; Protokoll &amp; Cursor zur&uuml;cksetzen</span>
+                    </button>
+                </div>
+
+                <!-- Live-Fortschritt & Zähler der Stapel-Bereinigung -->
+                <div id="sa-batch-panel" style="display: none; background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 14px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+                        <div id="sa-batch-status-text" style="font-weight: bold; font-size: 13px; color: #1c94c4;">
+                            Bereit zur Stapel-Bereinigung...
+                        </div>
+                        <div style="font-size: 12px; color: #666;">
+                            Aktueller Such-Cursor (<code>movies.id</code>): <strong id="sa-batch-cursor-label">Start (neueste zuerst)</strong>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 14px;">
+                        <div style="padding: 10px; background: #f2fbf4; border: 1px solid #b7e1c1; border-radius: 4px;">
+                            <div style="font-size: 11px; color: #555; text-transform: uppercase; font-weight: bold;">Bereinigte Videos</div>
+                            <div id="sa-batch-cnt-movies" style="font-size: 18px; font-weight: bold; color: #0f6826; margin-top: 2px;">0</div>
+                        </div>
+                        <div style="padding: 10px; background: #fff6f6; border: 1px solid #f1b8b8; border-radius: 4px;">
+                            <div style="font-size: 11px; color: #555; text-transform: uppercase; font-weight: bold;">Gel&ouml;schte m_*-Dateien</div>
+                            <div id="sa-batch-cnt-files" style="font-size: 18px; font-weight: bold; color: #c00000; margin-top: 2px;">0</div>
+                        </div>
+                        <div style="padding: 10px; background: #eef7fc; border: 1px solid #b8d3e6; border-radius: 4px;">
+                            <div style="font-size: 11px; color: #555; text-transform: uppercase; font-weight: bold;">Freigegebener Speicher</div>
+                            <div id="sa-batch-cnt-bytes" style="font-size: 18px; font-weight: bold; color: #1c94c4; margin-top: 2px;">0 Bytes</div>
+                        </div>
+                        <div style="padding: 10px; background: #f7f7f7; border: 1px solid #ddd; border-radius: 4px;">
+                            <div style="font-size: 11px; color: #555; text-transform: uppercase; font-weight: bold;">Gepr&uuml;fte / Saubere Ordner</div>
+                            <div style="font-size: 16px; font-weight: bold; color: #333; margin-top: 4px;">
+                                <span id="sa-batch-cnt-scanned">0</span> gepr&uuml;ft (<span id="sa-batch-cnt-clean">0</span> bereits sauber)
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="sa-batch-skip-box" style="display: none; padding: 10px 12px; background: #FFF9E6; border: 1px solid #FFE0B2; border-radius: 4px; margin-bottom: 12px; font-size: 12px; color: #8a5a00;">
+                        <strong>&#x26a0; Aus Sicherheitsgr&uuml;nden &uuml;bersprungene Ordner (<span id="sa-batch-cnt-skipped">0</span>):</strong>
+                        <ul id="sa-batch-skip-list" style="margin: 5px 0 0 18px; padding: 0;"></ul>
+                    </div>
+
+                    <div style="font-weight: bold; font-size: 12px; color: #333; margin-bottom: 6px;">
+                        Live-Bereinigungsprotokoll (neueste Eintrage oben):
+                    </div>
+                    <div style="max-height: 320px; overflow-y: auto; border: 1px solid #ddd; border-radius: 3px;">
+                        <table class="sa-table" style="margin-bottom: 0;">
+                            <thead>
+                                <tr>
+                                    <th>Online-ID / Ordner-ID</th>
+                                    <th>MID / Creator</th>
+                                    <th>Filmtitel &amp; Pfad</th>
+                                    <th>Gel&ouml;schte m_*-Dateien</th>
+                                    <th>Freigegeben</th>
+                                    <th>Desktop-MP4 Nachpr&uuml;fung</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sa-batch-log-tbody"></tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -776,6 +866,230 @@ $site .= '
                     alert("Fehler bei der Lösch-Anfrage: " + err);
                 }
             });
+        });
+
+        // --- STAPEL-BEREINIGUNG (BATCH-MODUS) ---
+        var batchCursorMovieId = 0;
+        var batchRunning = false;
+        var batchStopRequested = false;
+        var batchTotals = {
+            movies: 0,
+            files: 0,
+            bytes: 0,
+            scanned: 0,
+            clean: 0,
+            skipped: 0
+        };
+
+        function formatBytesJS(bytes) {
+            bytes = parseFloat(bytes) || 0;
+            if (bytes <= 0) return "0 Bytes";
+            var units = ["Bytes", "KB", "MB", "GB", "TB"];
+            var i = Math.floor(Math.log(bytes) / Math.log(1024));
+            if (i < 0) i = 0;
+            if (i >= units.length) i = units.length - 1;
+            return (bytes / Math.pow(1024, i)).toFixed(2).replace(".", ",") + " " + units[i];
+        }
+
+        function updateBatchCountersUI() {
+            jQuery("#sa-batch-cnt-movies").text(batchTotals.movies);
+            jQuery("#sa-batch-cnt-files").text(batchTotals.files);
+            jQuery("#sa-batch-cnt-bytes").text(formatBytesJS(batchTotals.bytes));
+            jQuery("#sa-batch-cnt-scanned").text(batchTotals.scanned);
+            jQuery("#sa-batch-cnt-clean").text(batchTotals.clean);
+            jQuery("#sa-batch-cnt-skipped").text(batchTotals.skipped);
+            jQuery("#sa-batch-cursor-label").text(batchCursorMovieId > 0 ? ("ab Ordner-ID < " + batchCursorMovieId) : "Start (neueste zuerst)");
+        }
+
+        function setBatchButtonsState(isRunning) {
+            batchRunning = isRunning;
+            jQuery(".btn-sa-batch-run").prop("disabled", isRunning).css("opacity", isRunning ? "0.55" : "1");
+            jQuery("#btn-sa-batch-reset").prop("disabled", isRunning);
+            if (isRunning) {
+                jQuery("#btn-sa-batch-stop").show().prop("disabled", false).html("&#x23f8; Nach aktuellem Paket anhalten (Stopp)");
+            } else {
+                jQuery("#btn-sa-batch-stop").hide();
+            }
+        }
+
+        function executeBatchStep(remainingTarget, isAutoMode, merchantId) {
+            if (batchStopRequested) {
+                setBatchButtonsState(false);
+                jQuery("#sa-batch-status-text").css("color", "#d35400").html("&#x23f8; Stapel-Bereinigung wurde auf Ihren Wunsch angehalten. Sie k&ouml;nnen jederzeit an derselben Stelle fortfahren.");
+                return;
+            }
+
+            var stepLimit = isAutoMode ? 50 : Math.min(remainingTarget, 100);
+            if (stepLimit <= 0) {
+                setBatchButtonsState(false);
+                jQuery("#sa-batch-status-text").css("color", "#0f6826").html("&#x2705; Gew&auml;hltes Stapel-Paket erfolgreich abgeschlossen (" + batchTotals.movies + " Videos bereinigt, " + formatBytesJS(batchTotals.bytes) + " freigegeben).");
+                return;
+            }
+
+            jQuery("#sa-batch-panel").show();
+            jQuery("#sa-batch-status-text").css("color", "#1c94c4").html(
+                "&#x23f3; Pr&uuml;fe und bereinige Film-Ordner auf dem Server " +
+                (isAutoMode ? "(Auto-Durchlauf aktiv)" : "(noch bis zu " + remainingTarget + " Videos in diesem Durchlauf)") + "..."
+            );
+
+            jQuery.ajax({
+                url: "' . ACP_URL . '/Ajax/storage_analytics_legacy_cleanup.php",
+                type: "POST",
+                dataType: "json",
+                data: {
+                    action: "delete_batch",
+                    batch_limit: stepLimit,
+                    merchant_id: merchantId,
+                    cursor_movie_id: batchCursorMovieId
+                },
+                success: function(res) {
+                    if (res.error) {
+                        setBatchButtonsState(false);
+                        jQuery("#sa-batch-status-text").css("color", "#c00000").html("&#x26d4; SICHERHEITS-STOPP / FEHLER: " + jQuery("<div>").text(res.error).html());
+                        alert("SICHERHEITS-STOPP: " + res.error);
+                        return;
+                    }
+
+                    batchTotals.movies += (parseInt(res.cleaned_movies_count, 10) || 0);
+                    batchTotals.files += (parseInt(res.deleted_files_count, 10) || 0);
+                    batchTotals.bytes += (parseFloat(res.freed_bytes) || 0);
+                    batchTotals.scanned += (parseInt(res.scanned_folders, 10) || 0);
+                    batchTotals.clean += (parseInt(res.already_clean_count, 10) || 0);
+                    batchTotals.skipped += (parseInt(res.skipped_no_desktop_count, 10) || 0);
+
+                    if (res.next_cursor_movie_id) {
+                        batchCursorMovieId = parseInt(res.next_cursor_movie_id, 10) || 0;
+                    }
+                    updateBatchCountersUI();
+
+                    // Übersprungene Ordner (ohne Desktop-MP4) protokollieren
+                    if (res.skipped_items && res.skipped_items.length > 0) {
+                        jQuery("#sa-batch-skip-box").show();
+                        var skipList = jQuery("#sa-batch-skip-list");
+                        jQuery.each(res.skipped_items, function(idx, sk) {
+                            var onlineTxt = sk.online_id ? ("Online-ID #" + sk.online_id + " / ") : "";
+                            skipList.prepend(
+                                jQuery("<li>").html(
+                                    "<strong>" + onlineTxt + "Ordner-ID #" + sk.movie_id + " (MID " + sk.merchant_id + "):</strong> " +
+                                    jQuery("<div>").text(sk.title).html() + " &ndash; " + jQuery("<div>").text(sk.reason).html()
+                                )
+                            );
+                        });
+                    }
+
+                    // Bereinigte Videos in die Live-Protokolltabelle (oben) einfügen
+                    if (res.cleaned_items && res.cleaned_items.length > 0) {
+                        var logBody = jQuery("#sa-batch-log-tbody");
+                        jQuery.each(res.cleaned_items, function(idx, item) {
+                            var tr = jQuery("<tr>");
+                            var idBadge = item.online_id
+                                ? ("<strong>Online #" + item.online_id + "</strong><br /><span style=\"font-size:11px; color:#666;\">Ordner #" + item.movie_id + "</span>")
+                                : ("<strong>Ordner #" + item.movie_id + "</strong>");
+                            tr.append(jQuery("<td>").html(idBadge));
+                            tr.append(jQuery("<td>").html("MID <strong>" + item.merchant_id + "</strong><br /><span style=\"font-size:11px; color:#666;\">" + jQuery("<div>").text(item.actor).html() + "</span>"));
+                            tr.append(jQuery("<td>").html(
+                                "<strong>" + jQuery("<div>").text(item.title).html() + "</strong><br />" +
+                                "<code style=\"font-size:11px; color:#555;\">" + jQuery("<div>").text(item.folder_path).html() + "/</code>"
+                            ));
+                            var filesHtml = "<strong>" + item.deleted_count + " Datei(en):</strong><br /><span style=\"font-size:11px; color:#c00000;\">" +
+                                jQuery("<div>").text((item.deleted_filenames || []).join(", ")).html() + "</span>";
+                            tr.append(jQuery("<td>").html(filesHtml));
+                            tr.append(jQuery("<td>").html("<strong style=\"color:#0f6826;\">" + item.freed_formatted + "</strong>"));
+                            var verifyHtml = item.desktop_verified_intact
+                                ? ("<span style=\"color:#0f6826; font-weight:bold;\">&#x2705; Intakt (" + item.desktop_size_formatted + ")</span><br /><code style=\"font-size:11px;\">" + jQuery("<div>").text(item.desktop_filename).html() + "</code>")
+                                : "<span style=\"color:#c00000; font-weight:bold;\">&#x26a0; Prüfen!</span>";
+                            tr.append(jQuery("<td>").html(verifyHtml));
+                            logBody.prepend(tr);
+                        });
+                    }
+
+                    if (res.emergency_stop) {
+                        setBatchButtonsState(false);
+                        jQuery("#sa-batch-status-text").css("color", "#c00000").html("&#x26d4; NOT-AUS: " + jQuery("<div>").text(res.emergency_reason).html());
+                        alert("NOT-AUS ausgelöst:\n" + res.emergency_reason);
+                        return;
+                    }
+
+                    if (!res.has_more) {
+                        setBatchButtonsState(false);
+                        jQuery("#sa-batch-status-text").css("color", "#0f6826").html(
+                            "&#x2705; Vollst&auml;ndig abgeschlossen! Es wurden alle passenden Film-Ordner bis zum Ende gepr&uuml;ft (Insgesamt bereinigt: " +
+                            batchTotals.movies + " Videos | Freigegeben: " + formatBytesJS(batchTotals.bytes) + ")."
+                        );
+                        return;
+                    }
+
+                    var cleanedNow = parseInt(res.cleaned_movies_count, 10) || 0;
+                    var nextRemaining = isAutoMode ? 50 : (remainingTarget - cleanedNow);
+
+                    if (isAutoMode || nextRemaining > 0) {
+                        setTimeout(function() {
+                            executeBatchStep(nextRemaining, isAutoMode, merchantId);
+                        }, 250);
+                    } else {
+                        setBatchButtonsState(false);
+                        jQuery("#sa-batch-status-text").css("color", "#0f6826").html(
+                            "&#x2705; Stapel-Paket erfolgreich abgeschlossen! (Insgesamt bereinigt: " +
+                            batchTotals.movies + " Videos | Gel&ouml;schte m_*-Dateien: " + batchTotals.files +
+                            " | Freigegeben: " + formatBytesJS(batchTotals.bytes) + "). Sie k&ouml;nnen direkt das n&auml;chste Paket starten."
+                        );
+                    }
+                },
+                error: function(xhr, status, err) {
+                    setBatchButtonsState(false);
+                    jQuery("#sa-batch-status-text").css("color", "#c00000").html("&#x26a0; Netzwerk-/Serverfehler bei der Stapel-Anfrage: " + jQuery("<div>").text(err).html());
+                }
+            });
+        }
+
+        jQuery(".btn-sa-batch-run").click(function() {
+            if (batchRunning) {
+                return;
+            }
+            var limit = parseInt(jQuery(this).attr("data-limit"), 10) || 10;
+            var isAuto = jQuery(this).attr("data-auto") === "1";
+            var merchantId = jQuery.trim(jQuery("#sa-test-merchant-id").val());
+            var scopeText = merchantId ? ("NUR für Händler-/Creator-ID (MID): " + merchantId) : "für ALLE Creator (alle Film-Ordner)";
+
+            var confirmText = isAuto
+                ? ("KONTROLLIERTER AUTO-DURCHLAUF (in 50er-Paketen):\n\n" +
+                   "Möchten Sie jetzt den automatischen Bereinigungs-Durchlauf " + scopeText + " starten?\n\n" +
+                   "- Es werden ausschließlich veraltete Mobil-Dateien (m_*.mp4, m_*.webm, m_*.ogv) gelöscht.\n" +
+                   "- Für jedes Video wird vorab und unmittelbar danach die Desktop-MP4 auf Unversehrtheit geprüft.\n" +
+                   "- Sie können den Durchlauf jederzeit über den Stopp-Button anhalten.")
+                : ("SICHERHEITS-BESTÄTIGUNG (Stapel-Bereinigung):\n\n" +
+                   "Möchten Sie jetzt bis zu " + limit + " Videos " + scopeText + " bereinigen?\n\n" +
+                   "- Es werden ausschließlich veraltete Mobil-Dateien mit Präfix m_ (m_*.mp4, m_*.webm, m_*.ogv) gelöscht.\n" +
+                   "- Die Desktop-MP4 ({id}_{file_id}.mp4) und alle Vorschaubilder werden für jedes Video vor und nach dem Löschen streng geprüft.");
+
+            if (!confirm(confirmText)) {
+                return;
+            }
+
+            batchStopRequested = false;
+            setBatchButtonsState(true);
+            executeBatchStep(limit, isAuto, merchantId);
+        });
+
+        jQuery("#btn-sa-batch-stop").click(function() {
+            if (!batchRunning) {
+                return;
+            }
+            batchStopRequested = true;
+            jQuery(this).prop("disabled", true).html("&#x23f3; Halte nach aktuellem Paket an...");
+        });
+
+        jQuery("#btn-sa-batch-reset").click(function() {
+            if (batchRunning) {
+                return;
+            }
+            batchCursorMovieId = 0;
+            batchTotals = { movies: 0, files: 0, bytes: 0, scanned: 0, clean: 0, skipped: 0 };
+            updateBatchCountersUI();
+            jQuery("#sa-batch-log-tbody").empty();
+            jQuery("#sa-batch-skip-list").empty();
+            jQuery("#sa-batch-skip-box").hide();
+            jQuery("#sa-batch-status-text").css("color", "#1c94c4").text("Protokoll und Such-Cursor wurden zurückgesetzt.");
         });
 
         loadStorageAnalytics(false);

@@ -125,3 +125,25 @@ Beim ersten Live-Scan auf dem Produktionsserver (`/var/www/web1/cloud_storage`) 
   * Nur `.webm` + `.ogv` (`m_*.webm` & `m_*.ogv`): **819,16 GB**
   * Inklusive ungenutzter Mobile-MP4 (`m_*.mp4`): **1,24 TB**
   * **Verbleibender Speicherbedarf nach Bereinigung (.webm & .ogv)**: **3,46 TB** (wodurch auf dem bestehenden Server sofort wieder über **1,5 TB** freier Speicherplatz zur Verfügung stehen).
+
+---
+
+## 6. 🛡️ Sichere Bereinigung veralteter Mobil-Dateien (Abschnitt `1.2b` – Einzel- & Stapel-Modus)
+
+In `acp/includes/storage_analytics.php` (Abschnitt `1.2b`) und `acp/includes/ajax/storage_analytics_legacy_cleanup.php` ist ein mehrstufig gesichertes Bereinigungs-Werkzeug integriert, um vorhandene `m_*.mp4`, `m_*.webm` und `m_*.ogv` Dateien kontrolliert vom Server zu entfernen:
+
+1. **Auflösung von `movies_online.id` und `movies.id`**:
+   * Da die ACP-Übersicht `/Filme-online` die Spalte `movies_online.id` anzeigt, die physischen Verzeichnisse auf dem Server (`MOVIES_PATH/{storage_location}/{merchant_id}/{movie_id}/`) jedoch immer nach `movies.id` benannt sind, führt `storage_analytics_legacy_cleanup.php` einen `LEFT JOIN movies_online mo ON mo.file_id = m.file_id` durch und prüft eingegebene IDs zuerst gegen `mo.id` (mit Fallback auf `m.id`).
+2. **7-Stufen-Sicherheitsprüfung (`sa_inspect_movie_folder`)**:
+   * **Stufe 1**: Die Desktop-Hauptdatei `{id}_{file_id}.mp4` muss physisch existieren und `> 0` Bytes groß sein (sonst wird im Ordner keine einzige Datei gelöscht).
+   * **Stufe 2**: Dateiname muss zwingend mit `m_` beginnen (`strpos($fn_lower, 'm_') === 0`).
+   * **Stufe 3**: Dateiendung muss `mp4`, `webm` oder `ogv` lauten (`.jpg`-Thumbnails sind ausgeschlossen).
+   * **Stufe 4**: Strenge Regex-Prüfung `/^m_[0-9]+_[a-z0-9]+\.(mp4|webm|ogv)$/i`.
+   * **Stufe 5**: Exakter Präfix-Abgleich `m_{movie_id}_`.
+   * **Stufe 6**: Ausschluss jeglicher Namens- oder `realpath()`-Gleichheit mit der Desktop-MP4.
+   * **Stufe 7**: Falls `.mp4`, muss die Dateigröße der `m_*.mp4` kleiner als die der Desktop-MP4 sein (`$fsize < $info['desktop_size']`).
+3. **Einzel-Video-Modus (`action=preview` & `action=delete_single`)**:
+   * Lädt ein einzelnes Video in die Vorschau, listet geschützte Dateien (grün) und zu löschende `m_*`-Dateien (rot) mit vollem Serverpfad auf und löscht erst nach Bestätigung.
+4. **Kontrollierter Stapel-Modus (`action=delete_batch`)**:
+   * Erlaubt die Bereinigung in Paketen (**10 Videos**, **50 Videos**, **100 Videos** oder **Auto-Durchlauf in 50er-Paketen** mit jederzeitiger **Stopp/Pause**-Funktion), optional gefiltert auf eine bestimmte Creator-ID (`MID`).
+   * Nach jedem bereinigten Video wird per `clearstatcache()` live geprüft, ob die Desktop-MP4 weiterhin mit identischer Byte-Größe existiert (**Not-Aus-Schutz / Circuit Breaker**).
