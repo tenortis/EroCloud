@@ -51,3 +51,15 @@
     - [x] Remove redundant `m_*.mp4`, `m_*.webm`, and `m_*.ogv` FFmpeg conversion steps in `cronjobs/convert_movie.php`
     - [x] Align `api/get_movie_url.php` (EroCloud) and `mobi/modules/videothek/video.php` (EroCMS) to use Desktop-MP4 (`movie_url`)
     - [x] Implement 7-stage safe Single-Video & Controlled Batch Cleanup (`10`/`50`/`100`/Auto-Run) for `m_*.mp4`, `m_*.webm`, and `m_*.ogv` in ACP `/Speicher-Analyse` (`acp/includes/storage_analytics.php` & `acp/includes/ajax/storage_analytics_legacy_cleanup.php`)
+
+- [ ] **Local AI Compliance & Subtitle Pipeline (Whisper.cpp + Llama.cpp)**
+    - [x] Analyze server hardware (Dell PowerEdge R720, 2x Xeon E5-2690 v2, 64 GB RAM, Debian 10) and define resource-safe CPU inference architecture
+    - [x] Document 4-phase concept & database architecture in `.agent/knowledge/architecture/ai-compliance-and-subtitle-pipeline.md`
+    - [ ] **Phase 1: ACP Single-Video Test Lab (`/KI-Analyse`) & Database Setup**
+        - [ ] Create database table `movies_ai_analysis` for tracking subtitle, transcript, text-compliance, and vision states across all 5,500+ movies
+        - [ ] Build ACP Test Cockpit (`acp/includes/ai_compliance_lab.php`) to select a single Creator video and test audio extraction, Whisper subtitle/language detection, and local LLM BRAM text checking step by step
+    - [ ] **Phase 2: Controlled Batch Processing & Background Cronjob (`cronjobs/ai_process_movies.php`)**
+        - [ ] Implement priority queue (newly converted movies first, then 5,500+ existing catalog movies) with CPU thread/nice throttling
+    - [ ] **Phase 3: ACP Movie Checking (`acp/includes/movie_checking.php`) & Player Subtitle Integration**
+    - [ ] **Phase 4: Separate Video Frame / Sprite-Grid Vision AI Analysis**
+
