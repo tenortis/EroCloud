@@ -548,7 +548,10 @@ $site .= '
                         &#x23ED; Nur 1 n&auml;chstes Video jetzt abarbeiten
                     </button>
                 </div>
-                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 5px;">Live-Verarbeitungsprotokoll:</label>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <label style="font-size: 12px; font-weight: bold;">Live-Verarbeitungsprotokoll:</label>
+                    <span id="aic-live-batch-ticker" style="font-size: 12px; font-weight: bold; color: #1c94c4;"></span>
+                </div>
                 <textarea id="aic-live-batch-log" class="aic-textarea-mono" rows="9" readonly="readonly" style="background: #1e2227; color: #a6e22e;" placeholder="Bereit. Klicken Sie auf &bdquo;Live-Batch starten&ldquo; oder &bdquo;Nur 1 n&auml;chstes Video jetzt abarbeiten&ldquo;..."></textarea>
             </div>
 
@@ -1116,8 +1119,21 @@ jQuery(document).ready(function() {
         box.scrollTop(box[0].scrollHeight);
     }
 
+    var batchStepTimer = null;
+    var batchStepElapsedSec = 0;
+    var batchAnnouncedMovieId = 0;
+
+    function stopBatchStepPoller() {
+        if (batchStepTimer) {
+            clearInterval(batchStepTimer);
+            batchStepTimer = null;
+        }
+        jQuery("#aic-live-batch-ticker").text("");
+    }
+
     function executeNextLiveBatchStep(autoContinue) {
         if (autoContinue && !liveBatchRunning) {
+            stopBatchStepPoller();
             appendBatchLog("Live-Batch wurde vom Administrator pausiert.");
             jQuery("#btn-aic-start-live-batch").show().prop("disabled", false);
             jQuery("#btn-aic-stop-live-batch").hide();
@@ -1128,12 +1144,40 @@ jQuery(document).ready(function() {
         appendBatchLog("Starte nächstes offenes Video (Whisper Audio-Extraktion + .vtt + BRAM-Check)...");
         jQuery("#btn-aic-step-live-batch").prop("disabled", true);
 
+        batchStepElapsedSec = 0;
+        batchAnnouncedMovieId = 0;
+        stopBatchStepPoller();
+        jQuery("#aic-live-batch-ticker").text("⏳ Whisper läuft (0 Sek.)...");
+
+        batchStepTimer = setInterval(function() {
+            batchStepElapsedSec += 2;
+            jQuery.ajax({
+                url: "' . ACP_URL . '/includes/ajax/ai_compliance_action.php",
+                type: "GET",
+                data: { action: "poll_worker_status" },
+                dataType: "json",
+                success: function(pRes) {
+                    if (pRes && pRes.status === "ok" && pRes.current_movie && pRes.current_movie.id) {
+                        var cm = pRes.current_movie;
+                        jQuery("#aic-live-batch-ticker").text("⏳ Verarbeite #" + cm.id + " (Dauer: " + cm.playtime_fmt + " Min.) – läuft seit " + batchStepElapsedSec + " Sek.");
+                        if (batchAnnouncedMovieId !== cm.id) {
+                            batchAnnouncedMovieId = cm.id;
+                            appendBatchLog("   ↳ Aktuell in Arbeit: Video #" + cm.id + " \"" + cm.title + "\" (Spieldauer: " + cm.playtime_fmt + " Min.)...");
+                        }
+                    } else {
+                        jQuery("#aic-live-batch-ticker").text("⏳ Whisper läuft (" + batchStepElapsedSec + " Sek.)...");
+                    }
+                }
+            });
+        }, 2000);
+
         jQuery.ajax({
             url: "' . ACP_URL . '/includes/ajax/ai_compliance_action.php",
             type: "POST",
             data: { action: "run_batch_step" },
             dataType: "json",
             success: function(res) {
+                stopBatchStepPoller();
                 if (!res || res.status !== "ok") {
                     appendBatchLog("FEHLER: " + (res && res.message ? res.message : "Unbekannter Fehler."));
                     liveBatchRunning = false;
@@ -1143,7 +1187,7 @@ jQuery(document).ready(function() {
                     return;
                 }
 
-                appendBatchLog(res.message);
+                appendBatchLog("✔ " + res.message);
                 updateStatsUI(res.stats, res.worker_status, null);
 
                 if (!res.has_more) {
@@ -1166,6 +1210,7 @@ jQuery(document).ready(function() {
                 }
             },
             error: function() {
+                stopBatchStepPoller();
                 appendBatchLog("Netzwerk- oder Timeout-Fehler beim Batch-Schritt. Pausiere.");
                 liveBatchRunning = false;
                 jQuery("#btn-aic-start-live-batch").show().prop("disabled", false);

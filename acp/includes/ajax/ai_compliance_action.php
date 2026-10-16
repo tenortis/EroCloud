@@ -30,6 +30,9 @@ if (is_logged_in('acp') !== true) {
     exit;
 }
 
+// Session-Lock sofort freigeben, damit parallele Status-Abfragen (poll_worker_status) waehrend eines Whisper-Laufs nicht blockieren
+@session_write_close();
+
 function aic_send_json($payload) {
     $clean = aic_sanitize_Recursive($payload);
     $json = json_encode($clean, JSON_UNESCAPED_UNICODE);
@@ -153,6 +156,27 @@ if ($action === 'init_dashboard') {
             'keyword_rules_json' => file_exists($rules_json_path) ? (string)@file_get_contents($rules_json_path) : '',
             'parsed_categories'  => aic_load_keyword_rules()
         )
+    ));
+}
+
+if ($action === 'poll_worker_status') {
+    $ws = aic_get_worker_status();
+    $cur_movie_info = null;
+    if (!empty($ws['current_movie_id'])) {
+        $rs_cm = p4c_query("SELECT `id`, `title`, `playtime_seconds` FROM `movies` WHERE `id` = '" . abs($ws['current_movie_id']) . "' LIMIT 1;", __FILE__, __LINE__);
+        if (p4c_num_rows($rs_cm) > 0) {
+            $cm = p4c_fetch_object($rs_cm);
+            $cur_movie_info = array(
+                'id'           => (int)$cm->id,
+                'title'        => aic_clean_html_text($cm->title),
+                'playtime_fmt' => aic_format_time((int)$cm->playtime_seconds)
+            );
+        }
+    }
+    aic_send_json(array(
+        'status'        => 'ok',
+        'worker_status' => $ws,
+        'current_movie' => $cur_movie_info
     ));
 }
 
