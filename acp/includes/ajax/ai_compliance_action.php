@@ -115,11 +115,42 @@ function aic_ensure_table() {
  * Prueft den Status der lokalen KI-Werkzeuge (FFmpeg, whisper.cpp, llama.cpp / Ollama).
  */
 function aic_check_environment() {
+    $ai_base_dir = defined('MOVIES_PATH') ? rtrim(MOVIES_PATH, '/') . '/priv/ai' : '/var/www/web1/priv/ai';
+    $whisper_bin_candidates = array(
+        $ai_base_dir . '/whisper.cpp/build/bin/whisper-cli',
+        $ai_base_dir . '/whisper.cpp/build/bin/main',
+        '/opt/erocloud_ai/whisper.cpp/build/bin/whisper-cli',
+        '/usr/local/bin/whisper-cli'
+    );
+    $whisper_model_candidates = array(
+        $ai_base_dir . '/models/ggml-large-v3-turbo-q5_0.bin',
+        $ai_base_dir . '/models/ggml-medium-q5_0.bin',
+        $ai_base_dir . '/models/ggml-base.bin',
+        '/opt/erocloud_ai/models/ggml-large-v3-turbo-q5_0.bin'
+    );
+
+    $found_whisper_bin = $whisper_bin_candidates[0];
+    foreach ($whisper_bin_candidates as $cand_bin) {
+        if (@file_exists($cand_bin)) {
+            $found_whisper_bin = $cand_bin;
+            break;
+        }
+    }
+
+    $found_whisper_model = $whisper_model_candidates[0];
+    foreach ($whisper_model_candidates as $cand_mod) {
+        if (@file_exists($cand_mod)) {
+            $found_whisper_model = $cand_mod;
+            break;
+        }
+    }
+
     $env = array(
+        'ai_base_dir'      => $ai_base_dir,
         'ffmpeg_bin'       => defined('FFMPEG_PATH') ? rtrim(FFMPEG_PATH, '/') . '/ffmpeg' : '/usr/bin/ffmpeg',
         'ffmpeg_ready'     => false,
-        'whisper_bin'      => '/opt/erocloud_ai/whisper.cpp/build/bin/whisper-cli',
-        'whisper_model'    => '/opt/erocloud_ai/models/ggml-large-v3-turbo-q5_0.bin',
+        'whisper_bin'      => $found_whisper_bin,
+        'whisper_model'    => $found_whisper_model,
         'whisper_ready'    => false,
         'llm_endpoint'     => 'http://127.0.0.1:8080/v1/chat/completions',
         'llm_ready'        => false,
@@ -726,8 +757,9 @@ if ($action === 'run_whisper') {
     // Pruefen, ob physische MP4 UND whisper.cpp auf dem Live-Server bereitstehen
     if ($details['mp4_exists'] && $env['ffmpeg_ready'] && $env['whisper_ready']) {
         $mode_used = 'Live-Server (FFmpeg WAV -> whisper.cpp)';
-        $wav_tmp   = sys_get_temp_dir() . '/erocloud_ai_audio_' . $details['id'] . '_' . time() . '.wav';
-        $json_base = sys_get_temp_dir() . '/erocloud_ai_out_' . $details['id'] . '_' . time();
+        $tmp_dir   = (defined('TEMP_DIR') && @is_dir(TEMP_DIR) && @is_writable(TEMP_DIR)) ? rtrim(TEMP_DIR, '/') : rtrim(sys_get_temp_dir(), '/');
+        $wav_tmp   = $tmp_dir . '/erocloud_ai_audio_' . $details['id'] . '_' . time() . '.wav';
+        $json_base = $tmp_dir . '/erocloud_ai_out_' . $details['id'] . '_' . time();
 
         $cmd_wav = escapeshellcmd($env['ffmpeg_bin']) . ' -y -i ' . escapeshellarg($details['mp4_path'])
             . ' -vn -acodec pcm_s16le -ar 16000 -ac 1 ' . escapeshellarg($wav_tmp) . ' 2>&1';
