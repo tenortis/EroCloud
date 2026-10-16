@@ -97,32 +97,20 @@ Ein Hintergrund-Cronjob kümmert sich um die automatische Aufbereitung der hochg
     * Befehl: `ffmpeg -y -i {org_file} -b:v 8000k -vf "scale={width}:trunc(ow/a/2)*2" -vcodec libx264 -preset veryslow -g 30 neu_{id}_{file_id}.mp4`
     * Optimierung: Anschließend wird `qt-faststart` ausgeführt (`neu_qt_{id}_{file_id}.mp4`), als finale `{id}_{file_id}.mp4` kopiert und der Dateiname in `movies.filename` gespeichert.
     * Speicherbedarf: ca. **1,01 MB pro Sekunde** (~60 MB pro Minute).
-  * **2. Mobile MP4 (`m_{id}_{file_id}.mp4`)**:
-    * Befehl: `ffmpeg -y -i {org_file} -b:v 1000k -vf "scale=640:trunc(ow/a/2)*2" -vcodec libx264 -b:a 196k -g 30 m_{id}_{file_id}.mp4`
-    * Optimierung: Auch hier wird anschließend `qt-faststart` ausgeführt.
-    * Speicherbedarf: ca. **0,15 MB pro Sekunde** (~8,9 MB pro Minute).
-  * **3. Mobile WebM (`m_{id}_{file_id}.webm`)**:
-    * Befehl: `ffmpeg -y -i {org_file} -b:v 1000k -vf "scale=640:trunc(ow/a/2)*2" -vcodec libvpx -acodec libvorbis -f webm -g 30 m_{id}_{file_id}.webm`
-    * Speicherbedarf: ca. **0,14 MB pro Sekunde** (~8,4 MB pro Minute).
-  * **4. Mobile OGV (`m_{id}_{file_id}.ogv`)**:
-    * Befehl: `ffmpeg -y -i {org_file} -b:v 1000k -vf "scale=640:trunc(ow/a/2)*2" -vcodec libtheora -acodec libvorbis -g 30 m_{id}_{file_id}.ogv`
-    * Speicherbedarf: ca. **0,14 MB pro Sekunde** (~8,4 MB pro Minute).
-  * **5. Vorschaubilder (`thumb_{id}_{file_id}_1..10.jpg`)**:
-    * Sobald alle 3 Mobil-Dateien (`mp4`, `webm`, `ogv`) existieren, wird `convert_status = '2'` gesetzt und FFmpeg extrahiert 10 gleichmäßig über die Laufzeit verteilte Screenshots mit `1024px` Breite (`scale="1024:-1"`).
-  * **6. Datenbereinigung**:
+  * **2. Vorschaubilder (`thumb_{id}_{file_id}_1..10.jpg`)**:
+    * Sobald die fertige MP4-Datei (`{id}_{file_id}.mp4`) existiert, wird `convert_status = '2'` gesetzt und FFmpeg extrahiert 10 gleichmäßig über die Laufzeit verteilte Screenshots mit `1024px` Breite (`scale="1024:-1"`).
+  * **3. Datenbereinigung**:
     * Sofern die hochgeladene Originaldatei einen anderen Dateinamen/Endung als `{id}_{file_id}.mp4` hatte, wird sie per `unlink($org_file)` gelöscht.
+  * *(Historischer Hinweis: Bis Oktober 2026 wurden zusätzlich `m_{id}_{file_id}.mp4`, `m_{id}_{file_id}.webm` und `m_{id}_{file_id}.ogv` konvertiert. Diese Konvertierungsschritte wurden aus `cronjobs/convert_movie.php` entfernt, da `api/movie_player.php` ausschließlich die Haupt-MP4 streamt und alle modernen Mobilgeräte diese direkt per HTTP-Range-Streaming abspielen).*
 
 ### 🔍 Technische Befunde & Optimierungspotenzial bei Konvertierung & Auslieferung
 Bei der Analyse des Zusammenspiels zwischen `cronjobs/convert_movie.php`, `api/get_movie_url.php` und `api/movie_player.php` wurden folgende wichtige Punkte festgestellt:
 
-1. **Veraltete Formate `m_*.webm` und `m_*.ogv` sind ungenutzter Ballast**:
-   * Obwohl `api/get_movie_url.php` die URLs `movie_url_mobil_webm` (`...&mobile=webm`) und `movie_url_mobil_ogg` (`...&mobile=ogg`) im XML/JSON ausgibt, wertet `api/movie_player.php` den Parameter `$_GET['mobile']` **überhaupt nicht aus**.
+1. **Veraltete Formate `m_*.mp4`, `m_*.webm` und `m_*.ogv` sind ungenutzter Ballast (Konvertierung deaktiviert)**:
+   * Obwohl `api/get_movie_url.php` die URLs `movie_url_mobil_mp4`, `movie_url_mobil_webm` und `movie_url_mobil_ogg` im JSON ausgibt, wertet `api/movie_player.php` den Parameter `$_GET['mobile']` **überhaupt nicht aus**.
    * `api/movie_player.php` streamt über die Klasse `VideoStream` (`includes/klassen/VideoStream.inc.php`) **immer ausschließlich die Desktop-MP4** (`$movie_ary->filename`).
-   * Da moderne Desktop- und Mobilbrowser (iOS, Android, Chrome, Safari, Firefox, Edge) zu 100 % nativ H.264/MP4 unterstützen, werden `.webm` und `.ogv` weder vom Player ausgeliefert noch von Browsern benötigt. Sie belegen bei ~5.680 Filmen rund **850–950 GB Speicherplatz** und verdoppeln unnötig die FFmpeg-Konvertierungszeit.
-2. **Mobile MP4 (`m_*.mp4`) wird aktuell ebenfalls vom Player ignoriert**:
-   * Auch bei Aufruf von `...&mobile=mp4` liefert `api/movie_player.php` derzeit die große Desktop-MP4 aus, da keine Weiche für `$_GET['mobile'] === 'mp4'` implementiert ist.
-   * Hier kann zukünftig entschieden werden, ob `m_*.mp4` ebenfalls komplett eingespart wird (weitere ~470 GB Ersparnis) oder ob `api/movie_player.php` für mobile Endgeräte auf `m_ . $movie_ary->filename` zugreifen soll.
-3. **Encoding-Optimierung für zukünftige Desktop-MP4s**:
+   * Da moderne Desktop- und Mobilbrowser (iOS, Android, Chrome, Safari, Firefox, Edge) zu 100 % nativ H.264/MP4 unterstützen, wurden die Konvertierungsschritte für `m_*.mp4`, `m_*.webm` und `m_*.ogv` in `cronjobs/convert_movie.php` entfernt. Die bestehenden Altdateien belegen bei ~5.550 Filmen rund **1,24 TB Speicherplatz** (davon 819,16 GB für `.webm`/`.ogv` und ~420 GB für `m_*.mp4`) und können physisch bereinigt werden.
+2. **Encoding-Optimierung für zukünftige Desktop-MP4s**:
    * Statt einer festen Bitrate von `-b:v 8000k -preset veryslow` und separatem `qt-faststart`-Kopierlauf empfiehlt sich zukünftig ein qualitätsbasiertes CRF-Encoding (`-crf 22 -maxrate 5000k -bufsize 10000k -preset slow -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart`). Dies spart ~35–40 % Dateigröße und Streaming-Traffic bei gleichbleibender visueller Qualität.
 
 ---
