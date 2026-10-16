@@ -28,7 +28,9 @@ Damit jederzeit nachvollziehbar ist, an welchen Stellen die Speicher- und Traffi
    * Ruft beim Laden der Seite asynchron per AJAX den Backend-Scanner `acp/includes/ajax/storage_analytics_scan.php` auf (bzw. mit `?force_refresh=1` beim Klick auf den Button **„Jetzt live neu berechnen“**).
 4. **AJAX-Scanner & Berechnungs-Backend (`acp/includes/ajax/storage_analytics_scan.php`)**:
    * Führt den physischen Dateisystem-Scan, die Datenbank-Auswertung, die Partitionsprüfung sowie die Traffic- und Cloud-Kostenberechnung durch und liefert ein strukturiertes JSON-Objekt zurück.
-5. **Ergänzende Schnellanzeige unter „Filme online“ (`acp/includes/movies_online.php`)**:
+5. **Sichere Einzel-Video-Testbereinigung (`acp/includes/ajax/storage_analytics_legacy_cleanup.php`)**:
+   * Ermöglicht im Tab 1 von `/Speicher-Analyse` (Abschnitt *1.2b*) das gezielte Laden eines einzelnen Test-Videos (optional gefiltert nach `movie_id` oder `merchant_id`) und die manuell bestätigte Löschung ausschließlich der veralteten `m_*.mp4`-, `m_*.webm`- und `m_*.ogv`-Dateien dieses einen Videos unter Anwendung einer **7-Stufen-Sicherheitsprüfung** (Existenz- & Größenprüfung der Desktop-MP4, strikter `m_`-Präfix-Check, Regex-Prüfung `^m_[0-9]+_[a-z0-9]+\.(mp4|webm|ogv)$`, `realpath`-Abgleich sowie anschließende Live-Nachprüfung der Desktop-MP4).
+6. **Ergänzende Schnellanzeige unter „Filme online“ (`acp/includes/movies_online.php`)**:
    * Zeigt oberhalb der Tabelle unter `/Filme-online` eine kompakte Zusammenfassung des reinen Online-Video-Speicherplatzes an (Cache-Datei: `sys_get_temp_dir() . '/erocloud_movies_online_size.cache'`).
 
 ---

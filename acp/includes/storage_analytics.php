@@ -189,7 +189,7 @@ $site .= '
 
         <h3 style="font-size: 16px; margin: 25px 0 10px 0; color: #333;">1.2 Aufschl&uuml;sselung der Video-Dateiformate (Konvertierungs-Ergebnisse)</h3>
         <div class="ui-widget-content" style="padding: 12px 15px; margin-bottom: 12px; border-radius: 4px; border: 1px solid #D1D1D1; background: #fcfdfd; font-size: 13px; line-height: 1.5;">
-            Pro hochgeladenem Film erzeugt der Cronjob <code>cronjobs/convert_movie.php</code> derzeit <strong>4 Videodateien</strong> (Desktop-MP4, Mobile-MP4, Mobile-WebM, Mobile-OGV) sowie <strong>10 Vorschaubilder</strong>. Die nachfolgende Tabelle zeigt exakt, wie viel Speicherplatz jede dieser Dateigruppen verbraucht und ob sie im System tats&auml;chlich ben&ouml;tigt wird:
+            F&uuml;r bestehende Filme wurden historisch durch <code>cronjobs/convert_movie.php</code> jeweils <strong>4 Videodateien</strong> (Desktop-MP4, Mobile-MP4, Mobile-WebM, Mobile-OGV) sowie <strong>10 Vorschaubilder</strong> angelegt (f&uuml;r Neu-Uploads ist die Konvertierung der 3 Mobil-Formate bereits deaktiviert). Die nachfolgende Tabelle zeigt exakt, wie viel Speicherplatz jede dieser Dateigruppen aktuell auf dem Server belegt:
         </div>
         <table class="sa-table" id="sa-table-formats">
             <thead>
@@ -204,6 +204,118 @@ $site .= '
             </thead>
             <tbody></tbody>
         </table>
+
+        <!-- 1.2b SICHERE EINZEL-VIDEO-TESTBEREINIGUNG -->
+        <h3 style="font-size: 16px; margin: 28px 0 10px 0; color: #333;">1.2b Sichere Einzel-Video-Testbereinigung (<code>m_*.mp4</code>, <code>m_*.webm</code>, <code>m_*.ogv</code>)</h3>
+        <div class="ui-widget-content" style="padding: 16px; margin-bottom: 22px; border-radius: 4px; border: 2px solid #1c94c4; background: #fbfdff; font-size: 13px; line-height: 1.5;">
+            <div style="margin-bottom: 12px;">
+                <strong style="font-size: 14px; color: #0c5460;">&#x1f6e1; 7-Stufen-Sicherheitsmodus (Einzel-Video-Test):</strong><br />
+                Hier k&ouml;nnen Sie die Bereinigung der nicht mehr ben&ouml;tigten Mobil-Dateien (<code>m_*.mp4</code>, <code>m_*.webm</code>, <code>m_*.ogv</code>) zun&auml;chst gezielt an <strong>einem einzigen Video</strong> testen und die exakten Server-Pfade vor und nach dem L&ouml;schen kontrollieren. <strong>Es wird nichts automatisch gel&ouml;scht.</strong> Eine Datei wird nur dann zur L&ouml;schung freigegeben, wenn die Desktop-Hauptdatei (<code>{id}_{file_id}.mp4</code>) physisch existiert, gr&ouml;&szlig;er als 0 Bytes ist und die zu l&ouml;schende Datei eindeutig mit dem Pr&auml;fix <code>m_</code> beginnt.
+            </div>
+
+            <!-- Such- & Filterleiste für das Einzel-Video -->
+            <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; padding: 12px; background: #f1f6fa; border: 1px solid #c5dbec; border-radius: 4px; margin-bottom: 15px;">
+                <div>
+                    <label for="sa-test-movie-id" style="display: block; font-weight: bold; font-size: 12px; margin-bottom: 4px; color: #333;">Gezielte Film-ID (optional):</label>
+                    <input type="number" id="sa-test-movie-id" placeholder="z. B. 4812" style="padding: 5px 8px; width: 130px; border: 1px solid #ccc; border-radius: 3px;" />
+                </div>
+                <div>
+                    <label for="sa-test-merchant-id" style="display: block; font-weight: bold; font-size: 12px; margin-bottom: 4px; color: #333;">H&auml;ndler-/Creator-ID (optional):</label>
+                    <input type="number" id="sa-test-merchant-id" placeholder="z. B. 10061" style="padding: 5px 8px; width: 150px; border: 1px solid #ccc; border-radius: 3px;" />
+                </div>
+                <div>
+                    <button type="button" id="btn-sa-load-preview" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only" style="padding: 6px 14px; font-size: 12px; font-weight: bold; cursor: pointer;">
+                        <span class="ui-button-text">&#x1f50d; 1 Test-Video in Vorschau laden</span>
+                    </button>
+                </div>
+                <div>
+                    <button type="button" id="btn-sa-next-preview" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only" style="padding: 6px 14px; font-size: 12px; cursor: pointer; display: none;">
+                        <span class="ui-button-text">&#x27a1; Anderes Test-Video anzeigen</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Status-/Hinweisbox für Vorschau -->
+            <div id="sa-cleanup-msg" style="display: none; padding: 12px 15px; border-radius: 4px; margin-bottom: 12px; font-weight: bold;"></div>
+
+            <!-- Nachher-Prüfprotokoll nach erfolgreicher Einzel-Löschung -->
+            <div id="sa-cleanup-result-box" style="display: none; padding: 15px; border-radius: 4px; border: 2px solid #28a745; background: #f3fff5; margin-bottom: 15px;"></div>
+
+            <!-- Detail-Vorschau für das EINE ausgewählte Video -->
+            <div id="sa-cleanup-preview-card" style="display: none; border: 1px solid #ccc; border-radius: 4px; background: #fff; padding: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid #e5e5e5; padding-bottom: 12px; margin-bottom: 14px;">
+                    <div>
+                        <div style="font-size: 15px; font-weight: bold; color: #222; margin-bottom: 4px;">
+                            Test-Video #<span id="sa-prev-movie-id">-</span>: <span id="sa-prev-title" style="color: #1c94c4;">-</span>
+                        </div>
+                        <div style="font-size: 12px; color: #555;">
+                            <strong>H&auml;ndler-ID:</strong> <span id="sa-prev-merchant-id">-</span> |
+                            <strong>Darsteller:</strong> <span id="sa-prev-actor">-</span> |
+                            <strong>File-ID:</strong> <code id="sa-prev-file-id">-</code> |
+                            <strong>Aufl&ouml;sung:</strong> <span id="sa-prev-res">-</span> |
+                            <strong>L&auml;nge:</strong> <span id="sa-prev-len">-</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="sa-badge" style="background: #1c94c4; font-size: 12px; padding: 5px 10px;">Vorschau f&uuml;r 1 einzelnes Video</span>
+                    </div>
+                </div>
+
+                <!-- Exakter Ordnerpfad zum Prüfen auf dem Server -->
+                <div style="padding: 10px 12px; background: #f7f7f7; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 15px; font-size: 12px;">
+                    <strong>Physischer Verzeichnispfad auf dem Server (zum Kopieren / Pr&uuml;fen per SSH oder FTP):</strong><br />
+                    <code id="sa-prev-folder-path" style="font-size: 13px; color: #000; word-break: break-all; display: inline-block; margin-top: 4px; background: #fff; padding: 4px 8px; border: 1px solid #ccc; border-radius: 3px;">-</code>
+                </div>
+
+                <!-- GRÜNER BEREICH: GESCHÜTZTE DATEIEN (WERDEN NIEMALS GELÖSCHT) -->
+                <div style="padding: 12px 15px; background: #f2fbf4; border: 1px solid #b7e1c1; border-radius: 4px; margin-bottom: 15px;">
+                    <div style="font-weight: bold; color: #0f6826; margin-bottom: 8px; font-size: 13px;">
+                        &#x2705; Gesch&uuml;tzte Dateien in diesem Ordner (bleiben zu 100 % unangetastet):
+                    </div>
+                    <table class="sa-table" style="margin-bottom: 0;">
+                        <thead>
+                            <tr>
+                                <th>Rolle / Schutzstatus</th>
+                                <th>Dateiname</th>
+                                <th>Vollst&auml;ndiger Serverpfad</th>
+                                <th>Dateigr&ouml;&szlig;e</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sa-prev-protected-tbody"></tbody>
+                    </table>
+                </div>
+
+                <!-- ROTER BEREICH: ZU LÖSCHENDE MOBIL-DATEIEN (m_*.mp4, m_*.webm, m_*.ogv) -->
+                <div style="padding: 12px 15px; background: #fff6f6; border: 1px solid #f1b8b8; border-radius: 4px; margin-bottom: 15px;">
+                    <div style="font-weight: bold; color: #b30000; margin-bottom: 8px; font-size: 13px;">
+                        &#x1f5d1; Zur L&ouml;schung vorgemerkte veraltete Mobil-Dateien (<span id="sa-prev-del-count">0</span> Dateien | Freizugebender Speicher: <span id="sa-prev-del-size">0 Bytes</span>):
+                    </div>
+                    <table class="sa-table" style="margin-bottom: 0;">
+                        <thead>
+                            <tr>
+                                <th>Dateiname (Pr&auml;fix <code>m_</code>)</th>
+                                <th>Format-Typ</th>
+                                <th>Vollst&auml;ndiger Serverpfad (wird per <code>unlink</code> entfernt)</th>
+                                <th>Dateigr&ouml;&szlig;e</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sa-prev-deletable-tbody"></tbody>
+                    </table>
+                </div>
+
+                <!-- BESTÄTIGUNGS-BUTTON FÜR DIESES EINE VIDEO -->
+                <div id="sa-prev-action-bar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding-top: 8px;">
+                    <div style="font-size: 12px; color: #555;">
+                        <strong>Sicherheitshinweis:</strong> Beim Klick auf den roten Button werden ausschlie&szlig;lich die oben in der roten Tabelle aufgelisteten <code>m_*</code>-Dateien dieses einen Videos gel&ouml;scht.
+                    </div>
+                    <div>
+                        <button type="button" id="btn-sa-delete-single" style="background: #c00000; color: #fff; border: 1px solid #900000; border-radius: 4px; padding: 8px 16px; font-size: 13px; font-weight: bold; cursor: pointer;">
+                            &#x1f5d1; Jetzt NUR f&uuml;r dieses 1 Video (#<span id="sa-btn-movie-id">-</span>) die <span id="sa-btn-del-count">0</span> markierten m_*-Dateien l&ouml;schen
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <h3 style="font-size: 16px; margin: 25px 0 10px 0; color: #333;">1.3 Videos nach Freigabe-Status</h3>
         <table class="sa-table" id="sa-table-statuses">
@@ -462,6 +574,203 @@ $site .= '
 
         jQuery("#btn-sa-refresh").click(function() {
             loadStorageAnalytics(true);
+        });
+
+        var currentPreviewMovie = null;
+        var currentSkipIndex = 0;
+
+        function renderSingleMoviePreview(m) {
+            currentPreviewMovie = m;
+            jQuery("#sa-prev-movie-id").text(m.movie_id);
+            jQuery("#sa-prev-title").text(m.title);
+            jQuery("#sa-prev-merchant-id").text(m.merchant_id);
+            jQuery("#sa-prev-actor").text(m.actor_username + " (#" + m.actor_id + ")");
+            jQuery("#sa-prev-file-id").text(m.file_id);
+            jQuery("#sa-prev-res").text(m.resolution);
+            jQuery("#sa-prev-len").text(m.playtime_string);
+            jQuery("#sa-prev-folder-path").text(m.folder_path + "/");
+
+            // Geschützte Dateien rendern (Desktop-MP4 + Vorschaubilder)
+            var protBody = jQuery("#sa-prev-protected-tbody");
+            protBody.empty();
+
+            var trDesktop = jQuery("<tr>");
+            if (m.desktop_exists && m.desktop_size_bytes > 0) {
+                trDesktop.append(jQuery("<td>").html(\'<span class="sa-badge" style="background:#008000;">GESCH&Uuml;TZT (DESKTOP-HAUPTVIDEO)</span>\'));
+                trDesktop.append(jQuery("<td>").html("<strong>" + jQuery("<div>").text(m.desktop_filename).html() + "</strong>"));
+                trDesktop.append(jQuery("<td>").html("<code>" + jQuery("<div>").text(m.desktop_full_path).html() + "</code>"));
+                trDesktop.append(jQuery("<td>").html(\'<strong style="color:#008000;">\' + m.desktop_size_formatted + "</strong>"));
+            } else {
+                trDesktop.append(jQuery("<td>").html(\'<span class="sa-badge" style="background:#c00000;">FEHLT / 0 BYTES (L&Ouml;SCHSPERRE AKTIV)</span>\'));
+                trDesktop.append(jQuery("<td>").text(m.desktop_filename));
+                trDesktop.append(jQuery("<td>").html("<code>" + jQuery("<div>").text(m.desktop_full_path).html() + "</code>"));
+                trDesktop.append(jQuery("<td>").text("0 Bytes"));
+            }
+            protBody.append(trDesktop);
+
+            var trThumbs = jQuery("<tr>");
+            trThumbs.append(jQuery("<td>").html(\'<span class="sa-badge" style="background:#008000;">GESCH&Uuml;TZT (VORSCHAUBILDER)</span>\'));
+            trThumbs.append(jQuery("<td>").html("<strong>" + m.thumbnails_count + "x thumb_*.jpg / .png</strong>"));
+            trThumbs.append(jQuery("<td>").html("<code>" + jQuery("<div>").text(m.folder_path + "/thumb_" + m.movie_id + "_" + m.file_id + "_*.jpg").html() + "</code>"));
+            trThumbs.append(jQuery("<td>").text(m.thumbnails_formatted));
+            protBody.append(trThumbs);
+
+            // Zu löschende m_*-Dateien rendern
+            var delBody = jQuery("#sa-prev-deletable-tbody");
+            delBody.empty();
+            jQuery("#sa-prev-del-count").text(m.deletable_count);
+            jQuery("#sa-prev-del-size").text(m.deletable_total_fmt);
+
+            if (m.deletable_count > 0) {
+                jQuery.each(m.deletable_files, function(idx, df) {
+                    var trDel = jQuery("<tr>");
+                    trDel.append(jQuery("<td>").html(\'<strong style="color:#c00000;">\' + jQuery("<div>").text(df.filename).html() + "</strong>"));
+                    trDel.append(jQuery("<td>").text(df.format_label));
+                    trDel.append(jQuery("<td>").html("<code>" + jQuery("<div>").text(df.full_path).html() + "</code>"));
+                    trDel.append(jQuery("<td>").html("<strong>" + df.size_formatted + "</strong>"));
+                    delBody.append(trDel);
+                });
+                jQuery("#sa-btn-movie-id").text(m.movie_id);
+                jQuery("#sa-btn-del-count").text(m.deletable_count);
+                jQuery("#sa-prev-action-bar").show();
+            } else {
+                var trEmpty = jQuery("<tr>");
+                trEmpty.append(jQuery(\'<td colspan="4" style="text-align:center; color:#008000; font-weight:bold; padding:12px;">\').html("&#x2705; In diesem Film-Ordner befinden sich keine veralteten m_*-Dateien (mehr). Die Desktop-MP4 und alle Vorschaubilder sind vollst&auml;ndig vorhanden."));
+                delBody.append(trEmpty);
+                jQuery("#sa-prev-action-bar").hide();
+            }
+
+            jQuery("#sa-cleanup-preview-card").show();
+        }
+
+        function loadSingleMoviePreview(resetSkip) {
+            if (resetSkip) {
+                currentSkipIndex = 0;
+            }
+            jQuery("#sa-cleanup-msg").hide();
+            var movieId = jQuery.trim(jQuery("#sa-test-movie-id").val());
+            var merchantId = jQuery.trim(jQuery("#sa-test-merchant-id").val());
+
+            jQuery("#btn-sa-load-preview").prop("disabled", true);
+
+            jQuery.ajax({
+                url: "' . ACP_URL . '/Ajax/storage_analytics_legacy_cleanup.php",
+                type: "GET",
+                dataType: "json",
+                data: {
+                    action: "preview",
+                    movie_id: movieId,
+                    merchant_id: merchantId,
+                    skip: currentSkipIndex
+                },
+                success: function(res) {
+                    jQuery("#btn-sa-load-preview").prop("disabled", false);
+                    if (res.error) {
+                        jQuery("#sa-cleanup-preview-card").hide();
+                        jQuery("#sa-cleanup-msg").css({"background": "#fff3f3", "border": "1px solid #f5c6cb", "color": "#c00000"}).text(res.error).show();
+                        return;
+                    }
+                    if (!res.found) {
+                        jQuery("#sa-cleanup-preview-card").hide();
+                        jQuery("#sa-cleanup-msg").css({"background": "#FFF9E6", "border": "1px solid #FFE0B2", "color": "#8a5a00"}).text(res.message).show();
+                        jQuery("#btn-sa-next-preview").hide();
+                        return;
+                    }
+                    renderSingleMoviePreview(res.movie);
+                    if (!movieId) {
+                        jQuery("#btn-sa-next-preview").show();
+                    } else {
+                        jQuery("#btn-sa-next-preview").hide();
+                    }
+                },
+                error: function(xhr, status, err) {
+                    jQuery("#btn-sa-load-preview").prop("disabled", false);
+                    alert("Fehler beim Laden der Einzel-Video-Vorschau: " + err);
+                }
+            });
+        }
+
+        jQuery("#btn-sa-load-preview").click(function() {
+            jQuery("#sa-cleanup-result-box").hide();
+            loadSingleMoviePreview(true);
+        });
+
+        jQuery("#btn-sa-next-preview").click(function() {
+            jQuery("#sa-cleanup-result-box").hide();
+            currentSkipIndex++;
+            loadSingleMoviePreview(false);
+        });
+
+        jQuery("#btn-sa-delete-single").click(function() {
+            if (!currentPreviewMovie || !currentPreviewMovie.can_delete_safely) {
+                alert("Sicherheitssperre: Für dieses Video liegt keine gültige Löschfreigabe vor.");
+                return;
+            }
+
+            var fileNamesList = [];
+            jQuery.each(currentPreviewMovie.deletable_files, function(i, f) {
+                fileNamesList.push(" - " + f.filename + " (" + f.size_formatted + ")");
+            });
+
+            var confirmMsg = "SICHERHEITS-BESTÄTIGUNG (Einzel-Video-Test):\n\n" +
+                "Möchten Sie jetzt für das Video #" + currentPreviewMovie.movie_id + " (\"" + currentPreviewMovie.title + "\") im Ordner:\n" +
+                currentPreviewMovie.folder_path + "/\n\n" +
+                "wirklich NUR die folgenden " + currentPreviewMovie.deletable_count + " veralteten Mobil-Dateien löschen?\n" +
+                fileNamesList.join("\n") + "\n\n" +
+                "GESCHÜTZT (bleibt zu 100 % erhalten):\n" +
+                " - " + currentPreviewMovie.desktop_filename + " (" + currentPreviewMovie.desktop_size_formatted + ")";
+
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+
+            jQuery("#btn-sa-delete-single").prop("disabled", true).text("Lösche markierte m_*-Dateien und prüfe Desktop-MP4...");
+
+            jQuery.ajax({
+                url: "' . ACP_URL . '/Ajax/storage_analytics_legacy_cleanup.php",
+                type: "POST",
+                dataType: "json",
+                data: {
+                    action: "delete_single",
+                    movie_id: currentPreviewMovie.movie_id,
+                    confirm_file_id: currentPreviewMovie.file_id
+                },
+                success: function(res) {
+                    jQuery("#btn-sa-delete-single").prop("disabled", false);
+                    if (res.error) {
+                        alert("Fehler / Sicherheitssperre: " + res.error);
+                        renderSingleMoviePreview(currentPreviewMovie);
+                        return;
+                    }
+
+                    var html = \'<div style="font-size:14px; font-weight:bold; color:#0f6826; margin-bottom:8px;">&#x2705; Einzel-Bereinigung für Video #\' + res.movie_id + \' erfolgreich abgeschlossen (Freigegeben: \' + res.freed_formatted + \')</div>\';
+                    html += \'<div style="margin-bottom:8px;"><strong>Gelöschte m_*-Dateien (\' + res.deleted_count + \'):</strong><ul style="margin:4px 0 8px 20px;">\';
+                    jQuery.each(res.deleted_files, function(i, df) {
+                        var statusText = df.verified_gone ? \'<span style="color:#008000; font-weight:bold;">[Vom Server gelöscht bestätigt]</span>\' : \'<span style="color:#c00000;">[Noch vorhanden]</span>\';
+                        html += "<li><code>" + jQuery("<div>").text(df.full_path).html() + "</code> (" + df.size_formatted + ") " + statusText + "</li>";
+                    });
+                    html += "</ul></div>";
+
+                    if (res.desktop_verified_intact) {
+                        html += \'<div style="padding:8px 12px; background:#e2f6e6; border:1px solid #8fd19e; border-radius:3px; color:#0a4b19;">\';
+                        html += \'<strong>&#x1f6e1; Live-Nachprüfung der Desktop-MP4 auf dem Server:</strong><br />\';
+                        html += \'Die Hauptdatei <code>\' + jQuery("<div>").text(res.desktop_full_path).html() + \'</code> ist <strong>unverändert vorhanden</strong> (Größe exakt: <strong>\' + res.desktop_size_formatted + \'</strong>) sowie <strong>\' + res.thumbnails_count_after + \' Vorschaubilder</strong> intakt.\';
+                        html += "</div>";
+                    } else {
+                        html += \'<div style="padding:8px 12px; background:#ffe6e6; border:1px solid #f5c6cb; color:#c00000; font-weight:bold;">Warnung: Bitte prüfen Sie den Ordner manuell auf dem Server!</div>\';
+                    }
+
+                    jQuery("#sa-cleanup-result-box").html(html).show();
+
+                    if (res.movie_after) {
+                        renderSingleMoviePreview(res.movie_after);
+                    }
+                },
+                error: function(xhr, status, err) {
+                    jQuery("#btn-sa-delete-single").prop("disabled", false);
+                    alert("Fehler bei der Lösch-Anfrage: " + err);
+                }
+            });
         });
 
         loadStorageAnalytics(false);
