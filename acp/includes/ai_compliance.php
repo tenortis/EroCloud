@@ -320,12 +320,20 @@ $site .= '
 
                 <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 15px; background: #f4f8fb; padding: 12px; border-radius: 4px;">
                     <div>
-                        <label style="font-size: 12px; font-weight: bold; margin-right: 6px;">Modus / Test-Szenario f&uuml;r Audio-Transkription:</label>
+                        <label style="font-size: 12px; font-weight: bold; margin-right: 6px;">Modus:</label>
                         <select id="aic-sim-scenario" class="aic-select">
-                            <option value="clean">Standard: Live-Audio aus MP4 (bzw. unbedenklicher deutscher Dialog)</option>
+                            <option value="clean">Live-Audio aus echter MP4 auswerten (whisper.cpp)</option>
                             <option value="bram_violation">Test-Szenario ROT: Gesprochener BRAM-Versto&szlig; im Video (K.O.-Tropfen / Kinderzimmer / PayPal)</option>
                             <option value="bram_warning">Test-Szenario GELB: Gesprochene Grauzone im Video (Stiefmutter / Fesselung / Natursekt)</option>
                             <option value="english_clean">Test-Szenario EN: Englischer Video-Dialog (Spracherkennung Englisch)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; font-weight: bold; margin-right: 6px;">Audio-Umfang:</label>
+                        <select id="aic-audio-limit" class="aic-select">
+                            <option value="120">Erste 2 Min. (Schnell-Test ~10 Sek.)</option>
+                            <option value="300">Erste 5 Min. (~25 Sek.)</option>
+                            <option value="0">Komplettes Video</option>
                         </select>
                     </div>
                     <div>
@@ -795,8 +803,9 @@ jQuery(document).ready(function() {
         if (!currentMovieId) return;
         var btn = jQuery(this);
         var scenario = jQuery("#aic-sim-scenario").val();
+        var audioLimit = jQuery("#aic-audio-limit").val();
         btn.prop("disabled", true).text("Audio & Untertitel werden verarbeitet...");
-        jQuery("#aic-whisper-timer").text("Bitte warten...");
+        jQuery("#aic-whisper-timer").text("Bitte warten (Whisper transkribiert echtes Audio)...");
 
         jQuery.ajax({
             url: "' . ACP_URL . '/includes/ajax/ai_compliance_action.php",
@@ -804,7 +813,8 @@ jQuery(document).ready(function() {
             data: {
                 action: "run_whisper",
                 movie_id: currentMovieId,
-                sim_scenario: scenario
+                sim_scenario: scenario,
+                audio_limit_sec: audioLimit
             },
             dataType: "json",
             success: function(res) {

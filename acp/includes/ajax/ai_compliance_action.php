@@ -112,6 +112,43 @@ function aic_ensure_table() {
 }
 
 /**
+ * Prueft Existenz einer Datei auch ausserhalb von PHP open_basedir (z.B. /usr/bin/ffmpeg unter LiveConfig).
+ */
+function aic_file_or_exec_exists($path) {
+    if (@file_exists($path)) {
+        return true;
+    }
+    if (function_exists('exec')) {
+        $out = array();
+        $ret = 1;
+        @exec('test -e ' . escapeshellarg($path) . ' && echo 1', $out, $ret);
+        if ($ret === 0 && isset($out[0]) && trim($out[0]) === '1') {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Bereinigt Datenbank-Texte von HTML-Tags (<p>, <br>) und wandelt HTML-Entities (&auml;, &uuml;, &szlig;) in echte UTF-8 Umlaute um.
+ */
+function aic_clean_html_text($str) {
+    if ($str === null || $str === '') {
+        return '';
+    }
+    $str = aic_utf8((string)$str);
+    $str = preg_replace('/<br\s*\/?>/i', "\n", $str);
+    $str = preg_replace('/<\/p>\s*<p[^>]*>/i', "\n\n", $str);
+    $str = strip_tags($str);
+    $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    // Falls doppelt kodierte Entities vorlagen, ein zweites Mal dekodieren
+    if (strpos($str, '&') !== false) {
+        $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
+    return trim($str);
+}
+
+/**
  * Prueft den Status der lokalen KI-Werkzeuge (FFmpeg, whisper.cpp, llama.cpp / Ollama).
  */
 function aic_check_environment() {
@@ -119,8 +156,8 @@ function aic_check_environment() {
     $whisper_bin_candidates = array(
         $ai_base_dir . '/whisper.cpp/build/bin/whisper-cli',
         $ai_base_dir . '/whisper.cpp/build/bin/main',
-        '/opt/erocloud_ai/whisper.cpp/build/bin/whisper-cli',
-        '/usr/local/bin/whisper-cli'
+        '/var/www/web1/priv/ai/whisper.cpp/build/bin/whisper-cli',
+        '/opt/erocloud_ai/whisper.cpp/build/bin/whisper-cli'
     );
     $whisper_model_candidates = array(
         'small' => $ai_base_dir . '/models/ggml-small-q5_1.bin',
@@ -131,20 +168,17 @@ function aic_check_environment() {
 
     $found_whisper_bin = $whisper_bin_candidates[0];
     foreach ($whisper_bin_candidates as $cand_bin) {
-        if (@file_exists($cand_bin)) {
+        if (aic_file_or_exec_exists($cand_bin)) {
             $found_whisper_bin = $cand_bin;
             break;
         }
     }
 
-    $found_whisper_model = $whisper_model_candidates['turbo'];
+    $found_whisper_model = $whisper_model_candidates['small'];
     $available_whisper_models = array();
     foreach ($whisper_model_candidates as $m_key => $cand_mod) {
-        if (@file_exists($cand_mod)) {
+        if (aic_file_or_exec_exists($cand_mod)) {
             $available_whisper_models[$m_key] = $cand_mod;
-            if ($found_whisper_model === $whisper_model_candidates['turbo'] && !@file_exists($found_whisper_model)) {
-                $found_whisper_model = $cand_mod;
-            }
         }
     }
     if (isset($available_whisper_models['small'])) {
@@ -153,26 +187,20 @@ function aic_check_environment() {
         $found_whisper_model = $available_whisper_models['turbo'];
     }
 
+    $ffmpeg_bin = defined('FFMPEG_PATH') ? rtrim(FFMPEG_PATH, '/') . '/ffmpeg' : '/usr/bin/ffmpeg';
+
     $env = array(
         'ai_base_dir'              => $ai_base_dir,
-        'ffmpeg_bin'               => defined('FFMPEG_PATH') ? rtrim(FFMPEG_PATH, '/') . '/ffmpeg' : '/usr/bin/ffmpeg',
-        'ffmpeg_ready'             => false,
+        'ffmpeg_bin'               => $ffmpeg_bin,
+        'ffmpeg_ready'             => aic_file_or_exec_exists($ffmpeg_bin) || aic_file_or_exec_exists('/usr/bin/ffmpeg'),
         'whisper_bin'              => $found_whisper_bin,
         'whisper_model'            => $found_whisper_model,
         'available_whisper_models' => $available_whisper_models,
-        'whisper_ready'            => false,
+        'whisper_ready'            => (aic_file_or_exec_exists($found_whisper_bin) && count($available_whisper_models) > 0),
         'llm_endpoint'             => 'http://127.0.0.1:8080/v1/chat/completions',
         'llm_ready'                => false,
         'llm_model_name'           => 'Nicht verbunden (Regel- & Keyword-Engine aktiv)'
     );
-
-    if (@file_exists($env['ffmpeg_bin']) || @file_exists('/usr/bin/ffmpeg') || @file_exists('/usr/local/bin/ffmpeg')) {
-        $env['ffmpeg_ready'] = true;
-    }
-
-    if (@file_exists($env['whisper_bin']) && @file_exists($env['whisper_model'])) {
-        $env['whisper_ready'] = true;
-    }
 
     // Kurzer Health-Check auf lokalen llama-server (Port 8080) oder Ollama (Port 11434)
     if (function_exists('curl_init')) {
@@ -290,9 +318,9 @@ function aic_analyze_texts($movie_data, $segments, $spoken_transcript, $env) {
     $rules_data = aic_load_keyword_rules();
     $categories = isset($rules_data['categories']) ? $rules_data['categories'] : array();
 
-    $title       = isset($movie_data['title']) ? (string)$movie_data['title'] : '';
-    $description = isset($movie_data['description']) ? (string)$movie_data['description'] : '';
-    $meta_text   = trim((isset($movie_data['meta_title']) ? $movie_data['meta_title'] : '') . ' ' . (isset($movie_data['meta_description']) ? $movie_data['meta_description'] : ''));
+    $title       = isset($movie_data['title']) ? aic_clean_html_text($movie_data['title']) : '';
+    $description = isset($movie_data['description']) ? aic_clean_html_text($movie_data['description']) : '';
+    $meta_text   = aic_clean_html_text((isset($movie_data['meta_title']) ? $movie_data['meta_title'] : '') . ' ' . (isset($movie_data['meta_description']) ? $movie_data['meta_description'] : ''));
 
     $violations = array();
     $detected_topics = array();
@@ -545,10 +573,10 @@ function aic_get_movie_details($movie_id) {
         'merchant_id'      => (int)$m->merchant_id,
         'actor_id'         => (int)$m->actor_id,
         'file_id'          => (string)$m->file_id,
-        'title'            => (string)$m->title,
-        'description'      => (string)$m->description,
-        'meta_title'       => isset($m->meta_title) ? (string)$m->meta_title : '',
-        'meta_description' => isset($m->meta_description) ? (string)$m->meta_description : '',
+        'title'            => aic_clean_html_text($m->title),
+        'description'      => aic_clean_html_text($m->description),
+        'meta_title'       => isset($m->meta_title) ? aic_clean_html_text($m->meta_title) : '',
+        'meta_description' => isset($m->meta_description) ? aic_clean_html_text($m->meta_description) : '',
         'movie_language'   => isset($m->movie_language) ? (string)$m->movie_language : '',
         'playtime_seconds' => (int)$m->playtime_seconds,
         'playtime_fmt'     => aic_format_time((int)$m->playtime_seconds),
@@ -747,9 +775,10 @@ if ($action === 'load_movie') {
 }
 
 if ($action === 'run_whisper') {
-    $movie_id = isset($_POST['movie_id']) ? abs($_POST['movie_id']) : 0;
-    $sim_scenario = isset($_POST['sim_scenario']) ? trim($_POST['sim_scenario']) : 'clean';
-    $details = aic_get_movie_details($movie_id);
+    $movie_id        = isset($_POST['movie_id']) ? abs($_POST['movie_id']) : 0;
+    $sim_scenario    = isset($_POST['sim_scenario']) ? trim($_POST['sim_scenario']) : 'clean';
+    $audio_limit_sec = isset($_POST['audio_limit_sec']) ? abs($_POST['audio_limit_sec']) : 120;
+    $details         = aic_get_movie_details($movie_id);
 
     if (!$details) {
         aic_send_json(array('status' => 'error', 'message' => 'Ungültige Film-ID.'));
@@ -763,17 +792,20 @@ if ($action === 'run_whisper') {
     $sub_status    = 2;
     $mode_used     = '';
 
-    // Pruefen, ob physische MP4 UND whisper.cpp auf dem Live-Server bereitstehen
-    if ($details['mp4_exists'] && $env['ffmpeg_ready'] && $env['whisper_ready']) {
+    // Wenn die echte MP4 auf dem Server liegt und "clean" (Live-Audio aus MP4) gewaehlt ist -> IMMER echtes FFmpeg + whisper.cpp ausfuehren!
+    if ($details['mp4_exists'] && $sim_scenario === 'clean') {
         @set_time_limit(600);
         $model_label = basename($env['whisper_model']);
-        $mode_used = 'Live-Server (FFmpeg WAV -> whisper.cpp [' . $model_label . '])';
+        $limit_label = ($audio_limit_sec > 0) ? ('Erste ' . round($audio_limit_sec / 60, 1) . ' Min.') : 'Komplettes Video';
+        $mode_used   = 'Live-Server (FFmpeg -> whisper.cpp [' . $model_label . ' | ' . $limit_label . '])';
+
         $tmp_dir   = (defined('TEMP_DIR') && @is_dir(TEMP_DIR) && @is_writable(TEMP_DIR)) ? rtrim(TEMP_DIR, '/') : rtrim(sys_get_temp_dir(), '/');
         $wav_tmp   = $tmp_dir . '/erocloud_ai_audio_' . $details['id'] . '_' . time() . '.wav';
         $json_base = $tmp_dir . '/erocloud_ai_out_' . $details['id'] . '_' . time();
 
+        $ffmpeg_limit_arg = ($audio_limit_sec > 0) ? (' -t ' . (int)$audio_limit_sec . ' ') : ' ';
         $cmd_wav = escapeshellcmd($env['ffmpeg_bin']) . ' -y -i ' . escapeshellarg($details['mp4_path'])
-            . ' -vn -acodec pcm_s16le -ar 16000 -ac 1 ' . escapeshellarg($wav_tmp) . ' 2>&1';
+            . $ffmpeg_limit_arg . '-vn -acodec pcm_s16le -ar 16000 -ac 1 ' . escapeshellarg($wav_tmp) . ' 2>&1';
         @exec($cmd_wav, $out_wav, $ret_wav);
 
         if ($ret_wav === 0 && @file_exists($wav_tmp)) {
@@ -809,11 +841,18 @@ if ($action === 'run_whisper') {
                 @copy($json_base . '.vtt', $target_vtt);
                 @unlink($json_base . '.vtt');
             }
+            if ($transcript === '') {
+                $transcript = '[00:00 - 00:05] (Kein gesprochener Dialog in diesem Audio-Abschnitt erkannt)';
+            }
         } else {
             @unlink($wav_tmp);
+            aic_send_json(array(
+                'status'  => 'error',
+                'message' => 'FFmpeg konnte keine WAV-Audiospur aus der MP4 extrahieren. Rückgabecode: ' . $ret_wav
+            ));
         }
     } else {
-        // Test- & Simulationsmodus (fuer lokale Entwicklung oder solange whisper.cpp noch nicht installiert ist)
+        // Test- & Simulationsmodus (nur wenn explizit ein Test-Szenario gewaehlt wurde oder lokal ohne MP4)
         $mode_used = 'Testlabor-Simulation (Whisper-Vorschau)';
         if ($sim_scenario === 'bram_violation') {
             $detected_lang = 'de';
