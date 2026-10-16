@@ -18,3 +18,7 @@
 
 # 1x am Tag (3:00 Uhr) - Gelöschte Filme und Dateileichen physisch bereinigen
 0 3 * * * /usr/bin/php /var/www/web1/htdocs/cronjobs/delete_movie.php
+
+# alle 2 Minuten - Lokale KI-Untertitel (.vtt) & Visa/Mastercard BRAM-Compliance-Worker
+*/2 * * * * /usr/bin/php /var/www/web1/htdocs/cronjobs/ai_compliance_worker.php >/dev/null 2>&1
+
