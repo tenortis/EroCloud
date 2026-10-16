@@ -72,6 +72,76 @@ if (!function_exists('sa_scan_dir_bytes')) {
     }
 }
 
+if (!function_exists('sa_get_disk_metrics')) {
+    function sa_get_disk_metrics($disk_check_path, $fallback_used_bytes = 0.0) {
+        $disk_total = 0.0;
+        $disk_free  = 0.0;
+
+        if (function_exists('disk_total_space')) {
+            $t = @disk_total_space($disk_check_path);
+            if ($t === false || $t <= 0) {
+                $rp = @realpath($disk_check_path);
+                if ($rp) {
+                    $t = @disk_total_space($rp);
+                }
+            }
+            if ($t !== false && $t > 0) {
+                $disk_total = (float)$t;
+            }
+        }
+
+        if (function_exists('disk_free_space')) {
+            $f = @disk_free_space($disk_check_path);
+            if ($f === false || $f <= 0) {
+                $rp = @realpath($disk_check_path);
+                if ($rp) {
+                    $f = @disk_free_space($rp);
+                }
+            }
+            if ($f !== false && $f > 0) {
+                $disk_free = (float)$f;
+            }
+        }
+
+        // Fallback 1: Linux 'df -P -k' falls disk_total_space in php.ini (disable_functions) gesperrt ist
+        if ($disk_total <= 0 && function_exists('exec')) {
+            $disabled = array_map('trim', explode(',', strtolower((string)@ini_get('disable_functions'))));
+            if (!in_array('exec', $disabled)) {
+                $df_out = array();
+                $df_ret = 1;
+                @exec('df -P -k ' . escapeshellarg($disk_check_path) . ' 2>/dev/null', $df_out, $df_ret);
+                if ($df_ret === 0 && isset($df_out[1])) {
+                    $parts = preg_split('/\s+/', trim($df_out[1]));
+                    if (count($parts) >= 4 && is_numeric($parts[1]) && (float)$parts[1] > 0) {
+                        $disk_total = (float)$parts[1] * 1024.0;
+                        if ($disk_free <= 0 && is_numeric($parts[3])) {
+                            $disk_free = (float)$parts[3] * 1024.0;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback 2: Wenn disk_total_space & exec deaktiviert sind, aber disk_free_space + physischer Scan vorliegen
+        if ($disk_total <= 0 && $disk_free > 0 && $fallback_used_bytes > 0) {
+            $disk_used  = (float)$fallback_used_bytes;
+            $disk_total = $disk_used + $disk_free;
+        } else {
+            $disk_used = ($disk_total > 0) ? max(0.0, $disk_total - $disk_free) : 0.0;
+        }
+
+        $disk_used_percent = ($disk_total > 0) ? round(($disk_used / $disk_total) * 100, 1) : 0.0;
+
+        return array(
+            'path'              => $disk_check_path,
+            'total_formatted'   => sa_format_bytes($disk_total),
+            'used_formatted'    => sa_format_bytes($disk_used),
+            'free_formatted'    => sa_format_bytes($disk_free),
+            'used_percent'      => $disk_used_percent
+        );
+    }
+}
+
 $cache_file = sys_get_temp_dir() . '/erocloud_storage_analytics_cache.json';
 $cache_lifetime = 86400; // 24 Stunden Cache
 $force_refresh = (isset($_GET['force_refresh']) && $_GET['force_refresh'] == '1');
@@ -81,6 +151,20 @@ if (!$force_refresh && file_exists($cache_file) && (time() - filemtime($cache_fi
     if ($cached_json !== false && $cached_json !== '') {
         $cached_data = json_decode($cached_json, true);
         if (is_array($cached_data)) {
+            if (isset($cached_data['disk']['total_formatted']) && $cached_data['disk']['total_formatted'] === '0 Bytes') {
+                $cached_used_bytes = 0.0;
+                if (isset($cached_data['categories']) && is_array($cached_data['categories'])) {
+                    foreach ($cached_data['categories'] as $cat_item) {
+                        if (isset($cat_item['actual_bytes'])) {
+                            $cached_used_bytes += (float)$cat_item['actual_bytes'];
+                        }
+                    }
+                }
+                $cloud_root_path = MOVIES_PATH . '/' . MOVIES_DEFAULT_DIR;
+                $disk_check_path = is_dir($cloud_root_path) ? $cloud_root_path : MOVIES_PATH;
+                $cached_data['disk'] = sa_get_disk_metrics($disk_check_path, $cached_used_bytes);
+                @file_put_contents($cache_file, json_encode($cached_data));
+            }
             $cached_data['from_cache'] = true;
             $cached_data['cache_age_minutes'] = round((time() - filemtime($cache_file)) / 60);
             echo json_encode($cached_data);
@@ -265,13 +349,9 @@ $mobile_mp4_bytes = $is_local_simulation
     ? $movie_formats['mobile_mp4']['est_bytes']
     : $movie_formats['mobile_mp4']['bytes'];
 
-// Server Disk Space
+// Server Disk Path
 $cloud_root_path = MOVIES_PATH . '/' . MOVIES_DEFAULT_DIR;
 $disk_check_path = is_dir($cloud_root_path) ? $cloud_root_path : MOVIES_PATH;
-$disk_total = (float)@disk_total_space($disk_check_path);
-$disk_free  = (float)@disk_free_space($disk_check_path);
-$disk_used  = ($disk_total > 0) ? max(0.0, $disk_total - $disk_free) : 0.0;
-$disk_used_percent = ($disk_total > 0) ? round(($disk_used / $disk_total) * 100, 1) : 0.0;
 
 // -----------------------------------------------------------------------------
 // 4. STREAMING & DOWNLOAD TRAFFIC (LETZTE 6 MONATE)
@@ -449,13 +529,7 @@ $response = array(
     'physical_movie_folders'=> $physical_movie_folders_found,
     'total_db_movies'       => $total_db_movies,
 
-    'disk' => array(
-        'path'              => $disk_check_path,
-        'total_formatted'   => sa_format_bytes($disk_total),
-        'used_formatted'    => sa_format_bytes($disk_used),
-        'free_formatted'    => sa_format_bytes($disk_free),
-        'used_percent'      => $disk_used_percent
-    ),
+    'disk' => sa_get_disk_metrics($disk_check_path, $total_storage_bytes_now),
 
     'summary' => array(
         'total_cloud_formatted'         => sa_format_bytes($total_storage_bytes_now),
