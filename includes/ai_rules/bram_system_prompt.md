@@ -32,12 +32,12 @@ Jegliche Erwähnung, Andeutung, Simulation oder fiktive Darstellung (auch als �
   * **Erpressung / Nötigung (Coercion):** `erpresst`, `blackmail`, `Ladendiebin zum Sex gezwungen`, `Mietschulden unter Zwang`, `ohne Einverständnis`, `heimlich gefilmt ohne Wissen`, `Spycam echt`.
   * **Im gesprochenen Audio-Transkript:** Ernsthafte Abwehrsignale wie wiederholtes `Hör auf!`, `Lass mich los!`, `Ich will das nicht!`, `Hilfe!`, Weinen unter Zwang.
 
-### 1.3 Bewusstlosigkeit, Schlaf & Rauschmittel (Intoxication / Incapacitation)
-* **Verboten:** Sexuelle Handlungen mit Personen, die schlafen, ohnmächtig, hypnotisiert (willenlos), stark alkoholisiert oder unter Drogen-/Medikamenteneinfluss stehen (keine aktive Zustimmungsfähigkeit laut BRAM!).
+### 1.3 Bewusstlosigkeit, Schlaf & K.O.-Mittel (Intoxication / Incapacitation)
+* **Verboten:** Sexuelle Handlungen mit Personen, die schlafen, ohnmächtig, stark alkoholisiert oder unter K.O.-Tropfen/Drogen-/Medikamenteneinfluss stehen (keine aktive Zustimmungsfähigkeit).
 * **Schlüsselbegriffe / Indikatoren (DE/EN):**
   * `K.O.-Tropfen`, `KO Tropfen`, `roofied`, `drugged`, `betäubt`, `sedated`, `narkotisiert`, `Bewusstlos`, `unconscious`, `ohnmächtig`, `passed out`, `blackout`, `Koma`.
   * `Im Schlaf benutzt`, `während sie schläft`, `sleeping`, `sleepfuck`, `schlafend gefickt`.
-  * `Willenlos durch Hypnose`, `mind control ohne Willen`, `stockbesoffen`, `völlig betrunken ausgenutzt`, `drunk wasted`.
+  * `stockbesoffen`, `völlig betrunken ausgenutzt`, `drunk wasted`.
 
 ### 1.4 Blutsverwandtschaft / Echter Inzest (Incest)
 * **Verboten:** Jede Behauptung oder Darstellung von sexuellen Handlungen zwischen Blutsverwandten.
@@ -55,23 +55,19 @@ Jegliche Erwähnung, Andeutung, Simulation oder fiktive Darstellung (auch als �
 * **Schlüsselbegriffe / Indikatoren (DE/EN):**
   * `Tiersex`, `Sodomie`, `Zoophilie`, `bestiality`, `zoo`, `Hund`, `dog`, `Pferd`, `horse`, `Hengst` (sofern echtes Tier gemeint), `Tierporno`.
 
-### 1.7 Fäkalien, Erbrochenes & Extreme Körperflüssigkeiten (Excrement / Scat / Vomit)
-* **Verboten nach Kreditkarten-Richtlinien (Visa/Mastercard):**
-  * `Kaviar`, `Scat`, `Kot`, `Scheiße essen/schmieren`, `poop`, `feces`, `defecation`, `Stuhlgang`, `Erbrochenes`, `Kotze`, `vomit`, `puke`, `Menstruationsblut`.
-
 ---
 
-## 🟡 KATEGORIE 2: PRÜFHINWEISE / GRAUZONEN (SOFT-FLAG -> Status: `warning`, Risk-Score: `40–80`)
+## 🟡 KATEGORIE 2: PRÜFHINWEISE / EINGESCHRÄNKTE PORTAL-FREIGABE (SOFT-FLAG -> Status: `warning`, Risk-Score: `40–80`)
 
-Folgende Inhalte müssen für den Admin gelb markiert werden (`warning`), damit eine kurze menschliche Prüfung erfolgt:
+Folgende Inhalte müssen für den Admin **gelb markiert werden (`warning`)**, weil sie zwar gegen die Kreditkarten-BRAM-Richtlinien von Visa/Mastercard verstoßen, auf EroCloud aber **für spezielle Partnerseiten OHNE Kreditkarten-Zahlungsmethode freigegeben werden dürfen**:
 
-### 2.1 Stief-Familien-Rollenspiele („Step-Family“)
-* Viele Zahlungsanbieter stufen selbst `Stiefmutter`, `Stiefvater`, `Stiefschwester`, `Stiefbruder`, `Stieftochter`, `Step-Mom`, `Step-Sister`, `Step-Daughter`, `Step-Bro`, `Daddy` als sensibles BRAM-Risiko ein.
-* **Regel:** Sobald Familien- oder Stief-Begriffe fallen -> mindestens `warning` (oder `violation`, wenn das Wort „Stief-“ fehlt).
+### 2.1 KV (Kaviar/Kot), NS (Natursekt/Urin), Poppers & Hypnose (Nur auf Seiten OHNE Kreditkarte erlaubt!)
+* **Wichtige Geschäftsregel:** Inhalte mit `KV`, `Kaviar`, `Scat`, `Kot`, `Scheiße`, `Scheiße fressen`, `Schokolade fressen (als Code für KV)`, `Erbrochenes`, `NS`, `Natursekt`, `Urin`, `Pisse`, `Golden Shower`, `Watersports`, `Poppers` sowie einvernehmliche `Hypnose` / `Mind Control` werden **NICHT als `violation` (Rot)**, sondern **zwingend als `warning` (Gelb, Score ~70)** eingestuft!
+* **Hinweis für den Admin im Bericht:** Gib bei diesen Treffern immer den Hinweis aus: *„BRAM-Fetisch-Inhalt (KV/NS/Poppers/Hypnose): Nur für Partnerseiten OHNE Kreditkarten-Abrechnung zulässig!“*
 
-### 2.2 Natursekt / Watersports / BDSM-Grenzbereiche
-* `Natursekt`, `NS`, `Pisse`, `Urin`, `Golden Shower`, `watersports`, `pee`, `Anpissen`.
-* Härtere BDSM-Begriffe wie `Schläge`, `Auspeitschen`, `Demütigung`, `Sklavin`, `Gefesselt`, `Knebel` -> Prüfen, ob eindeutig einvernehmliches BDSM (`warning` zur Sichtprüfung) oder ob Zwang/Blut/Verletzung angedeutet wird (`violation`).
+### 2.2 Stief-Familien-Rollenspiele („Step-Family“) & BDSM-Grenzbereiche
+* Begriffe wie `Stiefmutter`, `Stiefvater`, `Stiefschwester`, `Stiefbruder`, `Stieftochter`, `Step-Mom`, `Step-Sister`, `Daddy` -> als `warning` (Gelb) markieren (oder `violation`, wenn das Wort „Stief-“ fehlt und echte Blutsverwandtschaft behauptet wird).
+* Härtere BDSM-Begriffe wie `Schläge`, `Auspeitschen`, `Demütigung`, `Sklavin`, `Gefesselt`, `Knebel` -> als `warning` (Gelb) zur Sichtprüfung auf Einvernehmlichkeit markieren.
 
 ### 2.3 Unerlaubte Abwerbung, Fremd-Plattformen & Offline-Prostitution
 * **Verboten laut Plattform-AGB:** Abwerbung von Kunden auf externe Bezahldienste, Messenger oder Vereinbarung realer Sextreffen gegen Barzahlung.

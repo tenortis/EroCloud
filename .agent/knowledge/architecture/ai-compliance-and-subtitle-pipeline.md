@@ -141,10 +141,12 @@ Um die Kerntabelle `movies` sauber zu halten und für jedes der >5.500 Videos je
 Die lokale KI wird über ein striktes System-Prompt-Regelwerk angewiesen, sowohl **direkte Begriffe** als auch **Umschreibungen / Codewörter** in folgenden Bereichen zu melden:
 1. **Minderjährigkeit / Age-Play:** Begriffe oder Rollenspiele, die unter 18-Jährige suggerieren (*Schoolgirl, Teen-Abuse, zu jung, „gerade 18“ im bedenklichen Kontext*).
 2. **Fehlende Einvernehmlichkeit (Non-Consensual / Gewalt):** Zwang, Vergewaltigungs-Rollenspiele, echt wirkende Schmerzensschreie/Hilferufe im Audio-Transkript (*„Hör auf“, „Nein“* im nicht-einvernehmlichen Kontext), Erpressung.
-3. **Bewusstlosigkeit / Rauschmittel (Intoxication):** Schlafende Personen, K.O.-Tropfen, Hypnose-Ohnmacht, schwere Trunkenheit/Drogen.
-4. **Inzest / Blutsverwandtschaft:** Direkte familiäre Bezeichnungen (*Vater, Mutter, Bruder, Schwester, Tochter, Sohn* – auch mit „Stief-“ als Warnstufe `warning` zur manuellen Admin-Sichtung).
-5. **Extreme Praktiken (Hard-BRAM-Filter):** Blut, Wunden, Waffen, Fäkalien/Urin (Scat/Watersports je nach Zahlungsanbieter-Richtlinie), Ersticken/Strangulation, Tier-Bezug (Zoophilie).
-6. **Unerlaubte Eigenwerbung / Abwerbung:** Gesprochene oder geschriebene Hinweise auf externe Bezahlmethoden, PayPal, Telegram, OnlyFans oder private Treffen/Escort.
+3. **Bewusstlosigkeit / K.O.-Mittel (Hard-Block Rot):** Schlafende Personen, K.O.-Tropfen, Ohnmacht, schwere Trunkenheit/Drogen.
+4. **Inzest / Blutsverwandtschaft:** Direkte familiäre Bezeichnungen (*Vater, Mutter, Bruder, Schwester, Tochter, Sohn* = Rot; mit „Stief-“ als Warnstufe `warning` / Gelb zur manuellen Admin-Sichtung).
+5. **Extreme Gewalt & Illegalität (Hard-Block Rot):** Blut, Wunden, Waffen, Ersticken/Strangulation, Tier-Bezug (Zoophilie § 184a StGB).
+6. **Spezielle Fetische ohne Kreditkarten-Erlaubnis (Prüfhinweis Gelb – `warning`):**
+   * **KV (Kaviar / Scheiße / Kot), NS (Natursekt / Urin), Poppers & Hypnose:** Verstoßen zwar gegen die Visa/Mastercard BRAM-Richtlinien, sind bei EroCloud aber auf speziellen Fetisch-Partnerseiten **ohne Kreditkarten-Zahlung** erlaubt. Sie werden daher bewusst **gelb (`warning`, Score 70)** markiert mit dem Hinweis: *„Nur auf Seiten OHNE Kreditkarte erlaubt!“*.
+7. **Unerlaubte Eigenwerbung / Abwerbung (Prüfhinweis Gelb – `warning`):** Gesprochene oder geschriebene Hinweise auf externe Bezahlmethoden, PayPal, Überweisung, Telegram, OnlyFans oder private Treffen/Escort.
 
 ---
 
