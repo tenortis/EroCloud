@@ -216,12 +216,12 @@ $site .= '
             <!-- Such- & Filterleiste für das Einzel-Video -->
             <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; padding: 12px; background: #f1f6fa; border: 1px solid #c5dbec; border-radius: 4px; margin-bottom: 15px;">
                 <div>
-                    <label for="sa-test-movie-id" style="display: block; font-weight: bold; font-size: 12px; margin-bottom: 4px; color: #333;">Gezielte Film-ID (optional):</label>
-                    <input type="number" id="sa-test-movie-id" placeholder="z. B. 4812" style="padding: 5px 8px; width: 130px; border: 1px solid #ccc; border-radius: 3px;" />
+                    <label for="sa-test-movie-id" style="display: block; font-weight: bold; font-size: 12px; margin-bottom: 4px; color: #333;">Gezielte Film-ID (aus &bdquo;Filme online&ldquo;):</label>
+                    <input type="number" id="sa-test-movie-id" placeholder="z. B. 21" style="padding: 5px 8px; width: 140px; border: 1px solid #ccc; border-radius: 3px;" />
                 </div>
                 <div>
-                    <label for="sa-test-merchant-id" style="display: block; font-weight: bold; font-size: 12px; margin-bottom: 4px; color: #333;">H&auml;ndler-/Creator-ID (optional):</label>
-                    <input type="number" id="sa-test-merchant-id" placeholder="z. B. 10061" style="padding: 5px 8px; width: 150px; border: 1px solid #ccc; border-radius: 3px;" />
+                    <label for="sa-test-merchant-id" style="display: block; font-weight: bold; font-size: 12px; margin-bottom: 4px; color: #333;">H&auml;ndler-/Creator-ID (MID, optional):</label>
+                    <input type="number" id="sa-test-merchant-id" placeholder="z. B. 5" style="padding: 5px 8px; width: 150px; border: 1px solid #ccc; border-radius: 3px;" />
                 </div>
                 <div>
                     <button type="button" id="btn-sa-load-preview" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only" style="padding: 6px 14px; font-size: 12px; font-weight: bold; cursor: pointer;">
@@ -246,10 +246,12 @@ $site .= '
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid #e5e5e5; padding-bottom: 12px; margin-bottom: 14px;">
                     <div>
                         <div style="font-size: 15px; font-weight: bold; color: #222; margin-bottom: 4px;">
-                            Test-Video #<span id="sa-prev-movie-id">-</span>: <span id="sa-prev-title" style="color: #1c94c4;">-</span>
+                            Test-Video (<span id="sa-prev-movie-id">-</span>): <span id="sa-prev-title" style="color: #1c94c4;">-</span>
                         </div>
                         <div style="font-size: 12px; color: #555;">
-                            <strong>H&auml;ndler-ID:</strong> <span id="sa-prev-merchant-id">-</span> |
+                            <strong>Online-ID (Filme online):</strong> <span id="sa-prev-online-id">-</span> |
+                            <strong>Ordner-ID (<code>movies.id</code>):</strong> <span id="sa-prev-db-id">-</span> |
+                            <strong>H&auml;ndler-ID (MID):</strong> <span id="sa-prev-merchant-id">-</span> |
                             <strong>Darsteller:</strong> <span id="sa-prev-actor">-</span> |
                             <strong>File-ID:</strong> <code id="sa-prev-file-id">-</code> |
                             <strong>Aufl&ouml;sung:</strong> <span id="sa-prev-res">-</span> |
@@ -581,7 +583,10 @@ $site .= '
 
         function renderSingleMoviePreview(m) {
             currentPreviewMovie = m;
-            jQuery("#sa-prev-movie-id").text(m.movie_id);
+            var idLabel = (m.online_id && m.online_id > 0) ? ("Online-ID #" + m.online_id + " / Ordner-ID #" + m.movie_id) : ("Ordner-ID #" + m.movie_id);
+            jQuery("#sa-prev-movie-id").text(idLabel);
+            jQuery("#sa-prev-online-id").text((m.online_id && m.online_id > 0) ? ("#" + m.online_id) : "nicht in movies_online");
+            jQuery("#sa-prev-db-id").text("#" + m.movie_id);
             jQuery("#sa-prev-title").text(m.title);
             jQuery("#sa-prev-merchant-id").text(m.merchant_id);
             jQuery("#sa-prev-actor").text(m.actor_username + " (#" + m.actor_id + ")");

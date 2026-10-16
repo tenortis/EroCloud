@@ -25,6 +25,19 @@ if (is_logged_in('acp') === false) {
     exit;
 }
 
+if (!function_exists('sa_safe_utf8')) {
+    function sa_safe_utf8($str) {
+        if ($str === null || $str === false) {
+            return '';
+        }
+        $str = (string)$str;
+        if (!mb_check_encoding($str, 'UTF-8')) {
+            return mb_convert_encoding($str, 'UTF-8', 'ISO-8859-1, WINDOWS-1252, ASCII');
+        }
+        return $str;
+    }
+}
+
 if (!function_exists('sa_format_bytes')) {
     function sa_format_bytes($bytes) {
         $bytes = (float)$bytes;
@@ -87,8 +100,8 @@ function sa_inspect_movie_folder($m) {
                     $thumbnails_count++;
                     $thumbnails_bytes += $fsize;
                     $protected_files[] = array(
-                        'filename'       => $f,
-                        'full_path'      => $fpath,
+                        'filename'       => sa_safe_utf8($f),
+                        'full_path'      => sa_safe_utf8($fpath),
                         'size_bytes'     => $fsize,
                         'size_formatted' => sa_format_bytes($fsize),
                         'role'           => 'Vorschaubild / Cover (Geschützt)'
@@ -140,8 +153,8 @@ function sa_inspect_movie_folder($m) {
                     }
 
                     $deletable_files[] = array(
-                        'filename'       => $f,
-                        'full_path'      => $fpath,
+                        'filename'       => sa_safe_utf8($f),
+                        'full_path'      => sa_safe_utf8($fpath),
                         'extension'      => $ext,
                         'format_label'   => $format_label,
                         'size_bytes'     => $fsize,
@@ -153,8 +166,8 @@ function sa_inspect_movie_folder($m) {
                         ? 'Desktop-Hauptvideo (GESCHÜTZT - BLEIBT ERHALTEN)'
                         : 'Sonstige Datei (Geschützt)';
                     $protected_files[] = array(
-                        'filename'       => $f,
-                        'full_path'      => $fpath,
+                        'filename'       => sa_safe_utf8($f),
+                        'full_path'      => sa_safe_utf8($fpath),
                         'size_bytes'     => $fsize,
                         'size_formatted' => sa_format_bytes($fsize),
                         'role'           => $role
@@ -164,20 +177,23 @@ function sa_inspect_movie_folder($m) {
         }
     }
 
+    $online_id = isset($m->online_id) && (int)$m->online_id > 0 ? (int)$m->online_id : 0;
+
     return array(
         'movie_id'              => (int)$m->id,
+        'online_id'             => $online_id,
         'file_id'               => (string)$m->file_id,
         'merchant_id'           => (int)$m->merchant_id,
         'actor_id'              => (int)$m->actor_id,
-        'actor_username'        => isset($m->actor_username) && $m->actor_username !== '' ? $m->actor_username : 'Unbekannt',
-        'title'                 => (string)$m->title,
+        'actor_username'        => isset($m->actor_username) && $m->actor_username !== '' ? sa_safe_utf8($m->actor_username) : 'Unbekannt',
+        'title'                 => sa_safe_utf8($m->title),
         'status'                => (string)$m->status,
         'resolution'            => (string)$m->resolution,
         'playtime_string'       => (string)$m->playtime_string,
-        'folder_path'           => $folder,
+        'folder_path'           => sa_safe_utf8($folder),
         'folder_exists'         => $folder_exists,
-        'desktop_filename'      => $desktop_filename,
-        'desktop_full_path'     => $desktop_full_path,
+        'desktop_filename'      => sa_safe_utf8($desktop_filename),
+        'desktop_full_path'     => sa_safe_utf8($desktop_full_path),
         'desktop_exists'        => $desktop_exists,
         'desktop_size_bytes'    => $desktop_size,
         'desktop_size_formatted'=> sa_format_bytes($desktop_size),
@@ -202,10 +218,19 @@ if ($action === 'preview') {
     $filter_merchant_id = isset($_GET['merchant_id']) ? abs((int)$_GET['merchant_id']) : 0;
     $skip_count         = isset($_GET['skip']) ? abs((int)$_GET['skip']) : 0;
 
-    $where_parts = array("`m`.`convert_status` = '2'");
+    $where_parts = array();
+    $order_by_sql = "`mo`.`id` DESC, `m`.`id` DESC";
+
     if ($filter_movie_id > 0) {
-        $where_parts[] = "`m`.`id` = '" . $filter_movie_id . "'";
+        // WICHTIG: In "/Filme-online" wird die ID aus `movies_online.id` angezeigt,
+        // während das physische Verzeichnis nach `movies.id` benannt ist (verknüpft über `file_id`).
+        // Wir prüfen daher primär auf `movies_online.id` und als Fallback auf `movies.id`!
+        $where_parts[] = "(`mo`.`id` = '" . $filter_movie_id . "' OR `m`.`id` = '" . $filter_movie_id . "')";
+        $order_by_sql = "(CASE WHEN `mo`.`id` = '" . $filter_movie_id . "' THEN 0 ELSE 1 END) ASC, `m`.`id` DESC";
+    } else {
+        $where_parts[] = "`m`.`convert_status` = '2'";
     }
+
     if ($filter_merchant_id > 0) {
         $where_parts[] = "`m`.`merchant_id` = '" . $filter_merchant_id . "'";
     }
@@ -215,26 +240,28 @@ if ($action === 'preview') {
     $rs_movies = p4c_query("
         SELECT 
             `m`.`id`,
+            `mo`.`id` AS `online_id`,
             `m`.`file_id`,
             `m`.`merchant_id`,
             `m`.`actor_id`,
             `m`.`storage_location`,
             `m`.`filename`,
-            `m`.`title`,
+            IFNULL(`mo`.`title`, `m`.`title`) AS `title`,
             `m`.`status`,
             `m`.`resolution`,
             `m`.`playtime_string`,
             `a`.`username` AS `actor_username`
         FROM `movies` AS `m`
+        LEFT JOIN `movies_online` AS `mo` ON `m`.`file_id` = `mo`.`file_id`
         LEFT JOIN `actors` AS `a` ON `m`.`actor_id` = `a`.`id`
         WHERE " . $where_sql . "
-        ORDER BY `m`.`id` DESC;
+        ORDER BY " . $order_by_sql . ";
     ", __FILE__, __LINE__);
 
     if (p4c_num_rows($rs_movies) == 0) {
         echo json_encode(array(
             'found'   => false,
-            'message' => 'Es wurde kein konvertierter Film zu den angegebenen Filterkriterien in der Datenbank gefunden.'
+            'message' => 'Es wurde kein Film mit der ID #' . $filter_movie_id . ' (weder in Filme-online noch in der Haupttabelle movies) gefunden.'
         ));
         p4c_close(DB_HOST);
         exit;
@@ -250,8 +277,8 @@ if ($action === 'preview') {
             $inspected_folders++;
         }
 
-        // Wenn gezielt nach einer bestimmten Movie-ID gesucht wurde, geben wir genau dieses Video zurück
-        // (auch wenn dessen m_*-Dateien bereits gelöscht wurden, damit man den Nachher-Zustand prüfen kann!)
+        // Wenn gezielt nach einer bestimmten ID gesucht wurde, geben wir sofort den besten Treffer zurück
+        // (Priorität 1: `movies_online.id`, Priorität 2: `movies.id`)
         if ($filter_movie_id > 0) {
             $selected_inspection = $info;
             break;
@@ -310,17 +337,19 @@ if ($action === 'delete_single') {
     $rs_movie = p4c_query("
         SELECT 
             `m`.`id`,
+            `mo`.`id` AS `online_id`,
             `m`.`file_id`,
             `m`.`merchant_id`,
             `m`.`actor_id`,
             `m`.`storage_location`,
             `m`.`filename`,
-            `m`.`title`,
+            IFNULL(`mo`.`title`, `m`.`title`) AS `title`,
             `m`.`status`,
             `m`.`resolution`,
             `m`.`playtime_string`,
             `a`.`username` AS `actor_username`
         FROM `movies` AS `m`
+        LEFT JOIN `movies_online` AS `mo` ON `m`.`file_id` = `mo`.`file_id`
         LEFT JOIN `actors` AS `a` ON `m`.`actor_id` = `a`.`id`
         WHERE `m`.`id` = '" . $movie_id . "'
           AND `m`.`file_id` = '" . p4c_escape_string($confirm_file_id) . "'
@@ -423,6 +452,7 @@ if ($action === 'delete_single') {
     echo json_encode(array(
         'success'                 => true,
         'movie_id'                => $movie_id,
+        'online_id'               => $after_info['online_id'],
         'deleted_count'           => count($deleted_log),
         'deleted_files'           => $deleted_log,
         'failed_files'            => $failed_log,
