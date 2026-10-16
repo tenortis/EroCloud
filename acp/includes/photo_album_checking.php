@@ -208,6 +208,7 @@ if (isset($_POST['btn']['save_album'])) {
                     `online_at` = '".p4c_escape_string($album['online_at'])."',
                     `amount_webmaster` = '".abs($a->field('amount_webmaster'))."',
                     `amount_download` = '".abs($a->field('amount_download'))."',
+                    `admin_infos` = '',
                     `album_checked` = '".date("Y-m-d H:i:s")."';
                 ",__FILE__,__LINE__);
                 

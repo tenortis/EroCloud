@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 if (!defined('SAFE_INC'))
     die ("Hacking attempt...");
@@ -234,7 +234,8 @@ if (isset($_POST['upload_content'])) {
                 `seo_url` = '".p4c_escape_string($album['seo_url'])."',
                 `online_at` = '".p4c_escape_string($album['online_at'])."',
                 `amount_webmaster` = '".abs($album['amount_webmaster'])."',
-                `amount_download` = '".abs($album['amount_download'])."';",__FILE__,__LINE__)
+                `amount_download` = '".abs($album['amount_download'])."',
+                `admin_infos` = '';",__FILE__,__LINE__)
             ) {
                 $album_id = p4c_insert_id();
 

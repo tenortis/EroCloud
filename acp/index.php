@@ -203,6 +203,7 @@ $site = '<!DOCTYPE html>
                     $navWebcams = '';
                     $navSites = '';
                     $navContentCleanup = '';
+                    $navStorageAnalytics = '';
                     $navMoviesDrafts = '';
                     $navWMPartner = '';
                     $navBanners = '';
@@ -273,6 +274,9 @@ $site = '<!DOCTYPE html>
                     } elseif (isset($_GET['mod']) AND $_GET['mod']=='content_cleanup') {
                         $navContentCleanup = 'class="active"';
                         $main = 'content_cleanup.php';
+                    } elseif (isset($_GET['mod']) AND $_GET['mod']=='storage_analytics') {
+                        $navStorageAnalytics = 'class="active"';
+                        $main = 'storage_analytics.php';
                         
                     } elseif (isset($_GET['mod']) AND $_GET['mod']=='photo_albums_checking') {
                         $navFotoalben = 'class="active"';
@@ -376,6 +380,11 @@ $site = '<!DOCTYPE html>
                             <a '.$navContentCleanup.' href="'.ACP_URL.'/Content-Bereinigung">
                                 <i class="material-symbols-outlined md-30">delete_sweep</i>
                                 <span>Content-Bereinigung</span>
+                            </a>
+
+                            <a '.$navStorageAnalytics.' href="'.ACP_URL.'/Speicher-Analyse">
+                                <i class="material-symbols-outlined md-30">storage</i>
+                                <span>Speicher &amp; Traffic</span>
                             </a>
                         </div>';
                     }
@@ -533,7 +542,7 @@ $site = '<!DOCTYPE html>
             </script>';
         }
         
-        if (isset($_GET['mod']) AND ($_GET['mod'] == 'movies_online' OR $_GET['mod'] == 'movie_edit' OR $_GET['mod'] == 'photo_albums_online' OR $_GET['mod'] == 'photo_album_edit')) {
+        if (isset($_GET['mod']) AND ($_GET['mod'] == 'movies_online' OR $_GET['mod'] == 'movie_edit' OR $_GET['mod'] == 'movies_drafts' OR $_GET['mod'] == 'photo_albums_online' OR $_GET['mod'] == 'photo_album_edit' OR $_GET['mod'] == 'content_cleanup' OR $_GET['mod'] == 'storage_analytics')) {
             $site .= '
             <script>
                 jQuery(document).ready(function() {

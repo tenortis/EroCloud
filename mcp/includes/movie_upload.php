@@ -312,7 +312,8 @@ if (isset($_POST['upload_content']) OR isset($_POST['submit_step1'])) {
                 `amount_download` = '".abs($movie['amount_download'])."',
                 `category_master` = '".p4c_escape_string($movie['category_master'])."',
                 `category_slave` = '".p4c_escape_string($movie['category_slave'])."',
-                `visible_for_website`= '".p4c_escape_string($movie['visible_for_website'])."';",__FILE__,__LINE__)) {
+                `visible_for_website`= '".p4c_escape_string($movie['visible_for_website'])."',
+                `admin_infos` = '';",__FILE__,__LINE__)) {
 
                 $movie_id = p4c_insert_id();
 

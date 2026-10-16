@@ -10,16 +10,23 @@ Dieses Dokument beschreibt im Detail den gesamten Lebenslauf eines Videos (Filme
 
 ---
 
-## 1. 📂 Speicherort und Verzeichnisstruktur
-* **Hauptverzeichnis (`MOVIES_PATH`)**: `c:\xampp\htdocs` (das Web-Root-Verzeichnis).
-* **Unterverzeichnis (`MOVIES_DEFAULT_DIR`)**: `cloud_storage` (wird in `config.inc.php` definiert).
-* **Physischer Speicherpfad**: 
-  `c:\xampp\htdocs\cloud_storage\[merchant_id]\[movie_id]/`
-* **Hintergrund**: Die Ablage im Webroot (`cloud_storage/`) ermöglicht eine direkte Auslieferung und das Streaming der optimierten Mediendateien über den Webserver (Apache/Nginx).
+## 1. 📂 Speicherort, Multi-Storage-Vorbereitung und Speicher-Analyse
+* **Hauptverzeichnis (`MOVIES_PATH`)**: `dirname(dirname(__FILE__))` in `config.inc.php` (eine Ebene über dem Projektordner `htdocs`, auf dem Live-Server z. B. `/var/www/web1`).
+* **Standard-Unterverzeichnis (`MOVIES_DEFAULT_DIR`)**: `cloud_storage` (wird in `config.inc.php` definiert).
+* **Dynamische Datenbank-Spalte (`storage_location`)**:
+  * In den Tabellen `movies`, `movies_online`, `movies_deleted` sowie `photo_albums` besitzt jeder Datensatz die Spalte `storage_location`.
+  * Beim Anlegen eines neuen Films (`mcp/includes/movie_upload.php`) wird dort der Wert aus `MOVIES_DEFAULT_DIR` (`'cloud_storage'`) gespeichert.
+  * Beim Streaming (`api/movie_player.php`), Download (`api/movie_downloader.php`), Konvertieren (`cronjobs/convert_movie.php`) und Löschen (`cronjobs/delete_movie.php`) wird der Dateipfad immer dynamisch über `$movie_ary->storage_location` aufgelöst:
+    `MOVIES_PATH . '/' . $movie_ary->storage_location . '/' . $movie_ary->merchant_id . '/' . $movie_ary->id . '/' . $movie_ary->filename`
+  * **Architektur-Vorteil für externe Fileserver**: Durch diese Struktur können externe Storage-Systeme (z. B. per `rclone mount`, `s3fs` oder `SSHFS`) als zusätzliches Verzeichnis (z. B. `cloud_storage_2`) eingebunden und über `MOVIES_DEFAULT_DIR` für neue Uploads aktiviert werden, ohne dass bestehende Filme unter `cloud_storage` ihre Gültigkeit verlieren.
 
-### Speicherplatz-Auslesung bei Online-Filmen (`/Filme-online`)
-* Um die Serverauslastung zu minimieren, wird der gesamte belegte Speicherplatz aller veröffentlichten Videos über einen **24-Stunden-Cache** zwischengespeichert.
-* Administratoren können eine Echtzeit-Neuberechnung über die Schaltfläche **`[Größe neu berechnen]`** erzwingen (Parameter `?recalc_size=1`).
+### Speicherplatz- & Traffic-Analyse im ACP (`/Speicher-Analyse` & `/Filme-online`)
+* **Schnellübersicht unter `/Filme-online` (`acp/includes/movies_online.php`)**:
+  * Zeigt den belegten Speicherplatz aller veröffentlichten Videos über einen **24-Stunden-Cache** an (mit Echtzeit-Neuberechnung über `[Größe neu berechnen]` / `?recalc_size=1`).
+* **Detaillierte Analyse-Seite „Speicher & Traffic“ unter `/Speicher-Analyse` (`acp/includes/storage_analytics.php` & `acp/includes/ajax/storage_analytics_scan.php`)**:
+  * **Tab 1 (Speicherplatz & Dateiformate)**: Analysiert den gesamten Cloud-Speicherbedarf aufgeschlüsselt nach Systembereichen (*Videos*, *Fotoalben*, *Werbebanner*, *Händler-/Profilbilder*), nach Freigabe-Status (*Online*, *Entwürfe*, *Abgelehnt*, *Soft-Gelöscht*) sowie exakt nach den erzeugten **Video-Dateitypen** (`{id}_{file_id}.mp4`, `m_*.mp4`, `m_*.webm`, `m_*.ogv`, `thumb_*.jpg`). Weist zudem das sofortige Einsparpotenzial durch veraltete Videoformate und die aktuelle Server-Partitionsauslastung aus.
+  * **Tab 2 (Streaming- & Download-Traffic der letzten 6 Monate)**: Wertet alle Kunden-Zugriffe aus `movies_access` (`buy_timestamp` und `access_token_datetime`) der letzten 6 Monate monatsweise aus und berechnet das durchschnittliche monatliche Streaming- und Download-Datenvolumen (sowohl als 1x Basiswert als auch mit realistischem 2x Faktor für Mehrfach-Ansichten und Spulen).
+  * **Tab 3 (Konvertierungs-Check & Cloud-Kostenrechner)**: Dokumentiert die technischen Befunde der FFmpeg-Pipeline und kalkuliert live die voraussichtlichen monatlichen Kosten bei externen, Adult-freundlichen Cloud-Storage-Anbietern (*Backblaze B2*, *OVHcloud Object Storage*, *Wasabi*, *Bunny.net*).
 
 ---
 
@@ -77,22 +84,44 @@ Jedes Accordion-Element nutzt ein kompaktes **2-Spalten-Grid** (`row-cols-md-2`)
 
 ---
 
-## 4. ⚙️ Asynchrone Video-Konvertierung (Cronjob)
-Ein Hintergrund-Cronjob kümmert sich um die automatische Aufbereitung der Videos:
+## 4. ⚙️ Asynchrone Video-Konvertierung (`cronjobs/convert_movie.php`) & Auslieferung
+Ein Hintergrund-Cronjob kümmert sich um die automatische Aufbereitung der hochgeladenen Rohvideos:
 
-* **Pfad**: `cronjobs/convert_movie.php` (läuft alle paar Minuten).
-* **Ablauf**:
-  * Liest alle Filme mit `convert_status = '0'`.
-  * Setzt den Status temporär auf `1` (Konvertierung läuft) und speichert den Startzeitpunkt (`convert_starttime`).
-  * **FFmpeg-Konvertierungen**:
-    1. **Desktop MP4**: Konvertiert das Video in H.264 (`-vcodec libx264 -preset veryslow`) in der Originalauflösung. 
-    2. **Mobile MP4** (Dateiname beginnt mit `m_`): Konvertiert mit einer festen Breite von 640 Pixeln und einer niedrigeren Bitrate für mobile Geräte.
-    3. **Mobile WebM** (Dateiname beginnt mit `m_` und `.webm` Endung): Konvertiert unter Verwendung von `libvpx` (Video) und `libvorbis` (Audio).
-    4. **Mobile OGV** (Dateiname beginnt mit `m_` und `.ogv` Endung): Konvertiert unter Verwendung von `libtheora` (Video) und `libvorbis` (Audio).
-    5. **Streaming-Optimierung (qt-faststart)**: Nach der Generierung von Desktop- und Mobil-MP4s wird das Tool `qt-faststart` aufgerufen. Dies verschiebt die Metadaten (moov atom) an den Anfang der Datei, wodurch das Video gestreamt werden kann, noch während es herunterlädt.
-  * **Vorschaubilder (Thumbnails)**: Nach erfolgreicher Konvertierung extrahiert FFmpeg 10 Screenshots aus dem Video, die gleichmäßig über die Gesamtlaufzeit verteilt sind (`thumb_[movie_id]_[file_id]_%d.jpg`). Nicht existierende Slots werden in der UI sauber ausgeblendet.
-  * **Datenbereinigung**: Die ursprüngliche, hochgeladene Videodatei wird gelöscht, um Speicherplatz zu sparen.
-  * **Datenbank-Status**: Setzt `convert_status = '2'` (Konvertierung erfolgreich beendet). Bei Fehlern wird `convert_status = '3'` gesetzt.
+* **Pfad**: `cronjobs/convert_movie.php` (maximale parallele Instanzen gesteuert über `FFMPEG_SIMULTANEOUS_CONV = 2` in `config.inc.php`).
+* **Timeout-Schutz**: Läuft eine Konvertierung (`convert_status = '1'`) länger als **4 Stunden** ohne Abschluss (`convert_endtime == '0000-00-00 00:00:00'`), bricht der Cronjob diese automatisch ab und setzt `convert_status = '3'` (Fehler).
+* **Ablauf & erzeugte Dateien im Ordner `MOVIES_PATH/{storage_location}/{merchant_id}/{movie_id}/`**:
+  * Liest den ältesten Film mit `convert_status = '0'` und setzt ihn auf `convert_status = '1'`.
+  * **1. Desktop MP4 (`{id}_{file_id}.mp4`)**:
+    * Befehl: `ffmpeg -y -i {org_file} -b:v 8000k -vf "scale={width}:trunc(ow/a/2)*2" -vcodec libx264 -preset veryslow -g 30 neu_{id}_{file_id}.mp4`
+    * Optimierung: Anschließend wird `qt-faststart` ausgeführt (`neu_qt_{id}_{file_id}.mp4`), als finale `{id}_{file_id}.mp4` kopiert und der Dateiname in `movies.filename` gespeichert.
+    * Speicherbedarf: ca. **1,01 MB pro Sekunde** (~60 MB pro Minute).
+  * **2. Mobile MP4 (`m_{id}_{file_id}.mp4`)**:
+    * Befehl: `ffmpeg -y -i {org_file} -b:v 1000k -vf "scale=640:trunc(ow/a/2)*2" -vcodec libx264 -b:a 196k -g 30 m_{id}_{file_id}.mp4`
+    * Optimierung: Auch hier wird anschließend `qt-faststart` ausgeführt.
+    * Speicherbedarf: ca. **0,15 MB pro Sekunde** (~8,9 MB pro Minute).
+  * **3. Mobile WebM (`m_{id}_{file_id}.webm`)**:
+    * Befehl: `ffmpeg -y -i {org_file} -b:v 1000k -vf "scale=640:trunc(ow/a/2)*2" -vcodec libvpx -acodec libvorbis -f webm -g 30 m_{id}_{file_id}.webm`
+    * Speicherbedarf: ca. **0,14 MB pro Sekunde** (~8,4 MB pro Minute).
+  * **4. Mobile OGV (`m_{id}_{file_id}.ogv`)**:
+    * Befehl: `ffmpeg -y -i {org_file} -b:v 1000k -vf "scale=640:trunc(ow/a/2)*2" -vcodec libtheora -acodec libvorbis -g 30 m_{id}_{file_id}.ogv`
+    * Speicherbedarf: ca. **0,14 MB pro Sekunde** (~8,4 MB pro Minute).
+  * **5. Vorschaubilder (`thumb_{id}_{file_id}_1..10.jpg`)**:
+    * Sobald alle 3 Mobil-Dateien (`mp4`, `webm`, `ogv`) existieren, wird `convert_status = '2'` gesetzt und FFmpeg extrahiert 10 gleichmäßig über die Laufzeit verteilte Screenshots mit `1024px` Breite (`scale="1024:-1"`).
+  * **6. Datenbereinigung**:
+    * Sofern die hochgeladene Originaldatei einen anderen Dateinamen/Endung als `{id}_{file_id}.mp4` hatte, wird sie per `unlink($org_file)` gelöscht.
+
+### 🔍 Technische Befunde & Optimierungspotenzial bei Konvertierung & Auslieferung
+Bei der Analyse des Zusammenspiels zwischen `cronjobs/convert_movie.php`, `api/get_movie_url.php` und `api/movie_player.php` wurden folgende wichtige Punkte festgestellt:
+
+1. **Veraltete Formate `m_*.webm` und `m_*.ogv` sind ungenutzter Ballast**:
+   * Obwohl `api/get_movie_url.php` die URLs `movie_url_mobil_webm` (`...&mobile=webm`) und `movie_url_mobil_ogg` (`...&mobile=ogg`) im XML/JSON ausgibt, wertet `api/movie_player.php` den Parameter `$_GET['mobile']` **überhaupt nicht aus**.
+   * `api/movie_player.php` streamt über die Klasse `VideoStream` (`includes/klassen/VideoStream.inc.php`) **immer ausschließlich die Desktop-MP4** (`$movie_ary->filename`).
+   * Da moderne Desktop- und Mobilbrowser (iOS, Android, Chrome, Safari, Firefox, Edge) zu 100 % nativ H.264/MP4 unterstützen, werden `.webm` und `.ogv` weder vom Player ausgeliefert noch von Browsern benötigt. Sie belegen bei ~5.680 Filmen rund **850–950 GB Speicherplatz** und verdoppeln unnötig die FFmpeg-Konvertierungszeit.
+2. **Mobile MP4 (`m_*.mp4`) wird aktuell ebenfalls vom Player ignoriert**:
+   * Auch bei Aufruf von `...&mobile=mp4` liefert `api/movie_player.php` derzeit die große Desktop-MP4 aus, da keine Weiche für `$_GET['mobile'] === 'mp4'` implementiert ist.
+   * Hier kann zukünftig entschieden werden, ob `m_*.mp4` ebenfalls komplett eingespart wird (weitere ~470 GB Ersparnis) oder ob `api/movie_player.php` für mobile Endgeräte auf `m_ . $movie_ary->filename` zugreifen soll.
+3. **Encoding-Optimierung für zukünftige Desktop-MP4s**:
+   * Statt einer festen Bitrate von `-b:v 8000k -preset veryslow` und separatem `qt-faststart`-Kopierlauf empfiehlt sich zukünftig ein qualitätsbasiertes CRF-Encoding (`-crf 22 -maxrate 5000k -bufsize 10000k -preset slow -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart`). Dies spart ~35–40 % Dateigröße und Streaming-Traffic bei gleichbleibender visueller Qualität.
 
 ---
 
