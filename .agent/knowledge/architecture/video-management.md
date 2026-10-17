@@ -86,32 +86,36 @@ Jedes Accordion-Element nutzt ein kompaktes **2-Spalten-Grid** (`row-cols-md-2`)
 
 ---
 
-## 4. ⚙️ Asynchrone Video-Konvertierung (`cronjobs/convert_movie.php`) & Auslieferung
+## 4. ⚙️ Asynchrone Video-Konvertierung (`cronjobs/convert_movie.php`) & High-Performance-Auslieferung
 Ein Hintergrund-Cronjob kümmert sich um die automatische Aufbereitung der hochgeladenen Rohvideos:
 
 * **Pfad**: `cronjobs/convert_movie.php` (maximale parallele Instanzen gesteuert über `FFMPEG_SIMULTANEOUS_CONV = 2` in `config.inc.php`).
 * **Timeout-Schutz**: Läuft eine Konvertierung (`convert_status = '1'`) länger als **4 Stunden** ohne Abschluss (`convert_endtime == '0000-00-00 00:00:00'`), bricht der Cronjob diese automatisch ab und setzt `convert_status = '3'` (Fehler).
 * **Ablauf & erzeugte Dateien im Ordner `MOVIES_PATH/{storage_location}/{merchant_id}/{movie_id}/`**:
   * Liest den ältesten Film mit `convert_status = '0'` und setzt ihn auf `convert_status = '1'`.
-  * **1. Desktop MP4 (`{id}_{file_id}.mp4`)**:
-    * Befehl: `ffmpeg -y -i {org_file} -b:v 8000k -vf "scale={width}:trunc(ow/a/2)*2" -vcodec libx264 -preset veryslow -g 30 neu_{id}_{file_id}.mp4`
-    * Optimierung: Anschließend wird `qt-faststart` ausgeführt (`neu_qt_{id}_{file_id}.mp4`), als finale `{id}_{file_id}.mp4` kopiert und der Dateiname in `movies.filename` gespeichert.
-    * Speicherbedarf: ca. **1,01 MB pro Sekunde** (~60 MB pro Minute).
+  * **1. Einzige Streaming-MP4 (`{id}_{file_id}.mp4`) mit auflösungsabhängigem Constrained CRF (`-crf 23`)**:
+    * **Erhalt von Original-Auflösung (inkl. 4K & 9:16 Hochkant):** Über `-vf "scale=trunc(iw/2)*2:trunc(ih/2)*2"` bleibt die Original-Auflösung (4K, Full-HD, HD, SD sowie Smartphone-Hochkant-Reels) erhalten.
+    * **Dynamische Bitraten-Deckelung (`max($pre_width, $pre_height)`):**
+      * **2K / 4K Ultra-HD:** `-crf 23 -maxrate 6500k -bufsize 13000k -preset medium`
+      * **Full-HD 1080p *(inkl. Fallback bei fehlenden Metadaten)*:** `-crf 23 -maxrate 3200k -bufsize 6400k -preset slow`
+      * **HD 720p:** `-crf 23 -maxrate 2000k -bufsize 4000k -preset slow`
+      * **SD (`< 720p`):** `-crf 23 -maxrate 1200k -bufsize 2400k -preset slow`
+    * **Maximale Fehlertoleranz:** `-fflags +genpts+igndts` (repariert defekte Zeitstempel), `-pix_fmt yuv420p` (konvertiert 10-Bit-iPhone-Videos in universelles 8-Bit), `-acodec aac -strict -2 -b:a 128k -ac 2 -ar 44100` (normiert jede Tonspur und ignoriert fehlende Tonspuren bei Stummvideos), `-max_muxing_queue_size 4096` und `-movflags +faststart`.
+    * **Post-Conversion-Re-Analyze:** Nach Abschluss liest `getID3` Auflösung und Spieldauer frisch aus der fertigen `.mp4`-Datei aus und berechnet bei Bedarf `amount_own` nach, falls die Rohdatei beim Upload keine Header-Metadaten hatte.
   * **2. Vorschaubilder (`thumb_{id}_{file_id}_1..10.jpg`)**:
-    * Sobald die fertige MP4-Datei (`{id}_{file_id}.mp4`) existiert, wird `convert_status = '2'` gesetzt und FFmpeg extrahiert 10 gleichmäßig über die Laufzeit verteilte Screenshots mit `1024px` Breite (`scale="1024:-1"`).
+    * Sobald die fertige MP4-Datei (`{id}_{file_id}.mp4`) existiert, wird `convert_status = '2'` gesetzt und FFmpeg extrahiert 10 gleichmäßig über die Laufzeit verteilte Screenshots mit max. `1024px` Breite (`scale=min(1024\,iw):-2`).
   * **3. Datenbereinigung**:
     * Sofern die hochgeladene Originaldatei einen anderen Dateinamen/Endung als `{id}_{file_id}.mp4` hatte, wird sie per `unlink($org_file)` gelöscht.
   * *(Historischer Hinweis: Bis Oktober 2026 wurden zusätzlich `m_{id}_{file_id}.mp4`, `m_{id}_{file_id}.webm` und `m_{id}_{file_id}.ogv` konvertiert. Diese Konvertierungsschritte wurden aus `cronjobs/convert_movie.php` entfernt, da `api/movie_player.php` ausschließlich die Haupt-MP4 streamt und alle modernen Mobilgeräte diese direkt per HTTP-Range-Streaming abspielen).*
 
-### 🔍 Technische Befunde & Optimierungspotenzial bei Konvertierung & Auslieferung
-Bei der Analyse des Zusammenspiels zwischen `cronjobs/convert_movie.php`, `api/get_movie_url.php` und `api/movie_player.php` wurden folgende wichtige Punkte festgestellt:
-
-1. **Veraltete Formate `m_*.mp4`, `m_*.webm` und `m_*.ogv` sind ungenutzter Ballast (Konvertierung & API-Ausgabe bereinigt)**:
-   * `api/movie_player.php` streamt über die Klasse `VideoStream` (`includes/klassen/VideoStream.inc.php`) **immer ausschließlich die Desktop-MP4** (`$movie_ary->filename`).
-   * Die veralteten JSON-Felder `movie_url_mobil_mp4`, `movie_url_mobil_webm` und `movie_url_mobil_ogg` wurden aus `api/get_movie_url.php` entfernt (und `mobi/modules/videothek/video.php` im EroCMS auf `movie_url` umgestellt).
-   * Da moderne Desktop- und Mobilbrowser (iOS, Android, Chrome, Safari, Firefox, Edge) zu 100 % nativ H.264/MP4 unterstützen, wurden die Konvertierungsschritte für `m_*.mp4`, `m_*.webm` und `m_*.ogv` in `cronjobs/convert_movie.php` entfernt. Die bestehenden Altdateien belegen bei ~5.550 Filmen rund **1,24 TB Speicherplatz** (davon 819,16 GB für `.webm`/`.ogv` und ~420 GB für `m_*.mp4`) und können physisch bereinigt werden.
-2. **Encoding-Optimierung für zukünftige Desktop-MP4s**:
-   * Statt einer festen Bitrate von `-b:v 8000k -preset veryslow` und separatem `qt-faststart`-Kopierlauf empfiehlt sich zukünftig ein qualitätsbasiertes CRF-Encoding (`-crf 22 -maxrate 5000k -bufsize 10000k -preset slow -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart`). Dies spart ~35–40 % Dateigröße und Streaming-Traffic bei gleichbleibender visueller Qualität.
+### 📺 High-Performance-Streaming & TV-Übergabe (Apple AirPlay & Google Cast / Chromecast)
+* **`includes/klassen/VideoStream.inc.php`**:
+  * **Exakte Byte-Zählung (`strlen($data)`):** Verhindert abgeschnittene Datenpakete und Frame-Drops bei Short-Reads auf Storage-Mounts.
+  * **512 KB Aligned Chunk-Buffer (`524288` Bytes):** Deaktiviert PHPs internen 8-KB-Puffer (`stream_set_read_buffer(..., 0)`), schaltet jegliche Gzip-/Output-Bufferung ab und liefert sofortige Reaktionszeiten beim Spulen.
+  * **RFC 7233 Range-Konformität & CORS-Support für Smart-TVs:** Sendet `Accept-Ranges: bytes`, `ETag`, `Last-Modified`, unterstützt `If-Range`, `304 Not Modified`, `HEAD`- und `OPTIONS`-Preflight-Requests sowie `Access-Control-Allow-Origin: *` und `Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges, ETag` (zwingend für Chromecast / Android TV).
+* **`api/get_movie_url.php` & `api/movie_player.php`**:
+  * **Persistentes 6-Stunden-Token:** `get_movie_url.php` verwendet ein bestehendes, noch gültiges `access_token` wieder (statt es bei jedem Seiten-Reload zu überschreiben) und verlängert `access_token_datetime` auf **6 Stunden (`+6 hours`)**. Dadurch bricht ein bereits auf dem Fernseher laufender AirPlay-/Chromecast-Stream nicht ab, wenn der Kunde das Video auf dem Handy neu lädt.
+  * **Session-Stream-Cache & gedrosselte Token-Verlängerung:** `api/movie_player.php`, `acp/includes/movie_player.php` und `mcp/includes/movie_player.php` cachen den aufgelösten Dateipfad für 30 Minuten in `$_SESSION['erocloud_stream_cache']`, geben das PHP-Session-Lock (`session_write_close()`) sowie die DB-Verbindung (`p4c_close(DB_HOST)`) **vor** dem Streaming-Start frei und aktualisieren `access_token_datetime` höchstens 1× pro Stunde statt bei jedem einzelnen Range-Request.
 
 ---
 

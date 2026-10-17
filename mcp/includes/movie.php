@@ -599,7 +599,7 @@ $site .= '
                                 <video id="video_'.$m->field('id').'"
                                     poster="'.MCP_URL.'/PlayerPoster/'.$m->field('file_id').'&w=1280&h=720"
                                     width="100%"
-                                    preload="auto" controls class="w-100 h-auto rounded shadow-sm" style="max-height: 650px;">
+                                    preload="auto" controls playsinline webkit-playsinline x-webkit-airplay="allow" class="w-100 h-auto rounded shadow-sm" style="max-height: 650px;">
                                     <source src="'.MCP_URL.'/Player/'.$m->field('file_id').'" type="video/mp4" />
                                 </video>
                             </div>

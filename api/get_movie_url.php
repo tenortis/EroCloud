@@ -36,24 +36,30 @@ if (p4c_num_rows($rs_user_streaming_key) == 0) {
     $api['error'] = 'access denid';
     print_xml($api);
 }
+$access_obj = p4c_fetch_object($rs_user_streaming_key);
 
 $movie_id = p4c_escape_string($_GET['movie_id']);
 
 $rs_movie = p4c_query("SELECT * FROM `movies` WHERE `file_id`='".$movie_id."' LIMIT 1;",__FILE__,__LINE__);
 if (p4c_num_rows($rs_movie) == 0) {
     $api['error'] = 'movie_id not exists';
-    print_xml($api);;   
+    print_xml($api);
 }
 
 $movie_obj = p4c_fetch_object($rs_movie);
-$resolution = explode('x',$movie_obj->resolution);
+$resolution = explode('x', (string)$movie_obj->resolution);
 
-// Das Token ist nur 30 Sekunden gültig. Danach kann der Film von diesem Kunden nicht mehr direkt per URL aufgerufen werden
-$access_token = randomString(10);
+// Bestehendes gültiges Access-Token wiederverwenden (damit ein bereits aktiver TV-/AirPlay-/Chromecast-Stream
+// bei einem erneuten Seitenaufruf nicht abgebrochen wird) und Gültigkeit auf 6 Stunden verlängern.
+if (isset($access_obj->access_token) && $access_obj->access_token !== '' && isset($access_obj->access_token_datetime) && $access_obj->access_token_datetime > date("Y-m-d H:i:s")) {
+    $access_token = $access_obj->access_token;
+} else {
+    $access_token = randomString(10);
+}
 
 p4c_query("UPDATE `movies_access` SET 
-    `access_token` = '".$access_token."',
-    `access_token_datetime` = '".date("Y-m-d H:i:s", strtotime("+30 minutes"))."'
+    `access_token` = '".p4c_escape_string($access_token)."',
+    `access_token_datetime` = '".date("Y-m-d H:i:s", strtotime("+6 hours"))."'
 WHERE `user_streaming_key` = '". p4c_escape_string($user_streaming_key)."' LIMIT 1;",__FILE__,__LINE__);
 
 if ($_GET['buy_as'] == 'download') {
@@ -63,8 +69,8 @@ if ($_GET['buy_as'] == 'download') {
     $api['movie_url_mobil_mp4'] = $api['movie_url'];
     $api['poster_url_fsk16']    = API_URL.'/PlayerPoster/FSK16/'.$movie_id;
     $api['poster_url_fsk18']    = API_URL.'/PlayerPoster/FSK18/'.$movie_id;
-    $api['width']               = $resolution[0];
-    $api['height']              = $resolution[1];
+    $api['width']               = isset($resolution[0]) ? $resolution[0] : '';
+    $api['height']              = isset($resolution[1]) ? $resolution[1] : '';
 
 }
 

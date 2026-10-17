@@ -650,7 +650,7 @@ $site .= '
                 id="video_'.$m_online->field('id').'"
                 poster="'.ACP_URL.'/includes/movie_poster.php?id='.$m_online->field('file_id').'&w='.$width.'&h='.$height.'"
                 width="'.$width.'" height="'.$height.'"
-                preload="none"
+                preload="none" playsinline webkit-playsinline x-webkit-airplay="allow"
                 controls >
                 <source src="'.ACP_URL.'/includes/movie_player.php?id='.$m_online->field('file_id').'" type="video/mp4" />
             </video>

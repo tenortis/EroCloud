@@ -1,136 +1,371 @@
 <?php
 
 if (!defined('SAFE_INC'))
-	die ("Hacking attempt...");
+    die ("Hacking attempt...");
 
 /**
- * Description of VideoStream
+ * High-Performance HTTP Range Video Streamer (EroCloud)
  *
- * @author Rana
- * @link http://codesamplez.com/programming/php-html5-video-streaming-tutorial
- * 
- * $stream = new VideoStream($file);
- * $stream->start();
+ * Optimiert für sofortigen Start, flüssiges Seeking ohne Ruckler/Frame-Drops
+ * und volle TV-Streaming-Kompatibilität (Apple AirPlay, Google Cast / Chromecast, Smart-TVs).
+ * Strikt PHP 7.3+ kompatibel.
  */
- 
- 
-class VideoStream {
+class VideoStream
+{
+    /** @var string */
     private $path = "";
-    private $stream = "";
-    private $buffer = 102400;
-    private $start  = -1;
-    private $end    = -1;
-    private $size   = 0;
- 
-    function __construct($filePath) 
-    {
-        $this->path = $filePath;
-    }
-     
+
+    /** @var string */
+    private $mime = "";
+
+    /** @var resource|false|null */
+    private $stream = null;
+
     /**
-     * Open stream
+     * 512 KB Chunk-Größe (524288 Bytes):
+     * Optimaler Kompromiss aus geringem Syscall-Overhead, schneller Time-To-First-Frame
+     * beim Seeking und stabilem Durchsatz für 1080p/4K-Videos.
+     *
+     * @var int
+     */
+    private $buffer = 524288;
+
+    /** @var int */
+    private $start = 0;
+
+    /** @var int */
+    private $end = -1;
+
+    /** @var int */
+    private $size = 0;
+
+    /** @var int */
+    private $mtime = 0;
+
+    /** @var string */
+    private $etag = "";
+
+    /**
+     * @param string $filePath
+     * @param string $mime
+     */
+    public function __construct($filePath, $mime = 'video/mp4')
+    {
+        $this->path = (string)$filePath;
+        $this->mime = $mime !== '' ? (string)$mime : 'video/mp4';
+    }
+
+    /**
+     * Öffnet den Datei-Stream im Binärmodus und deaktiviert PHPs internen 8KB-Read-Buffer.
+     *
+     * @return void
      */
     private function open()
     {
-        if (!($this->stream = fopen($this->path, 'rb'))) {
-            die('Could not open stream for reading');
-        }        
+        if (!is_file($this->path) || !is_readable($this->path)) {
+            $this->sendError(404, 'Video file not found');
+        }
+
+        $this->stream = @fopen($this->path, 'rb');
+        if ($this->stream === false) {
+            $this->sendError(500, 'Could not open stream for reading');
+        }
+
+        if (function_exists('stream_set_read_buffer')) {
+            @stream_set_read_buffer($this->stream, 0);
+        }
+        if (function_exists('stream_set_chunk_size')) {
+            @stream_set_chunk_size($this->stream, $this->buffer);
+        }
     }
-     
+
     /**
-     * Set proper header to serve the video content
+     * Sendet einen HTTP-Fehlercode und beendet das Skript sauber.
+     *
+     * @param int    $code
+     * @param string $message
+     * @return void
+     */
+    private function sendError($code, $message = '')
+    {
+        if (is_resource($this->stream)) {
+            @fclose($this->stream);
+            $this->stream = null;
+        }
+        if (!headers_sent()) {
+            http_response_code((int)$code);
+            header('Content-Type: text/plain; charset=UTF-8');
+        }
+        exit($message);
+    }
+
+    /**
+     * Deaktiviert sämtliche Output-Buffer und Komprimierungen (gzip/deflate/zlib),
+     * damit Video-Bytes unverzögert und unkomprimiert an den Browser/TV gestreamt werden.
+     *
+     * @return void
+     */
+    private function disableOutputBuffering()
+    {
+        if (function_exists('apache_setenv')) {
+            @apache_setenv('no-gzip', '1');
+        }
+        @ini_set('zlib.output_compression', '0');
+        @ini_set('output_buffering', '0');
+        @ini_set('implicit_flush', '1');
+
+        while (ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+        ob_implicit_flush(true);
+    }
+
+    /**
+     * Sendet CORS-Header für Smart-TVs, Google Cast (Chromecast) & Apple AirPlay.
+     *
+     * @return void
+     */
+    public static function sendCorsHeaders()
+    {
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: GET, HEAD, OPTIONS');
+        header('Access-Control-Allow-Headers: Range, If-Range, Content-Type, Origin, Accept');
+        header('Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges, ETag');
+    }
+
+    /**
+     * Setzt alle RFC 7233-konformen HTTP- und Range-Header.
+     *
+     * @return bool False wenn kein Body gesendet werden soll (z. B. HEAD oder 304 Not Modified)
      */
     private function setHeader()
     {
-        ob_get_clean();
-        header("Content-Type: video/mp4");
-        header("Cache-Control: max-age=2592000, public");
-        header("Expires: ".gmdate('D, d M Y H:i:s', time()+2592000) . ' GMT');
-        header("Last-Modified: ".gmdate('D, d M Y H:i:s', @filemtime($this->path)) . ' GMT' );
-        $this->start = 0;
-        $this->size  = filesize($this->path);
-        $this->end   = $this->size - 1;
-        header("Accept-Ranges: 0-".$this->end);
-         
-        if (isset($_SERVER['HTTP_RANGE'])) {
-  
-            $c_start = $this->start;
-            $c_end = $this->end;
- 
-            list(, $range) = explode('=', $_SERVER['HTTP_RANGE'], 2);
-            if (strpos($range, ',') !== false) {
-                header('HTTP/1.1 416 Requested Range Not Satisfiable');
-                header("Content-Range: bytes $this->start-$this->end/$this->size");
-                exit;
-            }
-            if ($range == '-') {
-                $c_start = $this->size - substr($range, 1);
-            }else{
-                $range = explode('-', $range);
-                $c_start = $range[0];
-                 
-                $c_end = (isset($range[1]) && is_numeric($range[1])) ? $range[1] : $c_end;
-            }
-            $c_end = ($c_end > $this->end) ? $this->end : $c_end;
-            if ($c_start > $c_end || $c_start > $this->size - 1 || $c_end >= $this->size) {
-                header('HTTP/1.1 416 Requested Range Not Satisfiable');
-                header("Content-Range: bytes $this->start-$this->end/$this->size");
-                exit;
-            }
-            $this->start = $c_start;
-            $this->end = $c_end;
-            $length = $this->end - $this->start + 1;
-            fseek($this->stream, $this->start);
-            header('HTTP/1.1 206 Partial Content');
-            header("Content-Length: ".$length);
-            header("Content-Range: bytes $this->start-$this->end/".$this->size);
+        $this->disableOutputBuffering();
+
+        clearstatcache(true, $this->path);
+        $fileSize = @filesize($this->path);
+        if ($fileSize === false || $fileSize < 0) {
+            $this->sendError(404, 'Unable to determine video size');
         }
-        else
-        {
-            header("Content-Length: ".$this->size);
-        }  
-         
+
+        $this->size  = (int)$fileSize;
+        $this->mtime = (int)@filemtime($this->path);
+        if ($this->mtime <= 0) {
+            $this->mtime = time();
+        }
+        $this->start = 0;
+        $this->end   = $this->size > 0 ? ($this->size - 1) : 0;
+        $this->etag  = '"' . sprintf('%x-%x', $this->mtime, $this->size) . '"';
+
+        $lastModified = gmdate('D, d M Y H:i:s', $this->mtime) . ' GMT';
+
+        // Restriktive Session-No-Cache-Header entfernen, damit Browser & TV Chunks im Puffer halten dürfen
+        if (function_exists('header_remove')) {
+            @header_remove('Pragma');
+            @header_remove('Expires');
+            @header_remove('Cache-Control');
+        }
+
+        self::sendCorsHeaders();
+
+        $method = isset($_SERVER['REQUEST_METHOD']) ? strtoupper((string)$_SERVER['REQUEST_METHOD']) : 'GET';
+        if ($method === 'OPTIONS') {
+            http_response_code(204);
+            header('Content-Length: 0');
+            return false;
+        }
+
+        header('Content-Type: ' . $this->mime);
+        header('Accept-Ranges: bytes');
+        header('Cache-Control: private, max-age=86400');
+        header('Last-Modified: ' . $lastModified);
+        header('ETag: ' . $this->etag);
+        header('X-Accel-Buffering: no');
+        header('Content-Disposition: inline');
+
+        $rangeHeader = isset($_SERVER['HTTP_RANGE']) ? trim((string)$_SERVER['HTTP_RANGE']) : '';
+
+        // If-Range Validierung: Wenn sich die Datei geändert hat, kompletten Stream senden (200 OK)
+        if ($rangeHeader !== '' && isset($_SERVER['HTTP_IF_RANGE'])) {
+            $ifRange = trim((string)$_SERVER['HTTP_IF_RANGE']);
+            if ($ifRange !== $this->etag && $ifRange !== $lastModified) {
+                $rangeHeader = '';
+            }
+        }
+
+        // 304 Not Modified Unterstützung für nicht-Range-Anfragen
+        if ($rangeHeader === '') {
+            $ifNoneMatch     = isset($_SERVER['HTTP_IF_NONE_MATCH']) ? trim((string)$_SERVER['HTTP_IF_NONE_MATCH']) : '';
+            $ifModifiedSince = isset($_SERVER['HTTP_IF_MODIFIED_SINCE']) ? trim((string)$_SERVER['HTTP_IF_MODIFIED_SINCE']) : '';
+            if ($ifNoneMatch === $this->etag || ($ifNoneMatch === '' && $ifModifiedSince === $lastModified)) {
+                http_response_code(304);
+                return false;
+            }
+        }
+
+        if ($this->size === 0) {
+            http_response_code(200);
+            header('Content-Length: 0');
+            return false;
+        }
+
+        if ($rangeHeader !== '') {
+            if (stripos($rangeHeader, 'bytes=') !== 0) {
+                $this->sendRangeNotSatisfiable();
+            }
+
+            $rangeSpec = trim(substr($rangeHeader, 6));
+            // Multi-Range-Requests auf den ersten Range reduzieren
+            if (strpos($rangeSpec, ',') !== false) {
+                $parts     = explode(',', $rangeSpec);
+                $rangeSpec = trim($parts[0]);
+            }
+
+            $dashPos = strpos($rangeSpec, '-');
+            if ($dashPos === false) {
+                $this->sendRangeNotSatisfiable();
+            }
+
+            $startRaw = trim(substr($rangeSpec, 0, $dashPos));
+            $endRaw   = trim(substr($rangeSpec, $dashPos + 1));
+
+            if ($startRaw === '') {
+                // Suffix-Byte-Range: "bytes=-500" -> letzte 500 Bytes
+                if ($endRaw === '' || !ctype_digit($endRaw)) {
+                    $this->sendRangeNotSatisfiable();
+                }
+                $suffixLength = (int)$endRaw;
+                if ($suffixLength <= 0) {
+                    $this->sendRangeNotSatisfiable();
+                }
+                $cStart = max(0, $this->size - $suffixLength);
+                $cEnd   = $this->size - 1;
+            } else {
+                if (!ctype_digit($startRaw)) {
+                    $this->sendRangeNotSatisfiable();
+                }
+                $cStart = (int)$startRaw;
+                if ($endRaw === '') {
+                    $cEnd = $this->size - 1;
+                } else {
+                    if (!ctype_digit($endRaw)) {
+                        $this->sendRangeNotSatisfiable();
+                    }
+                    $cEnd = min((int)$endRaw, $this->size - 1);
+                }
+            }
+
+            if ($cStart < 0 || $cStart > $cEnd || $cStart >= $this->size) {
+                $this->sendRangeNotSatisfiable();
+            }
+
+            $this->start = $cStart;
+            $this->end   = $cEnd;
+            $length      = $this->end - $this->start + 1;
+
+            if ($this->start > 0 && @fseek($this->stream, $this->start, SEEK_SET) !== 0) {
+                $this->sendError(500, 'Could not seek to requested byte range');
+            }
+
+            http_response_code(206);
+            header('Content-Range: bytes ' . $this->start . '-' . $this->end . '/' . $this->size);
+            header('Content-Length: ' . $length);
+        } else {
+            http_response_code(200);
+            header('Content-Length: ' . $this->size);
+        }
+
+        // Bei HEAD-Requests nur die Header senden, keinen Body streamen
+        if ($method === 'HEAD') {
+            return false;
+        }
+
+        return true;
     }
-    
+
     /**
-     * close curretly opened stream
+     * Sendet 416 Range Not Satisfiable gemäß RFC 7233.
+     *
+     * @return void
+     */
+    private function sendRangeNotSatisfiable()
+    {
+        if (is_resource($this->stream)) {
+            @fclose($this->stream);
+            $this->stream = null;
+        }
+        http_response_code(416);
+        header('Content-Range: bytes */' . $this->size);
+        header('Content-Length: 0');
+        exit;
+    }
+
+    /**
+     * Schließt den Datei-Stream und beendet die Ausführung.
+     *
+     * @return void
      */
     private function end()
     {
-        fclose($this->stream);
+        if (is_resource($this->stream)) {
+            @fclose($this->stream);
+            $this->stream = null;
+        }
         exit;
     }
-     
+
     /**
-     * perform the streaming of calculated range
+     * Streamt den angeforderten Byte-Bereich exakt anhand der tatsächlich gelesenen Bytes.
+     *
+     * WICHTIG: Zählt strlen($data) statt $bytesToRead, damit Short-Reads auf Netzwerk-/Storage-Mounts
+     * niemals zu abgeschnittenen Chunks oder übersprungenen Video-Frames führen.
+     *
+     * @return void
      */
     private function stream()
     {
-        $i = $this->start;
-        set_time_limit(0);
-        while(!feof($this->stream) && $i <= $this->end) {
-            $bytesToRead = $this->buffer;
-            if(($i+$bytesToRead) > $this->end) {
-                $bytesToRead = $this->end - $i + 1;
+        @set_time_limit(0);
+        @ignore_user_abort(false);
+
+        $bytesRemaining = $this->end - $this->start + 1;
+
+        while ($bytesRemaining > 0 && !feof($this->stream)) {
+            if (connection_aborted() || connection_status() !== CONNECTION_NORMAL) {
+                break;
             }
-            $data = fread($this->stream, $bytesToRead);
+
+            $readLength = $bytesRemaining > $this->buffer ? $this->buffer : $bytesRemaining;
+            $data       = @fread($this->stream, $readLength);
+
+            if ($data === false || $data === '') {
+                break;
+            }
+
+            $bytesRead = strlen($data);
             echo $data;
             flush();
-            $i += $bytesToRead;
+
+            $bytesRemaining -= $bytesRead;
         }
     }
-     
+
     /**
-     * Start streaming video content
+     * Startet das Video-Streaming.
+     *
+     * @return void
      */
-    function start()
+    public function start()
     {
+        // Falls eine PHP-Session noch offen ist, sofort freigeben, damit parallele Range-Requests nicht blockieren
+        if (function_exists('session_status') && session_status() === PHP_SESSION_ACTIVE) {
+            @session_write_close();
+        }
+
         $this->open();
-        $this->setHeader();
-        $this->stream();
+        $shouldStreamBody = $this->setHeader();
+        if ($shouldStreamBody) {
+            $this->stream();
+        }
         $this->end();
     }
 }
-
-
-?>
