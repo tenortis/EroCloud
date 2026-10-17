@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 define('SAFE_INC', 1);
 
@@ -79,17 +79,25 @@ function to_thumb($bild, $size=0) {
     } else if ($movie_ary->quality == '6k') { 
         $logo = '6k.png';
     
-    // Wenn keine Qualität angegeben wurde nimm die Auflösung
-    } else if ($movie_ary->resolution == '1280x720') {
-        $logo = 'hd.png';
-    } else if ($movie_ary->resolution == '1920x1080' OR $movie_ary->resolution == '1440x1080') {
-        $logo = 'fullhd.png';
-    } else if ($movie_ary->resolution == '2048x1080') { 
-        $logo = '2k.png';
-    } else if ($movie_ary->resolution == '4096x2160') { 
-        $logo = '4k.png';
-    } else if ($movie_ary->resolution == '6144x3160') { 
-        $logo = '6k.png';
+    // Wenn keine Qualität angegeben wurde nimm die Auflösung (inkl. 9:16 Hochformat)
+    } else if (!empty($movie_ary->resolution)) {
+        $res_parts = explode('x', $movie_ary->resolution);
+        $res_w = isset($res_parts[0]) ? (int)$res_parts[0] : 0;
+        $res_h = isset($res_parts[1]) ? (int)$res_parts[1] : 0;
+        $max_dim = max($res_w, $res_h);
+        $min_dim = min($res_w, $res_h);
+
+        if ($max_dim >= 5500 || $min_dim >= 2800) {
+            $logo = '6k.png';
+        } else if ($max_dim >= 3200 || $min_dim >= 1800) {
+            $logo = '4k.png';
+        } else if ($max_dim >= 2000 || $min_dim >= 1300) {
+            $logo = '2k.png';
+        } else if ($max_dim >= 1600 || $min_dim >= 900) {
+            $logo = 'fullhd.png';
+        } else if ($max_dim >= 1000 || $min_dim >= 650) {
+            $logo = 'hd.png';
+        }
     }
     
     $watermark = ImageCreateFromPNG(MCP_DIR.'/images/movie_quality_buttons/'.$logo);

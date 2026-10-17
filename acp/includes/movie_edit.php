@@ -79,7 +79,7 @@ $file_path = MOVIES_PATH.'/'.$m_online->field('storage_location').'/'.$m_online-
 $streaming_preis = round($movie['playtime_seconds'] * $movie['amount_second']);
 
 $amount_webmaster_ary = array(0, 5, 10, 15, 20, 25);
-$replace_title_ary = array('�','^','�','�','�','$','%','{','[',']','}','�','`','~',"'",'_',';','<','>');
+$replace_title_ary = array('°','^','²','§','§','$','%','{','[',']','}','´','`','~',"'",'_',';','<','>');
 
 if (isset($_POST['save_movie'])) {
 
@@ -113,7 +113,7 @@ if (isset($_POST['save_movie'])) {
     $movie['title'] = str_replace(["#?", "?en"], ["#", "en"], $movie['title']);
     
     // Euro-Zeichen in Text umwandeln
-    $movie['title'] = str_replace(array('&#8364;','&euro;','','�','€','&#x20AC;'), "EUR", $movie['title']);
+    $movie['title'] = str_replace(array('&#8364;','&euro;','Â€','€','â‚¬','&#x20AC;'), "EUR", $movie['title']);
 
     
     if(!isset($_POST['description'])) {
@@ -178,7 +178,7 @@ if (isset($_POST['save_movie'])) {
         $movie['meta_title'] = substr(trim(str_replace($movie['title'])), 0, 65);
     } else {
         $movie['meta_title'] = substr(trim(str_replace($replace_title_ary, '', $_POST['meta_title'])), 0, 65);
-        $movie['meta_title'] = str_replace(array('&#8364;','&euro;','','�','€','&#x20AC;'), "EUR", $movie['meta_title']);
+        $movie['meta_title'] = str_replace(array('&#8364;','&euro;','Â€','€','â‚¬','&#x20AC;'), "EUR", $movie['meta_title']);
         $movie['meta_title'] = str_replace(array("\n", "\r"), '', $movie['meta_title']);
         if (empty($movie['meta_title'])) {$movie['meta_title'] = substr(trim($movie['title']), 0, 65);}   
     }
@@ -502,7 +502,7 @@ $site .= '
 <div id="movie_edit_tabs">
     <ul>
         <li><a href="#tab-edit">Bearbeiten</a></li>
-        <li><a href="#tab-purchases">Käufe & Zugriffe ('.$count_buys.')</a></li>
+        <li><a href="#tab-purchases">KÃ¤ufe & Zugriffe ('.$count_buys.')</a></li>
         <li><a href="#tab-tech">Technische Details</a></li>
     </ul>
 
@@ -568,16 +568,16 @@ $site .= '
                     "aaSorting": [[ 1, "desc" ]],
                     "oLanguage": {
                         "sSearch": "Suchen:",
-                        "sLengthMenu": "_MENU_ Einträge anzeigen",
-                        "sInfo": "Zeige _START_ bis _END_ von _TOTAL_ Einträgen",
-                        "sInfoEmpty": "Keine Einträge vorhanden",
-                        "sInfoFiltered": "(gefiltert aus _MAX_ Einträgen)",
-                        "sZeroRecords": "Keine passenden Einträge gefunden",
+                        "sLengthMenu": "_MENU_ EintrÃ¤ge anzeigen",
+                        "sInfo": "Zeige _START_ bis _END_ von _TOTAL_ EintrÃ¤gen",
+                        "sInfoEmpty": "Keine EintrÃ¤ge vorhanden",
+                        "sInfoFiltered": "(gefiltert aus _MAX_ EintrÃ¤gen)",
+                        "sZeroRecords": "Keine passenden EintrÃ¤ge gefunden",
                         "oPaginate": {
                             "sFirst": "Erste",
                             "sLast": "Letzte",
-                            "sNext": "Nächste",
-                            "sPrevious": "Zurück"
+                            "sNext": "NÃ¤chste",
+                            "sPrevious": "ZurÃ¼ck"
                         }
                     }
                 });
@@ -589,11 +589,15 @@ $site .= '
 
         if ($m_online->field('resolution') != '') {
             $explode = explode('x', $m_online->field('resolution'));
-            $width = $explode[0];
-            $height = $explode[1];
+            $width = isset($explode[0]) ? (int)$explode[0] : 0;
+            $height = isset($explode[1]) ? (int)$explode[1] : 0;
 
+            // Hochformat (z.B. 9:16 Smartphone-Videos)
+            if ($width > 0 && $height > $width) {
+                $width = round(540 * ($width / $height));
+                $height = 540;
             // 16:9
-            if ($width=='720' AND $height=='400') {
+            } elseif ($width=='720' AND $height=='400') {
                 $width = '600';
                 $height = '363';
             // 16:9
@@ -617,7 +621,7 @@ $site .= '
                 $width = '600';
                 $height = '450';
             // 16:9
-            } elseif ($width > '1280'){
+            } elseif ($width > 1280){
                 $width = '600';
                 $height = '363';
             // 4:3
@@ -654,21 +658,27 @@ $site .= '
         <div class="ui-widget-content" style="padding:5px 10px">';
             #if ($movie['quality'] == 'sd') {$selected['quality']['sd'] = 'selected';} else {$selected['quality']['sd'] = '';}
             
-            if ($m_online->field('resolution') == '1280x720') {
-                $quality = '720p HD';
-                $quality_s = 'hd';
-            } else if ($m_online->field('resolution') == '1920x1080' OR $m_online->field('resolution') == '1440x1080') {
-                $quality = '1080p Full HD';
-                $quality_s = 'fhd';
-            } else if ($m_online->field('resolution') == '2048x1080') { 
-                $quality = '2K';
-                $quality_s = '2k';
-            } else if ($m_online->field('resolution') == '4096x2160' OR  $m->field('resolution') == '3840x2160') { 
-                $quality = '4K';
-                $quality_s = '4k';
-            } else if ($m_online->field('resolution') == '6144x3160') { 
+            $res_parts = explode('x', (string)$m_online->field('resolution'));
+            $res_w = isset($res_parts[0]) ? (int)$res_parts[0] : 0;
+            $res_h = isset($res_parts[1]) ? (int)$res_parts[1] : 0;
+            $max_dim = max($res_w, $res_h);
+            $min_dim = min($res_w, $res_h);
+
+            if ($max_dim >= 5500 || $min_dim >= 2800) {
                 $quality = '6K';
                 $quality_s = '6k';
+            } else if ($max_dim >= 3200 || $min_dim >= 1800) {
+                $quality = '4K';
+                $quality_s = '4k';
+            } else if ($max_dim >= 2000 || $min_dim >= 1300) {
+                $quality = '2K';
+                $quality_s = '2k';
+            } else if ($max_dim >= 1600 || $min_dim >= 900) {
+                $quality = '1080p Full HD';
+                $quality_s = 'fhd';
+            } else if ($max_dim >= 1000 || $min_dim >= 650) {
+                $quality = '720p HD';
+                $quality_s = 'hd';
             } else {
                 $quality = 'SD?';
                 $quality_s = 'sd';
@@ -817,7 +827,7 @@ $site .= '
             <div class="ui-widget-content" style="padding:10px; border-top:none;">
                 <div class="edit_title">Gib einen aussagekr&auml;ftigen Filmtitel an. <span id="anzahl_title">(max. 65 Zeichen)</span></div>
                 <div class="edit_content" style="margin-bottom:8px;">
-                    <input type="text" name="title" value="'.$movie['title'].'" onkeyup="jQuery(this).zaehle_zeichen(65, \'anzahl_title\')"  placeholder="Geben Sie einen aussagekr�ftigen Filmtitel an." style="font-size:18px;" />
+                    <input type="text" name="title" value="'.$movie['title'].'" onkeyup="jQuery(this).zaehle_zeichen(65, \'anzahl_title\')"  placeholder="Geben Sie einen aussagekräftigen Filmtitel an." style="font-size:18px;" />
                 </div>
 
                 <div class="edit_title">Geben Sie eine gute und aussagekr&auml;ftige <b>Beschreibung</b> des Films an.</div>
@@ -1022,7 +1032,7 @@ $site .= '
         <div class="ui-widget-content radioset" style="font-size:12px; padding:10px; border-top:none; margin-bottom:10px;">';
         
             // gesperrt = Film nicht sichtbar. Bereits gekaufter Content weiterhin online.
-            // gel�scht = Sofern der Film noch nicht gekauft wurde, wird er gel�scht. Ansonsten ist er nur nicht sichbar. F�r Kunden die Ihn gesehen haben trotzdem weiterhin online
+            // gelöscht = Sofern der Film noch nicht gekauft wurde, wird er gelöscht. Ansonsten ist er nur nicht sichbar. Für Kunden die Ihn gesehen haben trotzdem weiterhin online
         
             if ($movie['status'] == 'active') {
                 $staus1 = 'checked="checked"';
@@ -1176,12 +1186,12 @@ $site .= '
 </div> <!-- End of tab-edit -->
 
 <div id="tab-purchases">
-    <div class="ui-widget-header" style="padding:10px; font-size:20px; margin-bottom:20px;">Käufe & Zugriffe für '.htmlspecialchars($movie['title'], ENT_QUOTES, 'UTF-8').'</div>
+    <div class="ui-widget-header" style="padding:10px; font-size:20px; margin-bottom:20px;">KÃ¤ufe & Zugriffe fÃ¼r '.htmlspecialchars($movie['title'], ENT_QUOTES, 'UTF-8').'</div>
     
     <div class="ui-widget-content" style="padding: 15px; margin-bottom: 20px; border-radius: 4px; border: 1px solid #D1D1D1; background: #fcfdfd;">
         <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
             <tr>
-                <td style="width: 25%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2;">Käufe Gesamt:</td>
+                <td style="width: 25%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2;">KÃ¤ufe Gesamt:</td>
                 <td style="width: 25%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2; font-weight: bold; color: #1c94c4;">'.$count_buys.'x</td>
                 <td style="width: 25%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2;">Zuletzt gekauft am:</td>
                 <td style="width: 25%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2; font-weight: bold;">'.$last_buy.'</td>
@@ -1258,11 +1268,11 @@ $site .= '
                 <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2; font-family: monospace;">'.$m_online->field('filename').'</td>
             </tr>
             <tr>
-                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">Dateigröße:</td>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">DateigrÃ¶ÃŸe:</td>
                 <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">'.$file_size_text.'</td>
             </tr>
             <tr>
-                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">Auflösung:</td>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">AuflÃ¶sung:</td>
                 <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">'.$m_online->field('resolution').'</td>
             </tr>
             <tr>

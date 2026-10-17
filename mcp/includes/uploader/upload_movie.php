@@ -49,16 +49,16 @@ function upload_file($rs_movie, $movie_id) {
     $fileinfo = $getID3->analyze($tmpFileName);
     
     #getid3_lib::CopyTagsToComments($fileinfo);
-    $play_time		= $fileinfo['playtime_string'];
-    $play_time_sec	= round($fileinfo['playtime_seconds']);
+    $play_time		= (isset($fileinfo['playtime_string']) && $fileinfo['playtime_string'] !== '') ? $fileinfo['playtime_string'] : '0:00';
+    $play_time_sec	= isset($fileinfo['playtime_seconds']) ? round($fileinfo['playtime_seconds']) : 0;
     
-    // Prüfe ob Film länger als 120 Sekunden
+    // PrÃ¼fe ob Film lÃ¤nger als 120 Sekunden
     
     if ($play_time_sec < 120) {
         #file_error("Der Film muss mindesten eine L&auml;nge von 2 Minuten haben.<br />(Dein Film: ".$play_time_sec." Sekunden)");
     }
     
-    if (isset($fileinfo['video']['resolution_x']) AND isset($fileinfo['video']['resolution_y'])) {
+    if (isset($fileinfo['video']['resolution_x']) AND isset($fileinfo['video']['resolution_y']) AND round($fileinfo['video']['resolution_x']) > 0 AND round($fileinfo['video']['resolution_y']) > 0) {
         $width = round($fileinfo['video']['resolution_x']);
         $height = round($fileinfo['video']['resolution_y']);
 
@@ -66,13 +66,13 @@ function upload_file($rs_movie, $movie_id) {
             #file_error("Der Film muss mindesten eine Aufl&ouml;sung von 640x480 (Pixel) haben.");    
         }
     } else {
-        $class_errorlog->log(print_r($fileinfo, true),__FILE__,__LINE__);
-        file_error("Der Film enth&auml;lt keine Angaben zur Aufl&ouml;sung (resolution_x / resolution_y).");
+        // Fallback bei fehlenden/defekten Container-Metadaten (wird bei der FFmpeg-Konvertierung repariert und aktualisiert)
+        $width = 1920;
+        $height = 1080;
     }
 
     $fileParts = pathinfo($fileName);
-    $extension = $fileParts['extension'];
-    $extension = strtolower($extension);
+    $extension = isset($fileParts['extension']) ? strtolower($fileParts['extension']) : '';
 
     if (!in_array($extension,$fileTypes)) {
         file_error("Falsches Dateiformat!<br />Es sind nur avi, flv, m4v, mkv, mov, mp4, mpg, wmv erlaubt.");
@@ -82,7 +82,7 @@ function upload_file($rs_movie, $movie_id) {
 
         $file_name = $movie_id.'_'.$movie_ary->file_id.'.'.$extension;
 
-        // erstelle Speicher für Filme
+        // erstelle Speicher fÃ¼r Filme
         if (!file_exists(MOVIES_PATH.'/'.$movie_ary->storage_location.'/'.$_SESSION['merchant_id'].'/'.$movie_id)) {
             mkdir(MOVIES_PATH.'/'.$movie_ary->storage_location.'/'.$_SESSION['merchant_id'].'/'.$movie_id, 0777, true);
         }

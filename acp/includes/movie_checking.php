@@ -656,11 +656,15 @@ $site .= '
 
         if ($m->field('resolution') != '') {
             $explode = explode('x', $m->field('resolution'));
-            $width = $explode[0];
-            $height = $explode[1];
+            $width = isset($explode[0]) ? (int)$explode[0] : 0;
+            $height = isset($explode[1]) ? (int)$explode[1] : 0;
 
+            // Hochformat (z.B. 9:16 Smartphone-Videos)
+            if ($width > 0 && $height > $width) {
+                $width = round(540 * ($width / $height));
+                $height = 540;
             // 16:9
-            if ($width=='720' AND $height=='400') {
+            } elseif ($width=='720' AND $height=='400') {
                 $width = '600';
                 $height = '363';
             // 16:9
@@ -684,7 +688,7 @@ $site .= '
                 $width = '600';
                 $height = '450';
             // 16:9
-            } elseif ($width > '1280'){
+            } elseif ($width > 1280){
                 $width = '600';
                 $height = '363';
             // 4:3
@@ -725,21 +729,27 @@ $site .= '
             } else {$selected['quality']['sd'] = '';}
             */
         
-            if ($m->field('resolution') == '1280x720') {
-                $quality = '720p HD';
-                $quality_s = 'hd';
-            } else if ($m->field('resolution') == '1920x1080' OR $m->field('resolution') == '1440x1080') {
-                $quality = '1080p Full HD';
-                $quality_s = 'fhd';
-            } else if ($m->field('resolution') == '2048x1080') { 
-                $quality = '2K';
-                $quality_s = '2k';
-            } else if ($m->field('resolution') == '4096x2160' OR $m->field('resolution') == '3840x2160') { 
-                $quality = '4K';
-                $quality_s = '4k';
-            } else if ($m->field('resolution') == '6144x3160') { 
+            $res_parts = explode('x', (string)$m->field('resolution'));
+            $res_w = isset($res_parts[0]) ? (int)$res_parts[0] : 0;
+            $res_h = isset($res_parts[1]) ? (int)$res_parts[1] : 0;
+            $max_dim = max($res_w, $res_h);
+            $min_dim = min($res_w, $res_h);
+
+            if ($max_dim >= 5500 || $min_dim >= 2800) {
                 $quality = '6K';
                 $quality_s = '6k';
+            } else if ($max_dim >= 3200 || $min_dim >= 1800) {
+                $quality = '4K';
+                $quality_s = '4k';
+            } else if ($max_dim >= 2000 || $min_dim >= 1300) {
+                $quality = '2K';
+                $quality_s = '2k';
+            } else if ($max_dim >= 1600 || $min_dim >= 900) {
+                $quality = '1080p Full HD';
+                $quality_s = 'fhd';
+            } else if ($max_dim >= 1000 || $min_dim >= 650) {
+                $quality = '720p HD';
+                $quality_s = 'hd';
             } else {
                 $quality = 'SD?';
                 $quality_s = 'sd';

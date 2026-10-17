@@ -59,11 +59,12 @@ WHERE `user_streaming_key` = '". p4c_escape_string($user_streaming_key)."' LIMIT
 if ($_GET['buy_as'] == 'download') {
     $api['movie_url'] = API_URL.'/Downloader/'.$user_streaming_key.'/'.$movie_id.'/'.$access_token;
 } else {
-    $api['movie_url']        = API_URL.'/Player/'.$user_streaming_key.'/'.$movie_id.'/'.$access_token;
-    $api['poster_url_fsk16'] = API_URL.'/PlayerPoster/FSK16/'.$movie_id;
-    $api['poster_url_fsk18'] = API_URL.'/PlayerPoster/FSK18/'.$movie_id;
-    $api['width']            = $resolution[0];
-    $api['height']           = $resolution[1];
+    $api['movie_url']           = API_URL.'/Player/'.$user_streaming_key.'/'.$movie_id.'/'.$access_token;
+    $api['movie_url_mobil_mp4'] = $api['movie_url'];
+    $api['poster_url_fsk16']    = API_URL.'/PlayerPoster/FSK16/'.$movie_id;
+    $api['poster_url_fsk18']    = API_URL.'/PlayerPoster/FSK18/'.$movie_id;
+    $api['width']               = $resolution[0];
+    $api['height']              = $resolution[1];
 
 }
 
