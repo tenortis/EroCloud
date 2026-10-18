@@ -281,9 +281,9 @@ if ($action === 'inspect_transcripts') {
                 continue;
             }
 
-            // Suche alle Klammer-Ausdruecke [...] und (...)
+            // Suche alle Klammer- und Sternchen-Ausdruecke [...], (...) und *...*
             $matches_b = array();
-            if (preg_match_all('/(\[[^\]]+\]|\([^\)]+\))/u', $st, $m_all)) {
+            if (preg_match_all('/(\[[^\]]+\]|\([^\)]+\)|\*[^\*]+\*)/u', $st, $m_all)) {
                 $matches_b = $m_all[1];
             }
 
@@ -295,27 +295,23 @@ if ($action === 'inspect_transcripts') {
 
                 $total_bracket_occ++;
                 if (!isset($brackets_map[$b_norm])) {
-                    // Automatische Kategorisierungs-Empfehlung ermitteln
-                    $b_low = mb_strtolower($b_norm, 'UTF-8');
-                    $cat_type  = 'review';
-                    $cat_label = 'Manuell prüfen';
-
-                    if (preg_match('/(musik|music|lachen|laugh|stöhn|moan|seufz|sigh|applaus|klatsch|atmen|breath|stille|silence|schrei|scream|weinen|cry|stöhnt|lacht)/iu', $b_low)) {
-                        $cat_type  = 'keep_atmosphere';
-                        $cat_label = 'Atmosphäre / Closed Caption (Behalten)';
-                    } elseif (preg_match('/(ɑ|ː|ə|ʊ|ɔ|ɛ|ɪ|ʃ|ʒ|\'[a-z]|bɑ|mmm+|ahh+|ohh+|uhh+|hmm+)/iu', $b_low)) {
-                        $cat_type  = 'convert_moan';
-                        $cat_label = 'Lautschrift / Stöhn-Laut (-> in [Stöhnen] umwandeln)';
-                    } elseif (preg_match('/(giliv|li-cc|cc|subtitles|untertitel|amara|copyright|translated|captioned|blank_audio|inaudible|unverständlich|geräusch)/iu', $b_low)) {
-                        $cat_type  = 'remove_artifact';
-                        $cat_label = 'Whisper-Artefakt / Halluzination (-> Rausfiltern)';
+                    $norm_target = aic_normalize_single_bracket_tag($b_norm);
+                    if ($norm_target !== '') {
+                        if ($norm_target === $b_norm) {
+                            $cat_type  = 'keep_atmosphere';
+                            $cat_label = 'Sauberer Atmosphären-Tag (' . $norm_target . ' -> Behalten)';
+                        } else {
+                            $cat_type  = 'convert_moan';
+                            $cat_label = 'Wird vereinheitlicht zu -> ' . $norm_target;
+                        }
                     } else {
                         $cat_type  = 'remove_artifact';
-                        $cat_label = 'Unbekannter Klammer-Tag (-> Prüfen / Rausfiltern)';
+                        $cat_label = 'Whisper-Halluzination / Müll (-> Wird restlos entfernt)';
                     }
 
                     $brackets_map[$b_norm] = array(
                         'tag'               => $b_norm,
+                        'normalized_to'     => $norm_target,
                         'total_occurrences' => 0,
                         'movie_count'       => 0,
                         'cat_type'          => $cat_type,
@@ -336,8 +332,8 @@ if ($action === 'inspect_transcripts') {
                 }
             }
 
-            // Pruefen, ob ausserhalb von Klammern noch echter gesprochener Text in dieser Zeile steht
-            $without_brackets = trim(preg_replace('/(\[[^\]]*\]|\([^\)]*\))/u', '', $st));
+            // Pruefen, ob ausserhalb von Klammern/Sternchen noch echter gesprochener Text in dieser Zeile steht
+            $without_brackets = trim(preg_replace('/(\[[^\]]*\]|\([^\)]*\)|\*[^\*]*\*)/u', '', $st));
             // Entferne reine Satzzeichen/Symbole
             $only_letters = preg_replace('/[^\p{L}\p{N}]+/u', '', $without_brackets);
 
@@ -446,6 +442,17 @@ if ($action === 'inspect_transcripts') {
     });
     $phrases_list = array_slice($phrases_filtered, 0, 80);
 
+    // Zaehle Filme mit exotischer Nicht-Whitelist-Sprache
+    $allowed_wl = aic_get_allowed_whisper_languages();
+    $exotic_total = 0;
+    $exotic_speech = 0;
+    foreach ($languages_list as $ll) {
+        if (!isset($allowed_wl[$ll['code_lower']])) {
+            $exotic_total  += (int)$ll['movie_count'];
+            $exotic_speech += (int)$ll['real_speech_count'];
+        }
+    }
+
     aic_send_json(array(
         'status'      => 'ok',
         'exported_at' => date('Y-m-d H:i:s'),
@@ -455,12 +462,190 @@ if ($action === 'inspect_transcripts') {
             'total_with_real_speech' => $total_with_real_speech,
             'total_only_brackets'    => $total_only_brackets,
             'unique_bracket_tags'    => count($brackets_list),
-            'total_bracket_occ'      => $total_bracket_occ
+            'total_bracket_occ'      => $total_bracket_occ,
+            'exotic_lang_total'      => $exotic_total,
+            'exotic_lang_speech'     => $exotic_speech
         ),
         'languages'        => $languages_list,
         'bracket_tags'     => array_slice($brackets_list, 0, 300),
         'repeated_phrases' => $phrases_list,
         'no_dialog_movies' => $no_dialog_list
+    ));
+}
+
+if ($action === 'clean_all_vtt_transcripts') {
+    @set_time_limit(600);
+    $t0 = microtime(true);
+
+    $rs_all = p4c_query("SELECT `ai`.`movie_id`, `ai`.`merchant_id`, `ai`.`subtitle_status`, `ai`.`detected_language`,
+            `ai`.`subtitle_filename`, `ai`.`spoken_transcript`, `ai`.`spoken_segments_json`,
+            `m`.`movie_language`, `m`.`storage_location`, `m`.`file_id`
+        FROM `movies_ai_analysis` `ai`
+        LEFT JOIN `movies` `m` ON `m`.`id` = `ai`.`movie_id`
+        WHERE `ai`.`subtitle_status` = '2'
+        ORDER BY `ai`.`movie_id` DESC;", __FILE__, __LINE__);
+
+    $total_checked        = 0;
+    $movies_modified      = 0;
+    $langs_corrected      = 0;
+    $segments_removed     = 0;
+    $tags_normalized      = 0;
+    $vtt_files_rewritten  = 0;
+    $exotic_speech_movies = array();
+    $now                  = date('Y-m-d H:i:s');
+
+    while ($row = p4c_fetch_object($rs_all)) {
+        $total_checked++;
+        $mid      = (int)$row->movie_id;
+        $merch_id = (int)$row->merchant_id;
+        $orig_lng = strtolower(trim((string)$row->detected_language));
+        $db_lng   = strtolower(trim((string)$row->movie_language));
+
+        $raw_segs = array();
+        if (!empty($row->spoken_segments_json)) {
+            $dec_s = @json_decode($row->spoken_segments_json, true);
+            if (is_array($dec_s)) {
+                $raw_segs = $dec_s;
+            }
+        }
+        if (empty($raw_segs) && !empty($row->spoken_transcript)) {
+            $lines = explode("\n", aic_utf8((string)$row->spoken_transcript));
+            foreach ($lines as $ln) {
+                $ln = trim($ln);
+                if ($ln === '') continue;
+                if (preg_match('/^\[(\d{2,}):(\d{2})\s*-\s*(\d{2,}):(\d{2})\]\s*(.+)$/u', $ln, $m_ts)) {
+                    $s_sec = ((int)$m_ts[1] * 60) + (int)$m_ts[2];
+                    $e_sec = ((int)$m_ts[3] * 60) + (int)$m_ts[4];
+                    $raw_segs[] = array('start' => $s_sec, 'end' => $e_sec, 'text' => trim($m_ts[5]));
+                } else {
+                    $raw_segs[] = array('start' => 0, 'end' => 3, 'text' => $ln);
+                }
+            }
+        }
+
+        $clean = aic_clean_and_normalize_segments($raw_segs, $orig_lng, $db_lng);
+
+        $new_lng       = $clean['detected_language'];
+        $new_segs_json = json_encode($clean['segments'], JSON_UNESCAPED_UNICODE);
+        $new_trans     = $clean['transcript'];
+
+        $segments_removed += (int)$clean['removed_count'];
+        $tags_normalized  += (int)$clean['normalized_count'];
+
+        if ($clean['had_exotic_lang'] && ($clean['had_foreign_speech'] || $clean['has_real_speech'])) {
+            $exotic_speech_movies[] = $mid;
+        }
+
+        $lang_changed  = ($new_lng !== $orig_lng);
+        $trans_changed = ($new_trans !== trim((string)$row->spoken_transcript) || $new_segs_json !== (string)$row->spoken_segments_json);
+
+        if ($lang_changed) {
+            $langs_corrected++;
+        }
+
+        if ($lang_changed || $trans_changed) {
+            $movies_modified++;
+            $err_note = '';
+            if ($clean['had_exotic_lang']) {
+                $err_note = 'OrigLang:' . $orig_lng . ($clean['had_foreign_speech'] ? ':ForeignSpeech' : '');
+            }
+            p4c_query("UPDATE `movies_ai_analysis` SET
+                    `detected_language`    = '" . p4c_escape_string($new_lng) . "',
+                    `spoken_transcript`    = '" . p4c_escape_string($new_trans) . "',
+                    `spoken_segments_json` = '" . p4c_escape_string($new_segs_json) . "',
+                    " . ($err_note !== '' ? "`last_error` = '" . p4c_escape_string($err_note) . "'," : "") . "
+                    `updated_at`           = '" . $now . "'
+                WHERE `movie_id` = '" . abs($mid) . "'
+                LIMIT 1;", __FILE__, __LINE__);
+        }
+
+        // Physische .vtt-Datei im Film-Verzeichnis mit den sauberen Segmenten überschreiben
+        $storage_loc = !empty($row->storage_location) ? $row->storage_location : MOVIES_DEFAULT_DIR;
+        $movie_dir   = MOVIES_PATH . '/' . $storage_loc . '/' . $merch_id . '/' . $mid;
+        $sub_file    = !empty($row->subtitle_filename) ? $row->subtitle_filename : ('sub_' . $mid . '_' . $row->file_id . '.vtt');
+        $vtt_path    = $movie_dir . '/' . $sub_file;
+
+        if (@is_dir($movie_dir)) {
+            $vtt_content = aic_build_vtt_content($clean['segments'], $new_lng);
+            if (@file_put_contents($vtt_path, $vtt_content) !== false) {
+                $vtt_files_rewritten++;
+            }
+        }
+    }
+
+    $dur = round(microtime(true) - $t0, 2);
+
+    aic_send_json(array(
+        'status'               => 'ok',
+        'duration_sec'         => $dur,
+        'total_checked'        => $total_checked,
+        'movies_modified'      => $movies_modified,
+        'langs_corrected'      => $langs_corrected,
+        'segments_removed'     => $segments_removed,
+        'tags_normalized'      => $tags_normalized,
+        'vtt_files_rewritten'  => $vtt_files_rewritten,
+        'exotic_speech_count'  => count($exotic_speech_movies),
+        'message'              => 'Bereinigung abgeschlossen (' . $dur . ' Sek.): ' . $movies_modified . ' von ' . $total_checked . ' Transkripten bereinigt, ' . $segments_removed . ' Halluzinations-/Schleifen-Segmente entfernt, ' . $tags_normalized . ' Atmosphären-Tags auf Deutsch vereinheitlicht, ' . $langs_corrected . ' exotische Sprachcodes korrigiert und ' . $vtt_files_rewritten . ' .vtt-Dateien sauber neu geschrieben.'
+    ));
+}
+
+if ($action === 'requeue_exotic_lang_movies') {
+    $requeue_mode = isset($_POST['requeue_mode']) ? trim((string)$_POST['requeue_mode']) : 'foreign_speech_only';
+    $allowed_wl   = array_keys(aic_get_allowed_whisper_languages());
+    $in_sql       = "'" . implode("','", array_map('p4c_escape_string', $allowed_wl)) . "'";
+
+    $rs_ex = p4c_query("SELECT `movie_id`, `detected_language`, `spoken_segments_json`, `spoken_transcript`, `last_error`
+        FROM `movies_ai_analysis`
+        WHERE `subtitle_status` = '2'
+          AND (LOWER(`detected_language`) NOT IN (" . $in_sql . ") OR `last_error` LIKE 'OrigLang:%');", __FILE__, __LINE__);
+
+    $requeued_ids = array();
+    $now = date('Y-m-d H:i:s');
+
+    while ($row = p4c_fetch_object($rs_ex)) {
+        $mid      = (int)$row->movie_id;
+        $det_low  = strtolower(trim((string)$row->detected_language));
+        $last_err = (string)$row->last_error;
+
+        if ($requeue_mode === 'all_exotic') {
+            $requeued_ids[] = $mid;
+        } else {
+            // Nur Filme einreihen, bei denen KO/JA/JW/LA/ZH (nicht bloß NN-Stöhnen) vorlag ODER fremdsprachige Schriftzeichen außerhalb von Klammern vorkamen
+            $orig_code = $det_low;
+            if (preg_match('/^OrigLang:([a-z]+)/i', $last_err, $m_ol)) {
+                $orig_code = strtolower($m_ol[1]);
+            }
+            $had_foreign_flag = (stripos($last_err, 'ForeignSpeech') !== false);
+            $has_non_bracket  = false;
+            $without_b = trim(preg_replace('/(\[[^\]]*\]|\([^\)]*\)|\*[^\*]*\*)/u', '', (string)$row->spoken_transcript));
+            $without_b = preg_replace('/\d{2,}:\d{2}/', '', $without_b);
+            if (stripos($without_b, 'Kein gesprochener Dialog') === false && mb_strlen(preg_replace('/[^\p{L}]+/u', '', $without_b), 'UTF-8') >= 3) {
+                $has_non_bracket = true;
+            }
+
+            if ($had_foreign_flag || ($orig_code !== 'nn' && $orig_code !== 'no' && $has_non_bracket)) {
+                $requeued_ids[] = $mid;
+            }
+        }
+    }
+
+    if (!empty($requeued_ids)) {
+        $ids_sql = implode(',', array_map('abs', $requeued_ids));
+        p4c_query("UPDATE `movies_ai_analysis` SET
+                `subtitle_status` = '0',
+                `last_error`      = '',
+                `updated_at`      = '" . $now . "'
+            WHERE `movie_id` IN (" . $ids_sql . ");", __FILE__, __LINE__);
+    }
+
+    aic_send_json(array(
+        'status'        => 'ok',
+        'requeued_count'=> count($requeued_ids),
+        'requeued_ids'  => array_slice($requeued_ids, 0, 50),
+        'stats'         => aic_get_catalog_and_batch_stats(),
+        'message'       => count($requeued_ids) > 0
+            ? (count($requeued_ids) . ' Filme wurden auf Status „Offen“ (subtitle_status = 0) zurückgesetzt und werden vom Hintergrund-Cronjob automatisch mit der neuen europäischen Sprach-Whitelist & Fallback-Logik neu durch Whisper transkribiert!')
+            : 'Keine passenden Filme zum erneuten Einreihen gefunden (alle betroffenen Filme sind bereits eingereiht oder bereinigt).'
     ));
 }
 

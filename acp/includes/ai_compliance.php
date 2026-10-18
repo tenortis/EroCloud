@@ -780,7 +780,7 @@ $site .= '
                         &#x1F50E; Bestandsaufnahme der vorhandenen <code>.vtt</code>-Untertitel &amp; Whisper-Segmente
                     </div>
                     <div style="font-size:13px; color:#444; line-height:1.45;">
-                        Dieses Werkzeug durchsucht alle bereits in <code>movies_ai_analysis</code> gespeicherten Audio-Transkripte und zeigt Ihnen, welche <strong>Klammer-Ausdr&uuml;cke</strong> (z. B. <code>[Musik]</code> vs. <code>[ &apos;bɑː ]</code> oder <code>[ Giliv Li-CC]</code>), welche <strong>Sprachk&uuml;rzel</strong> (wie <code>DE</code>, <code>EN</code>, <code>NN</code>) und welche <strong>Filme ohne echten Dialog</strong> vorkommen.
+                        Dieses Werkzeug durchsucht alle bereits in <code>movies_ai_analysis</code> gespeicherten Audio-Transkripte und zeigt Ihnen, welche <strong>Klammer- &amp; Sternchen-Ausdr&uuml;cke</strong> (z. B. <code>[Musik]</code>, <code>* Sie st&ouml;hnt. *</code> vs. <code>[ &apos;bɑː ]</code> oder <code>[두 번째 요리]</code>), welche <strong>Sprachk&uuml;rzel</strong> (wie <code>DE</code>, <code>EN</code>, <code>NN</code>, <code>KO</code>, <code>JA</code>) und welche <strong>Filme ohne echten Dialog</strong> vorkommen.
                     </div>
                 </div>
                 <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
@@ -796,6 +796,45 @@ $site .= '
                 </div>
             </div>
             <div id="aic-insp-export-msg" style="margin-top:8px; font-size:12px; font-weight:bold; color:#155724; display:none;"></div>
+        </div>
+
+        <!-- BEREINIGUNGS- & SPRACH-WHITELIST-AKTIONEN -->
+        <div class="aic-step-box" style="background:#f8fff9; border:1px solid #c3e6cb; border-left:4px solid #28a745; margin-bottom:18px;">
+            <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:18px;">
+                <div style="flex:1 1 480px;">
+                    <div style="font-size:15px; font-weight:bold; color:#155724; margin-bottom:6px;">
+                        &#x1F9F9; Schritt 1: Alle vorhandenen Transkripte &amp; <code>.vtt</code>-Dateien rückwirkend bereinigen (ohne Whisper-Neulauf)
+                    </div>
+                    <div style="font-size:12px; color:#333; line-height:1.5; margin-bottom:10px;">
+                        Bereinigt in wenigen Sekunden alle bereits transkribierten Filme in <code>movies_ai_analysis</code> und schreibt deren <code>.vtt</code>-Dateien auf dem Server sauber neu:<br/>
+                        &bull; <strong>Atmosph&auml;re vereinheitlichen &amp; entflackern:</strong> Macht aus Varianten wie <code>[MUSIC]</code>, <code>*Sie st&ouml;hnt.*</code>, <code>[Groaning]</code>, <code>[ &apos;bɑː ]</code>, <code>(breathing heavily)</code> einheitlich <code>[Musik]</code>, <code>[St&ouml;hnen]</code>, <code>[Schweres Atmen]</code>, <code>[Lachen]</code> und fasst Endlos-Schleifen zusammen.<br/>
+                        &bull; <strong>Halluzinationen restlos l&ouml;schen:</strong> Entfernt alle koreanischen/japanischen/chinesischen Zeichen (<code>[두 번째 요리]</code>), TV-Artefakte (<code>[Untertitel im Auftrag des ZDF]</code>, <code>(istig oder schreit)</code>, <code>* Stimmengewirr *</code>, <code>[BLANK_AUDIO]</code>).<br/>
+                        &bull; <strong>Sprach-Whitelist anwenden:</strong> Korrigiert exotische Whisper-Codes (<code>NN</code>, <code>KO</code>, <code>JA</code>, <code>JW</code>, <code>LA</code>, <code>ZH</code>) automatisch auf die g&uuml;ltige europ&auml;ische Sprache (<code>DE</code>, <code>EN</code>, <code>ES</code>, <code>FR</code>, <code>IT</code>, <code>NL</code>, <code>PL</code>, <code>CS</code>, <code>RU</code>, <code>PT</code>).
+                    </div>
+                    <button type="button" id="btn-aic-clean-all-vtt" class="aic-btn-success" style="padding:8px 16px; font-size:13px;">
+                        &#x1F9F9; Alle bestehenden Transkripte &amp; .vtt-Dateien jetzt bereinigen
+                    </button>
+                </div>
+
+                <div style="flex:1 1 420px; background:#fff9e6; border:1px solid #ffeeba; border-radius:4px; padding:12px 14px;">
+                    <div style="font-size:14px; font-weight:bold; color:#856404; margin-bottom:6px;">
+                        &#x1F504; Schritt 2: Filme mit exotischer Sprache erneut durch Whisper schicken
+                    </div>
+                    <div style="font-size:12px; color:#444; line-height:1.45; margin-bottom:10px;">
+                        Falls Whisper bei einem Film in den ersten 30 Sek. f&auml;lschlicherweise Koreanisch (<code>KO</code>), Japanisch (<code>JA</code>) oder Javanisch (<code>JW</code>) geraten hat, wurde nachfolgender deutscher Dialog im falschen Alphabet transkribiert. Hier k&ouml;nnen Sie diese Filme f&uuml;r den Hintergrund-Cronjob auf „Offen“ zur&uuml;cksetzen (der Cronjob nutzt ab sofort automatisch den europ&auml;ischen Sprach-Fallback!):
+                    </div>
+                    <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                        <select id="aic-requeue-exotic-mode" class="aic-select" style="flex:1 1 240px; font-size:12px;">
+                            <option value="foreign_speech_only">Empfohlen: Nur KO/JA/JW/LA/ZH-Filme mit vermutetem Sprach-Dialog (~20-30 Filme)</option>
+                            <option value="all_exotic">Alle Filme mit exotischem Code (inkl. aller 136 NN-St&ouml;hn-Videos)</option>
+                        </select>
+                        <button type="button" id="btn-aic-requeue-exotic" class="aic-btn-warning" style="padding:7px 12px; font-size:12px;">
+                            &#x1F504; F&uuml;r Whisper-Cronjob einreihen
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div id="aic-insp-clean-msg" style="margin-top:12px; padding:10px 12px; border-radius:4px; font-size:13px; font-weight:bold; display:none;"></div>
         </div>
 
         <!-- 4 KPI-KARTEN FUER DEN INSPEKTOR -->
@@ -1712,9 +1751,10 @@ jQuery(document).ready(function() {
                 if (lList.length === 0) {
                     lHtml = "<tr><td colspan=\"6\" style=\"text-align:center; color:#666; padding:14px;\">Noch keine transkribierten Videos vorhanden.</td></tr>";
                 } else {
+                    var allowedWl = { de:1, en:1, es:1, fr:1, it:1, nl:1, pl:1, cs:1, ru:1, pt:1, tr:1, hu:1, sv:1, da:1 };
                     for (var j = 0; j < lList.length; j++) {
                         var lg = lList[j];
-                        var isSuspect = (lg.code === "NN" || lg.code === "NO" || lg.code === "LA" || lg.code === "CY" || lg.code === "JW" || (lg.only_brackets_count > 0 && lg.real_speech_count === 0));
+                        var isSuspect = (!allowedWl[lg.code_lower] || (lg.only_brackets_count > 0 && lg.real_speech_count === 0));
                         var codeBadge = isSuspect
                             ? "<span class=\"aic-badge\" style=\"background:#e0a800; color:#111;\">" + escHtml(lg.code) + "</span>"
                             : "<span class=\"aic-badge\" style=\"background:#28a745; color:#fff;\">" + escHtml(lg.code) + "</span>";
@@ -1810,6 +1850,64 @@ jQuery(document).ready(function() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         jQuery("#aic-insp-export-msg").show().html("&#x2705; Die Datei <code>erocloud_vtt_analyse.json</code> wurde heruntergeladen.");
+    });
+
+    jQuery("#btn-aic-clean-all-vtt").on("click", function() {
+        var btn = jQuery(this);
+        var origHtml = btn.html();
+        btn.prop("disabled", true).html("&#x23F3; Bereinige alle Transkripte &amp; .vtt-Dateien...");
+        jQuery("#aic-insp-clean-msg").show().css({ background: "#e2f0fb", color: "#0c5460", border: "1px solid #bee5eb" }).html("&#x23F3; Bitte warten: Alle vorhandenen Transkripte werden normalisiert, entflackert und die .vtt-Dateien neu geschrieben...");
+
+        jQuery.ajax({
+            url: ajaxUrl,
+            type: "POST",
+            dataType: "json",
+            data: { action: "clean_all_vtt_transcripts" },
+            success: function(res) {
+                btn.prop("disabled", false).html(origHtml);
+                if (res && res.status === "ok") {
+                    jQuery("#aic-insp-clean-msg").show().css({ background: "#d4edda", color: "#155724", border: "1px solid #c3e6cb" }).html("&#x2705; " + escHtml(res.message));
+                    runTranscriptInspector();
+                } else {
+                    jQuery("#aic-insp-clean-msg").show().css({ background: "#f8d7da", color: "#721c24", border: "1px solid #f5c6cb" }).html("&#x26A0; Fehler bei der Bereinigung.");
+                }
+            },
+            error: function() {
+                btn.prop("disabled", false).html(origHtml);
+                jQuery("#aic-insp-clean-msg").show().css({ background: "#f8d7da", color: "#721c24", border: "1px solid #f5c6cb" }).html("&#x26A0; Netzwerkfehler bei der Bereinigung.");
+            }
+        });
+    });
+
+    jQuery("#btn-aic-requeue-exotic").on("click", function() {
+        var btn = jQuery(this);
+        var origHtml = btn.html();
+        var mode = jQuery("#aic-requeue-exotic-mode").val();
+        btn.prop("disabled", true).html("&#x23F3; Reihe Filme ein...");
+
+        jQuery.ajax({
+            url: ajaxUrl,
+            type: "POST",
+            dataType: "json",
+            data: {
+                action: "requeue_exotic_lang_movies",
+                requeue_mode: mode
+            },
+            success: function(res) {
+                btn.prop("disabled", false).html(origHtml);
+                if (res && res.status === "ok") {
+                    if (res.stats) {
+                        renderCatalogStats(res.stats);
+                    }
+                    jQuery("#aic-insp-clean-msg").show().css({ background: "#fff3cd", color: "#856404", border: "1px solid #ffeeba" }).html("&#x1F504; " + escHtml(res.message));
+                    runTranscriptInspector();
+                }
+            },
+            error: function() {
+                btn.prop("disabled", false).html(origHtml);
+                alert("Netzwerkfehler beim Einreihen der Filme.");
+            }
+        });
     });
 
     jQuery(document).on("click", ".btn-aic-open-inspector", function() {

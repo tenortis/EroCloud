@@ -357,6 +357,287 @@ function aic_format_time($seconds) {
 }
 
 /**
+ * Liefert die Whitelist der erlaubten europäischen Sprachen für Whisper-Transkripte auf EroCloud.
+ * Wenn Whisper bei -l auto durch Stöhnen/Musik in den ersten 30 Sek. eine exotische Sprache
+ * wie NN, KO, JA, JW, LA oder ZH halluziniert, greift automatisch unser Sprach-Fallback.
+ */
+function aic_get_allowed_whisper_languages() {
+    return array(
+        'de' => 'Deutsch',
+        'en' => 'Englisch',
+        'es' => 'Spanisch',
+        'fr' => 'Französisch',
+        'it' => 'Italienisch',
+        'nl' => 'Niederländisch',
+        'pl' => 'Polnisch',
+        'cs' => 'Tschechisch',
+        'ru' => 'Russisch',
+        'pt' => 'Portugiesisch',
+        'tr' => 'Türkisch',
+        'hu' => 'Ungarisch',
+        'sv' => 'Schwedisch',
+        'da' => 'Dänisch'
+    );
+}
+
+/**
+ * Prüft einen einzelnen Klammer- oder Sternchen-Ausdruck ([...], (...), *...*)
+ * und gibt entweder einen vereinheitlichten deutschen Atmosphären-Tag zurück
+ * ([Musik], [Stöhnen], [Schweres Atmen], [Lachen], [Klatschen]) oder '' (komplett löschen).
+ */
+function aic_normalize_single_bracket_tag($raw_tag) {
+    $t = trim(aic_utf8((string)$raw_tag));
+    if ($t === '') {
+        return '';
+    }
+
+    // Äußere Klammern [...], (...) oder Sternchen *...* entfernen
+    $inner = preg_replace('/^[\[\(\*]+|[\]\)\*]+$/u', '', $t);
+    $inner = trim($inner);
+    if ($inner === '') {
+        return '';
+    }
+
+    // Zeitstempel-Klammern wie [00:12 - 00:15] niemals als Tag behandeln
+    if (preg_match('/^\d{2,}:\d{2}/', $inner)) {
+        return $t;
+    }
+
+    $low = mb_strtolower($inner, 'UTF-8');
+    // Satzzeichen am Ende für sauberen Vergleich entfernen
+    $low_clean = trim(preg_replace('/[\.\!\?\,\-\*\_]+$/u', '', $low));
+
+    // 1. Bekannte Whisper-Halluzinationen & technische Artefakte sofort restlos löschen
+    if (preg_match('/(istig oder schreit|drillenzel|engineerise|bundesregierung|bohemian|untertitel|subtitles|amara\.org|copyright|zdf|wdr|swr|ndr|mdr|sprechen durcheinander|stimmengewirr|indistinct|foreign language|fremdsprache|unverständlich|inaudible|blank_audio|mumbling|geräusch|gespräch|maschin|motor|pieps|clanking|splashing|knocking|door|birds|rustling|chuva|slow motion|silence|stille|snoring|growling|barking|bell dings|water|wind| applause.*music|geheunut|tired of this|can\'t see the end|father can|tövättius|rhodontic|pscape|oliĺ)/iu', $low)) {
+        return '';
+    }
+
+    // 2. Musik & Gesang -> [Musik]
+    if (preg_match('/^(musik|music|music playing|upbeat music|sad music|dramatic music|gesang|singing|w tle śpiew|音楽|humming|summen)$/iu', $low_clean)) {
+        return '[Musik]';
+    }
+
+    // 3. Alle fremden Schriftsysteme (Koreanisch, Japanisch, Chinesisch, Kyrillisch, Arabisch, Hebräisch, Hindi) in Klammern löschen
+    if (preg_match('/[\x{AC00}-\x{D7AF}\x{1100}-\x{11FF}\x{3040}-\x{30FF}\x{4E00}-\x{9FFF}\x{0400}-\x{04FF}\x{0600}-\x{06FF}\x{0590}-\x{05FF}\x{0900}-\x{097F}]/u', $inner)) {
+        return '';
+    }
+
+    // 4. Lachen / Kichern -> [Lachen]
+    if (preg_match('/^(sie lacht|er lacht|lachen|lacht|gelächter|laughter|laughing|laughs|kichert|kichern|giggles|giggling|chuckling|chuckles)$/iu', $low_clean)) {
+        return '[Lachen]';
+    }
+
+    // 5. Atmen / Keuchen -> [Schweres Atmen]
+    if (preg_match('/^(atmen|atmet|schweres atmen|tiefe atemzüge|breathing|breathing heavily|heavy breathing|breaths out|exhales|inhales|inhaling|exhaling|sharp inhale|panting|keuchen|keucht|schnaufen|hecheln|sniffs)$/iu', $low_clean)) {
+        return '[Schweres Atmen]';
+    }
+
+    // 6. Klatschen / Applaus -> [Klatschen]
+    if (preg_match('/^(applaus|applause|klatschen|klatscht|clapping)$/iu', $low_clean)) {
+        return '[Klatschen]';
+    }
+
+    // 7. Stöhnen / Lustlaute / Schreien / Seufzen -> [Stöhnen]
+    if (preg_match('/^(stöhnen|stöhnt|sie stöhnt|sie stöhnt auf.*|er stöhnt|moaning|moans|groaning|groans|sighs|sighing|seufzen|seufzt|grunts|grunting|gagging|schreien|schreit|sie schreit|er schreit|screaming|screams|sie schluchzt|schluchzen|schluchzt|weinen|weint|crying|sobbing|sobs|sounds of pain|suspiración|oh|ah|uh|mmh|hmm)$/iu', $low_clean)) {
+        return '[Stöhnen]';
+    }
+
+    // Kurze phonetische IPA-Stöhnlaute wie [ ˈbɑː ], [ ˈkɛː ], [Shh... uggh...] -> [Stöhnen]
+    if (mb_strlen($inner, 'UTF-8') <= 24 && preg_match('/([ɑːəʊɔɛɪʃʒᶯᶴᶵ]|bɑ|kɛ|uggh|shh.*\.\.\.|mmm+|ahh+|ohh+|uhh+)/iu', $low)) {
+        return '[Stöhnen]';
+    }
+
+    // Alle übrigen unbekannten Klammer-Tags restlos verwerfen
+    return '';
+}
+
+/**
+ * Bereinigt, normalisiert und dedupliziert Whisper-Segmente eines Videos:
+ * - Entfernt Halluzinationen (Koreanisch/Japanisch/TV-Untertitel/Technik-Tags)
+ * - Vereinheitlicht sinnvolle Atmosphären-Tags auf Deutsch ([Musik], [Stöhnen], [Schweres Atmen], [Lachen], [Klatschen])
+ * - Verhindert Sekundentakt-Flackern durch Zusammenfassen aufeinanderfolgender identischer Atmosphären-Tags
+ * - Prüft und korrigiert den Sprachcode anhand der europäischen Sprach-Whitelist
+ */
+function aic_clean_and_normalize_segments($segments, $detected_lang = 'de', $movie_db_lang = 'de') {
+    $allowed_langs = aic_get_allowed_whisper_languages();
+    $det_low       = strtolower(trim((string)$detected_lang));
+    $db_low        = strtolower(trim((string)$movie_db_lang));
+    $fallback_lang = ($db_low !== '' && isset($allowed_langs[$db_low])) ? $db_low : 'de';
+
+    $had_exotic_lang = ($det_low === '' || $det_low === 'unbekannt' || !isset($allowed_langs[$det_low]));
+    $effective_lang  = $had_exotic_lang ? $fallback_lang : $det_low;
+
+    if (!is_array($segments)) {
+        $segments = array();
+    }
+
+    $atmos_tags_lookup = array(
+        '[Musik]'          => true,
+        '[Stöhnen]'        => true,
+        '[Schweres Atmen]' => true,
+        '[Lachen]'         => true,
+        '[Klatschen]'      => true
+    );
+
+    $cleaned_segments   = array();
+    $removed_count      = 0;
+    $normalized_count   = 0;
+    $has_real_speech    = false;
+    $had_foreign_speech = false;
+
+    $last_atmos_tag   = '';
+    $last_atmos_end   = -999.0;
+    $last_short_word  = '';
+    $last_short_end   = -999.0;
+
+    foreach ($segments as $seg) {
+        $start = isset($seg['start']) ? round((float)$seg['start'], 2) : 0.0;
+        $end   = isset($seg['end']) ? round((float)$seg['end'], 2) : ($start + 3.0);
+        if ($end <= $start) {
+            $end = round($start + 2.5, 2);
+        }
+        $raw_text = isset($seg['text']) ? trim(aic_utf8((string)$seg['text'])) : '';
+        if ($raw_text === '') {
+            continue;
+        }
+
+        // Platzhalter für "Kein gesprochener Dialog" oder "Stummfilm" überspringen
+        if (stripos($raw_text, 'Kein gesprochener Dialog') !== false || stripos($raw_text, 'besitzt keine Tonspur') !== false) {
+            continue;
+        }
+
+        $work_text = $raw_text;
+
+        // 1. Alle [...], (...) und *...* Ausdrücke über den Normalisierer schicken
+        if (preg_match('/(\[[^\]]+\]|\([^\)]+\)|\*[^\*]+\*)/u', $work_text)) {
+            $work_text = preg_replace_callback('/(\[[^\]]+\]|\([^\)]+\)|\*[^\*]+\*)/u', function($m) use (&$normalized_count) {
+                $norm = aic_normalize_single_bracket_tag($m[1]);
+                if ($norm !== $m[1]) {
+                    $normalized_count++;
+                }
+                return $norm;
+            }, $work_text);
+        }
+
+        $work_text = trim(preg_replace('/\s+/u', ' ', $work_text));
+        if ($work_text === '') {
+            $removed_count++;
+            continue;
+        }
+
+        // 2. Bekannte TV-/YouTube-Stille-Halluzinationen außerhalb von Klammern ausfiltern
+        if (preg_match('/(untertitel im auftrag|untertitel der amara|amara\.org|copyright wdr|swr 20\d\d|vielen dank fürs zuschauen|danke fürs zuschauen|bis zum nächsten mal|subtitles by|translated by|captioned by)/iu', $work_text)) {
+            $removed_count++;
+            continue;
+        }
+
+        // 3. Nicht-lateinische Halluzinations-Schriften außerhalb von Klammern prüfen
+        // (Koreanisch, Japanisch, Chinesisch, Arabisch, Hebräisch, Devanagari; Kyrillisch nur erlaubt wenn Sprache = ru)
+        $non_latin_pattern = ($effective_lang === 'ru')
+            ? '/[\x{AC00}-\x{D7AF}\x{1100}-\x{11FF}\x{3040}-\x{30FF}\x{4E00}-\x{9FFF}\x{0600}-\x{06FF}\x{0590}-\x{05FF}\x{0900}-\x{097F}]/u'
+            : '/[\x{AC00}-\x{D7AF}\x{1100}-\x{11FF}\x{3040}-\x{30FF}\x{4E00}-\x{9FFF}\x{0400}-\x{04FF}\x{0600}-\x{06FF}\x{0590}-\x{05FF}\x{0900}-\x{097F}]/u';
+
+        if (preg_match($non_latin_pattern, $work_text)) {
+            $had_foreign_speech = true;
+            $removed_count++;
+            continue;
+        }
+
+        // 4. Falls in einer Zeile mehrere identische Atmosphären-Tags hintereinander stehen (z.B. "[Stöhnen] [Stöhnen]"), zusammenfassen
+        $work_text = preg_replace('/(\[(?:Musik|Stöhnen|Schweres Atmen|Lachen|Klatschen)\])(?:\s*\1)+/u', '$1', $work_text);
+        $work_text = trim($work_text);
+
+        // Reine Satzzeichen/Striche/Zahlen-Fragmente wie "[-)]" oder ".0" verwerfen
+        $letters_only = preg_replace('/[^\p{L}]+/u', '', $work_text);
+        if (mb_strlen($letters_only, 'UTF-8') < 2) {
+            $removed_count++;
+            continue;
+        }
+
+        // 5. Prüfen, ob das Segment ein reiner Atmosphären-Tag ist
+        if (isset($atmos_tags_lookup[$work_text])) {
+            // Anti-Flacker-Schutz: Wenn derselbe Atmosphären-Tag innerhalb der letzten 15 Sekunden bereits angezeigt wurde, überspringen
+            if ($last_atmos_tag === $work_text && ($start - $last_atmos_end) < 15.0) {
+                $removed_count++;
+                continue;
+            }
+            // Ruhige Einblenddauer (min. 2.5 Sek., max. 5.0 Sek.)
+            $dur = $end - $start;
+            if ($dur < 2.5) {
+                $end = round($start + 2.5, 2);
+            } elseif ($dur > 5.0) {
+                $end = round($start + 5.0, 2);
+            }
+            $last_atmos_tag = $work_text;
+            $last_atmos_end = $end;
+
+            $cleaned_segments[] = array(
+                'start' => $start,
+                'end'   => $end,
+                'text'  => $work_text
+            );
+            continue;
+        }
+
+        // 6. Echter Text außerhalb von reinen Atmosphären-Tags:
+        // Falls im selben Segment noch ein Atmosphären-Tag neben echtem gesprochenem Text klebt, den Tag entfernen, damit der Satz sauber lesbar ist
+        $text_without_atmos = trim(preg_replace('/\[(?:Musik|Stöhnen|Schweres Atmen|Lachen|Klatschen)\]/u', '', $work_text));
+        $text_without_atmos = trim(preg_replace('/\s+/u', ' ', $text_without_atmos));
+        if ($text_without_atmos !== '') {
+            $work_text = $text_without_atmos;
+        }
+
+        // Anti-Schleifen-Schutz für extrem kurze 1-Wort-Laute ("Oh.", "Ah.", "Oh!", "Ah!", "Hm.", "Mh.")
+        $short_norm = mb_strtolower(trim(preg_replace('/[\.\!\?\,\s]+/u', '', $work_text)), 'UTF-8');
+        if (in_array($short_norm, array('oh', 'ah', 'uh', 'hm', 'mh', 'mmh', 'hmm', 'ja', 'ohja', 'ahja'))) {
+            if ($last_short_word === $short_norm && ($start - $last_short_end) < 4.5) {
+                $removed_count++;
+                continue;
+            }
+            $last_short_word = $short_norm;
+            $last_short_end  = $end;
+        } else {
+            $last_short_word = '';
+            $last_atmos_tag  = ''; // Echter Satz setzt die Atmosphären-Sperre zurück
+        }
+
+        $has_real_speech = true;
+        $cleaned_segments[] = array(
+            'start' => $start,
+            'end'   => $end,
+            'text'  => $work_text
+        );
+    }
+
+    // Falls das Video gar keinen echten Dialog enthält (nur [Stöhnen]/[Musik]), Sprache auf Fallback (DB-Sprache / de) setzen
+    if (!$has_real_speech && $det_low !== $fallback_lang) {
+        $effective_lang = $fallback_lang;
+    }
+
+    // Text-Transkript mit Zeitstempeln neu aufbauen
+    $lines = array();
+    foreach ($cleaned_segments as $cs) {
+        $lines[] = '[' . aic_format_time($cs['start']) . ' - ' . aic_format_time($cs['end']) . '] ' . $cs['text'];
+    }
+    $transcript_str = implode("\n", $lines);
+    if ($transcript_str === '') {
+        $transcript_str = '[00:00 - 00:05] (Kein gesprochener Dialog im Video erkannt)';
+    }
+
+    return array(
+        'segments'           => $cleaned_segments,
+        'transcript'         => $transcript_str,
+        'detected_language'  => $effective_lang,
+        'raw_language'       => $det_low,
+        'had_exotic_lang'    => $had_exotic_lang,
+        'had_foreign_speech' => $had_foreign_speech,
+        'has_real_speech'    => $has_real_speech,
+        'removed_count'      => $removed_count,
+        'normalized_count'   => $normalized_count
+    );
+}
+
+/**
  * Erzeugt aus Zeitsegmenten den Inhalt einer WebVTT-Untertiteldatei (.vtt)
  */
 function aic_build_vtt_content($segments, $lang = 'de') {
@@ -759,48 +1040,103 @@ function aic_process_single_movie_pipeline($movie_id, $env, $options = array()) 
         @exec($cmd_wav, $out_wav, $ret_wav);
 
         if ($ret_wav === 0 && aic_file_or_exec_exists($wav_tmp)) {
+            $allowed_langs_map = aic_get_allowed_whisper_languages();
+            $db_lang_low       = strtolower(trim((string)$details['movie_language']));
+            $fallback_lang     = ($db_lang_low !== '' && isset($allowed_langs_map[$db_lang_low])) ? $db_lang_low : 'de';
+            $force_lang        = (isset($options['force_language']) && isset($allowed_langs_map[strtolower(trim((string)$options['force_language']))]))
+                ? strtolower(trim((string)$options['force_language']))
+                : 'auto';
+
             $cmd_wh = 'nice -n 15 ' . escapeshellcmd($env['whisper_bin'])
                 . ' -m ' . escapeshellarg($env['whisper_model'])
                 . ' -f ' . escapeshellarg($wav_tmp)
-                . ' -l auto -bs 1 -bo 1 -t ' . (int)$threads . ' -oj -ovtt -of ' . escapeshellarg($json_base) . ' 2>&1';
+                . ' -l ' . escapeshellarg($force_lang) . ' -bs 1 -bo 1 -t ' . (int)$threads . ' -oj -ovtt -of ' . escapeshellarg($json_base) . ' 2>&1';
             $out_wh = array();
             $ret_wh = 1;
             @exec($cmd_wh, $out_wh, $ret_wh);
-            @unlink($wav_tmp);
 
+            $raw_segments = array();
             if (aic_file_or_exec_exists($json_base . '.json')) {
                 $w_json = @json_decode(@file_get_contents($json_base . '.json'), true);
                 if (isset($w_json['result']['language'])) {
-                    $detected_lang = trim((string)$w_json['result']['language']);
+                    $detected_lang = strtolower(trim((string)$w_json['result']['language']));
                 }
                 if (isset($w_json['transcription']) && is_array($w_json['transcription'])) {
-                    $lines = array();
                     foreach ($w_json['transcription'] as $item) {
                         $s_sec = isset($item['offsets']['from']) ? round($item['offsets']['from'] / 1000, 2) : 0;
                         $e_sec = isset($item['offsets']['to']) ? round($item['offsets']['to'] / 1000, 2) : ($s_sec + 3);
                         $txt   = isset($item['text']) ? trim($item['text']) : '';
                         if ($txt !== '') {
-                            $segments[] = array('start' => $s_sec, 'end' => $e_sec, 'text' => $txt);
-                            $lines[]    = '[' . aic_format_time($s_sec) . ' - ' . aic_format_time($e_sec) . '] ' . $txt;
+                            $raw_segments[] = array('start' => $s_sec, 'end' => $e_sec, 'text' => $txt);
                         }
                     }
-                    $transcript = implode("\n", $lines);
                 }
                 @unlink($json_base . '.json');
             }
-
             if (aic_file_or_exec_exists($json_base . '.vtt')) {
-                $target_vtt = $details['movie_dir'] . '/' . $sub_file;
-                @copy($json_base . '.vtt', $target_vtt);
                 @unlink($json_base . '.vtt');
             }
 
-            if ($transcript === '') {
-                $transcript = '[00:00 - 00:05] (Kein gesprochener Dialog im Video erkannt)';
+            // Intelligenter Fallback: Falls -l auto eine exotische Nicht-Whitelist-Sprache (z.B. NN, KO, JA, JW, LA, ZH)
+            // geraten hat UND Text außerhalb von Klammer-Geräuschen transkribiert wurde, sofort mit Fallback-Sprache (-l de/en/es) neu ausführen!
+            if ($force_lang === 'auto' && !isset($allowed_langs_map[strtolower($detected_lang)])) {
+                $has_non_bracket_text = false;
+                foreach ($raw_segments as $rs_item) {
+                    $without_b = trim(preg_replace('/(\[[^\]]*\]|\([^\)]*\)|\*[^\*]*\*)/u', '', $rs_item['text']));
+                    $letters_b = preg_replace('/[^\p{L}\p{N}]+/u', '', $without_b);
+                    if (mb_strlen($letters_b, 'UTF-8') >= 2) {
+                        $has_non_bracket_text = true;
+                        break;
+                    }
+                }
+
+                if ($has_non_bracket_text && aic_file_or_exec_exists($wav_tmp)) {
+                    $cmd_wh_retry = 'nice -n 15 ' . escapeshellcmd($env['whisper_bin'])
+                        . ' -m ' . escapeshellarg($env['whisper_model'])
+                        . ' -f ' . escapeshellarg($wav_tmp)
+                        . ' -l ' . escapeshellarg($fallback_lang) . ' -bs 1 -bo 1 -t ' . (int)$threads . ' -oj -ovtt -of ' . escapeshellarg($json_base) . ' 2>&1';
+                    $out_wh2 = array();
+                    $ret_wh2 = 1;
+                    @exec($cmd_wh_retry, $out_wh2, $ret_wh2);
+
+                    if (aic_file_or_exec_exists($json_base . '.json')) {
+                        $w_json2 = @json_decode(@file_get_contents($json_base . '.json'), true);
+                        $detected_lang = $fallback_lang;
+                        $raw_segments  = array();
+                        if (isset($w_json2['transcription']) && is_array($w_json2['transcription'])) {
+                            foreach ($w_json2['transcription'] as $item2) {
+                                $s_sec = isset($item2['offsets']['from']) ? round($item2['offsets']['from'] / 1000, 2) : 0;
+                                $e_sec = isset($item2['offsets']['to']) ? round($item2['offsets']['to'] / 1000, 2) : ($s_sec + 3);
+                                $txt   = isset($item2['text']) ? trim($item2['text']) : '';
+                                if ($txt !== '') {
+                                    $raw_segments[] = array('start' => $s_sec, 'end' => $e_sec, 'text' => $txt);
+                                }
+                            }
+                        }
+                        @unlink($json_base . '.json');
+                    }
+                    if (aic_file_or_exec_exists($json_base . '.vtt')) {
+                        @unlink($json_base . '.vtt');
+                    }
+                    $mode_used .= ' [Fallback -> ' . strtoupper($fallback_lang) . ']';
+                }
             }
 
+            @unlink($wav_tmp);
+
+            // Segmente bereinigen, Atmosphären-Tags vereinheitlichen & Flacker-Schleifen zusammenfassen
+            $clean_res     = aic_clean_and_normalize_segments($raw_segments, $detected_lang, $details['movie_language']);
+            $segments      = $clean_res['segments'];
+            $transcript    = $clean_res['transcript'];
+            $detected_lang = $clean_res['detected_language'];
+
+            // Saubere, bereinigte WebVTT-Datei (.vtt) im Film-Verzeichnis speichern
+            $target_vtt  = $details['movie_dir'] . '/' . $sub_file;
+            $vtt_content = aic_build_vtt_content($segments, $detected_lang);
+            @file_put_contents($target_vtt, $vtt_content);
+
             // Optional: Falls movies.movie_language leer ist und Option aktiv, erkannte Sprache eintragen
-            $allowed_langs = array('de', 'en', 'fr', 'es', 'nl', 'ru', 'pl');
+            $allowed_langs = array_keys($allowed_langs_map);
             if (!empty($batch_cfg['sync_empty_movie_lang']) && empty($details['movie_language']) && in_array($detected_lang, $allowed_langs)) {
                 p4c_query("UPDATE `movies` SET `movie_language` = '" . p4c_escape_string($detected_lang) . "' WHERE `id` = '" . abs($details['id']) . "' AND (`movie_language` = '' OR `movie_language` IS NULL) LIMIT 1;", __FILE__, __LINE__);
             }
