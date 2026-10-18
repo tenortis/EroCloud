@@ -10,12 +10,15 @@ define('SAFE_INC', 1);
 
 include_once("../../../config.inc.php");
 include_once(ACP_DIR."/common.inc.php");
+include_once(SOURCEDIR."/includes/ai_compliance_core.inc.php");
 
 if (is_logged_in('acp') === false) {
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(array('error' => 'Nicht autorisiert.'));
     exit;
 }
+
+aic_ensure_table();
 
 function safe_utf8($str) {
     if ($str === null || $str === false) return '';
@@ -27,7 +30,7 @@ function safe_utf8($str) {
 
 $sEcho = isset($_GET['sEcho']) ? intval($_GET['sEcho']) : (isset($_GET['draw']) ? intval($_GET['draw']) : 0);
 
-$rs_movies = p4c_query("SELECT `id`, `file_id`, `quality`, `merchant_id`, `actor_id`, `checksum`, `title`, `description`, `online_at`, `movie_language`, `movie_checked`, `status`, `category_master` FROM `movies_online` ORDER BY `id` DESC", __FILE__, __LINE__);
+$rs_movies = p4c_query("SELECT mo.`id`, mo.`file_id`, mo.`quality`, mo.`merchant_id`, mo.`actor_id`, mo.`checksum`, mo.`title`, mo.`description`, mo.`online_at`, mo.`movie_language`, mo.`movie_checked`, mo.`status`, mo.`category_master`, ai.`subtitle_status`, ai.`text_check_status`, ai.`text_compliance`, ai.`text_risk_score`, ai.`text_summary` FROM `movies_online` mo LEFT JOIN `movies` m ON m.`file_id` = mo.`file_id` LEFT JOIN `movies_ai_analysis` ai ON ai.`movie_id` = m.`id` ORDER BY mo.`id` DESC", __FILE__, __LINE__);
 
 $output = array(
     "sEcho" => $sEcho,
@@ -97,6 +100,8 @@ if (p4c_num_rows($rs_movies) > 0) {
         
         $lang = isset($movie_language_ary[$movie_ary->movie_language]) ? $movie_language_ary[$movie_ary->movie_language] : $movie_ary->movie_language;
 
+        $bram_badge = aic_render_bram_score_badge($movie_ary->text_check_status, $movie_ary->text_compliance, $movie_ary->text_risk_score, $movie_ary->text_summary, $movie_ary->subtitle_status);
+
         $row = array();
         $row[] = '<a href="'.ACP_URL.'/Film-bearbeiten/'.$movie_ary->id.'">'.$movie_ary->id.'</a>';
         $row[] = '<a href="'.ACP_URL.'/Haendler/'.$movie_ary->merchant_id.'">'.$movie_ary->merchant_id.'</a>';
@@ -107,6 +112,7 @@ if (p4c_num_rows($rs_movies) > 0) {
         $row[] = safe_utf8($movie_ary->online_at);
         $row[] = safe_utf8($lang);
         $row[] = safe_utf8($category_master);
+        $row[] = $bram_badge;
         $row[] = '<a href="'.ACP_URL.'/Film-bearbeiten/'.$movie_ary->id.'">'.$title.'</a>';
         $row[] = $description;
    

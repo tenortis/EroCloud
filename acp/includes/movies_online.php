@@ -85,8 +85,9 @@ $site .= '
                     },
                     
                     "num-html-pre": function ( a ) {
-                        var x = String(a).replace( /<[\s\S]*?>/g, "" );
-                        return parseFloat( x );
+                        var x = String(a).replace( /<[\s\S]*?>/g, "" ).trim();
+                        var parsed = parseFloat( x );
+                        return isNaN(parsed) ? -1 : parsed;
                     },
                  
                     "num-html-asc": function ( a, b ) {
@@ -132,6 +133,7 @@ $site .= '
                         {"sClass": "center", "sWidth":"160px"},
                         {"sClass": "center", "sWidth":"50px"},
                         {"sClass": "center", "sWidth":"50px"},
+                        {"sClass": "center", "sWidth":"95px", "sType": "num-html"},
                         {"sClass": "left", "sWidth":"auto"},
                         {"sClass": "left", "bVisible": false}
                     ],
@@ -171,6 +173,7 @@ $site .= '
                     <th>Online seit</th>
                     <th>Filmsprache</th>
                     <th>Hauptkat.</th>
+                    <th>BRAM Score</th>
                     <th style="text-align:left;">Filmtitel</th>
                     <th>Beschreibung</th>
                 </tr>

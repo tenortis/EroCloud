@@ -211,6 +211,7 @@ $site .= '
         <li><a href="#tab-aic-batch">2. Batch- &amp; Cronjob-Steuerung (Alle Videos)</a></li>
         <li><a href="#tab-aic-rules">3. Visa/Mastercard BRAM-Regelwerk &amp; Prompt</a></li>
         <li><a href="#tab-aic-history">4. Analyse-Historie &amp; Filter (<span id="aic-hist-count">0</span>)</a></li>
+        <li><a href="#tab-aic-inspector">5. Transkript- &amp; VTT-Inspektor</a></li>
     </ul>
 
     <!-- KOPF-STATISTIKEN & SYSTEM-STATUS -->
@@ -252,7 +253,8 @@ $site .= '
                 <span id="aic-env-llm" class="aic-badge" style="background: #6c757d; margin-left: 6px;">Lokale KI (llama.cpp): Pr&uuml;fe...</span>
                 <span id="aic-env-cron" class="aic-badge" style="background: #6c757d; margin-left: 6px;">Hintergrund-Cronjob: Pr&uuml;fe...</span>
             </div>
-            <div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button type="button" class="aic-btn-primary btn-aic-open-inspector" style="padding: 6px 12px; font-size: 12px;">&#x1F50E; Vorhandene .vtt-Transkripte &amp; Klammer-Tags analysieren</button>
                 <button type="button" id="btn-aic-reload-dash" class="aic-btn-secondary">&#x21bb; Status aktualisieren</button>
             </div>
         </div>
@@ -522,6 +524,9 @@ $site .= '
                 <button type="button" id="btn-aic-bulk-recheck-all" class="aic-btn-secondary" title="Pr&uuml;ft alle bereits analysierten Filme noch einmal mit den aktuell gespeicherten BRAM-Regeln (z. B. nach &Auml;nderung der Wortliste)">
                     &#x1F504; Gesamten Katalog mit aktuellem BRAM-Regelwerk neu bewerten
                 </button>
+                <button type="button" class="aic-btn-primary btn-aic-open-inspector" title="Analysiert alle bisher erzeugten .vtt-Transkripte auf Klammer-Ausdr&uuml;cke wie [Musik], [ &apos;bɑː ], Halluzinationen und Sprachcodes (NN)">
+                    &#x1F50E; Vorhandene .vtt-Transkripte &amp; Klammer-Ausdr&uuml;cke analysieren
+                </button>
                 <span id="aic-bulk-precheck-status" style="font-size: 13px; font-weight: bold; color: #155724;"></span>
             </div>
         </div>
@@ -734,6 +739,7 @@ $site .= '
                 <div>
                     <button type="button" id="btn-aic-apply-filter" class="aic-btn-primary">Filtern</button>
                     <button type="button" id="btn-aic-reset-filter" class="aic-btn-secondary">Zur&uuml;cksetzen</button>
+                    <button type="button" class="aic-btn-primary btn-aic-open-inspector" style="margin-left: 8px;">&#x1F50E; .vtt-Transkripte &amp; Klammer-Tags analysieren</button>
                 </div>
             </div>
         </div>
@@ -757,6 +763,146 @@ $site .= '
                 </tr>
             </tbody>
         </table>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- TAB 5: TRANSKRIPT- & VTT-INSPEKTOR (KLAMMERN, SPRACHEN & ARTEFAKTE) -->
+    <!-- ================================================================== -->
+    <div id="tab-aic-inspector" style="display: none;">
+        <div class="ui-widget-header" style="padding:10px; font-size:18px; margin-bottom:15px;">
+            Transkript- &amp; WebVTT-Inspektor: Auswertung aller bisher von Whisper erzeugten Untertitel-Texte
+        </div>
+
+        <div class="aic-step-box" style="background:#f4f8fb; border-left:4px solid #1c94c4;">
+            <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px;">
+                <div style="flex:1 1 600px;">
+                    <div style="font-size:15px; font-weight:bold; color:#1c94c4; margin-bottom:4px;">
+                        &#x1F50E; Bestandsaufnahme der vorhandenen <code>.vtt</code>-Untertitel &amp; Whisper-Segmente
+                    </div>
+                    <div style="font-size:13px; color:#444; line-height:1.45;">
+                        Dieses Werkzeug durchsucht alle bereits in <code>movies_ai_analysis</code> gespeicherten Audio-Transkripte und zeigt Ihnen, welche <strong>Klammer-Ausdr&uuml;cke</strong> (z. B. <code>[Musik]</code> vs. <code>[ &apos;bɑː ]</code> oder <code>[ Giliv Li-CC]</code>), welche <strong>Sprachk&uuml;rzel</strong> (wie <code>DE</code>, <code>EN</code>, <code>NN</code>) und welche <strong>Filme ohne echten Dialog</strong> vorkommen.
+                    </div>
+                </div>
+                <div>
+                    <button type="button" id="btn-aic-run-inspector" class="aic-btn-primary">
+                        &#x1F504; Transkript-Analyse jetzt starten / aktualisieren
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4 KPI-KARTEN FUER DEN INSPEKTOR -->
+        <div class="aic-card-grid" style="margin-bottom:18px;">
+            <div class="aic-card">
+                <div class="aic-card-title">Transkribierte Videos (.vtt)</div>
+                <div class="aic-card-value" id="aic-insp-total-sub">-</div>
+                <div class="aic-card-sub">Stummfilme ohne Tonspur: <strong id="aic-insp-total-silent">-</strong></div>
+            </div>
+            <div class="aic-card" style="background:#f8fff9; border-color:#c3e6cb;">
+                <div class="aic-card-title" style="color:#155724;">Videos mit echtem Dialog</div>
+                <div class="aic-card-value" style="color:#28a745;" id="aic-insp-real-speech">-</div>
+                <div class="aic-card-sub">Enthalten echte gesprochene S&auml;tze / W&ouml;rter</div>
+            </div>
+            <div class="aic-card" style="background:#fff9e6; border-color:#ffeeba;">
+                <div class="aic-card-title" style="color:#856404;">Nur Klammer-Laute (Kein Dialog)</div>
+                <div class="aic-card-value" style="color:#d39e00;" id="aic-insp-only-brackets">-</div>
+                <div class="aic-card-sub">Nur <code>[ ... ]</code> (z. B. St&ouml;hnen / Musik / Artefakte)</div>
+            </div>
+            <div class="aic-card">
+                <div class="aic-card-title">Erkannte Klammer-Ausdr&uuml;cke</div>
+                <div class="aic-card-value"><span id="aic-insp-unique-brackets">-</span> <small style="font-size:13px; color:#666;">(<span id="aic-insp-occ-brackets">0</span>x gesamt)</small></div>
+                <div class="aic-card-sub">Unterschiedliche <code>[ ... ]</code> &amp; <code>( ... )</code> Tags</div>
+            </div>
+        </div>
+
+        <!-- TABELLE 1: ALLE KLAMMER-AUSDRUECKE [...] & (...) -->
+        <div class="aic-step-box">
+            <div class="aic-step-header">
+                <div class="aic-step-title">1. Alle gefundenen Klammer-Ausdr&uuml;cke <code>[ ... ]</code> &amp; <code>( ... )</code> in den Untertiteln (sortiert nach H&auml;ufigkeit)</div>
+                <div style="font-size:12px; color:#666;">Gr&uuml;n = Atmosph&auml;re behalten | Blau/Orange = Lautschrift in <code>[St&ouml;hnen]</code> umwandeln | Rot = Whisper-Artefakt l&ouml;schen</div>
+            </div>
+            <table class="aic-table">
+                <thead>
+                    <tr>
+                        <th style="width:240px;">Klammer-Ausdruck in <code>.vtt</code></th>
+                        <th style="width:130px;">Vorkommen (Zeilen)</th>
+                        <th style="width:130px;">Betroffene Filme</th>
+                        <th style="width:310px;">Automatische Einsch&auml;tzung / Empfehlung</th>
+                        <th>Beispiel-Filme (Klicken zum Pr&uuml;fen im Testlabor oder Bearbeiten)</th>
+                    </tr>
+                </thead>
+                <tbody id="aic-tbody-insp-brackets">
+                    <tr><td colspan="5" style="text-align:center; color:#666; padding:14px;">Klicken Sie oben auf &bdquo;Transkript-Analyse jetzt starten&ldquo;, um alle vorhandenen Transkripte auszuwerten.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- TABELLE 2: ERKANNTE SPRACHKUERZEL (INKL. NN-CHECK) -->
+        <div class="aic-step-box">
+            <div class="aic-step-header">
+                <div class="aic-step-title">2. Auswertung der von Whisper vergebenen Sprachk&uuml;rzel (<code>DE</code>, <code>EN</code>, <code>NN</code> usw.)</div>
+                <div style="font-size:12px; color:#666;">Zeigt sofort, bei welchen Sprachk&uuml;rzeln echter Dialog vorliegt und wo Whisper nur St&ouml;hnen/Rauschen als <code>NN</code> eingestuft hat</div>
+            </div>
+            <table class="aic-table">
+                <thead>
+                    <tr>
+                        <th style="width:100px;">K&uuml;rzel</th>
+                        <th style="width:280px;">Sprache / Bedeutung</th>
+                        <th style="width:120px;">Filme gesamt</th>
+                        <th style="width:150px;">Davon mit echtem Dialog</th>
+                        <th style="width:160px;">Davon NUR Ger&auml;usche <code>[...]</code></th>
+                        <th>Beispiel-Filme</th>
+                    </tr>
+                </thead>
+                <tbody id="aic-tbody-insp-langs">
+                    <tr><td colspan="6" style="text-align:center; color:#666; padding:14px;">Noch keine Auswertung geladen.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- TABELLE 3: FILME OHNE ECHTEN GESPROCHENEN DIALOG -->
+        <div class="aic-step-box">
+            <div class="aic-step-header">
+                <div class="aic-step-title">3. Filme mit <code>.vtt</code>-Untertitel, die KEINEN echten gesprochenen Satz enthalten (Nur <code>[...]</code> / Laute)</div>
+                <div style="font-size:12px; color:#666;">Genau wie Film #8590 aus Ihrem Beispiel – hier hat Whisper nur Laute/Klammern erkannt</div>
+            </div>
+            <table class="aic-table">
+                <thead>
+                    <tr>
+                        <th style="width:90px;">Movie-ID</th>
+                        <th style="width:220px;">Filmtitel</th>
+                        <th style="width:100px;">Sprach-Code</th>
+                        <th style="width:110px;">Anzahl Zeilen</th>
+                        <th>Vorschau des erzeugten Transkripts</th>
+                        <th style="width:170px;">Aktion</th>
+                    </tr>
+                </thead>
+                <tbody id="aic-tbody-insp-nodialog">
+                    <tr><td colspan="6" style="text-align:center; color:#666; padding:14px;">Noch keine Auswertung geladen.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- TABELLE 4: HAEUFIG WIEDERHOLTE PHRASEN AUSSERHALB VON KLAMMERN -->
+        <div class="aic-step-box">
+            <div class="aic-step-header">
+                <div class="aic-step-title">4. H&auml;ufig wiederholte Kurz-S&auml;tze au&szlig;erhalb von Klammern (Halluzinations-Check)</div>
+                <div style="font-size:12px; color:#666;">Hilft beim Erkennen typischer Whisper-S&auml;tze bei Stille (z. B. &bdquo;Untertitel von...&ldquo;, &bdquo;Vielen Dank f&uuml;rs Zuschauen&ldquo;)</div>
+            </div>
+            <table class="aic-table">
+                <thead>
+                    <tr>
+                        <th>Textzeile / Phrase</th>
+                        <th style="width:130px;">Vorkommen gesamt</th>
+                        <th style="width:130px;">In verschiedenen Filmen</th>
+                        <th style="width:280px;">Beispiel-Filme</th>
+                    </tr>
+                </thead>
+                <tbody id="aic-tbody-insp-phrases">
+                    <tr><td colspan="4" style="text-align:center; color:#666; padding:14px;">Noch keine Auswertung geladen.</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -956,9 +1102,14 @@ jQuery(document).ready(function() {
                 // Historie fuellen
                 renderHistoryTable(res.history);
 
-                // Beim ersten Start automatisch ein Video ins Testlabor laden
-                if (autoLoadFirst && currentMovieId === 0 && res.recent_movies && res.recent_movies.length > 0) {
-                    loadMovieIntoLab({ movie_id: res.recent_movies[0].id });
+                // Beim ersten Start ggf. movie_id aus URL-Parameter oder erstes Video ins Testlabor laden
+                if (autoLoadFirst && currentMovieId === 0) {
+                    var urlMatch = window.location.search.match(/[?&]movie_id=(\d+)/);
+                    if (urlMatch && parseInt(urlMatch[1], 10) > 0) {
+                        loadMovieIntoLab({ movie_id: parseInt(urlMatch[1], 10) });
+                    } else if (res.recent_movies && res.recent_movies.length > 0) {
+                        loadMovieIntoLab({ movie_id: res.recent_movies[0].id });
+                    }
                 }
             }
         });
@@ -1472,6 +1623,174 @@ jQuery(document).ready(function() {
                 jQuery("#aic-save-rules-msg").css("color", "#dc3545").text("Netzwerkfehler beim Speichern.");
             }
         });
+    });
+
+    // Tab 5: Transkript- & VTT-Inspektor
+    function renderMovieSampleLinks(samples) {
+        if (!samples || samples.length === 0) return "-";
+        var links = [];
+        for (var i = 0; i < samples.length; i++) {
+            var sm = samples[i];
+            var mid = sm.id;
+            var ttl = escHtml(sm.title || ("Film #" + mid));
+            links.push(
+                "<button type=\"button\" class=\"aic-btn-secondary btn-insp-load-lab\" data-id=\"" + mid + "\" style=\"padding:2px 7px; font-size:11px; margin:2px 4px 2px 0;\" title=\"Im Testlabor öffnen: " + ttl + "\">#" + mid + "</button>"
+            );
+        }
+        return links.join("");
+    }
+
+    function runTranscriptInspector() {
+        var btn = jQuery("#btn-aic-run-inspector");
+        btn.prop("disabled", true).text("Analysiere alle vorhandenen .vtt-Transkripte...");
+        jQuery("#aic-tbody-insp-brackets").html("<tr><td colspan=\"5\" style=\"text-align:center; padding:14px;\">Werte alle gespeicherten Transkripte und Segmente aus...</td></tr>");
+
+        jQuery.ajax({
+            url: "' . ACP_URL . '/includes/ajax/ai_compliance_action.php",
+            type: "POST",
+            data: { action: "inspect_transcripts" },
+            dataType: "json",
+            success: function(res) {
+                btn.prop("disabled", false).html("&#x1F504; Transkript-Analyse jetzt starten / aktualisieren");
+                if (!res || res.status !== "ok") {
+                    alert(res && res.message ? res.message : "Fehler bei der Transkript-Auswertung.");
+                    return;
+                }
+
+                var sum = res.summary || {};
+                jQuery("#aic-insp-total-sub").text(sum.total_transcribed || 0);
+                jQuery("#aic-insp-total-silent").text(sum.total_silent || 0);
+                jQuery("#aic-insp-real-speech").text(sum.total_with_real_speech || 0);
+                jQuery("#aic-insp-only-brackets").text(sum.total_only_brackets || 0);
+                jQuery("#aic-insp-unique-brackets").text(sum.unique_bracket_tags || 0);
+                jQuery("#aic-insp-occ-brackets").text(sum.total_bracket_occ || 0);
+
+                // 1. Klammer-Ausdruecke rendern
+                var bList = res.bracket_tags || [];
+                var bHtml = "";
+                if (bList.length === 0) {
+                    bHtml = "<tr><td colspan=\"5\" style=\"text-align:center; color:#666; padding:14px;\">Keine Klammer-Ausdr&uuml;cke in den aktuell vorhandenen Transkripten gefunden (oder auf diesem System wurden noch keine Videos mit Whisper transkribiert).</td></tr>";
+                } else {
+                    for (var i = 0; i < bList.length; i++) {
+                        var b = bList[i];
+                        var badgeStyle = "background:#6c757d; color:#fff;";
+                        if (b.cat_type === "keep_atmosphere") {
+                            badgeStyle = "background:#28a745; color:#fff;";
+                        } else if (b.cat_type === "convert_moan") {
+                            badgeStyle = "background:#17a2b8; color:#fff;";
+                        } else if (b.cat_type === "remove_artifact") {
+                            badgeStyle = "background:#dc3545; color:#fff;";
+                        }
+                        bHtml += "<tr>"
+                            + "<td><code style=\"font-size:13px; font-weight:bold; background:#f4f4f4; padding:3px 7px; border-radius:3px; border:1px solid #ccc;\">" + escHtml(b.tag) + "</code></td>"
+                            + "<td><strong>" + b.total_occurrences + "x</strong></td>"
+                            + "<td>" + b.movie_count + " Film(e)</td>"
+                            + "<td><span class=\"aic-badge\" style=\"" + badgeStyle + "\">" + escHtml(b.cat_label) + "</span></td>"
+                            + "<td>" + renderMovieSampleLinks(b.sample_movies)
+                            + " <button type=\"button\" class=\"aic-btn-secondary btn-insp-filter-hist\" data-q=\"" + escHtml(b.tag) + "\" style=\"padding:2px 7px; font-size:11px; margin-left:6px;\" title=\"Alle Filme mit diesem Tag in Tab 4 anzeigen\">In Historie filtern &rarr;</button></td>"
+                            + "</tr>";
+                    }
+                }
+                jQuery("#aic-tbody-insp-brackets").html(bHtml);
+
+                // 2. Sprachen rendern
+                var lList = res.languages || [];
+                var lHtml = "";
+                if (lList.length === 0) {
+                    lHtml = "<tr><td colspan=\"6\" style=\"text-align:center; color:#666; padding:14px;\">Noch keine transkribierten Videos vorhanden.</td></tr>";
+                } else {
+                    for (var j = 0; j < lList.length; j++) {
+                        var lg = lList[j];
+                        var isSuspect = (lg.code === "NN" || lg.code === "NO" || lg.code === "LA" || lg.code === "CY" || lg.code === "JW" || (lg.only_brackets_count > 0 && lg.real_speech_count === 0));
+                        var codeBadge = isSuspect
+                            ? "<span class=\"aic-badge\" style=\"background:#e0a800; color:#111;\">" + escHtml(lg.code) + "</span>"
+                            : "<span class=\"aic-badge\" style=\"background:#28a745; color:#fff;\">" + escHtml(lg.code) + "</span>";
+                        lHtml += "<tr>"
+                            + "<td>" + codeBadge + "</td>"
+                            + "<td><strong>" + escHtml(lg.name) + "</strong></td>"
+                            + "<td><strong>" + lg.movie_count + "</strong></td>"
+                            + "<td style=\"color:#155724; font-weight:bold;\">" + lg.real_speech_count + " Filme</td>"
+                            + "<td style=\"color:" + (lg.only_brackets_count > 0 ? "#dc3545" : "#666") + "; font-weight:bold;\">" + lg.only_brackets_count + " Filme</td>"
+                            + "<td>" + renderMovieSampleLinks(lg.sample_movies)
+                            + " <button type=\"button\" class=\"aic-btn-secondary btn-insp-filter-hist\" data-q=\"" + escHtml(lg.code_lower) + "\" style=\"padding:2px 7px; font-size:11px; margin-left:6px;\">Alle " + escHtml(lg.code) + "-Filme &rarr;</button></td>"
+                            + "</tr>";
+                    }
+                }
+                jQuery("#aic-tbody-insp-langs").html(lHtml);
+
+                // 3. Filme ohne echten Dialog rendern
+                var ndList = res.no_dialog_movies || [];
+                var ndHtml = "";
+                if (ndList.length === 0) {
+                    ndHtml = "<tr><td colspan=\"6\" style=\"text-align:center; color:#155724; padding:14px;\">Keine Filme gefunden, die nur aus Klammer-Ger&auml;uschen bestehen.</td></tr>";
+                } else {
+                    for (var k = 0; k < ndList.length; k++) {
+                        var nd = ndList[k];
+                        ndHtml += "<tr>"
+                            + "<td><strong>#" + nd.movie_id + "</strong></td>"
+                            + "<td>" + escHtml(nd.title) + "</td>"
+                            + "<td><span class=\"aic-badge\" style=\"background:#e0a800; color:#111;\">" + escHtml(nd.detected_language) + "</span></td>"
+                            + "<td>" + nd.segment_count + " Zeilen</td>"
+                            + "<td><code style=\"font-size:11px; color:#444;\">" + escHtml(nd.preview) + "</code></td>"
+                            + "<td>"
+                            + "<button type=\"button\" class=\"aic-btn-secondary btn-insp-load-lab\" data-id=\"" + nd.movie_id + "\" style=\"padding:3px 8px; font-size:11px;\">Im Labor &ouml;ffnen</button> "
+                            + "<a href=\"' . ACP_URL . '/Film-bearbeiten/" + nd.movie_id + "#tab-transcript\" target=\"_blank\" class=\"aic-btn-secondary\" style=\"padding:3px 8px; font-size:11px; text-decoration:none;\">Film &#x2197;</a>"
+                            + "</td>"
+                            + "</tr>";
+                    }
+                }
+                jQuery("#aic-tbody-insp-nodialog").html(ndHtml);
+
+                // 4. Wiederholte Kurz-Phrasen rendern
+                var pList = res.repeated_phrases || [];
+                var pHtml = "";
+                if (pList.length === 0) {
+                    pHtml = "<tr><td colspan=\"4\" style=\"text-align:center; color:#666; padding:14px;\">Keine mehrfach wiederholten Kurz-Phrasen gefunden.</td></tr>";
+                } else {
+                    for (var m = 0; m < pList.length; m++) {
+                        var ph = pList[m];
+                        pHtml += "<tr>"
+                            + "<td><strong>" + escHtml(ph.phrase) + "</strong></td>"
+                            + "<td>" + ph.total_occurrences + "x</td>"
+                            + "<td>" + ph.movie_count + " Film(e)</td>"
+                            + "<td>" + renderMovieSampleLinks(ph.sample_movies) + "</td>"
+                            + "</tr>";
+                    }
+                }
+                jQuery("#aic-tbody-insp-phrases").html(pHtml);
+            },
+            error: function() {
+                btn.prop("disabled", false).html("&#x1F504; Transkript-Analyse jetzt starten / aktualisieren");
+                alert("Netzwerkfehler beim Laden des Transkript-Inspektors.");
+            }
+        });
+    }
+
+    jQuery(document).on("click", ".btn-aic-open-inspector", function() {
+        jQuery("#ai_compliance_tabs").tabs("option", "active", 4);
+        runTranscriptInspector();
+    });
+
+    jQuery("#btn-aic-run-inspector").on("click", function() {
+        runTranscriptInspector();
+    });
+
+    jQuery(document).on("click", ".btn-insp-load-lab", function() {
+        var mid = jQuery(this).data("id");
+        if (mid) {
+            jQuery("#ai_compliance_tabs").tabs("option", "active", 0);
+            jQuery("#aic-input-movie-id").val(mid);
+            loadMovie({ movie_id: mid });
+        }
+    });
+
+    jQuery(document).on("click", ".btn-insp-filter-hist", function() {
+        var q = jQuery(this).data("q");
+        jQuery("#ai_compliance_tabs").tabs("option", "active", 3);
+        jQuery("#aic-filter-comp").val("all");
+        jQuery("#aic-filter-sub").val("has_sub");
+        jQuery("#aic-filter-search").val(q);
+        applyHistoryFilter();
     });
 
     // Initialer Start

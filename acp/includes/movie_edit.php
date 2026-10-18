@@ -293,6 +293,9 @@ if (isset($_POST['save_movie'])) {
                 `last_updated_by` = '".abs($_SESSION['employee_id'])."',
                 `last_updated_datetime` = '".date("Y-m-d H:i:s")."'
                 WHERE `file_id` = '".p4c_escape_string($m_online->field('file_id'))."' LIMIT 1;",__FILE__,__LINE__)) {
+
+                include_once(SOURCEDIR . '/includes/ai_compliance_core.inc.php');
+                aic_render_movie_detail_bram_box($m->field('id'), $movie, true);
                 
                 header('Location: '.ACP_URL.'/Film-bearbeiten/'.$movie_id);
                 exit;
@@ -497,16 +500,23 @@ $site .= '
     .material-symbols-outlined.md-progress {color:#FF9900;}
 
 -->
-</style>
+</style>';
 
+include_once(SOURCEDIR . '/includes/ai_compliance_core.inc.php');
+$ai_tabs_data = aic_get_movie_bram_and_ai_tabs_data($m->field('id'), $movie, isset($_POST['save_movie']), 'movie_edit_tabs');
+
+$site .= $ai_tabs_data['css_html'] . '
 <div id="movie_edit_tabs">
     <ul>
         <li><a href="#tab-edit">Bearbeiten</a></li>
-        <li><a href="#tab-purchases">KÃ¤ufe & Zugriffe ('.$count_buys.')</a></li>
+        ' . $ai_tabs_data['tab_bram_li'] . '
+        ' . $ai_tabs_data['tab_transcript_li'] . '
+        <li><a href="#tab-purchases">K&auml;ufe &amp; Zugriffe ('.$count_buys.')</a></li>
         <li><a href="#tab-tech">Technische Details</a></li>
     </ul>
 
-    <div id="tab-edit" style="padding:0;">
+    <div id="tab-edit">
+        ' . $ai_tabs_data['top_banner_html'] . '
         <form action="" method="post">
             <div style="width:600px; float:left;">
                 <div class="ui-widget-header" style="padding:10px; font-size:20px; margin-bottom:20px;">Film bearbeiten</div> ';
@@ -568,16 +578,16 @@ $site .= '
                     "aaSorting": [[ 1, "desc" ]],
                     "oLanguage": {
                         "sSearch": "Suchen:",
-                        "sLengthMenu": "_MENU_ EintrÃ¤ge anzeigen",
-                        "sInfo": "Zeige _START_ bis _END_ von _TOTAL_ EintrÃ¤gen",
-                        "sInfoEmpty": "Keine EintrÃ¤ge vorhanden",
-                        "sInfoFiltered": "(gefiltert aus _MAX_ EintrÃ¤gen)",
-                        "sZeroRecords": "Keine passenden EintrÃ¤ge gefunden",
+                        "sLengthMenu": "_MENU_ Eintr&auml;ge anzeigen",
+                        "sInfo": "Zeige _START_ bis _END_ von _TOTAL_ Eintr&auml;gen",
+                        "sInfoEmpty": "Keine Eintr&auml;ge vorhanden",
+                        "sInfoFiltered": "(gefiltert aus _MAX_ Eintr&auml;gen)",
+                        "sZeroRecords": "Keine passenden Eintr&auml;ge gefunden",
                         "oPaginate": {
                             "sFirst": "Erste",
                             "sLast": "Letzte",
-                            "sNext": "NÃ¤chste",
-                            "sPrevious": "ZurÃ¼ck"
+                            "sNext": "N&auml;chste",
+                            "sPrevious": "Zur&uuml;ck"
                         }
                     }
                 });
@@ -1182,16 +1192,20 @@ $site .= '
             $site .= '
         </div>
     </div>
+    <div style="clear:both;"></div>
 </form>
 </div> <!-- End of tab-edit -->
 
+' . $ai_tabs_data['tab_bram_panel_html'] . '
+' . $ai_tabs_data['tab_transcript_panel_html'] . '
+
 <div id="tab-purchases">
-    <div class="ui-widget-header" style="padding:10px; font-size:20px; margin-bottom:20px;">KÃ¤ufe & Zugriffe fÃ¼r '.htmlspecialchars($movie['title'], ENT_QUOTES, 'UTF-8').'</div>
+    <div class="ui-widget-header" style="padding:10px; font-size:20px; margin-bottom:20px;">K&auml;ufe &amp; Zugriffe f&uuml;r '.htmlspecialchars($movie['title'], ENT_QUOTES, 'UTF-8').'</div>
     
     <div class="ui-widget-content" style="padding: 15px; margin-bottom: 20px; border-radius: 4px; border: 1px solid #D1D1D1; background: #fcfdfd;">
         <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
             <tr>
-                <td style="width: 25%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2;">KÃ¤ufe Gesamt:</td>
+                <td style="width: 25%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2;">K&auml;ufe Gesamt:</td>
                 <td style="width: 25%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2; font-weight: bold; color: #1c94c4;">'.$count_buys.'x</td>
                 <td style="width: 25%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2;">Zuletzt gekauft am:</td>
                 <td style="width: 25%; padding: 8px 5px; border-bottom: 1px solid #e2e2e2; font-weight: bold;">'.$last_buy.'</td>
@@ -1268,11 +1282,11 @@ $site .= '
                 <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2; font-family: monospace;">'.$m_online->field('filename').'</td>
             </tr>
             <tr>
-                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">DateigrÃ¶ÃŸe:</td>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">Dateigr&ouml;&szlig;e:</td>
                 <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">'.$file_size_text.'</td>
             </tr>
             <tr>
-                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">AuflÃ¶sung:</td>
+                <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">Aufl&ouml;sung:</td>
                 <td style="padding: 10px 5px; border-bottom: 1px solid #e2e2e2;">'.$m_online->field('resolution').'</td>
             </tr>
             <tr>

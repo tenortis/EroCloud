@@ -72,7 +72,7 @@ function aic_fetch_history_rows($compliance_filter = 'all', $subtitle_filter = '
             $where[] = "(`ai`.`movie_id` = '" . $id_num . "' OR `ai`.`merchant_id` = '" . $id_num . "')";
         } else {
             $esc_q = p4c_escape_string($q);
-            $where[] = "(`m`.`title` LIKE '%" . $esc_q . "%' OR `ai`.`text_summary` LIKE '%" . $esc_q . "%' OR `ai`.`spoken_transcript` LIKE '%" . $esc_q . "%')";
+            $where[] = "(`m`.`title` LIKE '%" . $esc_q . "%' OR `ai`.`text_summary` LIKE '%" . $esc_q . "%' OR `ai`.`spoken_transcript` LIKE '%" . $esc_q . "%' OR `ai`.`detected_language` = '" . $esc_q . "')";
         }
     }
 
@@ -190,6 +190,276 @@ if ($action === 'filter_history') {
         'status'  => 'ok',
         'history' => $rows,
         'stats'   => aic_get_catalog_and_batch_stats()
+    ));
+}
+
+if ($action === 'inspect_transcripts') {
+    // Analysiert alle bisher vorhandenen Whisper-Transkripte & .vtt-Segmente in movies_ai_analysis
+    $rs_tr = p4c_query("SELECT `ai`.`movie_id`, `ai`.`merchant_id`, `ai`.`subtitle_status`, `ai`.`detected_language`,
+            `ai`.`spoken_transcript`, `ai`.`spoken_segments_json`, `m`.`title`, `m`.`playtime_seconds`
+        FROM `movies_ai_analysis` `ai`
+        LEFT JOIN `movies` `m` ON `m`.`id` = `ai`.`movie_id`
+        WHERE `ai`.`subtitle_status` IN (2, 3) OR (`ai`.`spoken_transcript` != '' AND `ai`.`spoken_transcript` IS NOT NULL)
+        ORDER BY `ai`.`movie_id` DESC;", __FILE__, __LINE__);
+
+    $lang_names = array(
+        'de' => 'Deutsch',
+        'en' => 'Englisch',
+        'fr' => 'Französisch',
+        'es' => 'Spanisch',
+        'it' => 'Italienisch',
+        'nl' => 'Niederländisch',
+        'pl' => 'Polnisch',
+        'ru' => 'Russisch',
+        'cs' => 'Tschechisch',
+        'pt' => 'Portugiesisch',
+        'nn' => 'Norwegisch Nynorsk (Häufiges Whisper-Artefakt bei Stöhnen/Rauschen)',
+        'no' => 'Norwegisch (Häufiges Whisper-Artefakt bei Geräuschen)',
+        'la' => 'Latein (Whisper-Artefakt)',
+        'cy' => 'Walisisch (Whisper-Artefakt)',
+        'jw' => 'Javanisch (Whisper-Artefakt)'
+    );
+
+    $total_transcribed       = 0;
+    $total_silent            = 0;
+    $total_only_brackets     = 0;
+    $total_with_real_speech  = 0;
+    $total_bracket_occ       = 0;
+
+    $languages_map  = array();
+    $brackets_map   = array();
+    $phrases_map    = array();
+    $no_dialog_list = array();
+
+    while ($row = p4c_fetch_object($rs_tr)) {
+        $mid      = (int)$row->movie_id;
+        $sub_st   = (int)$row->subtitle_status;
+        $lang_raw = strtolower(trim((string)$row->detected_language));
+        if ($lang_raw === '') {
+            $lang_raw = 'unbekannt';
+        }
+        $mtitle = aic_clean_html_text($row->title);
+
+        if ($sub_st === 3) {
+            $total_silent++;
+            continue;
+        }
+        $total_transcribed++;
+
+        // Segmente extrahieren
+        $seg_texts = array();
+        if (!empty($row->spoken_segments_json)) {
+            $dec_s = @json_decode($row->spoken_segments_json, true);
+            if (is_array($dec_s)) {
+                foreach ($dec_s as $s_item) {
+                    if (isset($s_item['text']) && trim((string)$s_item['text']) !== '') {
+                        $seg_texts[] = trim(aic_utf8((string)$s_item['text']));
+                    }
+                }
+            }
+        }
+        if (empty($seg_texts) && !empty($row->spoken_transcript)) {
+            $raw_lines = explode("\n", aic_utf8((string)$row->spoken_transcript));
+            foreach ($raw_lines as $rl) {
+                $rl = trim($rl);
+                if ($rl === '') continue;
+                // Entferne Zeitstempel am Zeilenanfang wie [00:00 - 00:05]
+                $rl_clean = preg_replace('/^\[\d{2,}:\d{2}(?:\.\d+)?\s*-\s*\d{2,}:\d{2}(?:\.\d+)?\]\s*/', '', $rl);
+                if (trim($rl_clean) !== '') {
+                    $seg_texts[] = trim($rl_clean);
+                }
+            }
+        }
+
+        $movie_has_real_speech = false;
+        $movie_seen_brackets   = array();
+        $movie_seen_phrases    = array();
+
+        foreach ($seg_texts as $st) {
+            // Ignoriere unseren eigenen Platzhalter fuer Stummfilme / keinen Dialog
+            if (stripos($st, 'Kein gesprochener Dialog') !== false || stripos($st, 'besitzt keine Tonspur') !== false) {
+                continue;
+            }
+
+            // Suche alle Klammer-Ausdruecke [...] und (...)
+            $matches_b = array();
+            if (preg_match_all('/(\[[^\]]+\]|\([^\)]+\))/u', $st, $m_all)) {
+                $matches_b = $m_all[1];
+            }
+
+            foreach ($matches_b as $b_tag) {
+                $b_norm = trim($b_tag);
+                if ($b_norm === '') continue;
+                // Zeitstempel-Klammern überspringen falls noch vorhanden
+                if (preg_match('/^\[\d{2,}:\d{2}/', $b_norm)) continue;
+
+                $total_bracket_occ++;
+                if (!isset($brackets_map[$b_norm])) {
+                    // Automatische Kategorisierungs-Empfehlung ermitteln
+                    $b_low = mb_strtolower($b_norm, 'UTF-8');
+                    $cat_type  = 'review';
+                    $cat_label = 'Manuell prüfen';
+
+                    if (preg_match('/(musik|music|lachen|laugh|stöhn|moan|seufz|sigh|applaus|klatsch|atmen|breath|stille|silence|schrei|scream|weinen|cry|stöhnt|lacht)/iu', $b_low)) {
+                        $cat_type  = 'keep_atmosphere';
+                        $cat_label = 'Atmosphäre / Closed Caption (Behalten)';
+                    } elseif (preg_match('/(ɑ|ː|ə|ʊ|ɔ|ɛ|ɪ|ʃ|ʒ|\'[a-z]|bɑ|mmm+|ahh+|ohh+|uhh+|hmm+)/iu', $b_low)) {
+                        $cat_type  = 'convert_moan';
+                        $cat_label = 'Lautschrift / Stöhn-Laut (-> in [Stöhnen] umwandeln)';
+                    } elseif (preg_match('/(giliv|li-cc|cc|subtitles|untertitel|amara|copyright|translated|captioned|blank_audio|inaudible|unverständlich|geräusch)/iu', $b_low)) {
+                        $cat_type  = 'remove_artifact';
+                        $cat_label = 'Whisper-Artefakt / Halluzination (-> Rausfiltern)';
+                    } else {
+                        $cat_type  = 'remove_artifact';
+                        $cat_label = 'Unbekannter Klammer-Tag (-> Prüfen / Rausfiltern)';
+                    }
+
+                    $brackets_map[$b_norm] = array(
+                        'tag'               => $b_norm,
+                        'total_occurrences' => 0,
+                        'movie_count'       => 0,
+                        'cat_type'          => $cat_type,
+                        'cat_label'         => $cat_label,
+                        'sample_movies'     => array()
+                    );
+                }
+                $brackets_map[$b_norm]['total_occurrences']++;
+                if (!isset($movie_seen_brackets[$b_norm])) {
+                    $movie_seen_brackets[$b_norm] = true;
+                    $brackets_map[$b_norm]['movie_count']++;
+                    if (count($brackets_map[$b_norm]['sample_movies']) < 6) {
+                        $brackets_map[$b_norm]['sample_movies'][] = array(
+                            'id'    => $mid,
+                            'title' => $mtitle
+                        );
+                    }
+                }
+            }
+
+            // Pruefen, ob ausserhalb von Klammern noch echter gesprochener Text in dieser Zeile steht
+            $without_brackets = trim(preg_replace('/(\[[^\]]*\]|\([^\)]*\))/u', '', $st));
+            // Entferne reine Satzzeichen/Symbole
+            $only_letters = preg_replace('/[^\p{L}\p{N}]+/u', '', $without_brackets);
+
+            if (mb_strlen($only_letters, 'UTF-8') >= 2) {
+                $movie_has_real_speech = true;
+
+                // Fuer Top-Phrasen / Halluzinations-Check speichern
+                $p_norm = trim($without_brackets);
+                if (mb_strlen($p_norm, 'UTF-8') <= 90) {
+                    if (!isset($phrases_map[$p_norm])) {
+                        $phrases_map[$p_norm] = array(
+                            'phrase'            => $p_norm,
+                            'total_occurrences' => 0,
+                            'movie_count'       => 0,
+                            'sample_movies'     => array()
+                        );
+                    }
+                    $phrases_map[$p_norm]['total_occurrences']++;
+                    if (!isset($movie_seen_phrases[$p_norm])) {
+                        $movie_seen_phrases[$p_norm] = true;
+                        $phrases_map[$p_norm]['movie_count']++;
+                        if (count($phrases_map[$p_norm]['sample_movies']) < 5) {
+                            $phrases_map[$p_norm]['sample_movies'][] = array(
+                                'id'    => $mid,
+                                'title' => $mtitle
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        if ($movie_has_real_speech) {
+            $total_with_real_speech++;
+        } else {
+            $total_only_brackets++;
+            if (count($no_dialog_list) < 50) {
+                $preview_str = implode(' | ', array_slice($seg_texts, 0, 4));
+                if (mb_strlen($preview_str, 'UTF-8') > 140) {
+                    $preview_str = mb_substr($preview_str, 0, 140, 'UTF-8') . '...';
+                }
+                $no_dialog_list[] = array(
+                    'movie_id'          => $mid,
+                    'merchant_id'       => (int)$row->merchant_id,
+                    'title'             => $mtitle,
+                    'detected_language' => strtoupper($lang_raw),
+                    'segment_count'     => count($seg_texts),
+                    'preview'           => $preview_str
+                );
+            }
+        }
+
+        // Sprach-Statistik aktualisieren
+        if (!isset($languages_map[$lang_raw])) {
+            $languages_map[$lang_raw] = array(
+                'code'               => strtoupper($lang_raw),
+                'code_lower'         => $lang_raw,
+                'name'               => isset($lang_names[$lang_raw]) ? $lang_names[$lang_raw] : ('ISO-Code: ' . strtoupper($lang_raw)),
+                'movie_count'        => 0,
+                'real_speech_count'  => 0,
+                'only_brackets_count'=> 0,
+                'sample_movies'      => array()
+            );
+        }
+        $languages_map[$lang_raw]['movie_count']++;
+        if ($movie_has_real_speech) {
+            $languages_map[$lang_raw]['real_speech_count']++;
+        } else {
+            $languages_map[$lang_raw]['only_brackets_count']++;
+        }
+        if (count($languages_map[$lang_raw]['sample_movies']) < 6) {
+            $languages_map[$lang_raw]['sample_movies'][] = array(
+                'id'          => $mid,
+                'title'       => $mtitle,
+                'only_noises' => !$movie_has_real_speech
+            );
+        }
+    }
+
+    // Sortieren nach Haeufigkeit
+    $languages_list = array_values($languages_map);
+    usort($languages_list, function($a, $b) {
+        return $b['movie_count'] - $a['movie_count'];
+    });
+
+    $brackets_list = array_values($brackets_map);
+    usort($brackets_list, function($a, $b) {
+        if ($b['total_occurrences'] !== $a['total_occurrences']) {
+            return $b['total_occurrences'] - $a['total_occurrences'];
+        }
+        return $b['movie_count'] - $a['movie_count'];
+    });
+
+    // Bei Phrasen nur solche zeigen, die mindestens 2x vorkommen
+    $phrases_filtered = array();
+    foreach ($phrases_map as $pm) {
+        if ($pm['total_occurrences'] >= 2) {
+            $phrases_filtered[] = $pm;
+        }
+    }
+    usort($phrases_filtered, function($a, $b) {
+        if ($b['movie_count'] !== $a['movie_count']) {
+            return $b['movie_count'] - $a['movie_count'];
+        }
+        return $b['total_occurrences'] - $a['total_occurrences'];
+    });
+    $phrases_list = array_slice($phrases_filtered, 0, 40);
+
+    aic_send_json(array(
+        'status' => 'ok',
+        'summary' => array(
+            'total_transcribed'      => $total_transcribed,
+            'total_silent'           => $total_silent,
+            'total_with_real_speech' => $total_with_real_speech,
+            'total_only_brackets'    => $total_only_brackets,
+            'unique_bracket_tags'    => count($brackets_list),
+            'total_bracket_occ'      => $total_bracket_occ
+        ),
+        'languages'        => $languages_list,
+        'bracket_tags'     => array_slice($brackets_list, 0, 100),
+        'repeated_phrases' => $phrases_list,
+        'no_dialog_movies' => $no_dialog_list
     ));
 }
 

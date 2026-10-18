@@ -392,6 +392,9 @@ if (isset($_POST['btn']['save_movie'])) {
                     }
                 }
             }
+
+            include_once(SOURCEDIR . '/includes/ai_compliance_core.inc.php');
+            aic_render_movie_detail_bram_box($m->field('id'), $movie, true);
             
             header('Location: '.ACP_URL.'/Filme-pruefen');
             exit;
@@ -480,13 +483,26 @@ $site .= '
     .material-symbols-outlined.md-error {color:#FF0000;}
 
 -->
-</style>
+</style>';
 
-<form action="" method="post">
+include_once(SOURCEDIR . '/includes/ai_compliance_core.inc.php');
+$ai_tabs_data = aic_get_movie_bram_and_ai_tabs_data($m->field('id'), $movie, isset($_POST['btn']['save_movie']), 'movie_checking_tabs');
 
-    <div style="width:600px; float:left;">
-        <div class="ui-widget-header" style="padding:10px; font-size:20px; margin-bottom:10px;">Film pr&uuml;fen und ver&ouml;ffentlichen</div> 
-        ';
+$site .= $ai_tabs_data['css_html'] . '
+<div id="movie_checking_tabs">
+    <ul>
+        <li><a href="#tab-edit">Bearbeiten</a></li>
+        ' . $ai_tabs_data['tab_bram_li'] . '
+        ' . $ai_tabs_data['tab_transcript_li'] . '
+    </ul>
+
+    <div id="tab-edit">
+        ' . $ai_tabs_data['top_banner_html'] . '
+        <form action="" method="post">
+
+            <div style="width:600px; float:left;">
+                <div class="ui-widget-header" style="padding:10px; font-size:20px; margin-bottom:10px;">Film pr&uuml;fen und ver&ouml;ffentlichen</div> 
+                ';
         $rs_check_is_online = p4c_query("SELECT * FROM `movies_online` WHERE `file_id`='". p4c_escape_string($m->field('file_id'))."' LIMIT 1;",__FILE__,__LINE__);
         if (p4c_num_rows($rs_check_is_online) > 0) {
             $online_obj = p4c_fetch_object($rs_check_is_online);
@@ -526,6 +542,7 @@ $site .= '
         <script type="text/javascript">
         // <![CDATA[
             jQuery(document).ready(function() {
+                jQuery("#movie_checking_tabs").tabs();
                 jQuery(".group1").colorbox({photo:true, rel:"group1", maxWidth:"100%", width:"auto", maxHeight:"80%"});
                             
                 jQuery.fn.preis_je_sekunde = function() {
@@ -1325,6 +1342,13 @@ $site .= '
             $site .= '
         </div>
     </div>
-</form>';
+    <div style="clear:both;"></div>
+</form>
+</div> <!-- End of tab-edit -->
+
+' . $ai_tabs_data['tab_bram_panel_html'] . '
+' . $ai_tabs_data['tab_transcript_panel_html'] . '
+
+</div> <!-- End of movie_checking_tabs -->';
 
 ?>
