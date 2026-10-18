@@ -374,10 +374,10 @@ if ($action === 'inspect_transcripts') {
             $total_with_real_speech++;
         } else {
             $total_only_brackets++;
-            if (count($no_dialog_list) < 50) {
-                $preview_str = implode(' | ', array_slice($seg_texts, 0, 4));
-                if (mb_strlen($preview_str, 'UTF-8') > 140) {
-                    $preview_str = mb_substr($preview_str, 0, 140, 'UTF-8') . '...';
+            if (count($no_dialog_list) < 100) {
+                $preview_str = implode(' | ', array_slice($seg_texts, 0, 6));
+                if (mb_strlen($preview_str, 'UTF-8') > 200) {
+                    $preview_str = mb_substr($preview_str, 0, 200, 'UTF-8') . '...';
                 }
                 $no_dialog_list[] = array(
                     'movie_id'          => $mid,
@@ -444,11 +444,12 @@ if ($action === 'inspect_transcripts') {
         }
         return $b['total_occurrences'] - $a['total_occurrences'];
     });
-    $phrases_list = array_slice($phrases_filtered, 0, 40);
+    $phrases_list = array_slice($phrases_filtered, 0, 80);
 
     aic_send_json(array(
-        'status' => 'ok',
-        'summary' => array(
+        'status'      => 'ok',
+        'exported_at' => date('Y-m-d H:i:s'),
+        'summary'     => array(
             'total_transcribed'      => $total_transcribed,
             'total_silent'           => $total_silent,
             'total_with_real_speech' => $total_with_real_speech,
@@ -457,7 +458,7 @@ if ($action === 'inspect_transcripts') {
             'total_bracket_occ'      => $total_bracket_occ
         ),
         'languages'        => $languages_list,
-        'bracket_tags'     => array_slice($brackets_list, 0, 100),
+        'bracket_tags'     => array_slice($brackets_list, 0, 300),
         'repeated_phrases' => $phrases_list,
         'no_dialog_movies' => $no_dialog_list
     ));

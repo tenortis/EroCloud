@@ -775,7 +775,7 @@ $site .= '
 
         <div class="aic-step-box" style="background:#f4f8fb; border-left:4px solid #1c94c4;">
             <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px;">
-                <div style="flex:1 1 600px;">
+                <div style="flex:1 1 520px;">
                     <div style="font-size:15px; font-weight:bold; color:#1c94c4; margin-bottom:4px;">
                         &#x1F50E; Bestandsaufnahme der vorhandenen <code>.vtt</code>-Untertitel &amp; Whisper-Segmente
                     </div>
@@ -783,12 +783,19 @@ $site .= '
                         Dieses Werkzeug durchsucht alle bereits in <code>movies_ai_analysis</code> gespeicherten Audio-Transkripte und zeigt Ihnen, welche <strong>Klammer-Ausdr&uuml;cke</strong> (z. B. <code>[Musik]</code> vs. <code>[ &apos;bɑː ]</code> oder <code>[ Giliv Li-CC]</code>), welche <strong>Sprachk&uuml;rzel</strong> (wie <code>DE</code>, <code>EN</code>, <code>NN</code>) und welche <strong>Filme ohne echten Dialog</strong> vorkommen.
                     </div>
                 </div>
-                <div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
                     <button type="button" id="btn-aic-run-inspector" class="aic-btn-primary">
-                        &#x1F504; Transkript-Analyse jetzt starten / aktualisieren
+                        &#x1F504; Transkript-Analyse starten
+                    </button>
+                    <button type="button" id="btn-aic-copy-inspector" class="aic-btn-success" style="display:none;" title="Kopiert die komplette Auswertung in die Zwischenablage, sodass Sie sie direkt im Chat einfügen können">
+                        &#x1F4CB; Ergebnisse f&uuml;r Chat kopieren
+                    </button>
+                    <button type="button" id="btn-aic-download-inspector" class="aic-btn-secondary" style="display:none;" title="Lädt die komplette Auswertung als .json Datei herunter">
+                        &#x1F4BE; Als .json herunterladen
                     </button>
                 </div>
             </div>
+            <div id="aic-insp-export-msg" style="margin-top:8px; font-size:12px; font-weight:bold; color:#155724; display:none;"></div>
         </div>
 
         <!-- 4 KPI-KARTEN FUER DEN INSPEKTOR -->
@@ -1626,6 +1633,8 @@ jQuery(document).ready(function() {
     });
 
     // Tab 5: Transkript- & VTT-Inspektor
+    var lastInspectorData = null;
+
     function renderMovieSampleLinks(samples) {
         if (!samples || samples.length === 0) return "-";
         var links = [];
@@ -1643,6 +1652,7 @@ jQuery(document).ready(function() {
     function runTranscriptInspector() {
         var btn = jQuery("#btn-aic-run-inspector");
         btn.prop("disabled", true).text("Analysiere alle vorhandenen .vtt-Transkripte...");
+        jQuery("#aic-insp-export-msg").hide();
         jQuery("#aic-tbody-insp-brackets").html("<tr><td colspan=\"5\" style=\"text-align:center; padding:14px;\">Werte alle gespeicherten Transkripte und Segmente aus...</td></tr>");
 
         jQuery.ajax({
@@ -1651,11 +1661,14 @@ jQuery(document).ready(function() {
             data: { action: "inspect_transcripts" },
             dataType: "json",
             success: function(res) {
-                btn.prop("disabled", false).html("&#x1F504; Transkript-Analyse jetzt starten / aktualisieren");
+                btn.prop("disabled", false).html("&#x1F504; Transkript-Analyse aktualisieren");
                 if (!res || res.status !== "ok") {
                     alert(res && res.message ? res.message : "Fehler bei der Transkript-Auswertung.");
                     return;
                 }
+
+                lastInspectorData = res;
+                jQuery("#btn-aic-copy-inspector, #btn-aic-download-inspector").show();
 
                 var sum = res.summary || {};
                 jQuery("#aic-insp-total-sub").text(sum.total_transcribed || 0);
@@ -1760,11 +1773,44 @@ jQuery(document).ready(function() {
                 jQuery("#aic-tbody-insp-phrases").html(pHtml);
             },
             error: function() {
-                btn.prop("disabled", false).html("&#x1F504; Transkript-Analyse jetzt starten / aktualisieren");
+                btn.prop("disabled", false).html("&#x1F504; Transkript-Analyse starten");
                 alert("Netzwerkfehler beim Laden des Transkript-Inspektors.");
             }
         });
     }
+
+    jQuery("#btn-aic-copy-inspector").on("click", function() {
+        if (!lastInspectorData) return;
+        var jsonStr = JSON.stringify(lastInspectorData, null, 2);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(jsonStr).then(function() {
+                jQuery("#aic-insp-export-msg").show().html("&#x2705; Die komplette Auswertung wurde in Ihre Zwischenablage kopiert! Sie k&ouml;nnen sie jetzt direkt mit <strong>Strg+V</strong> im Chat einf&uuml;gen.");
+            });
+        } else {
+            var ta = document.createElement("textarea");
+            ta.value = jsonStr;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
+            jQuery("#aic-insp-export-msg").show().html("&#x2705; Die komplette Auswertung wurde in Ihre Zwischenablage kopiert! Sie k&ouml;nnen sie jetzt direkt mit <strong>Strg+V</strong> im Chat einf&uuml;gen.");
+        }
+    });
+
+    jQuery("#btn-aic-download-inspector").on("click", function() {
+        if (!lastInspectorData) return;
+        var jsonStr = JSON.stringify(lastInspectorData, null, 2);
+        var blob = new Blob([jsonStr], { type: "application/json;charset=utf-8" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = "erocloud_vtt_analyse.json";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        jQuery("#aic-insp-export-msg").show().html("&#x2705; Die Datei <code>erocloud_vtt_analyse.json</code> wurde heruntergeladen.");
+    });
 
     jQuery(document).on("click", ".btn-aic-open-inspector", function() {
         jQuery("#ai_compliance_tabs").tabs("option", "active", 4);
