@@ -554,22 +554,28 @@ function aic_clean_and_normalize_segments($segments, $detected_lang = 'de', $mov
             continue;
         }
 
-        // 5. Prüfen, ob das Segment ein reiner Atmosphären-Tag ist
+        // 5. Prüfen, ob das Segment ein reiner Atmosphären-Tag ist ([Musik], [Stöhnen], [Schweres Atmen], [Lachen], [Klatschen])
         if (isset($atmos_tags_lookup[$work_text])) {
-            // Anti-Flacker-Schutz: Wenn derselbe Atmosphären-Tag innerhalb der letzten 15 Sekunden bereits angezeigt wurde, überspringen
-            if ($last_atmos_tag === $work_text && ($start - $last_atmos_end) < 15.0) {
+            $last_idx = count($cleaned_segments) - 1;
+            // Echtes Verschmelzen: Wenn das vorherige Segment derselbe Atmosphären-Tag war und keine lange Pause (> 12 Sek.) dazwischen lag,
+            // verlängern wir den End-Zeitstempel des bestehenden Blocks auf das Ende dieses Blocks (-> ein großer durchgehender Zeitraum!)
+            if ($last_idx >= 0 && $cleaned_segments[$last_idx]['text'] === $work_text && ($start - $cleaned_segments[$last_idx]['end']) <= 12.0) {
+                if ($end > $cleaned_segments[$last_idx]['end']) {
+                    $cleaned_segments[$last_idx]['end'] = $end;
+                }
                 $removed_count++;
                 continue;
             }
-            // Ruhige Einblenddauer (min. 2.5 Sek., max. 5.0 Sek.)
-            $dur = $end - $start;
-            if ($dur < 2.5) {
-                $end = round($start + 2.5, 2);
-            } elseif ($dur > 5.0) {
-                $end = round($start + 5.0, 2);
+
+            // Falls der Einzelblock extrem kurz ist (< 2.0 Sek.), auf mind. 2.0 Sek. setzen
+            if (($end - $start) < 2.0) {
+                $end = round($start + 2.0, 2);
             }
-            $last_atmos_tag = $work_text;
-            $last_atmos_end = $end;
+
+            // Überlappung mit vorherigem Segment verhindern
+            if ($last_idx >= 0 && $cleaned_segments[$last_idx]['end'] > $start && $start > $cleaned_segments[$last_idx]['start']) {
+                $cleaned_segments[$last_idx]['end'] = $start;
+            }
 
             $cleaned_segments[] = array(
                 'start' => $start,
@@ -598,7 +604,12 @@ function aic_clean_and_normalize_segments($segments, $detected_lang = 'de', $mov
             $last_short_end  = $end;
         } else {
             $last_short_word = '';
-            $last_atmos_tag  = ''; // Echter Satz setzt die Atmosphären-Sperre zurück
+        }
+
+        // Überlappung mit einem vorangegangenen Atmosphären-Block sauber abschneiden, sobald echter Dialog beginnt
+        $last_idx = count($cleaned_segments) - 1;
+        if ($last_idx >= 0 && $cleaned_segments[$last_idx]['end'] > $start && $start > $cleaned_segments[$last_idx]['start']) {
+            $cleaned_segments[$last_idx]['end'] = $start;
         }
 
         $has_real_speech = true;
