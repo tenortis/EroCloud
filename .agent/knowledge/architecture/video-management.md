@@ -127,12 +127,20 @@ Nach der Konvertierung kann der Händler das Video bearbeiten (`mcp/includes/mov
 
 ---
 
-## 6. 🔍 Prüfung und Freischaltung (ACP)
+## 6. 🔍 Prüfung, BRAM-Compliance und Freischaltung (ACP)
+> **Detaillierte KI- & BRAM-Referenz:** Alle Details zur lokalen Whisper-Untertitel-Pipeline, BRAM-Regel-Engine und dem `/KI-Analyse`-Cockpit sind in `@ai-compliance-and-subtitle-pipeline.md` dokumentiert.
+
 Ein Administrator prüft das Video im **Admin Control Panel (ACP)**:
 
-* **Listenansicht**: `acp/includes/movies_checking.php` (AJAX-Quelle: `acp/includes/ajax/movies_checking.php`).
-  * Filtert nach: `movie_checked = '0000-00-00 00:00:00' AND released = '1' AND convert_status > '1'`.
-* **Prüfungsseite**: `acp/includes/movie_checking.php`.
+* **Listenansichten (`/Filme-pruefen` & `/Filme-online`)**:
+  * `acp/includes/movies_checking.php` (`acp/includes/ajax/movies_checking.php`) filtert nach `movie_checked = '0000-00-00 00:00:00' AND released = '1' AND convert_status > '1'`.
+  * Beide Tabellen (`movies_checking.php` und `movies_online.php`) zeigen in einer eigenen Spalte **„BRAM-Score“** das farbige Compliance-Badge (`aic_render_bram_score_badge()`):
+    * **Rot (`violation`)**: Kritischer Visa/Mastercard BRAM- oder Rechts-Verstoß (`#dc3545`).
+    * **Orange (`warning`)**: Prüfhinweis / Spezialfetisch ohne Kreditkarte (`#e0a800`).
+    * **Grün (`ok` + Audio geprüft)**: Text & gesprochenes Video-Audio unbedenklich (`#28a745`).
+    * **Info-Blau/Türkis (`ok` + Audio noch offen)**: `5 / 100 (Nur Text)` – Vorab-Textcheck unauffällig, Audio-Transkription durch den Whisper-Cronjob steht noch aus (`#17a2b8`).
+* **Prüfungs- & Bearbeitungsseite (`/Film-pruefen/{id}` -> `acp/includes/movie_checking.php` & `/Film-bearbeiten/{id}` -> `acp/includes/movie_edit.php`)**:
+  * **Top-Compliance-Banner & KI-Reiter:** Direkt über dem Bearbeitungsformular erscheint das farbige BRAM-Compliance-Banner (`aic_get_movie_bram_and_ai_tabs_data()`) inkl. Fundstellen-Pills. Zudem stehen die beiden Reiter **„BRAM & KI-Analyse“ (`#tab-bram`)** und **„Audio & Transkript (.vtt)“ (`#tab-transcript`)** bereit, über die das gesprochene Audio jederzeit live per `whisper.cpp` transkribiert und auf BRAM-Verstöße geprüft werden kann. Beim Speichern von Änderungen wird der BRAM-Score automatisch neu berechnet (`$force_recalc = true`).
   * Der Admin kann alle Metadaten anpassen, die FSK16/18 Covers ändern und die Vorschau-Länge definieren.
   * **Freischaltung (Status active)**: Setzt `status = 'active'`, `movie_checked = current_datetime` und fügt das Video in die Tabelle `movies_online` ein. Erst hierdurch ist das Video auf den Frontend-Webseiten sichtbar.
   * **Ablehnung (Rejection)**: Der Admin wählt einen Ablehnungsgrund aus.
