@@ -66,8 +66,12 @@
         - [x] Download and verify `ggml-small-q5_1.bin` (~3.2s/chunk, 430 MB RAM) and `ggml-large-v3-turbo-q5_0.bin`
         - [x] Extract shared pipeline core (`includes/ai_compliance_core.inc.php`) with LiveConfig `open_basedir` fallback (`aic_file_or_exec_exists`), HTML entity decoding (`aic_clean_html_text`), and silent/missing-MP4 resilience
         - [x] Implement background worker (`cronjobs/ai_compliance_worker.php`), ACP Batch & Cronjob Control Center (Tab 2), 15-second Catalog Metadata Quick-Scan, Live Browser Batch with 2-second status poller, and History Filtering (Tab 4)
+    - [x] **Phase 3: ACP Movie Checking (`movie_checking.php`), Movie Editing (`movie_edit.php`), Overview Tables & VTT Normalization**
+        - [x] Add sortable `BRAM-Score` column (`aic_render_bram_score_badge()`) in `/Filme-online` (`acp/includes/movies_online.php` & `acp/includes/ajax/movies_online.php`) and `/Filme-pruefen` (`acp/includes/movies_checking.php` & `acp/includes/ajax/movies_checking.php`)
+        - [x] Distinguish pre-transcription metadata checks (`0 / 100 (Nur Text)` in blue/teal when `subtitle_status = 0`) from full audio+text checks (`0 / 100` in green when `subtitle_status IN (2, 3)`)
+        - [x] Integrate top BRAM status banner and dedicated tabs `BRAM & KI-Analyse` (`#tab-bram`) and `Audio & Transkript (.vtt)` (`#tab-transcript`) into `/Film-bearbeiten/{movie_id}` (`acp/includes/movie_edit.php`) and `/Film-pruefen/{movie_id}` (`acp/includes/movie_checking.php`) via `aic_get_movie_bram_and_ai_tabs_data()`
+        - [x] Build Tab 5 (`5. Transkript- & VTT-Inspektor`) in `/KI-Analyse` (`acp/includes/ai_compliance.php`) with `.json` export & clipboard copy to analyze bracket/asterisk tags, language codes, and non-dialog videos
+        - [x] Implement European Whisper language whitelist (`aic_get_allowed_whisper_languages()`) with automatic 2-stage fallback in `aic_process_single_movie_pipeline()` when `-l auto` hallucinates exotic languages (`NN`, `KO`, `JA`, `JW`, `LA`, `ZH`)
+        - [x] Implement VTT bracket/asterisk normalizer & continuous time-range merger (`aic_normalize_single_bracket_tag()` & `aic_clean_and_normalize_segments()`), plus 1-click retroactive catalog cleanup (`clean_all_vtt_transcripts`) and exotic-language requeue (`requeue_exotic_lang_movies`)
     - [ ] **Phase 2B: Optional Local Text LLM (`llama.cpp` Server + Uncensored GGUF Model) for Semantic Context Checking**
-    - [ ] **Phase 3: ACP Movie Checking (`acp/includes/movie_checking.php`) & Player Subtitle Integration**
     - [ ] **Phase 4: Separate Video Frame / Sprite-Grid Vision AI Analysis**
-
-

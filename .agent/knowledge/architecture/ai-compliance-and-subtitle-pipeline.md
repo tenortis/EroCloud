@@ -95,18 +95,26 @@ Sobald wir in Phase 1 an mehreren echten Creator-Videos gesehen haben, dass Unte
      * **Prio 1:** Neu hochgeladene und frisch konvertierte Filme (`released = '1'` und noch ungeprüft im ACP `movie_checked = '0000-00-00 00:00:00'`), damit der Admin bei der Freischaltung sofort das Transkript und den KI-Bericht vorliegen hat!
      * **Prio 2:** Schrittweises Abarbeiten der über 5.500 Bestandsfilme (`movies_online` / `movies` mit `convert_status = '2'`), bei denen noch keine Untertitel bzw. noch keine KI-Textprüfung in der Datenbank hinterlegt sind.
 
-### Phase 3: Integration in die ACP-Videoprüfung (`movie_checking.php`) & Player
-* Auf der regulären Prüfungsseite (`acp/includes/movie_checking.php`) sieht der Admin direkt eine **KI-Compliance-Box** (Erkannte Sprache, Ampel-Status, Zusammenfassung des gesprochenen Inhalts, markierte Warnhinweise mit Klick-Sprungmarke im Videoplayer).
-* Die erzeugte `.vtt`-Untertiteldatei kann optional direkt im HTML5-Videoplayer (`<track kind="subtitles" ...>`) eingebunden werden.
+### Phase 3: Integration in die ACP-Videoprüfung (`movie_checking.php`), Videobearbeitung (`movie_edit.php`), Übersichtslisten & Untertitel-Bereinigung (Abgeschlossen & Aktiv)
+* **Sortierbare Spalte `BRAM-Score` in den ACP-Filmübersichten:**
+  * Sowohl in `/Filme-online` (`acp/includes/movies_online.php` & `acp/includes/ajax/movies_online.php`) als auch in `/Filme-pruefen` (`acp/includes/movies_checking.php` & `acp/includes/ajax/movies_checking.php`) wird über `aic_render_bram_score_badge()` der aktuelle BRAM-Risiko-Score angezeigt und ist direkt per Klick in DataTables sortierbar.
+  * **Klare Unterscheidung zwischen Vorab-Textcheck und vollständiger Audio-Prüfung:**
+    * Solange ein Film noch nicht durch den Whisper-Cronjob transkribiert wurde (`subtitle_status = 0`), aber in Titel/Beschreibung unauffällig ist, zeigt das Badge **Blau/Türkis (`0 / 100 (Nur Text)`)** statt Grün an.
+    * Erst wenn sowohl die Text-Metadaten als auch das gesprochene Audio-Transkript (`subtitle_status IN (2, 3)`) geprüft und unbedenklich sind, erscheint **Grün (`0 / 100`)**.
+* **Dedizierte Reiter in `/Film-bearbeiten/{movie_id}` und `/Film-pruefen/{movie_id}`:**
+  * Über `aic_get_movie_bram_and_ai_tabs_data()` werden in `acp/includes/movie_edit.php` und `acp/includes/movie_checking.php` zwei eigene jQuery-UI-Tabs sowie ein kompaktes Top-Banner im Bearbeiten-Tab eingebunden:
+    1. **Tab „BRAM & KI-Analyse“ (`#tab-bram`):** 4 KPI-Karten, KI-Zusammenfassung, detaillierte Fundstellen-Tabelle (mit exaktem Zeitstempel bei Audio-Treffern), Übersicht der bereinigten Textquellen und Button zur sofortigen Neuprüfung.
+    2. **Tab „Audio & Transkript (.vtt)“ (`#tab-transcript`):** Status der MP4- & `.vtt`-Datei, erkannte Sprache, manueller Whisper-Direktstart (mit wählbarem Audio-Umfang) sowie nebeneinanderliegende Textfelder für das gesprochene Audio-Transkript und die `.vtt`-Untertiteldatei.
+  * Beim Speichern eines Films im ACP wird die BRAM-Bewertung automatisch mit den neuen Texten aktualisiert (`$force_recalc = true`).
 
 ### Phase 4: Visuelle Video-Analyse (Vision-KI / Frame-Collagen)
-Als komplett eigenständiges Modul (sobald Phase 1–2 abgeschlossen sind):
+Als komplett eigenständiges Modul (sobald Phase 1–3 abgeschlossen sind):
 * FFmpeg erstellt aus der bestehenden `.mp4` ein **4x4 Sprite-Grid** (`16 Szenen` gleichmäßig über den Film verteilt auf einem einzigen Bild inkl. eingebranntem Zeitstempel).
 * Ein lokales Vision-Modell analysiert dieses Übersichtsbild auf visuelle BRAM-Verstöße (Gewalt, Waffen, Blut, Fesselung/Zwang, eingeblendete Fremd-URLs/Watermarks) und erstellt eine visuelle Inhaltszusammenfassung in `movies_ai_analysis`.
 
 ---
 
-## 4. 🗄️ Geplantes Datenbank-Schema (`movies_ai_analysis`)
+## 4. 🗄️ Datenbank-Schema (`movies_ai_analysis`)
 
 Um die Kerntabelle `movies` sauber zu halten und für jedes der >5.500 Videos jederzeit abfragen zu können, welcher Schritt bereits erledigt ist, wird eine dedizierte Tabelle `movies_ai_analysis` verwendet:
 
@@ -115,22 +123,23 @@ Um die Kerntabelle `movies` sauber zu halten und für jedes der >5.500 Videos je
 | `movie_id` | `INT(11) UNSIGNED PRIMARY KEY` | Verknüpfung zu `movies.id` |
 | `merchant_id` | `INT(11) UNSIGNED INDEX` | Verknüpfung zu `movies.merchant_id` |
 | `subtitle_status` | `TINYINT(1) DEFAULT 0` | `0` = Offen, `1` = In Arbeit, `2` = Erstellt, `3` = Kein Audio/Stumm, `4` = Fehler |
-| `detected_language` | `VARCHAR(10) DEFAULT ''` | ISO-Sprachcode aus Whisper (z. B. `de`, `en`, `es`, `fr`) |
-| `language_confidence` | `DECIMAL(5,2) DEFAULT 0.00` | Sicherheit der Spracherkennung in Prozent (z. B. `98.50`) |
+| `detected_language` | `VARCHAR(16) DEFAULT ''` | Bereinigter ISO-Sprachcode (z. B. `de`, `en`, `es`, `fr`, `nl`, `pl`, `ru`) |
+| `language_confidence` | `DECIMAL(5,2) DEFAULT 0.00` | Sicherheit der Spracherkennung in Prozent (z. B. `98.40`) |
 | `subtitle_filename` | `VARCHAR(255) DEFAULT ''` | Dateiname der erzeugten `.vtt`-Datei im Film-Ordner (`sub_{id}_{file_id}.vtt`) |
-| `spoken_transcript` | `MEDIUMTEXT` | Vollständiger aus dem Video extrahierter Text (Reintext) |
-| `spoken_segments_json`| `MEDIUMTEXT` | JSON-Array der Textsegmente mit Start-/End-Zeitstempeln (`start`, `end`, `text`) |
-| `whisper_duration_sec`| `DECIMAL(6,2) DEFAULT 0.00` | Benötigte Rechenzeit für die Audio-Transkription in Sekunden |
+| `spoken_transcript` | `MEDIUMTEXT` | Vollständiger, bereinigter Text aus dem Video mit Zeitstempeln (`[MM:SS - MM:SS] ...`) |
+| `spoken_segments_json`| `MEDIUMTEXT` | JSON-Array der bereinigten & verschmolzenen Segmente (`start`, `end`, `text`) |
+| `whisper_duration_sec`| `DECIMAL(7,2) DEFAULT 0.00` | Benötigte Rechenzeit für die Audio-Transkription in Sekunden |
 | `text_check_status` | `TINYINT(1) DEFAULT 0` | `0` = Offen, `1` = In Arbeit, `2` = Geprüft, `3` = Fehler |
-| `text_compliance` | `ENUM('pending','ok','warning','violation')` | Ergebnis der BRAM-/Rechtsprüfung für Metadaten + gesprochenen Text |
-| `text_risk_score` | `TINYINT(3) UNSIGNED DEFAULT 0` | Risikobewertung der KI von `0` (unbedenklich) bis `100` (schwerer Verstoß) |
-| `text_summary` | `TEXT` | Kurze deutsche Zusammenfassung der KI zum Inhalt & gesprochenen Text |
-| `text_violations_json`| `TEXT` | JSON-Liste gefundener Verstöße (Kategorie, Zitat, Quelle: Titel/Beschreibung/Audio-Minute) |
-| `text_duration_sec` | `DECIMAL(6,2) DEFAULT 0.00` | Benötigte Rechenzeit der Text-KI in Sekunden |
+| `text_compliance` | `VARCHAR(20) DEFAULT 'pending'` | Ergebnis der BRAM-/Rechtsprüfung (`pending`, `ok`, `warning`, `violation`) |
+| `text_risk_score` | `TINYINT(3) UNSIGNED DEFAULT 0` | Risikobewertung von `0` (unbedenklich) bis `100` (schwerer Verstoß) |
+| `text_engine_used` | `VARCHAR(64) DEFAULT ''` | Verwendete Prüf-Engine (z. B. `BRAM-Regel-Engine (JSON v1.1)` oder LLM) |
+| `text_summary` | `TEXT` | Deutsche Zusammenfassung der Prüfung zum Inhalt & Audio-Transkript |
+| `text_violations_json`| `MEDIUMTEXT` | JSON-Liste gefundener Verstöße (Kategorie, Zitat, Quelle: Titel/Beschreibung/Audio-Zeit) |
+| `text_duration_sec` | `DECIMAL(7,2) DEFAULT 0.00` | Benötigte Rechenzeit der Text-Prüfung in Sekunden |
 | `vision_check_status` | `TINYINT(1) DEFAULT 0` | *(Für Phase 4)* `0` = Offen, `1` = In Arbeit, `2` = Geprüft, `3` = Fehler |
-| `vision_compliance` | `ENUM('pending','ok','warning','violation')` | *(Für Phase 4)* Ergebnis der visuellen Bild-Analyse |
-| `vision_report_json` | `TEXT` | *(Für Phase 4)* JSON-Bericht der visuellen Video-Analyse |
-| `last_error` | `VARCHAR(500) DEFAULT ''` | Fehlerprotokoll falls FFmpeg, Whisper oder LLM fehlschlagen |
+| `vision_compliance` | `VARCHAR(20) DEFAULT 'pending'` | *(Für Phase 4)* Ergebnis der visuellen Bild-Analyse |
+| `vision_report_json` | `MEDIUMTEXT` | *(Für Phase 4)* JSON-Bericht der visuellen Video-Analyse |
+| `last_error` | `VARCHAR(500) DEFAULT ''` | Fehlerprotokoll oder Herkunftsvermerk (`OrigLang:...`) bei Sprachkorrektur |
 | `created_at` | `DATETIME` | Zeitstempel der ersten Erstellung |
 | `updated_at` | `DATETIME` | Zeitstempel der letzten Aktualisierung |
 
@@ -138,43 +147,71 @@ Um die Kerntabelle `movies` sauber zu halten und für jedes der >5.500 Videos je
 
 ## 5. 🛡️ Geprüfte Compliance-Kategorien (Visa / Mastercard BRAM & Gesetz)
 
-Die lokale KI wird über ein striktes System-Prompt-Regelwerk angewiesen, sowohl **direkte Begriffe** als auch **Umschreibungen / Codewörter** in folgenden Bereichen zu melden:
+Die lokale KI und die Keyword-Regel-Engine prüfen sowohl **direkte Begriffe** als auch **Umschreibungen / Wortstämme** in folgenden Bereichen:
 1. **Minderjährigkeit / Age-Play:** Begriffe oder Rollenspiele, die unter 18-Jährige suggerieren (*Schoolgirl, Teen-Abuse, zu jung, „gerade 18“ im bedenklichen Kontext*).
 2. **Fehlende Einvernehmlichkeit (Non-Consensual / Gewalt):** Zwang, Vergewaltigungs-Rollenspiele, echt wirkende Schmerzensschreie/Hilferufe im Audio-Transkript (*„Hör auf“, „Nein“* im nicht-einvernehmlichen Kontext), Erpressung.
 3. **Bewusstlosigkeit / K.O.-Mittel (Hard-Block Rot):** Schlafende Personen, K.O.-Tropfen, Ohnmacht, schwere Trunkenheit/Drogen.
-4. **Inzest / Blutsverwandtschaft:** Direkte familiäre Bezeichnungen (*Vater, Mutter, Bruder, Schwester, Tochter, Sohn* = Rot; mit „Stief-“ als Warnstufe `warning` / Gelb zur manuellen Admin-Sichtung).
+4. **Inzest / Blutsverwandtschaft:** Direkte familiäre Bezeichnungen (*Vater, Mutter, Bruder, Schwester, Tochter, Sohn* = Rot; mit „Stief-“ als Warnstufe `warning` / Orange zur manuellen Admin-Sichtung).
 5. **Extreme Gewalt & Illegalität (Hard-Block Rot):** Blut, Wunden, Waffen, Ersticken/Strangulation, Tier-Bezug (Zoophilie § 184a StGB).
-6. **Spezielle Fetische ohne Kreditkarten-Erlaubnis (Prüfhinweis Gelb – `warning`):**
-   * **KV (Kaviar / Scheiße / Kot), NS (Natursekt / Urin), Poppers & Hypnose:** Verstoßen zwar gegen die Visa/Mastercard BRAM-Richtlinien, sind bei EroCloud aber auf speziellen Fetisch-Partnerseiten **ohne Kreditkarten-Zahlung** erlaubt. Sie werden daher bewusst **gelb (`warning`, Score 70)** markiert mit dem Hinweis: *„Nur auf Seiten OHNE Kreditkarte erlaubt!“*.
-7. **Unerlaubte Eigenwerbung / Abwerbung (Prüfhinweis Gelb – `warning`):** Gesprochene oder geschriebene Hinweise auf externe Bezahlmethoden, PayPal, Überweisung, Telegram, OnlyFans oder private Treffen/Escort.
+6. **Spezielle Fetische ohne Kreditkarten-Erlaubnis (Prüfhinweis Orange – `warning`):**
+   * **KV (Kaviar / Scheiße / Kot), NS (Natursekt / Urin), Poppers & Hypnose:** Verstoßen zwar gegen die Visa/Mastercard BRAM-Richtlinien, sind bei EroCloud aber auf speziellen Fetisch-Partnerseiten **ohne Kreditkarten-Zahlung** erlaubt. Sie werden daher bewusst **orange (`warning`, Score 70)** markiert mit dem Hinweis: *„Nur auf Seiten OHNE Kreditkarte erlaubt!“*.
+7. **Unerlaubte Eigenwerbung / Abwerbung (Prüfhinweis Orange – `warning`):** Gesprochene oder geschriebene Hinweise auf externe Bezahlmethoden, PayPal, Überweisung, Telegram, OnlyFans oder private Treffen/Escort.
 
 ---
 
-## 6. 📍 Implementierte Dateien, Workflows & Server-Integration (Stand: Phase 1 & Phase 2 aktiv)
+## 6. 🧹 Intelligente Whisper-Sprach-Whitelist & WebVTT-Untertitel-Bereinigung
+
+Eine Analyse von **1.287 real transkribierten Creator-Videos** auf dem Live-Server ergab wichtige Besonderheiten von `whisper.cpp` bei Erotik-Videos, die direkt in der Pipeline (`includes/ai_compliance_core.inc.php`) abgefangen werden:
+
+### 6.1 Europäische Sprach-Whitelist & Automatischer 2-Stufen-Fallback
+* **Hintergrund:** Wenn in den ersten 30 Sekunden eines Videos nicht gesprochen, sondern nur gestöhnt, geatmet oder Musik gespielt wird, rät `whisper.cpp` im `-l auto`-Modus häufig exotische Sprachen wie `NN` (Norwegisch Nynorsk), `KO` (Koreanisch), `JA` (Japanisch), `JW` (Javanisch), `LA` (Latein) oder `ZH` (Chinesisch) und transkribiert den gesamten Rest des Videos im falschen Alphabet.
+* **Lösung (`aic_get_allowed_whisper_languages()` & `aic_process_single_movie_pipeline()`):**
+  1. Es gilt eine feste Whitelist europäischer Sprachen: **`de`, `en`, `es`, `fr`, `it`, `nl`, `pl`, `cs`, `ru`, `pt`, `tr`, `hu`, `sv`, `da`**.
+  2. Erkennt Whisper mit `-l auto` eine dieser Sprachen, wird sie übernommen (korrigiert damit auch falsche Datenbank-Angaben der Creatorin).
+  3. Gibt `-l auto` hingegen eine exotische Nicht-Whitelist-Sprache zurück (`nn`, `ko`, `ja`, `jw`, `la`, `zh` usw.) und hat Whisper Text außerhalb von Klammern transkribiert, startet `aic_process_single_movie_pipeline()` **sofort automatisch einen zweiten Whisper-Lauf auf derselben temporären `.wav`-Datei mit erzwungener Fallback-Sprache (`-l de` bzw. `movies.movie_language`)**.
+
+### 6.2 Normalisierung von Klammer-/Sternchen-Tags & Zeitraum-Verschmelzung (`aic_clean_and_normalize_segments()`)
+1. **Vereinheitlichung sinnvoller Atmosphären-Untertitel auf Deutsch (`aic_normalize_single_bracket_tag()`):**
+   * Alle Varianten in eckigen Klammern `[...]`, runden Klammern `(...)` und Sternchen `*...*` werden auf 5 saubere deutsche Closed-Caption-Tags vereinheitlicht:
+     * **`[Musik]`** *(aus `[Musik]`, `[MUSIC]`, `[Music]`, `(upbeat music)`, `*Musik*`, `(音楽)`, `[w tle śpiew]` usw.)*
+     * **`[Stöhnen]`** *(aus `[Stöhnen]`, `* Sie stöhnt. *`, `* Er stöhnt. *`, `* Sie schreit. *`, `[Groaning]`, `[moaning]`, `(Sie schluchzt.)`, `[Suspiración]` sowie phonetischen IPA-Stöhnlauten wie `[ ˈbɑː ]`, `[ ˈkɛː ]`)*
+     * **`[Schweres Atmen]`** *(aus `[Atmen]`, `[heavy breathing]`, `(breathing heavily)`, `[inhales]`, `(panting)` usw.)*
+     * **`[Lachen]`** *(aus `[Lachen]`, `* Sie lacht. *`, `[Gelächter]`, `[Laughter]` usw.)*
+     * **`[Klatschen]`** *(aus `[Applaus]`, `(applause)`, `[Klatschen]`)*
+2. **Echtes Verschmelzen aufeinanderfolgender Zeiträume (Anti-Flacker-Logik):**
+   * Wenn Whisper im Sekundentakt hunderte Male untereinander `[Musik]` oder `[Stöhnen]` ausgibt, werden direkt aufeinanderfolgende identische Atmosphären-Tags (solange keine Pause > 12 Sek. und kein gesprochener Dialog dazwischen liegt) **zu einem einzigen durchgehenden Zeitraum verschmolzen** (`Start des ersten Blocks` bis `Ende des letzten zusammenhängenden Blocks`, z. B. `[00:10 - 01:45] [Musik]`).
+   * Sobald echter gesprochener Dialog einsetzt, wird der vorangegangene Atmosphären-Block exakt an der Startsekunde des Satzes beendet, damit sich im Videoplayer keine Untertitel überlappen.
+3. **Restlose Entfernung von Halluzinationen & technischen Artefakten:**
+   * Alle fremden Schriftsysteme (Koreanisch `[두 번째 요리]`, Japanisch `(おうくんの声)`, Chinesisch `(我現在要吃飯了)`, Arabisch, Hindi, Kyrillisch außer bei `ru`), TV-Untertitel-Halluzinationen (`[Untertitel im Auftrag des ZDF]`, `amara.org`) sowie unbrauchbare Tags (`[BLANK_AUDIO]`, `[inaudible]`, `[unverständlich]`, `(istig oder schreit)`, `* Stimmengewirr *`, `* Sie sprechen durcheinander. *`) werden restlos gelöscht.
+
+---
+
+## 7. 📍 Implementierte Dateien & ACP-Oberflächen im Überblick
 
 > **Server-Installations-Details:** Alle Linux-/Debian-10-spezifischen Kompilierungsschritte (`whisper.cpp`, CMake/GCC-Patches, Modell-Pfade unter `/var/www/web1/priv/ai/`) sind im Detail in `@ai-server-installation-guide.md` dokumentiert.
 
 1. **Zentrale Kern-Bibliothek (`includes/ai_compliance_core.inc.php`)**:
-   * [`includes/ai_compliance_core.inc.php`](file:///c:/xampp/htdocs/EroCloud/includes/ai_compliance_core.inc.php): Gemeinsame Funktionsbibliothek für das ACP-Cockpit und den Hintergrund-Cronjob:
-     * `aic_ensure_table()`: Erstellt und verwaltet automatisch die Datenbanktabelle `movies_ai_analysis`.
-     * `aic_check_environment()`: Prüft den Live-Status von `FFmpeg`, `whisper.cpp` (`ggml-small-q5_1.bin` & `ggml-large-v3-turbo-q5_0.bin`) sowie `llama.cpp` / `Ollama` (inkl. `open_basedir`-Fallback `aic_file_or_exec_exists()`).
-     * `aic_process_single_movie_pipeline()`: Extrahiert temporär die 16kHz-Mono-WAV aus der bestehenden `.mp4`, führt `whisper-cli` mit `nice -n 15 -bs 1 -bo 1` aus, schreibt die `.vtt`-Untertiteldatei (`sub_{id}_{file_id}.vtt`) in den Filmordner, löscht die temporäre `.wav`-Datei sofort wieder, speichert das gesprochene Transkript mit Zeitstempeln in `movies_ai_analysis` und führt direkt im Anschluss die BRAM-Textprüfung aus.
-     * `aic_analyze_texts()`: Kombiniert Filmtitel, Beschreibung, SEO-Metadaten und das gesprochene Video-Transkript (nach HTML-/Entity-Bereinigung durch `aic_clean_html_text()`) und prüft sie gegen das BRAM-Regelwerk sowie optional gegen das lokale Sprachmodell (`llama.cpp`).
+   * [`includes/ai_compliance_core.inc.php`](file:///c:/xampp/htdocs/EroCloud/includes/ai_compliance_core.inc.php):
+     * `aic_ensure_table()`, `aic_check_environment()`, `aic_get_allowed_whisper_languages()`.
+     * `aic_normalize_single_bracket_tag()` & `aic_clean_and_normalize_segments()`: Bereinigung, Übersetzung und Zeitraum-Verschmelzung aller `.vtt`-Segmente.
+     * `aic_process_single_movie_pipeline()`: Komplette Audio- & Text-Pipeline inkl. automatischem Sprach-Fallback.
+     * `aic_render_bram_score_badge()`: Rendert die farbigen BRAM-Badges (`Grün`, `Orange`, `Rot`, `Blau/Nur Text`) in den Film-Tabellen.
+     * `aic_get_movie_bram_and_ai_tabs_data()`: Generiert das Top-Banner sowie die beiden kompletten Reiter `#tab-bram` und `#tab-transcript` für die Film-Detailseiten.
 2. **BRAM-Regelwerk, Prompt & Batch-Konfiguration (`includes/ai_rules/`)**:
-   * [`includes/ai_rules/bram_system_prompt.md`](file:///c:/xampp/htdocs/EroCloud/includes/ai_rules/bram_system_prompt.md): Vollständiger Markdown-System-Prompt für die lokale Prüf-KI (`llama.cpp`), unterteilt in **Kategorie 1: ROT (`violation` / Universeller Hard-Block)** und **Kategorie 2: GELB (`warning` / Nur auf Portalen ohne Kreditkartenabrechnung zulässig: KV, Scheiße, NS, Natursekt, Poppers, Hypnose + Grauzonen/Abwerbung)**.
-   * [`includes/ai_rules/bram_keyword_rules.json`](file:///c:/xampp/htdocs/EroCloud/includes/ai_rules/bram_keyword_rules.json): Strukturierter DE/EN Keyword- & Wortstamm-Katalog inkl. `fetish_no_creditcard` (`warning`, Basis-Score 70).
-   * [`includes/ai_rules/batch_config.json`](file:///c:/xampp/htdocs/EroCloud/includes/ai_rules/batch_config.json): Persistente Konfiguration für den Hintergrund-Cronjob (`cron_enabled`, `whisper_model_pref`, `whisper_threads`, `audio_limit_sec`, `order_direction`, `pause_on_ffmpeg_convert`, `max_movies_per_run`, `sync_empty_movie_lang`).
-   * `includes/ai_rules/batch_status.json`: Laufzeit-Heartbeat des Workers (aktuell verarbeitete `movie_id`, letzte Meldung, Zeitstempel, Gesamtzähler).
+   * [`includes/ai_rules/bram_system_prompt.md`](file:///c:/xampp/htdocs/EroCloud/includes/ai_rules/bram_system_prompt.md) & [`includes/ai_rules/bram_keyword_rules.json`](file:///c:/xampp/htdocs/EroCloud/includes/ai_rules/bram_keyword_rules.json).
+   * [`includes/ai_rules/batch_config.json`](file:///c:/xampp/htdocs/EroCloud/includes/ai_rules/batch_config.json) & `includes/ai_rules/batch_status.json`.
 3. **Hintergrund-Cronjob (`cronjobs/ai_compliance_worker.php`)**:
-   * [`cronjobs/ai_compliance_worker.php`](file:///c:/xampp/htdocs/EroCloud/cronjobs/ai_compliance_worker.php) (dokumentiert in [`cronjobs/jobs.txt`](file:///c:/xampp/htdocs/EroCloud/cronjobs/jobs.txt)):
-     * Wird über LiveConfig / Crontab alle 2 Minuten aufgerufen (`*/2 * * * * /usr/bin/php /var/www/web1/htdocs/cronjobs/ai_compliance_worker.php >/dev/null 2>&1`).
-     * Verhindert Überlappungen durch `flock()` auf `/var/www/web1/priv/tmp/erocloud_ai_worker.lock` und pausiert automatisch, sobald `convert_movie.php` aktiv Videos konvertiert (`convert_status = 1`).
-4. **ACP-Routing, Navigation & 4-Tab-Cockpit (`/KI-Analyse`)**:
-   * [`acp/.htaccess`](file:///c:/xampp/htdocs/EroCloud/acp/.htaccess) & [`acp/index.php`](file:///c:/xampp/htdocs/EroCloud/acp/index.php): Route `/KI-Analyse` unter **Content Prüfen → KI-Analyse & BRAM**.
+   * [`cronjobs/ai_compliance_worker.php`](file:///c:/xampp/htdocs/EroCloud/cronjobs/ai_compliance_worker.php) (dokumentiert in [`cronjobs/jobs.txt`](file:///c:/xampp/htdocs/EroCloud/cronjobs/jobs.txt)).
+4. **ACP 5-Tab-Cockpit (`/KI-Analyse`)**:
    * [`acp/includes/ai_compliance.php`](file:///c:/xampp/htdocs/EroCloud/acp/includes/ai_compliance.php) & [`acp/includes/ajax/ai_compliance_action.php`](file:///c:/xampp/htdocs/EroCloud/acp/includes/ajax/ai_compliance_action.php):
-     * **Tab 1:** Einzel-Video-Testlabor (Auswahl eines Videos, Live-Whisper-Test mit wählbarem Audio-Umfang, editierbare Vorschau von Transkript & `.vtt`, detaillierter BRAM-Prüfbericht).
-     * **Tab 2:** Batch- & Cronjob-Steuerung (Fortschrittsbalken für alle >5.500 Videos, 15-Sekunden-Katalog-Schnellscan für alle Video-Titel/Beschreibungen in 250er-Paketen, Live-Browser-Batch mit 2-Sekunden-Status-Ticker und Server-Cronjob-Konfiguration).
-     * **Tab 3:** Live-Editor für `bram_system_prompt.md` und `bram_keyword_rules.json`.
-     * **Tab 4:** Analyse-Historie mit Schnellfiltern nach BRAM-Ampel (`Rot`, `Gelb / Ohne KK`, `Grün`), Untertitel-Status (`.vtt vorhanden`, `Stummfilm`, `Offen`, `Fehler`) und Volltext-/ID-Suche.
+     * **Tab 1:** Einzel-Video-Testlabor & Live-Prüfung.
+     * **Tab 2:** Batch- & Cronjob-Steuerung (inkl. 15-Sekunden-Katalog-Schnellscan & Live-Browser-Batch).
+     * **Tab 3:** BRAM-Regelwerk & KI-System-Prompt-Editor.
+     * **Tab 4:** Analyse-Historie & Filter (`movies_ai_analysis`).
+     * **Tab 5:** Transkript- & VTT-Inspektor (Statistische Auswertung aller Klammer-/Sternchen-Tags und Sprachen, `.json`-Export/Copy, **Schritt 1: 1-Klick-Massenbereinigung aller bestehenden Transkripte & `.vtt`-Dateien** ohne Whisper-Neulauf sowie **Schritt 2: 1-Klick-Wiedereinreihen exotischer Sprach-Filme** in die Whisper-Cronjob-Queue).
+5. **ACP Film-Übersichten & Detailseiten**:
+   * [`acp/includes/movies_online.php`](file:///c:/xampp/htdocs/EroCloud/acp/includes/movies_online.php) & [`acp/includes/ajax/movies_online.php`](file:///c:/xampp/htdocs/EroCloud/acp/includes/ajax/movies_online.php): Sortierbare Spalte `BRAM-Score`.
+   * [`acp/includes/movies_checking.php`](file:///c:/xampp/htdocs/EroCloud/acp/includes/movies_checking.php) & [`acp/includes/ajax/movies_checking.php`](file:///c:/xampp/htdocs/EroCloud/acp/includes/ajax/movies_checking.php): Sortierbare Spalte `BRAM-Score`.
+   * [`acp/includes/movie_edit.php`](file:///c:/xampp/htdocs/EroCloud/acp/includes/movie_edit.php) & [`acp/includes/movie_checking.php`](file:///c:/xampp/htdocs/EroCloud/acp/includes/movie_checking.php): Top-Banner + eigene Reiter `BRAM & KI-Analyse` und `Audio & Transkript (.vtt)`.
 
 
