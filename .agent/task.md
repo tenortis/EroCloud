@@ -79,5 +79,5 @@
     - [x] Analyze Pay4Coins SSO login (`mcp/login.php`) and MCP routing (`mcp/.htaccess`, `mcp/index.php`)
     - [x] Document architecture blueprint (`app/` & `web/` separation, SPA fragment loading, Pay4Coins-Blue theme) in `.agent/knowledge/architecture/mcp-modernization-architecture.md`
     - [x] Build clickable interactive layout prototype in `mcp/mcp_neu/app/` and `mcp/mcp_neu/web/` with all current MCP sidebar menu entries, KKC tile design in Pay4Coins-Blue (`#0284C7` / `#4297D7`), and zero-reload SPA navigation
-    - [ ] Implement live Pay4Coins SSO login (`mcp/mcp_neu/web/login.php`) and database-backed `Startseite` dashboard
+    - [x] Implement live Pay4Coins SSO login (`mcp/mcp_neu/web/login.php`), live MCP session authentication (`is_logged_in('mcp')`), and database-backed `Startseite` dashboard (`HomeController` & `views/dashboard.php`)
     - [ ] Implement Actors, Movies, and Photo-Albums modules in `mcp_neu`

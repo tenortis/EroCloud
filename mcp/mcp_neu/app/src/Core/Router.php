@@ -21,6 +21,12 @@ class Router
 
     public static function dispatch(Request $request): void
     {
+        // Authentifizierungs-Prüfung für alle API-Aufrufe
+        if (!function_exists('is_logged_in') || is_logged_in('mcp') !== true) {
+            Response::error('Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut über Pay4Coins an.', 401);
+            return;
+        }
+
         $route = $request->route();
 
         if (empty(self::$routes)) {
@@ -51,41 +57,45 @@ class Router
                 Response::html($result);
             }
         } catch (\Throwable $e) {
+            if (function_exists('p4c_errorlog')) {
+                p4c_errorlog($e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+            }
             Response::error("Interner Fehler bei Ausführung von '{$route}': " . $e->getMessage(), 500);
         }
     }
 
     private static function registerDefaults(): void
     {
-        $ctrl = 'App\\Modules\\Preview\\PreviewController';
+        $homeCtrl    = 'App\\Modules\\Home\\HomeController';
+        $previewCtrl = 'App\\Modules\\Preview\\PreviewController';
 
-        // 1. Startseite (Eingeloggt & Ausgeloggte Gast-Vorschau)
-        self::register('startseite', $ctrl, 'startseite');
-        self::register('home', $ctrl, 'startseite');
-        self::register('guest', $ctrl, 'guest');
+        // 1. Startseite (Echtes Partner-Dashboard & Richtlinien-Bestätigung)
+        self::register('startseite', $homeCtrl, 'view');
+        self::register('home', $homeCtrl, 'view');
+        self::register('home/accept-rules', $homeCtrl, 'acceptRules');
 
         // 2. Content hochladen
-        self::register('movie-upload', $ctrl, 'movieUpload');
-        self::register('photo-album-upload', $ctrl, 'photoAlbumUpload');
+        self::register('movie-upload', $previewCtrl, 'movieUpload');
+        self::register('photo-album-upload', $previewCtrl, 'photoAlbumUpload');
 
         // 3. Content in der Cloud
-        self::register('movies', $ctrl, 'movies');
-        self::register('movie', $ctrl, 'movieDetail');
-        self::register('photo-albums', $ctrl, 'photoAlbums');
-        self::register('photo-album', $ctrl, 'photoAlbumDetail');
+        self::register('movies', $previewCtrl, 'movies');
+        self::register('movie', $previewCtrl, 'movieDetail');
+        self::register('photo-albums', $previewCtrl, 'photoAlbums');
+        self::register('photo-album', $previewCtrl, 'photoAlbumDetail');
 
         // 4. Profile (Darsteller)
-        self::register('actors', $ctrl, 'actors');
-        self::register('new-actor', $ctrl, 'newActor');
-        self::register('actor', $ctrl, 'actorDetail');
+        self::register('actors', $previewCtrl, 'actors');
+        self::register('new-actor', $previewCtrl, 'newActor');
+        self::register('actor', $previewCtrl, 'actorDetail');
 
         // 5. Partnerprogramm (Webmaster)
-        self::register('webmaster-ads', $ctrl, 'webmasterAds');
-        self::register('webmaster-newads', $ctrl, 'webmasterNewAds');
-        self::register('webmaster-stats', $ctrl, 'webmasterStats');
-        self::register('webmaster-advertise-partner', $ctrl, 'webmasterAdvertisePartner');
+        self::register('webmaster-ads', $previewCtrl, 'webmasterAds');
+        self::register('webmaster-newads', $previewCtrl, 'webmasterNewAds');
+        self::register('webmaster-stats', $previewCtrl, 'webmasterStats');
+        self::register('webmaster-advertise-partner', $previewCtrl, 'webmasterAdvertisePartner');
 
         // 6. FAQ
-        self::register('faq', $ctrl, 'faq');
+        self::register('faq', $previewCtrl, 'faq');
     }
 }

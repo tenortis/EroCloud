@@ -131,6 +131,7 @@ const App = {
       const html = await res.text();
       contentArea.innerHTML = html;
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      this.initDynamicEvents();
     } catch (err) {
       contentArea.innerHTML = `
         <div class="alert alert-danger m-4">
@@ -142,7 +143,7 @@ const App = {
   },
 
   // ========================================================================
-  // 3. API-Key Kopierfunktion (im Modal)
+  // 3. API-Key Kopierfunktion (im Modal) & Dynamische Events (Content-Regeln)
   // ========================================================================
   initApiKeyCopy() {
     const copyBtn = document.getElementById('btn-copy-api-key');
@@ -159,6 +160,46 @@ const App = {
         this.toast('Ihr API-Key wurde in die Zwischenablage kopiert.', 'success');
       }
     });
+  },
+
+  initDynamicEvents() {
+    const submitRulesBtn = document.getElementById('btn-submit-content-rules');
+    const chkRules = document.getElementById('chk-accept-content-rules');
+    if (submitRulesBtn && chkRules) {
+      submitRulesBtn.addEventListener('click', async () => {
+        if (!chkRules.checked) {
+          this.toast('Bitte setzen Sie zuerst das Häkchen zur Bestätigung der Nutzungsrichtlinien.', 'warning');
+          return;
+        }
+        submitRulesBtn.disabled = true;
+        try {
+          const formData = new FormData();
+          formData.append('upload_content', '1');
+          formData.append('csrf_token', this.csrfToken);
+
+          const res = await fetch(`${this.basePath}/api.php?route=home/accept-rules`, {
+            method: 'POST',
+            body: formData
+          });
+          const data = await res.json();
+          if (res.ok && data.status === 'success') {
+            const modalEl = document.getElementById('modal-content-rules');
+            if (modalEl) {
+              const bsModal = bootstrap.Modal.getInstance(modalEl);
+              if (bsModal) bsModal.hide();
+            }
+            this.toast(data.message || 'Nutzungsrichtlinien erfolgreich bestätigt.', 'success');
+            this.handleRoute();
+          } else {
+            this.toast(data.message || 'Fehler beim Speichern.', 'danger');
+            submitRulesBtn.disabled = false;
+          }
+        } catch (err) {
+          this.toast('Verbindungsfehler: ' + err.message, 'danger');
+          submitRulesBtn.disabled = false;
+        }
+      });
+    }
   },
 
   // ========================================================================

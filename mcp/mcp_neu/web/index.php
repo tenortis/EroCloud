@@ -13,24 +13,93 @@ require_once __DIR__ . '/../app/bootstrap.php';
 
 use App\Core\Csrf;
 
-// Benutzerdaten aus aktiver MCP-Session übernehmen (oder Vorschau-Werte für den Layout-Test)
+global $mysql;
+
+// 1. Logout verarbeiten (analog mcp/index.php)
+if (isset($_GET['logout'])) {
+    if (isset($_SESSION['merchant_id'])) {
+        if ($_GET['logout'] === 'auto') {
+            log_action('Vom System abgemeldet. (auto)');
+        } else {
+            log_action('Vom System abgemeldet. (manuell)');
+        }
+    }
+
+    $logoutUrl = (isset($_SESSION['logged_in_as']) && $_SESSION['logged_in_as'] === 'merchant')
+        ? LOGIN_URL . '/?logout&ref=erocloud'
+        : MCP_URL;
+
+    $_SESSION = [];
+    @session_destroy();
+    header('Location: ' . $logoutUrl);
+    exit;
+}
+
+// 2. Authentifizierungs-Prüfung (Echte MCP Partner-Session erforderlich)
+if (!function_exists('is_logged_in') || is_logged_in('mcp') !== true || empty($_SESSION['merchant_id'])) {
+    header('Location: ' . LOGIN_URL . '?ref=erocloud');
+    exit;
+}
+
+// 3. Echte Partner- und Profildaten für Topbar, Sidebar und Modals laden
+$merchantId       = abs((int)$_SESSION['merchant_id']);
+$merchant         = new Merchant($mysql, $merchantId);
 $merchantUsername = isset($_SESSION['merchant_username']) && trim((string)$_SESSION['merchant_username']) !== ''
     ? (string)$_SESSION['merchant_username']
-    : 'Mustermann-Partner';
+    : (string)$merchant->username('aes_decrypt');
 
-$initials = mb_strtoupper(mb_substr($merchantUsername, 0, 2));
+$initials = mb_strtoupper(mb_substr(trim($merchantUsername), 0, 2));
 if ($initials === '') {
     $initials = 'EC';
 }
 
-$p4cMcpUrl = defined('Pay4Coins_MCP_URL') ? Pay4Coins_MCP_URL : 'https://merchant.pay4coins.com';
+$apiKey           = (string)$merchant->api_key('aes_decrypt');
+$partnerId        = (string)$merchant->partner_id();
+$minActorProfiles = abs((int)$merchant->minimum_number_actor_profiles());
+
+// Darsteller-Profile des Partners für die Sidebar laden
+$sidebarActors = [];
+$rsActors = p4c_query("SELECT `id`, `username`, `profile_image_fsk16`
+    FROM `actors`
+    WHERE `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted'
+    ORDER BY `username` ASC;", __FILE__, __LINE__);
+
+if ($rsActors && p4c_num_rows($rsActors) > 0) {
+    while ($actorObj = p4c_fetch_object($rsActors)) {
+        $sidebarActors[] = [
+            'id'           => abs((int)$actorObj->id),
+            'username'     => (string)$actorObj->username,
+            'avatar_fsk16' => (string)$actorObj->profile_image_fsk16,
+        ];
+    }
+}
+$countActors = count($sidebarActors);
+
+// Anzahl der Filme in der Cloud für den Sidebar-Zähler laden
+$countMovies = 0;
+if ($countActors > 0) {
+    $rsMoviesCount = p4c_query("SELECT COUNT(*) AS `cnt`
+        FROM `movies`
+        WHERE `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted';", __FILE__, __LINE__);
+    if ($rsMoviesCount && p4c_num_rows($rsMoviesCount) > 0) {
+        $cntObj = p4c_fetch_object($rsMoviesCount);
+        $countMovies = abs((int)($cntObj->cnt ?? 0));
+    }
+}
+
+// Prüfen, ob Partnerprogramm für diesen Partner aktiv ist
+$showWebmasterMenu = in_array($partnerId, ['ABPP2HNMDG', 'KJDJEEESAX', 'CCRVWMVD67', '9SN2XTH2TU'], true);
+
+$mcpUrl       = defined('MCP_URL') ? MCP_URL : 'https://erocloud.net';
+$p4cMcpUrl    = defined('Pay4Coins_MCP_URL') ? Pay4Coins_MCP_URL : 'https://merchant.pay4coins.com';
 $supportEmail = defined('SUPPORT_EMAIL') ? SUPPORT_EMAIL : 'techsupport@pay4coins.com';
 $supportPhone = defined('SUPPORT_PHONE_NUMBER') ? SUPPORT_PHONE_NUMBER : '+49 (0)6106 625 918 27';
-$companyName = defined('COMPANYNAME') ? COMPANYNAME : 'CIPA MEDIA S.L.';
-$projectName = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
+$companyName  = defined('COMPANYNAME') ? COMPANYNAME : 'CIPA MEDIA S.L.';
+$projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
+$siteUrl      = defined('URL') ? URL : 'https://erocloud.net';
 
 $csrfToken = Csrf::token();
-$basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? ''))), '/');
+$basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? ''))), '/');
 ?>
 <!DOCTYPE html>
 <html lang="de" data-bs-theme="light">
@@ -62,7 +131,7 @@ $basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'
 <div class="app-wrapper">
 
   <!-- ========================================================================
-       SIDEBAR (Alle Menüeinträge aus der aktuellen MCP-Version)
+       SIDEBAR (Echte Partner-Navigation)
        ======================================================================== -->
   <aside class="app-sidebar">
     <!-- Brand Header -->
@@ -86,6 +155,7 @@ $basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'
         <span>Meine Startseite</span>
       </a>
 
+      <?php if ($countActors > 0): ?>
       <!-- 2. Content hochladen (Standardmäßig geschlossen) -->
       <a class="sidebar-link sidebar-submenu-toggle" data-bs-toggle="collapse" href="#submenu-upload" role="button" aria-expanded="false" aria-controls="submenu-upload">
         <i class="bi bi-cloud-arrow-up-fill"></i>
@@ -103,11 +173,11 @@ $basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'
         </a>
       </div>
 
-      <!-- 3. Content in der Cloud (Standardmäßig geschlossen, einzeilig mit Zähler-Badge) -->
+      <!-- 3. Content in der Cloud (Standardmäßig geschlossen, mit echtem Zähler) -->
       <a class="sidebar-link sidebar-submenu-toggle" data-bs-toggle="collapse" href="#submenu-cloud" role="button" aria-expanded="false" aria-controls="submenu-cloud">
         <i class="bi bi-cloud-fill"></i>
         <span class="text-nowrap">Content in der Cloud</span>
-        <span class="sidebar-count-badge ms-auto me-1" title="Anzahl Filme in der Cloud">24</span>
+        <span id="sidebar-movies-count" class="sidebar-count-badge ms-auto me-1" title="Anzahl Ihrer Filme in der Cloud"><?= (int)$countMovies ?></span>
         <i class="bi bi-chevron-right chevron-icon ms-0"></i>
       </a>
       <div class="collapse sidebar-submenu" id="submenu-cloud">
@@ -120,37 +190,53 @@ $basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'
           <span>Fotos in der Cloud</span>
         </a>
       </div>
+      <?php endif; ?>
 
-      <!-- 4. Profile (Standardmäßig geschlossen) -->
+      <!-- 4. Profile (Standardmäßig geschlossen, mit echten Darsteller-Profilen) -->
       <a class="sidebar-link sidebar-submenu-toggle" data-bs-toggle="collapse" href="#submenu-actors" role="button" aria-expanded="false" aria-controls="submenu-actors">
         <i class="bi bi-person-circle"></i>
         <span class="text-nowrap">Profile</span>
         <i class="bi bi-chevron-right chevron-icon"></i>
       </a>
       <div class="collapse sidebar-submenu" id="submenu-actors">
+        <?php if ($countActors > 1): ?>
         <a href="#/actors" class="sidebar-link" data-route="#/actors">
           <i class="bi bi-people-fill"></i>
           <span>Alle Profile anzeigen</span>
         </a>
+        <?php endif; ?>
+
+        <?php if ($countActors < $minActorProfiles): ?>
         <a href="#/new-actor" class="sidebar-link" data-route="#/new-actor">
           <i class="bi bi-person-plus-fill"></i>
           <span>Profil anlegen</span>
         </a>
-        <!-- Beispiel-Darstellerprofile (wie im aktuellen MCP mit Avatar) -->
-        <a href="#/actor?id=1&amp;name=SophiaLove" class="sidebar-link" data-route="#/actor?id=1&name=SophiaLove">
-          <span class="sidebar-actor-avatar">SL</span>
-          <span class="text-truncate">SophiaLove</span>
+        <?php endif; ?>
+
+        <?php foreach ($sidebarActors as $sActor): ?>
+        <?php
+          $sAvatarUrl = $sActor['avatar_fsk16'] !== ''
+              ? $mcpUrl . '/ProfilePicture/' . rawurlencode($sActor['avatar_fsk16'])
+              : '';
+          $sInitials = mb_strtoupper(mb_substr($sActor['username'], 0, 2));
+          $sRoute = '#/actor?id=' . (int)$sActor['id'] . '&name=' . urlencode($sActor['username']);
+        ?>
+        <a href="<?= htmlspecialchars($sRoute, ENT_QUOTES, 'UTF-8') ?>" class="sidebar-link" data-route="<?= htmlspecialchars($sRoute, ENT_QUOTES, 'UTF-8') ?>">
+          <?php if ($sAvatarUrl !== ''): ?>
+          <img src="<?= htmlspecialchars($sAvatarUrl, ENT_QUOTES, 'UTF-8') ?>" alt="" class="rounded-circle object-fit-cover flex-shrink-0 border" style="width: 22px; height: 22px;">
+          <?php else: ?>
+          <span class="sidebar-actor-avatar"><?= htmlspecialchars($sInitials, ENT_QUOTES, 'UTF-8') ?></span>
+          <?php endif; ?>
+          <span class="text-truncate"><?= htmlspecialchars($sActor['username'], ENT_QUOTES, 'UTF-8') ?></span>
         </a>
-        <a href="#/actor?id=2&amp;name=MiaSweet" class="sidebar-link" data-route="#/actor?id=2&name=MiaSweet">
-          <span class="sidebar-actor-avatar">MS</span>
-          <span class="text-truncate">MiaSweet</span>
-        </a>
+        <?php endforeach; ?>
       </div>
 
-      <!-- 5. Partnerprogramm (Aufklappbar) -->
+      <?php if ($showWebmasterMenu): ?>
+      <!-- 5. Partnerprogramm (Nur für freigeschaltete Bestands-Partner) -->
       <a class="sidebar-link sidebar-submenu-toggle" data-bs-toggle="collapse" href="#submenu-webmaster" role="button" aria-expanded="false" aria-controls="submenu-webmaster">
         <i class="bi bi-currency-euro"></i>
-        <span>Partnerprogramm</span>
+        <span class="text-nowrap">Partnerprogramm</span>
         <i class="bi bi-chevron-right chevron-icon"></i>
       </a>
       <div class="collapse sidebar-submenu" id="submenu-webmaster">
@@ -171,6 +257,7 @@ $basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'
           <span>Darsteller werben</span>
         </a>
       </div>
+      <?php endif; ?>
 
       <!-- 6. Abrechnungen und Meine Daten (Pay4Coins Box) -->
       <div class="sidebar-heading mt-3">Abrechnungen &amp; Meine Daten</div>
@@ -231,13 +318,13 @@ $basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'
 
       <!-- Quick-Actions & Partner-Menü -->
       <div class="d-flex align-items-center gap-2 gap-md-3 ms-auto">
-        <!-- Direktbutton: Film hochladen -->
+        <?php if ($countActors > 0): ?>
         <a href="#/movie-upload" class="btn btn-sm btn-primary-kkc d-flex align-items-center gap-1">
           <i class="bi bi-cloud-arrow-up-fill"></i>
           <span>Film hochladen</span>
         </a>
-
         <div class="vr my-2"></div>
+        <?php endif; ?>
 
         <!-- Theme Toggle Button (Hell / Dunkel) -->
         <button id="theme-toggle" class="btn btn-outline-kkc" title="Design wechseln">
@@ -258,7 +345,7 @@ $basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'
             </div>
           </button>
           <ul class="dropdown-menu dropdown-menu-end shadow-lg border-secondary border-opacity-25">
-            <li><h6 class="dropdown-header">Partner: <?= htmlspecialchars($merchantUsername, ENT_QUOTES, 'UTF-8') ?></h6></li>
+            <li><h6 class="dropdown-header">Eingeloggt als: <?= htmlspecialchars($merchantUsername, ENT_QUOTES, 'UTF-8') ?></h6></li>
             <li>
               <a class="dropdown-item" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#modal-api-key">
                 <i class="bi bi-key me-2 text-muted"></i>Mein API-Key
@@ -271,7 +358,7 @@ $basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'
             </li>
             <li><hr class="dropdown-divider"></li>
             <li>
-              <a class="dropdown-item text-danger" href="/index.php?logout">
+              <a class="dropdown-item text-danger" href="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>/index.php?logout">
                 <i class="bi bi-box-arrow-right me-2"></i>Logout
               </a>
             </li>
@@ -294,7 +381,7 @@ $basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'
      MODALS (Mein API-Key, Support & Kontakt, Impressum)
      ======================================================================== -->
 
-<!-- Modal: Mein API-Key -->
+<!-- Modal: Mein API-Key (Mit echtem entschlüsselten API-Key aus der DB) -->
 <div class="modal fade" id="modal-api-key" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content shadow-lg">
@@ -307,17 +394,23 @@ $basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'
       <div class="modal-body">
         <label class="form-label small text-muted">Ihr persönlicher API-Schlüssel:</label>
         <div class="input-group mb-2">
-          <input type="text" id="input-api-key" class="form-control font-monospace text-center fw-bold" value="A9F4K2M8X7P1Q6W3E5R0T2Y8U4I6O9L1" readonly>
+          <input type="text" id="input-api-key" class="form-control font-monospace text-center fw-bold" value="<?= htmlspecialchars($apiKey, ENT_QUOTES, 'UTF-8') ?>" readonly>
           <button type="button" id="btn-copy-api-key" class="btn btn-primary-kkc">
             <i class="bi bi-clipboard-check me-1"></i> Kopieren
           </button>
         </div>
         <div class="alert alert-warning d-flex align-items-center gap-2 py-2 px-3 small mb-3">
           <i class="bi bi-exclamation-triangle-fill fs-5"></i>
-          <span>Behandeln Sie Ihren API-Key bitte stets vertraulich wie die PIN für Ihr Bankkonto.</span>
+          <span>Behandeln Sie den API-Key bitte stets vertraulich wie die PIN für Ihr Bankkonto.</span>
         </div>
+        <p class="text-muted small mb-2">
+          Der API-Key ermöglicht es Ihnen, Darsteller und deren Content aus der EroCloud direkt auf Ihre eigene Webseite zu importieren.
+        </p>
         <p class="text-muted small mb-0">
-          Der API-Key ermöglicht es Ihnen, Darsteller-Profile sowie deren Filme und Fotoalben aus der EroCloud direkt auf Ihre eigene Webseite zu importieren.
+          Weitere Informationen zum Import von Filmen auf Ihre eigene Webseite finden Sie hier:<br>
+          <a href="https://pay4coins.net/2018/07/11/erocloud-wie-importiere-ich-darsteller-auf-meine-webseite/" target="_blank" rel="noopener" class="ec-text-primary text-break">
+            https://pay4coins.net/2018/07/11/erocloud-wie-importiere-ich-darsteller-auf-meine-webseite/
+          </a>
         </p>
       </div>
       <div class="modal-footer border-top">
@@ -367,9 +460,9 @@ $basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'
   </div>
 </div>
 
-<!-- Modal: Impressum -->
+<!-- Modal: Impressum (Vollständiges Original-Impressum) -->
 <div class="modal fade" id="modal-imprint" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content shadow-lg">
       <div class="modal-header border-bottom">
         <h5 class="modal-title font-heading">
@@ -378,11 +471,43 @@ $basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body small text-muted">
-        <p class="fw-bold text-body mb-1"><?= htmlspecialchars($projectName, ENT_QUOTES, 'UTF-8') ?> ist ein Service der <?= htmlspecialchars($companyName, ENT_QUOTES, 'UTF-8') ?></p>
-        <p class="mb-2">
-          Kontakt E-Mail: <a href="mailto:<?= htmlspecialchars($supportEmail, ENT_QUOTES, 'UTF-8') ?>" class="ec-text-primary"><?= htmlspecialchars($supportEmail, ENT_QUOTES, 'UTF-8') ?></a><br>
-          Telefon: <?= htmlspecialchars($supportPhone, ENT_QUOTES, 'UTF-8') ?>
-        </p>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <div class="fw-bold text-body">CIPA Media S.L.</div>
+            <div>Av. Emilio Luque Moreno 19</div>
+            <div>Oficina 6</div>
+            <div>38300 La Orotava (S/C de Tenerife)</div>
+            <div>Spanien</div>
+          </div>
+          <div class="col-md-6">
+            <div class="fw-bold text-body">Handelsregister Teneriffa:</div>
+            <div>TOMO: 3368 · LIBRO: 0 · FOLIO: 40</div>
+            <div>HOJA: TF-54807 · INSCRIPT: 1</div>
+            <div>VAT: CIF B76659168</div>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <div class="fw-bold text-body">Informationen für Kunden, Verkäufer und Händler:</div>
+          <div>Tel.: +34 922 971 738 · Fax: +34 922 971 768</div>
+          <div>E-Mail: <a href="mailto:<?= htmlspecialchars($supportEmail, ENT_QUOTES, 'UTF-8') ?>" class="ec-text-primary"><?= htmlspecialchars($supportEmail, ENT_QUOTES, 'UTF-8') ?></a></div>
+          <div>Web: <a href="<?= htmlspecialchars($siteUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" class="ec-text-primary"><?= htmlspecialchars($siteUrl, ENT_QUOTES, 'UTF-8') ?></a></div>
+        </div>
+
+        <div class="mb-2">
+          <div class="fw-bold text-body">Seiteninhalte</div>
+          <div>Unsere Webseiten wurden mit größter Sorgfalt zusammengestellt. Dennoch können wir keine Haftung für die Richtigkeit und Vollständigkeit der Angaben übernehmen.</div>
+        </div>
+
+        <div class="mb-2">
+          <div class="fw-bold text-body">Hyperlinks</div>
+          <div>Aufgeführte Links unserer Webseiten stellen keine Empfehlungen dar. Die Genauigkeit und Richtigkeit der dort aufgeführten Informationen werden von uns nicht überprüft. Für Schäden, die aus der Verwendung dieser Informationen entstehen, übernehmen wir keine Haftung.</div>
+        </div>
+
+        <div>
+          <div class="fw-bold text-body">Copyright</div>
+          <div>Sämtliche Rechte an den angebotenen Inhalten bleiben vorbehalten, soweit nachfolgend nichts anderes bestimmt ist. Jegliche darüber hinausgehende Nutzung, insbesondere die Wiedergabe, Vervielfältigung oder sonstige Nutzung der Inhalte der Webseiten ist ohne vorherige schriftliche Genehmigung der <?= htmlspecialchars($companyName, ENT_QUOTES, 'UTF-8') ?> unzulässig und rechtswidrig.</div>
+        </div>
       </div>
       <div class="modal-footer border-top">
         <button type="button" class="btn btn-sm btn-outline-kkc" data-bs-dismiss="modal">Schließen</button>
@@ -397,3 +522,7 @@ $basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'
 
 </body>
 </html>
+<?php
+p4c_close(DB_HOST);
+p4c_errorlog(error_get_last());
+?>

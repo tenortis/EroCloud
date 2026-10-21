@@ -23,16 +23,6 @@ class PreviewController
         $this->request = $request;
     }
 
-    public function startseite(): string
-    {
-        return View::render('Preview', 'startseite');
-    }
-
-    public function guest(): string
-    {
-        return View::render('Preview', 'guest');
-    }
-
     public function movieUpload(): string
     {
         return View::render('Preview', 'section_placeholder', [
