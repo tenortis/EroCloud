@@ -11,6 +11,8 @@ define('SAFE_INC', 1);
 include_once("../config.inc.php");
 include_once(MCP_DIR."/common.inc.php");
 
+header('Access-Control-Allow-Origin: *');
+
 function send_fallback_and_exit() {
     $fallback = MCP_DIR.'/images/movie_poster_nopic.jpg';
     while (ob_get_level() > 0) { @ob_end_clean(); }

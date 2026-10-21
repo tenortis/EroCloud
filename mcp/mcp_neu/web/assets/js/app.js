@@ -1052,29 +1052,103 @@ const App = {
       });
     });
 
-    // 5. Automatisch generiertes Vorschaubild (1..10) für FSK16 / FSK18 auswählen
+    // Hover-Lupe auch auf den Vorschaubildern der Film-Detailseite aktivieren
+    this.initThumbnailHoverZoom();
+
+    // Zentrale Hilfsfunktion: Vorschaubild (Szene #1..10 oder Eigenes Bild #11/#12) für FSK16 / FSK18 setzen
+    const applyMovieThumbSelection = (fsk, num, url, zoomUrl, editorUrl, isNewCustomUpload = false) => {
+      const fskStr = String(fsk);
+      const numStr = String(num);
+      const customNum = fskStr === '16' ? '11' : '12';
+      const isCustom = (numStr === customNum);
+
+      const hiddenInput = document.getElementById(`input-preview-fsk${fskStr}`);
+      const previewImg = document.getElementById(`current-fsk${fskStr}-preview`);
+      const previewWrap = document.getElementById(`current-fsk${fskStr}-wrap`);
+      const badgeNum = document.getElementById(`badge-fsk${fskStr}-num`);
+      const restoreBtn = document.getElementById(`btn-restore-custom-fsk${fskStr}`);
+
+      if (hiddenInput) hiddenInput.value = numStr;
+      if (previewImg && url) previewImg.src = url;
+      if (badgeNum) {
+        badgeNum.textContent = isCustom ? `Eigenes Bild (#${numStr})` : `Szene #${numStr}`;
+      }
+
+      if (previewWrap) {
+        previewWrap.setAttribute('data-num', numStr);
+        if (url) previewWrap.setAttribute('data-thumb-url', url);
+        if (zoomUrl || url) previewWrap.setAttribute('data-zoom-src', zoomUrl || url);
+        if (editorUrl || zoomUrl || url) previewWrap.setAttribute('data-editor-url', editorUrl || zoomUrl || url);
+      }
+
+      // Falls neues eigenes Bild hochgeladen oder aus dem Milchglas-Editor gespeichert wurde, Kachel #11/#12 aktualisieren
+      if (isNewCustomUpload) {
+        const customSection = document.getElementById('custom-uploaded-thumbs-section');
+        const customCard = document.getElementById(`custom-thumb-card-${customNum}`);
+        const customImg = document.getElementById(`custom-thumb-img-${customNum}`);
+        const customWrap = document.getElementById(`custom-thumb-wrap-${customNum}`);
+        const customSelectBtn = document.getElementById(`btn-select-custom-${customNum}`);
+
+        if (customSection) customSection.classList.remove('d-none');
+        if (customCard) customCard.classList.remove('d-none');
+        if (customImg && url) customImg.src = url;
+        if (customWrap) {
+          if (url) customWrap.setAttribute('data-thumb-url', url);
+          if (zoomUrl || url) customWrap.setAttribute('data-zoom-src', zoomUrl || url);
+          if (editorUrl || zoomUrl || url) customWrap.setAttribute('data-editor-url', editorUrl || zoomUrl || url);
+        }
+        if (customSelectBtn) {
+          if (url) customSelectBtn.setAttribute('data-url', url);
+          if (zoomUrl || url) customSelectBtn.setAttribute('data-zoom-url', zoomUrl || url);
+          if (editorUrl || zoomUrl || url) customSelectBtn.setAttribute('data-editor-url', editorUrl || zoomUrl || url);
+        }
+        if (restoreBtn) {
+          restoreBtn.setAttribute('data-has-custom', '1');
+          if (url) restoreBtn.setAttribute('data-url', url);
+          if (zoomUrl || url) restoreBtn.setAttribute('data-zoom-url', zoomUrl || url);
+          if (editorUrl || zoomUrl || url) restoreBtn.setAttribute('data-editor-url', editorUrl || zoomUrl || url);
+        }
+      }
+
+      // „Wieder eigenes FSK16/18 nutzen"-Button einblenden, sobald ein eigenes Bild existiert, aber aktuell eine Szene #1..10 aktiv ist
+      if (restoreBtn) {
+        const hasCustom = restoreBtn.getAttribute('data-has-custom') === '1';
+        if (hasCustom && !isCustom) {
+          restoreBtn.classList.remove('d-none');
+        } else {
+          restoreBtn.classList.add('d-none');
+        }
+      }
+
+      // Aktiven Status aller Auswahl-Buttons für dieses FSK aktualisieren
+      const activeClass = fskStr === '16' ? 'btn-success' : 'btn-danger';
+      document.querySelectorAll(`.js-select-movie-thumb[data-fsk="${fskStr}"]`).forEach(b => {
+        if (b.id === `btn-restore-custom-fsk${fskStr}`) return;
+        const bNum = b.getAttribute('data-num');
+        if (bNum === numStr) {
+          b.classList.remove('btn-outline-secondary');
+          b.classList.add(activeClass);
+        } else {
+          b.classList.remove(activeClass);
+          b.classList.add('btn-outline-secondary');
+        }
+      });
+    };
+
+    // 5. Automatisch generiertes Vorschaubild (1..10) oder eigenes Bild (#11/#12) für FSK16 / FSK18 auswählen
     document.querySelectorAll('.js-select-movie-thumb').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const fsk = btn.getAttribute('data-fsk');
         const num = btn.getAttribute('data-num');
         const url = btn.getAttribute('data-url');
+        const zoomUrl = btn.getAttribute('data-zoom-url') || url;
+        const editorUrl = btn.getAttribute('data-editor-url') || zoomUrl;
         if (!fsk || !num) return;
 
-        const hiddenInput = document.getElementById(`input-preview-fsk${fsk}`);
-        const previewImg = document.getElementById(`current-fsk${fsk}-preview`);
-        const badgeNum = document.getElementById(`badge-fsk${fsk}-num`);
-
-        if (hiddenInput) hiddenInput.value = num;
-        if (previewImg && url) previewImg.src = url;
-        if (badgeNum) badgeNum.textContent = `Bild #${num}`;
-
-        document.querySelectorAll(`.js-select-movie-thumb[data-fsk="${fsk}"]`).forEach(b => {
-          b.classList.remove(fsk === '16' ? 'btn-success' : 'btn-danger');
-          b.classList.add('btn-outline-secondary');
-        });
-        btn.classList.remove('btn-outline-secondary');
-        btn.classList.add(fsk === '16' ? 'btn-success' : 'btn-danger');
-        this.toast(`Vorschaubild #${num} für FSK${fsk} ausgewählt. Bitte speichere deine Änderungen.`, 'info');
+        applyMovieThumbSelection(fsk, num, url, zoomUrl, editorUrl, false);
+        const label = (num === '11' || num === '12') ? `Eigenes Bild (#${num})` : `Szene #${num}`;
+        this.toast(`${label} für FSK${fsk} ausgewählt. Bitte speichere anschließend deine Änderungen.`, 'info');
       });
     });
 
@@ -1110,13 +1184,11 @@ const App = {
 
           if (res.ok && data.status === 'ok') {
             this.toast(data.message || `Eigenes FSK${fsk}-Coverbild gespeichert.`, 'success');
-            const hiddenInput = document.getElementById(`input-preview-fsk${fsk}`);
-            const previewImg = document.getElementById(`current-fsk${fsk}-preview`);
-            const badgeNum = document.getElementById(`badge-fsk${fsk}-num`);
-
-            if (hiddenInput && data.thumb_number) hiddenInput.value = String(data.thumb_number);
-            if (previewImg && data.preview_url) previewImg.src = data.preview_url;
-            if (badgeNum && data.thumb_number) badgeNum.textContent = `Eigenes Bild (#${data.thumb_number})`;
+            const thumbNum = data.thumb_number || (String(fsk) === '16' ? 11 : 12);
+            const previewUrl = data.preview_url || data.thumb_url || '';
+            const zoomUrl = data.zoom_url || previewUrl;
+            const editorUrl = data.editor_url || zoomUrl;
+            applyMovieThumbSelection(fsk, thumbNum, previewUrl, zoomUrl, editorUrl, true);
           } else {
             this.toast(data.message || 'Fehler beim Hochladen des Coverbilds.', 'danger');
           }
@@ -1128,6 +1200,9 @@ const App = {
         }
       });
     });
+
+    // 6b. Interaktiver FSK16 Milchglas-Editor & Großansicht-Modal initialisieren
+    this.initMovieThumbEditorModal(applyMovieThumbSelection);
 
     // 7. Film-Bearbeitungsformular speichern (#/movie?id=...)
     if (editForm) {
@@ -1295,6 +1370,489 @@ const App = {
         if (this.activeMovieUploadXhr) {
           this.activeMovieUploadXhr.abort();
         }
+      });
+    }
+  },
+
+  // ========================================================================
+  // 3b-2. Vorschaubild-Großansicht & Interaktiver FSK16 Milchglas-Editor
+  // ========================================================================
+  initMovieThumbEditorModal(applyMovieThumbSelection) {
+    const modalEl = document.getElementById('modalMovieThumbEditor');
+    const canvas = document.getElementById('movie-thumb-editor-canvas');
+    if (!modalEl || !canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const loadingEl = document.getElementById('thumb-editor-loading');
+    const titleEl = document.getElementById('thumb-editor-modal-title');
+    const shapesBadge = document.getElementById('thumb-editor-shapes-badge');
+    const shapesListEl = document.getElementById('thumb-editor-shapes-list');
+    const btnUndo = document.getElementById('btn-thumb-editor-undo');
+    const btnClear = document.getElementById('btn-thumb-editor-clear');
+    const btnApplyFsk18 = document.getElementById('btn-editor-apply-fsk18');
+    const btnSaveFsk16 = document.getElementById('btn-editor-save-fsk16');
+    const btnSaveFsk16Label = document.getElementById('btn-editor-save-fsk16-label');
+    const toolBtns = modalEl.querySelectorAll('.js-editor-tool-btn');
+    const intensityBtns = modalEl.querySelectorAll('.js-editor-intensity-btn');
+
+    const state = {
+      movieId: '0',
+      num: '1',
+      thumbUrl: '',
+      zoomUrl: '',
+      editorUrl: '',
+      currentTool: 'rect', // 'rect' | 'circle'
+      currentIntensity: 2, // 1 = Mittel, 2 = Stark, 3 = Maximal
+      baseImage: null,
+      frostedCache: {},
+      shapes: [],
+      isDrawing: false,
+      startX: 0,
+      startY: 0,
+      activeDragShape: null
+    };
+
+    // Erzeugt einen echten Milchglas-Buffer (Frosted Glass) für die gegebene Stärke (1..3)
+    const getFrostedBuffer = (intensity) => {
+      if (!state.baseImage) return null;
+      if (state.frostedCache[intensity]) {
+        return state.frostedCache[intensity];
+      }
+
+      const w = canvas.width;
+      const h = canvas.height;
+      const scaleFactor = intensity === 1 ? 14 : (intensity === 2 ? 22 : 34);
+      const blurPx = intensity === 1 ? 12 : (intensity === 2 ? 20 : 30);
+      const tintAlpha = intensity === 1 ? 0.18 : (intensity === 2 ? 0.25 : 0.32);
+
+      // Schritt 1: Weiches Downscaling & Upscaling zur sicheren Auflösung feiner Details
+      const smallW = Math.max(12, Math.round(w / scaleFactor));
+      const smallH = Math.max(8, Math.round(h / scaleFactor));
+      const tmpCanvas = document.createElement('canvas');
+      tmpCanvas.width = smallW;
+      tmpCanvas.height = smallH;
+      const tmpCtx = tmpCanvas.getContext('2d');
+      tmpCtx.imageSmoothingEnabled = true;
+      tmpCtx.imageSmoothingQuality = 'high';
+      tmpCtx.drawImage(state.baseImage, 0, 0, smallW, smallH);
+
+      // Schritt 2: Hochskalieren + Gaußscher Weichzeichner + Milchglas-Tönung
+      const frostCanvas = document.createElement('canvas');
+      frostCanvas.width = w;
+      frostCanvas.height = h;
+      const frostCtx = frostCanvas.getContext('2d');
+      frostCtx.imageSmoothingEnabled = true;
+      frostCtx.imageSmoothingQuality = 'high';
+
+      try {
+        frostCtx.filter = `blur(${blurPx}px) brightness(1.06) saturate(0.9)`;
+      } catch (_) {
+        // Fallback falls Browser kein ctx.filter unterstützt
+      }
+      frostCtx.drawImage(tmpCanvas, 0, 0, smallW, smallH, 0, 0, w, h);
+      frostCtx.filter = 'none';
+
+      // Zweiter Weichzeichner-Durchgang für besonders weiche Übergänge
+      frostCtx.globalAlpha = 0.65;
+      frostCtx.drawImage(tmpCanvas, 0, 0, smallW, smallH, 0, 0, w, h);
+      frostCtx.globalAlpha = 1.0;
+
+      // Milchglas-Schleier (Frosted White Glaze)
+      frostCtx.fillStyle = `rgba(255, 255, 255, ${tintAlpha})`;
+      frostCtx.fillRect(0, 0, w, h);
+
+      state.frostedCache[intensity] = frostCanvas;
+      return frostCanvas;
+    };
+
+    const traceShapePath = (targetCtx, shape) => {
+      targetCtx.beginPath();
+      if (shape.type === 'circle') {
+        const cx = shape.x + shape.w / 2;
+        const cy = shape.y + shape.h / 2;
+        const rx = Math.max(1, Math.abs(shape.w / 2));
+        const ry = Math.max(1, Math.abs(shape.h / 2));
+        targetCtx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+      } else {
+        const r = Math.min(10, Math.abs(shape.w) / 4, Math.abs(shape.h) / 4);
+        if (typeof targetCtx.roundRect === 'function') {
+          targetCtx.roundRect(shape.x, shape.y, shape.w, shape.h, r);
+        } else {
+          targetCtx.rect(shape.x, shape.y, shape.w, shape.h);
+        }
+      }
+    };
+
+    const renderCanvas = (showGuides = true) => {
+      if (!state.baseImage || !ctx) return;
+      const w = canvas.width;
+      const h = canvas.height;
+
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(state.baseImage, 0, 0, w, h);
+
+      const allShapes = state.activeDragShape
+        ? [...state.shapes, state.activeDragShape]
+        : state.shapes;
+
+      allShapes.forEach((sh, idx) => {
+        if (sh.w < 4 || sh.h < 4) return;
+        const frostBuf = getFrostedBuffer(sh.intensity || state.currentIntensity);
+        if (!frostBuf) return;
+
+        ctx.save();
+        traceShapePath(ctx, sh);
+        ctx.clip();
+        ctx.drawImage(frostBuf, 0, 0, w, h);
+        ctx.restore();
+
+        if (showGuides) {
+          ctx.save();
+          traceShapePath(ctx, sh);
+          ctx.lineWidth = Math.max(2, Math.round(w / 420));
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+          ctx.setLineDash([6, 4]);
+          ctx.stroke();
+
+          // Nummeriertes Badge oben links an der Form
+          const labelText = `#${idx + 1}`;
+          ctx.font = `bold ${Math.max(12, Math.round(w / 65))}px sans-serif`;
+          const textW = ctx.measureText(labelText).width + 10;
+          const badgeH = Math.max(20, Math.round(w / 45));
+          const bx = Math.max(4, Math.min(w - textW - 4, sh.x));
+          const by = Math.max(4, Math.min(h - badgeH - 4, sh.y));
+
+          ctx.fillStyle = 'rgba(124, 58, 237, 0.9)';
+          ctx.fillRect(bx, by, textW, badgeH);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(labelText, bx + 5, by + badgeH - 6);
+          ctx.restore();
+        }
+      });
+    };
+
+    const syncToolbarAndPills = () => {
+      const count = state.shapes.length;
+      if (shapesBadge) {
+        shapesBadge.textContent = count === 1 ? '1 Milchglas-Bereich' : `${count} Milchglas-Bereiche`;
+        shapesBadge.className = count > 0 ? 'badge bg-primary' : 'badge bg-secondary';
+      }
+      if (btnUndo) btnUndo.disabled = count === 0;
+      if (btnClear) btnClear.disabled = count === 0;
+
+      if (btnSaveFsk16Label) {
+        btnSaveFsk16Label.textContent = count > 0
+          ? `Bearbeitetes Bild (${count}× Milchglas) als FSK 16 speichern`
+          : 'Unverändert als FSK 16 Cover übernehmen';
+      }
+
+      if (shapesListEl) {
+        if (count === 0) {
+          shapesListEl.classList.add('d-none');
+          shapesListEl.innerHTML = '';
+        } else {
+          shapesListEl.classList.remove('d-none');
+          shapesListEl.innerHTML = state.shapes.map((sh, i) => {
+            const typeLabel = sh.type === 'circle' ? 'Kreis' : 'Viereck';
+            return `
+              <span class="badge bg-light text-dark border d-inline-flex align-items-center gap-1 py-1 px-2">
+                <span>#${i + 1} ${typeLabel}</span>
+                <button type="button" class="btn-close js-remove-single-shape" data-shape-idx="${i}" style="font-size: 0.55rem;" title="Diesen Bereich entfernen"></button>
+              </span>
+            `;
+          }).join('');
+
+          shapesListEl.querySelectorAll('.js-remove-single-shape').forEach(rmBtn => {
+            rmBtn.addEventListener('click', () => {
+              const idx = parseInt(rmBtn.getAttribute('data-shape-idx') || '-1', 10);
+              if (idx >= 0 && idx < state.shapes.length) {
+                state.shapes.splice(idx, 1);
+                syncToolbarAndPills();
+                renderCanvas(true);
+              }
+            });
+          });
+        }
+      }
+    };
+
+    // Werkzeug-Umschalter (Viereck vs. Kreis)
+    toolBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.currentTool = btn.getAttribute('data-shape-tool') || 'rect';
+        toolBtns.forEach(b => {
+          const active = b === btn;
+          b.classList.toggle('btn-primary-kkc', active);
+          b.classList.toggle('active', active);
+          b.classList.toggle('btn-outline-kkc', !active);
+        });
+      });
+    });
+
+    // Milchglas-Stärke Umschalter (Mittel / Stark / Maximal)
+    intensityBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.currentIntensity = parseInt(btn.getAttribute('data-intensity') || '2', 10);
+        intensityBtns.forEach(b => {
+          const active = b === btn;
+          b.classList.toggle('btn-primary-kkc', active);
+          b.classList.toggle('active', active);
+          b.classList.toggle('btn-outline-kkc', !active);
+        });
+      });
+    });
+
+    if (btnUndo) {
+      btnUndo.addEventListener('click', () => {
+        if (state.shapes.length > 0) {
+          state.shapes.pop();
+          syncToolbarAndPills();
+          renderCanvas(true);
+        }
+      });
+    }
+
+    if (btnClear) {
+      btnClear.addEventListener('click', () => {
+        state.shapes = [];
+        syncToolbarAndPills();
+        renderCanvas(true);
+      });
+    }
+
+    // Maus- & Touch-Koordinaten auf Canvas-Auflösung umrechnen
+    const getCanvasCoords = (clientX, clientY) => {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / Math.max(1, rect.width);
+      const scaleY = canvas.height / Math.max(1, rect.height);
+      return {
+        x: Math.max(0, Math.min(canvas.width, (clientX - rect.left) * scaleX)),
+        y: Math.max(0, Math.min(canvas.height, (clientY - rect.top) * scaleY))
+      };
+    };
+
+    const startDrawing = (clientX, clientY) => {
+      if (!state.baseImage) return;
+      const pt = getCanvasCoords(clientX, clientY);
+      state.isDrawing = true;
+      state.startX = pt.x;
+      state.startY = pt.y;
+      state.activeDragShape = {
+        type: state.currentTool,
+        intensity: state.currentIntensity,
+        x: pt.x,
+        y: pt.y,
+        w: 0,
+        h: 0
+      };
+    };
+
+    const moveDrawing = (clientX, clientY) => {
+      if (!state.isDrawing || !state.activeDragShape) return;
+      const pt = getCanvasCoords(clientX, clientY);
+      const x = Math.min(state.startX, pt.x);
+      const y = Math.min(state.startY, pt.y);
+      const w = Math.abs(pt.x - state.startX);
+      const h = Math.abs(pt.y - state.startY);
+
+      state.activeDragShape.x = x;
+      state.activeDragShape.y = y;
+      state.activeDragShape.w = w;
+      state.activeDragShape.h = h;
+      renderCanvas(true);
+    };
+
+    const endDrawing = () => {
+      if (!state.isDrawing) return;
+      state.isDrawing = false;
+      if (state.activeDragShape && state.activeDragShape.w >= 10 && state.activeDragShape.h >= 10) {
+        state.shapes.push({ ...state.activeDragShape });
+        syncToolbarAndPills();
+      }
+      state.activeDragShape = null;
+      renderCanvas(true);
+    };
+
+    canvas.addEventListener('mousedown', (ev) => {
+      if (ev.button !== 0) return;
+      startDrawing(ev.clientX, ev.clientY);
+    });
+    window.addEventListener('mousemove', (ev) => {
+      if (state.isDrawing) {
+        moveDrawing(ev.clientX, ev.clientY);
+      }
+    });
+    window.addEventListener('mouseup', () => {
+      if (state.isDrawing) {
+        endDrawing();
+      }
+    });
+
+    canvas.addEventListener('touchstart', (ev) => {
+      if (ev.touches.length === 1) {
+        ev.preventDefault();
+        startDrawing(ev.touches[0].clientX, ev.touches[0].clientY);
+      }
+    }, { passive: false });
+    canvas.addEventListener('touchmove', (ev) => {
+      if (state.isDrawing && ev.touches.length === 1) {
+        ev.preventDefault();
+        moveDrawing(ev.touches[0].clientX, ev.touches[0].clientY);
+      }
+    }, { passive: false });
+    canvas.addEventListener('touchend', () => {
+      if (state.isDrawing) {
+        endDrawing();
+      }
+    });
+
+    // Modal für ein bestimmtes Vorschaubild öffnen
+    const openEditorForThumb = (movieId, num, thumbUrl, zoomUrl, editorUrl) => {
+      this.hideThumbZoomPopover();
+      state.movieId = String(movieId || '0');
+      state.num = String(num || '1');
+      state.thumbUrl = thumbUrl || '';
+      state.zoomUrl = zoomUrl || thumbUrl || '';
+      state.editorUrl = editorUrl || zoomUrl || thumbUrl || '';
+      state.shapes = [];
+      state.frostedCache = {};
+      state.baseImage = null;
+      state.isDrawing = false;
+      state.activeDragShape = null;
+
+      const labelName = (state.num === '11' || state.num === '12')
+        ? `Eigenes Bild (#${state.num})`
+        : `Szene #${state.num}`;
+      if (titleEl) {
+        titleEl.textContent = `${labelName} – Großansicht & FSK16 Milchglas-Editor`;
+      }
+
+      syncToolbarAndPills();
+      if (loadingEl) loadingEl.classList.remove('d-none');
+      canvas.classList.add('d-none');
+
+      const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+      bsModal.show();
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        canvas.width = img.naturalWidth || 960;
+        canvas.height = img.naturalHeight || 540;
+        state.baseImage = img;
+        state.frostedCache = {};
+        if (loadingEl) loadingEl.classList.add('d-none');
+        canvas.classList.remove('d-none');
+        renderCanvas(true);
+      };
+      img.onerror = () => {
+        if (loadingEl) {
+          loadingEl.innerHTML = '<div class="text-danger small">Das Vorschaubild konnte nicht geladen werden.</div>';
+        }
+      };
+      const sep = state.editorUrl.includes('?') ? '&' : '?';
+      img.src = `${state.editorUrl}${sep}_cb=${Date.now()}`;
+    };
+
+    document.querySelectorAll('.js-open-thumb-editor-modal').forEach(el => {
+      el.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        openEditorForThumb(
+          el.getAttribute('data-movie-id'),
+          el.getAttribute('data-num'),
+          el.getAttribute('data-thumb-url'),
+          el.getAttribute('data-zoom-src'),
+          el.getAttribute('data-editor-url')
+        );
+      });
+    });
+
+    document.querySelectorAll('.js-open-active-fsk-editor').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const fsk = btn.getAttribute('data-fsk') || '16';
+        const wrap = document.getElementById(`current-fsk${fsk}-wrap`);
+        if (!wrap) return;
+        openEditorForThumb(
+          wrap.getAttribute('data-movie-id'),
+          wrap.getAttribute('data-num'),
+          wrap.getAttribute('data-thumb-url'),
+          wrap.getAttribute('data-zoom-src'),
+          wrap.getAttribute('data-editor-url')
+        );
+      });
+    });
+
+    // Unzensiert als FSK 18 Cover übernehmen
+    if (btnApplyFsk18) {
+      btnApplyFsk18.addEventListener('click', () => {
+        const targetNum = state.num === '11' ? '1' : state.num;
+        applyMovieThumbSelection('18', targetNum, state.thumbUrl, state.zoomUrl, state.editorUrl, false);
+        const bsModal = bootstrap.Modal.getInstance(modalEl);
+        if (bsModal) bsModal.hide();
+        this.toast(`Bild #${targetNum} als FSK 18 Cover ausgewählt. Bitte speichere anschließend deine Änderungen.`, 'success');
+      });
+    }
+
+    // Als FSK 16 Cover speichern (entweder direkt oder mit eingezeichneten Milchglas-Bereichen als Bild #11 hochladen)
+    if (btnSaveFsk16) {
+      btnSaveFsk16.addEventListener('click', async () => {
+        if (state.shapes.length === 0) {
+          const targetNum = state.num === '12' ? '11' : state.num;
+          applyMovieThumbSelection('16', targetNum, state.thumbUrl, state.zoomUrl, state.editorUrl, false);
+          const bsModal = bootstrap.Modal.getInstance(modalEl);
+          if (bsModal) bsModal.hide();
+          this.toast(`Bild #${targetNum} als FSK 16 Cover ausgewählt. Bitte speichere anschließend deine Änderungen.`, 'success');
+          return;
+        }
+
+        // Mit Milchglas-Bereichen: Hilfslinien ausblenden und fertiges Bild als eigenes FSK16-Cover (#11) hochladen
+        renderCanvas(false);
+        btnSaveFsk16.disabled = true;
+
+        canvas.toBlob(async (blob) => {
+          if (!blob) {
+            this.toast('Das bearbeitete Bild konnte nicht erzeugt werden.', 'danger');
+            btnSaveFsk16.disabled = false;
+            renderCanvas(true);
+            return;
+          }
+
+          try {
+            const file = new File([blob], `fsk16_milchglas_${state.movieId}.jpg`, { type: 'image/jpeg' });
+            const formData = new FormData();
+            formData.append('movie_id', state.movieId);
+            formData.append('fsk', '16');
+            formData.append('poster', file);
+            formData.append('_csrf', this.csrfToken);
+
+            const res = await fetch(`${this.basePath}/api.php?route=movies/upload-poster`, {
+              method: 'POST',
+              headers: { 'X-CSRF-Token': this.csrfToken },
+              body: formData
+            });
+            const data = await res.json();
+
+            if (res.ok && data.status === 'ok') {
+              const thumbNum = data.thumb_number || 11;
+              const previewUrl = data.preview_url || data.thumb_url || '';
+              const zoomUrl = data.zoom_url || previewUrl;
+              const editorUrl = data.editor_url || zoomUrl;
+
+              applyMovieThumbSelection('16', thumbNum, previewUrl, zoomUrl, editorUrl, true);
+              const bsModal = bootstrap.Modal.getInstance(modalEl);
+              if (bsModal) bsModal.hide();
+              this.toast('Dein mit Milchglas bearbeitetes FSK16-Coverbild (#11) wurde gespeichert und ausgewählt!', 'success');
+            } else {
+              this.toast(data.message || 'Fehler beim Speichern des bearbeiteten FSK16-Covers.', 'danger');
+              renderCanvas(true);
+            }
+          } catch (err) {
+            this.toast('Upload-Fehler: ' + err.message, 'danger');
+            renderCanvas(true);
+          } finally {
+            btnSaveFsk16.disabled = false;
+          }
+        }, 'image/jpeg', 0.92);
       });
     }
   },

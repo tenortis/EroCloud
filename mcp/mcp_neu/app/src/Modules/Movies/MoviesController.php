@@ -266,21 +266,42 @@ class MoviesController
             }
         }
 
-        // Verfügbare automatisch generierte Vorschaubilder (1..10) ermitteln
+        // Verfügbare automatisch generierte Vorschaubilder (1..10) sowie eigene Cover (#11 / #12) ermitteln
         $availableThumbs = [];
         $moviesPath      = defined('MOVIES_PATH') ? MOVIES_PATH : (dirname(__DIR__, 5) . '/priv');
         $storageLoc      = (string)$mObj->storage_location;
         $baseFilename    = substr((string)$mObj->filename, 0, -4);
+        $movieDir        = rtrim($moviesPath, '/\\') . '/' . $storageLoc . '/' . $merchantId . '/' . $movieId;
+
+        $hasThumbOnDisk = static function (int $num) use ($movieDir, $movieId, $fileId, $baseFilename): bool {
+            $prefixes = [
+                $movieDir . '/thumb_' . $movieId . '_' . $fileId . '_' . $num,
+                $movieDir . '/thumb_' . $movieId . '_' . strtolower($fileId) . '_' . $num,
+                $movieDir . '/thumb_' . $baseFilename . '_' . $num,
+            ];
+            foreach ($prefixes as $prefix) {
+                foreach (['.jpg', '.jpeg', '.png', '.gif'] as $ext) {
+                    if (is_file($prefix . $ext)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        };
 
         for ($i = 1; $i <= 10; $i++) {
-            $thumbBase = rtrim($moviesPath, '/\\') . '/' . $storageLoc . '/' . $merchantId . '/' . $movieId . '/thumb_' . $baseFilename . '_' . $i;
-            if (is_file($thumbBase . '.jpg') || is_file($thumbBase . '.jpeg') || is_file($thumbBase . '.png')) {
+            if ($hasThumbOnDisk($i)) {
                 $availableThumbs[] = [
-                    'num' => $i,
-                    'url' => $mcpUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=' . $i . '&w=186',
+                    'num'        => $i,
+                    'url'        => $mcpUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=' . $i . '&w=186',
+                    'zoom_url'   => $mcpUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=' . $i . '&w=640',
+                    'editor_url' => $mcpUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=' . $i . '&w=1024',
                 ];
             }
         }
+
+        $hasCustomFsk16 = $hasThumbOnDisk(11) || abs((int)$mObj->preview_image_fsk16) === 11;
+        $hasCustomFsk18 = $hasThumbOnDisk(12) || abs((int)$mObj->preview_image_fsk18) === 12;
 
         // Kategorien inkl. System-Auto-Erkennung laden
         $categoryGroups = $this->loadCategoriesWithAutoDetection(
@@ -295,28 +316,35 @@ class MoviesController
         $actors   = $this->loadActiveMerchantActors($merchantId, $actorId);
         $websites = $this->loadMerchantWebsites($merchant, (string)$mObj->visible_for_website);
 
+        $nowCacheBust = time();
         $movieData = [
-            'id'                  => $movieId,
-            'file_id'             => $fileId,
-            'title'               => $title,
-            'description'         => $desc,
-            'online_at'           => $onlineAt,
-            'online_at_display'   => ($mObj->online_at !== '0000-00-00 00:00:00' && !empty($mObj->online_at))
+            'id'                      => $movieId,
+            'file_id'                 => $fileId,
+            'title'                   => $title,
+            'description'             => $desc,
+            'online_at'               => $onlineAt,
+            'online_at_display'       => ($mObj->online_at !== '0000-00-00 00:00:00' && !empty($mObj->online_at))
                 ? date('d.m.Y H:i', strtotime((string)$mObj->online_at))
                 : '-',
-            'can_edit_online_at'  => (((string)$mObj->movie_checked === '0000-00-00 00:00:00' && !$isMovieOnline) || strtotime((string)$mObj->online_at) > time()),
-            'playtime_seconds'    => round((float)$mObj->playtime_seconds),
-            'playtime_string'     => (string)($mObj->playtime_string ?? '0:00'),
-            'resolution'          => (string)($mObj->resolution ?? ''),
-            'amount_second'       => number_format((float)$mObj->amount_second, 1, '.', ''),
-            'streaming_coins'     => (int)round((float)$mObj->playtime_seconds * (float)$mObj->amount_second),
-            'as_download'         => abs((int)$mObj->as_download) === 1 ? 1 : 0,
-            'amount_download'     => abs((int)$mObj->amount_download),
-            'preview'             => abs((int)$mObj->preview) === 1 ? 1 : 0,
-            'fsk16'               => abs((int)$mObj->preview_image_fsk16),
-            'fsk18'               => abs((int)$mObj->preview_image_fsk18),
-            'custom_fsk16_url'    => $mcpUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=11&w=186&t=' . time(),
-            'custom_fsk18_url'    => $mcpUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=12&w=186&t=' . time(),
+            'can_edit_online_at'      => (((string)$mObj->movie_checked === '0000-00-00 00:00:00' && !$isMovieOnline) || strtotime((string)$mObj->online_at) > time()),
+            'playtime_seconds'        => round((float)$mObj->playtime_seconds),
+            'playtime_string'         => (string)($mObj->playtime_string ?? '0:00'),
+            'resolution'              => (string)($mObj->resolution ?? ''),
+            'amount_second'           => number_format((float)$mObj->amount_second, 1, '.', ''),
+            'streaming_coins'         => (int)round((float)$mObj->playtime_seconds * (float)$mObj->amount_second),
+            'as_download'             => abs((int)$mObj->as_download) === 1 ? 1 : 0,
+            'amount_download'         => abs((int)$mObj->amount_download),
+            'preview'                 => abs((int)$mObj->preview) === 1 ? 1 : 0,
+            'fsk16'                   => abs((int)$mObj->preview_image_fsk16),
+            'fsk18'                   => abs((int)$mObj->preview_image_fsk18),
+            'has_custom_fsk16'        => $hasCustomFsk16,
+            'has_custom_fsk18'        => $hasCustomFsk18,
+            'custom_fsk16_url'        => $mcpUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=11&w=186&t=' . $nowCacheBust,
+            'custom_fsk16_zoom_url'   => $mcpUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=11&w=640&t=' . $nowCacheBust,
+            'custom_fsk16_editor_url' => $mcpUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=11&w=1024&t=' . $nowCacheBust,
+            'custom_fsk18_url'        => $mcpUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=12&w=186&t=' . $nowCacheBust,
+            'custom_fsk18_zoom_url'   => $mcpUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=12&w=640&t=' . $nowCacheBust,
+            'custom_fsk18_editor_url' => $mcpUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=12&w=1024&t=' . $nowCacheBust,
             'player_poster_url'   => $mcpUrl . '/PlayerPoster/' . rawurlencode($fileId) . '&w=1280&h=720',
             'player_video_url'    => $mcpUrl . '/Player/' . rawurlencode($fileId),
             'convert_status'      => (int)$mObj->convert_status,
@@ -1121,8 +1149,11 @@ class MoviesController
             WHERE `id` = '" . $movieId . "' AND `merchant_id` = '" . $merchantId . "'
             LIMIT 1;", __FILE__, __LINE__);
 
-        $mcpUrl   = defined('MCP_URL') ? MCP_URL : 'https://erocloud.net';
-        $thumbUrl = $mcpUrl . '/thumb.php?movie_id=' . rawurlencode((string)$mObj->file_id) . '&thumb_number=' . $imgId . '&w=186&t=' . time();
+        $mcpUrl    = defined('MCP_URL') ? MCP_URL : 'https://erocloud.net';
+        $ts        = time();
+        $thumbUrl  = $mcpUrl . '/thumb.php?movie_id=' . rawurlencode((string)$mObj->file_id) . '&thumb_number=' . $imgId . '&w=186&t=' . $ts;
+        $zoomUrl   = $mcpUrl . '/thumb.php?movie_id=' . rawurlencode((string)$mObj->file_id) . '&thumb_number=' . $imgId . '&w=640&t=' . $ts;
+        $editorUrl = $mcpUrl . '/thumb.php?movie_id=' . rawurlencode((string)$mObj->file_id) . '&thumb_number=' . $imgId . '&w=1024&t=' . $ts;
 
         Response::json([
             'status'       => 'ok',
@@ -1130,6 +1161,8 @@ class MoviesController
             'thumb_number' => $imgId,
             'thumb_url'    => $thumbUrl,
             'preview_url'  => $thumbUrl,
+            'zoom_url'     => $zoomUrl,
+            'editor_url'   => $editorUrl,
             'message'      => "Dein eigenes FSK{$fsk}-Vorschaubild wurde erfolgreich hochgeladen und ausgewählt.",
         ]);
     }

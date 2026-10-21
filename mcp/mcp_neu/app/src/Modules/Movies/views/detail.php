@@ -31,10 +31,26 @@ $amountDownload  = (int)($movie['amount_download'] ?? 10);
 $preview         = (int)($movie['preview'] ?? 0);
 $fsk16           = (int)($movie['fsk16'] ?? 1);
 $fsk18           = (int)($movie['fsk18'] ?? 2);
-$customFsk16Url  = (string)($movie['custom_fsk16_url'] ?? '');
-$customFsk18Url  = (string)($movie['custom_fsk18_url'] ?? '');
+$hasCustomFsk16  = !empty($movie['has_custom_fsk16']);
+$hasCustomFsk18  = !empty($movie['has_custom_fsk18']);
+$customFsk16Url       = (string)($movie['custom_fsk16_url'] ?? '');
+$customFsk16ZoomUrl   = (string)($movie['custom_fsk16_zoom_url'] ?? '');
+$customFsk16EditorUrl = (string)($movie['custom_fsk16_editor_url'] ?? '');
+$customFsk18Url       = (string)($movie['custom_fsk18_url'] ?? '');
+$customFsk18ZoomUrl   = (string)($movie['custom_fsk18_zoom_url'] ?? '');
+$customFsk18EditorUrl = (string)($movie['custom_fsk18_editor_url'] ?? '');
 $playerPosterUrl = (string)($movie['player_poster_url'] ?? '');
 $playerVideoUrl  = (string)($movie['player_video_url'] ?? '');
+
+$mcpBaseUrl            = defined('MCP_URL') ? MCP_URL : 'https://erocloud.net';
+$nowTs                 = time();
+$currentFsk16ThumbUrl  = $mcpBaseUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=' . $fsk16 . '&w=186&t=' . $nowTs;
+$currentFsk16ZoomUrl   = $mcpBaseUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=' . $fsk16 . '&w=640&t=' . $nowTs;
+$currentFsk16EditorUrl = $mcpBaseUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=' . $fsk16 . '&w=1024&t=' . $nowTs;
+
+$currentFsk18ThumbUrl  = $mcpBaseUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=' . $fsk18 . '&w=186&t=' . $nowTs;
+$currentFsk18ZoomUrl   = $mcpBaseUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=' . $fsk18 . '&w=640&t=' . $nowTs;
+$currentFsk18EditorUrl = $mcpBaseUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=' . $fsk18 . '&w=1024&t=' . $nowTs;
 $convertStatus   = (int)($movie['convert_status'] ?? 0);
 $movieChecked    = (string)($movie['movie_checked'] ?? '0000-00-00 00:00:00');
 $released        = (int)($movie['released'] ?? 0);
@@ -234,50 +250,195 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
       <div class="kkc-card mb-4">
         <div class="kkc-card-header">
           <h6 class="mb-0 fw-bold"><i class="bi bi-images me-2 text-primary"></i>Vorschaubilder (FSK16 &amp; FSK18)</h6>
+          <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 small">
+            <i class="bi bi-magic me-1"></i>Mit FSK16 Milchglas-Editor
+          </span>
         </div>
         <div class="kkc-card-body">
           <p class="text-muted small mb-3">
-            Wähle jeweils ein Vorschaubild für den <strong>FSK16-Bereich</strong> (jugendfrei) und den <strong>FSK18-Bereich</strong> aus oder lade eigene Coverbilder (JPG/PNG, max. 6 MB) hoch.
+            Fahre mit der Maus über ein Bild für die <strong>Großansicht</strong> oder klicke ein Bild an, um es im <strong>FSK16 Milchglas-Editor</strong> mit Vierecken oder Kreisen unkenntlich zu machen.
           </p>
 
           <!-- Aktuelle Auswahl nebeneinander -->
           <div class="row g-3 mb-4">
+            <!-- Aktives FSK 16 Cover -->
             <div class="col-6">
-              <div class="p-2 border rounded-3 bg-light text-center h-100">
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                  <span class="badge bg-success">FSK 16 Cover</span>
-                  <span class="small text-muted" id="badge-fsk16-num">Bild #<?= $fsk16 ?></span>
-                </div>
-                <img id="current-fsk16-preview"
-                     src="<?= htmlspecialchars((defined('MCP_URL') ? MCP_URL : 'https://erocloud.net') . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=' . $fsk16 . '&w=186&t=' . time(), ENT_QUOTES, 'UTF-8') ?>"
-                     alt="FSK16"
-                     class="img-fluid rounded border mb-2"
-                     style="max-height: 115px; object-fit: cover;">
+              <div class="p-2 border rounded-3 bg-light text-center h-100 d-flex flex-column justify-content-between">
                 <div>
-                  <label class="btn btn-sm btn-outline-kkc w-100 mb-0">
-                    <i class="bi bi-upload me-1"></i> Eigenes FSK16 Bild
+                  <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="badge bg-success">FSK 16 Cover</span>
+                    <span class="small text-muted fw-semibold" id="badge-fsk16-num">
+                      <?= $fsk16 === 11 ? 'Eigenes Bild (#11)' : ('Szene #' . $fsk16) ?>
+                    </span>
+                  </div>
+                  <div class="position-relative d-inline-block w-100 mb-2 cursor-pointer js-hover-zoom-thumb js-open-thumb-editor-modal"
+                       id="current-fsk16-wrap"
+                       data-movie-id="<?= $movieId ?>"
+                       data-num="<?= $fsk16 ?>"
+                       data-fsk="16"
+                       data-thumb-url="<?= htmlspecialchars($currentFsk16ThumbUrl, ENT_QUOTES, 'UTF-8') ?>"
+                       data-zoom-src="<?= htmlspecialchars($currentFsk16ZoomUrl, ENT_QUOTES, 'UTF-8') ?>"
+                       data-editor-url="<?= htmlspecialchars($currentFsk16EditorUrl, ENT_QUOTES, 'UTF-8') ?>"
+                       data-zoom-fsk="16"
+                       data-zoom-title="Aktuelles FSK 16 Cover (Klick zum Bearbeiten)">
+                    <img id="current-fsk16-preview"
+                         src="<?= htmlspecialchars($currentFsk16ThumbUrl, ENT_QUOTES, 'UTF-8') ?>"
+                         alt="FSK16"
+                         class="img-fluid rounded border w-100"
+                         style="height: 115px; object-fit: cover;">
+                    <span class="badge bg-dark bg-opacity-75 position-absolute bottom-0 end-0 m-1 small">
+                      <i class="bi bi-magic me-1"></i>Milchglas-Editor
+                    </span>
+                  </div>
+                </div>
+                <div class="d-grid gap-1">
+                  <button type="button" class="btn btn-sm btn-kkc-primary js-open-active-fsk-editor" data-fsk="16">
+                    <i class="bi bi-magic me-1"></i> FSK16 bearbeiten (Milchglas)
+                  </button>
+                  <label class="btn btn-sm btn-outline-kkc mb-0">
+                    <i class="bi bi-upload me-1"></i> Eigenes FSK16 hochladen
                     <input type="file" class="d-none js-movie-poster-upload" data-fsk="16" data-movie-id="<?= $movieId ?>" accept=".jpg,.jpeg,.png">
                   </label>
+                  <button type="button"
+                          id="btn-restore-custom-fsk16"
+                          class="btn btn-sm btn-outline-success js-select-movie-thumb <?= ($hasCustomFsk16 && $fsk16 !== 11) ? '' : 'd-none' ?>"
+                          data-fsk="16"
+                          data-num="11"
+                          data-has-custom="<?= $hasCustomFsk16 ? '1' : '0' ?>"
+                          data-url="<?= htmlspecialchars($customFsk16Url, ENT_QUOTES, 'UTF-8') ?>"
+                          data-zoom-url="<?= htmlspecialchars($customFsk16ZoomUrl, ENT_QUOTES, 'UTF-8') ?>"
+                          data-editor-url="<?= htmlspecialchars($customFsk16EditorUrl, ENT_QUOTES, 'UTF-8') ?>">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i> Wieder eigenes FSK16 (#11)
+                  </button>
                 </div>
               </div>
             </div>
 
+            <!-- Aktives FSK 18 Cover -->
             <div class="col-6">
-              <div class="p-2 border rounded-3 bg-light text-center h-100">
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                  <span class="badge bg-danger">FSK 18 Cover</span>
-                  <span class="small text-muted" id="badge-fsk18-num">Bild #<?= $fsk18 ?></span>
-                </div>
-                <img id="current-fsk18-preview"
-                     src="<?= htmlspecialchars((defined('MCP_URL') ? MCP_URL : 'https://erocloud.net') . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=' . $fsk18 . '&w=186&t=' . time(), ENT_QUOTES, 'UTF-8') ?>"
-                     alt="FSK18"
-                     class="img-fluid rounded border mb-2"
-                     style="max-height: 115px; object-fit: cover;">
+              <div class="p-2 border rounded-3 bg-light text-center h-100 d-flex flex-column justify-content-between">
                 <div>
-                  <label class="btn btn-sm btn-outline-kkc w-100 mb-0">
-                    <i class="bi bi-upload me-1"></i> Eigenes FSK18 Bild
+                  <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="badge bg-danger">FSK 18 Cover</span>
+                    <span class="small text-muted fw-semibold" id="badge-fsk18-num">
+                      <?= $fsk18 === 12 ? 'Eigenes Bild (#12)' : ('Szene #' . $fsk18) ?>
+                    </span>
+                  </div>
+                  <div class="position-relative d-inline-block w-100 mb-2 cursor-pointer js-hover-zoom-thumb js-open-thumb-editor-modal"
+                       id="current-fsk18-wrap"
+                       data-movie-id="<?= $movieId ?>"
+                       data-num="<?= $fsk18 ?>"
+                       data-fsk="18"
+                       data-thumb-url="<?= htmlspecialchars($currentFsk18ThumbUrl, ENT_QUOTES, 'UTF-8') ?>"
+                       data-zoom-src="<?= htmlspecialchars($currentFsk18ZoomUrl, ENT_QUOTES, 'UTF-8') ?>"
+                       data-editor-url="<?= htmlspecialchars($currentFsk18EditorUrl, ENT_QUOTES, 'UTF-8') ?>"
+                       data-zoom-fsk="18"
+                       data-zoom-title="Aktuelles FSK 18 Cover (Klick für Großansicht)">
+                    <img id="current-fsk18-preview"
+                         src="<?= htmlspecialchars($currentFsk18ThumbUrl, ENT_QUOTES, 'UTF-8') ?>"
+                         alt="FSK18"
+                         class="img-fluid rounded border w-100"
+                         style="height: 115px; object-fit: cover;">
+                    <span class="badge bg-dark bg-opacity-75 position-absolute bottom-0 end-0 m-1 small">
+                      <i class="bi bi-arrows-fullscreen me-1"></i>Vergrößern
+                    </span>
+                  </div>
+                </div>
+                <div class="d-grid gap-1">
+                  <button type="button" class="btn btn-sm btn-outline-secondary js-open-active-fsk-editor" data-fsk="18">
+                    <i class="bi bi-arrows-fullscreen me-1"></i> Großansicht / Für FSK16 nutzen
+                  </button>
+                  <label class="btn btn-sm btn-outline-kkc mb-0">
+                    <i class="bi bi-upload me-1"></i> Eigenes FSK18 hochladen
                     <input type="file" class="d-none js-movie-poster-upload" data-fsk="18" data-movie-id="<?= $movieId ?>" accept=".jpg,.jpeg,.png">
                   </label>
+                  <button type="button"
+                          id="btn-restore-custom-fsk18"
+                          class="btn btn-sm btn-outline-danger js-select-movie-thumb <?= ($hasCustomFsk18 && $fsk18 !== 12) ? '' : 'd-none' ?>"
+                          data-fsk="18"
+                          data-num="12"
+                          data-has-custom="<?= $hasCustomFsk18 ? '1' : '0' ?>"
+                          data-url="<?= htmlspecialchars($customFsk18Url, ENT_QUOTES, 'UTF-8') ?>"
+                          data-zoom-url="<?= htmlspecialchars($customFsk18ZoomUrl, ENT_QUOTES, 'UTF-8') ?>"
+                          data-editor-url="<?= htmlspecialchars($customFsk18EditorUrl, ENT_QUOTES, 'UTF-8') ?>">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i> Wieder eigenes FSK18 (#12)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bereits hochgeladene eigene Bilder (#11 & #12) zum schnellen Zurückwechseln -->
+          <div id="custom-uploaded-thumbs-section" class="mb-3 <?= ($hasCustomFsk16 || $hasCustomFsk18) ? '' : 'd-none' ?>">
+            <div class="small fw-semibold mb-2 text-primary">
+              <i class="bi bi-cloud-check me-1"></i>Deine gespeicherten eigenen Coverbilder (jederzeit wieder wählbar):
+            </div>
+            <div class="row g-2">
+              <div class="col-6 <?= $hasCustomFsk16 ? '' : 'd-none' ?>" id="custom-thumb-card-11">
+                <div class="p-2 border rounded-2 bg-white text-center shadow-sm">
+                  <div class="position-relative cursor-pointer mb-1 js-hover-zoom-thumb js-open-thumb-editor-modal"
+                       id="custom-thumb-wrap-11"
+                       data-movie-id="<?= $movieId ?>"
+                       data-num="11"
+                       data-fsk="16"
+                       data-thumb-url="<?= htmlspecialchars($customFsk16Url, ENT_QUOTES, 'UTF-8') ?>"
+                       data-zoom-src="<?= htmlspecialchars($customFsk16ZoomUrl, ENT_QUOTES, 'UTF-8') ?>"
+                       data-editor-url="<?= htmlspecialchars($customFsk16EditorUrl, ENT_QUOTES, 'UTF-8') ?>"
+                       data-zoom-fsk="16"
+                       data-zoom-title="Eigenes FSK 16 Bild (#11)">
+                    <img id="custom-thumb-img-11"
+                         src="<?= htmlspecialchars($customFsk16Url, ENT_QUOTES, 'UTF-8') ?>"
+                         alt="Eigenes FSK16 (#11)"
+                         class="img-fluid rounded"
+                         style="height: 76px; width: 100%; object-fit: cover;">
+                    <span class="badge bg-success position-absolute top-0 start-0 m-1" style="font-size: 0.65rem;">Eigenes #11</span>
+                  </div>
+                  <div class="d-flex gap-1 justify-content-center">
+                    <button type="button"
+                            id="btn-select-custom-11"
+                            class="btn btn-xs <?= $fsk16 === 11 ? 'btn-success' : 'btn-outline-secondary' ?> py-0 px-2 small js-select-movie-thumb"
+                            data-fsk="16"
+                            data-num="11"
+                            data-url="<?= htmlspecialchars($customFsk16Url, ENT_QUOTES, 'UTF-8') ?>"
+                            data-zoom-url="<?= htmlspecialchars($customFsk16ZoomUrl, ENT_QUOTES, 'UTF-8') ?>"
+                            data-editor-url="<?= htmlspecialchars($customFsk16EditorUrl, ENT_QUOTES, 'UTF-8') ?>">
+                      Als FSK16 nutzen
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-6 <?= $hasCustomFsk18 ? '' : 'd-none' ?>" id="custom-thumb-card-12">
+                <div class="p-2 border rounded-2 bg-white text-center shadow-sm">
+                  <div class="position-relative cursor-pointer mb-1 js-hover-zoom-thumb js-open-thumb-editor-modal"
+                       id="custom-thumb-wrap-12"
+                       data-movie-id="<?= $movieId ?>"
+                       data-num="12"
+                       data-fsk="18"
+                       data-thumb-url="<?= htmlspecialchars($customFsk18Url, ENT_QUOTES, 'UTF-8') ?>"
+                       data-zoom-src="<?= htmlspecialchars($customFsk18ZoomUrl, ENT_QUOTES, 'UTF-8') ?>"
+                       data-editor-url="<?= htmlspecialchars($customFsk18EditorUrl, ENT_QUOTES, 'UTF-8') ?>"
+                       data-zoom-fsk="18"
+                       data-zoom-title="Eigenes FSK 18 Bild (#12)">
+                    <img id="custom-thumb-img-12"
+                         src="<?= htmlspecialchars($customFsk18Url, ENT_QUOTES, 'UTF-8') ?>"
+                         alt="Eigenes FSK18 (#12)"
+                         class="img-fluid rounded"
+                         style="height: 76px; width: 100%; object-fit: cover;">
+                    <span class="badge bg-danger position-absolute top-0 start-0 m-1" style="font-size: 0.65rem;">Eigenes #12</span>
+                  </div>
+                  <div class="d-flex gap-1 justify-content-center">
+                    <button type="button"
+                            id="btn-select-custom-12"
+                            class="btn btn-xs <?= $fsk18 === 12 ? 'btn-danger' : 'btn-outline-secondary' ?> py-0 px-2 small js-select-movie-thumb"
+                            data-fsk="18"
+                            data-num="12"
+                            data-url="<?= htmlspecialchars($customFsk18Url, ENT_QUOTES, 'UTF-8') ?>"
+                            data-zoom-url="<?= htmlspecialchars($customFsk18ZoomUrl, ENT_QUOTES, 'UTF-8') ?>"
+                            data-editor-url="<?= htmlspecialchars($customFsk18EditorUrl, ENT_QUOTES, 'UTF-8') ?>">
+                      Als FSK18 nutzen
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -285,29 +446,54 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
 
           <!-- Automatisch generierte Vorschaubilder 1..10 -->
           <?php if (!empty($availableThumbs)): ?>
-            <div class="small fw-semibold mb-2">Automatisch generierte Szenenbilder (Klick zum Zuweisen):</div>
+            <div class="small fw-semibold mb-2">
+              Automatisch generierte Szenenbilder <span class="text-muted fw-normal">(Maus = Lupe, Klick auf Bild = Großansicht &amp; Milchglas-Editor)</span>:
+            </div>
             <div class="row g-2">
               <?php foreach ($availableThumbs as $th): ?>
-                <?php $tNum = (int)$th['num']; ?>
+                <?php
+                $tNum       = (int)$th['num'];
+                $tUrl       = (string)$th['url'];
+                $tZoomUrl   = (string)($th['zoom_url'] ?? $tUrl);
+                $tEditorUrl = (string)($th['editor_url'] ?? $tZoomUrl);
+                ?>
                 <div class="col-6 col-sm-4">
-                  <div class="p-1 border rounded-2 bg-white text-center">
-                    <img src="<?= htmlspecialchars((string)$th['url'], ENT_QUOTES, 'UTF-8') ?>"
-                         alt="Szene #<?= $tNum ?>"
-                         class="img-fluid rounded mb-1"
-                         style="height: 72px; width: 100%; object-fit: cover;">
+                  <div class="p-1 border rounded-2 bg-white text-center h-100">
+                    <div class="position-relative cursor-pointer mb-1 js-hover-zoom-thumb js-open-thumb-editor-modal"
+                         data-movie-id="<?= $movieId ?>"
+                         data-num="<?= $tNum ?>"
+                         data-fsk="16"
+                         data-thumb-url="<?= htmlspecialchars($tUrl, ENT_QUOTES, 'UTF-8') ?>"
+                         data-zoom-src="<?= htmlspecialchars($tZoomUrl, ENT_QUOTES, 'UTF-8') ?>"
+                         data-editor-url="<?= htmlspecialchars($tEditorUrl, ENT_QUOTES, 'UTF-8') ?>"
+                         data-zoom-fsk="18"
+                         data-zoom-title="Szene #<?= $tNum ?> (Klicken für Großansicht &amp; Milchglas-Editor)">
+                      <img src="<?= htmlspecialchars($tUrl, ENT_QUOTES, 'UTF-8') ?>"
+                           alt="Szene #<?= $tNum ?>"
+                           class="img-fluid rounded"
+                           style="height: 76px; width: 100%; object-fit: cover;">
+                      <span class="badge bg-dark bg-opacity-75 position-absolute top-0 start-0 m-1" style="font-size: 0.65rem;">#<?= $tNum ?></span>
+                      <span class="badge bg-primary bg-opacity-75 position-absolute bottom-0 end-0 m-1" style="font-size: 0.65rem;" title="Im Milchglas-Editor öffnen">
+                        <i class="bi bi-magic"></i>
+                      </span>
+                    </div>
                     <div class="d-flex gap-1 justify-content-center">
                       <button type="button"
                               class="btn btn-xs <?= $fsk16 === $tNum ? 'btn-success' : 'btn-outline-secondary' ?> py-0 px-2 small js-select-movie-thumb"
                               data-fsk="16"
                               data-num="<?= $tNum ?>"
-                              data-url="<?= htmlspecialchars((string)$th['url'], ENT_QUOTES, 'UTF-8') ?>">
+                              data-url="<?= htmlspecialchars($tUrl, ENT_QUOTES, 'UTF-8') ?>"
+                              data-zoom-url="<?= htmlspecialchars($tZoomUrl, ENT_QUOTES, 'UTF-8') ?>"
+                              data-editor-url="<?= htmlspecialchars($tEditorUrl, ENT_QUOTES, 'UTF-8') ?>">
                         FSK16
                       </button>
                       <button type="button"
                               class="btn btn-xs <?= $fsk18 === $tNum ? 'btn-danger' : 'btn-outline-secondary' ?> py-0 px-2 small js-select-movie-thumb"
                               data-fsk="18"
                               data-num="<?= $tNum ?>"
-                              data-url="<?= htmlspecialchars((string)$th['url'], ENT_QUOTES, 'UTF-8') ?>">
+                              data-url="<?= htmlspecialchars($tUrl, ENT_QUOTES, 'UTF-8') ?>"
+                              data-zoom-url="<?= htmlspecialchars($tZoomUrl, ENT_QUOTES, 'UTF-8') ?>"
+                              data-editor-url="<?= htmlspecialchars($tEditorUrl, ENT_QUOTES, 'UTF-8') ?>">
                         FSK18
                       </button>
                     </div>
@@ -581,3 +767,87 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
     </div>
   </div>
 </form>
+
+<!-- Modal: Vorschaubild-Großansicht & Interaktiver FSK16 Milchglas-Editor -->
+<div class="modal fade" id="modalMovieThumbEditor" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-light py-3">
+        <div>
+          <h5 class="modal-title fw-bold mb-0">
+            <i class="bi bi-magic text-primary me-2"></i><span id="thumb-editor-modal-title">Vorschaubild &amp; FSK16 Milchglas-Editor</span>
+          </h5>
+          <div class="small text-muted">
+            Ziehe mit gedrückter Maustaste beliebig viele <strong>Vierecke</strong> oder <strong>Kreise</strong> über die Stellen, die für FSK16 mit einem Milchglas-Effekt verdeckt werden sollen.
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+      </div>
+
+      <div class="modal-body p-3 p-md-4">
+        <!-- Werkzeugleiste -->
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 p-2 px-3 mb-3 rounded-3 border bg-light">
+          <!-- Form-Werkzeug -->
+          <div class="d-flex align-items-center flex-wrap gap-2">
+            <span class="small fw-semibold text-secondary me-1"><i class="bi bi-vector-pen me-1"></i>Form:</span>
+            <div class="btn-group btn-group-sm" role="group" aria-label="Form-Auswahl">
+              <button type="button" class="btn btn-primary-kkc active js-editor-tool-btn" data-shape-tool="rect">
+                <i class="bi bi-bounding-box-circles me-1"></i> Viereck
+              </button>
+              <button type="button" class="btn btn-outline-kkc js-editor-tool-btn" data-shape-tool="circle">
+                <i class="bi bi-circle me-1"></i> Kreis / Oval
+              </button>
+            </div>
+
+            <!-- Milchglas-Intensität -->
+            <span class="small fw-semibold text-secondary ms-2 me-1"><i class="bi bi-droplet-half me-1"></i>Milchglas-Stärke:</span>
+            <div class="btn-group btn-group-sm" role="group" aria-label="Milchglas-Stärke">
+              <button type="button" class="btn btn-outline-kkc js-editor-intensity-btn" data-intensity="1">Mittel</button>
+              <button type="button" class="btn btn-primary-kkc active js-editor-intensity-btn" data-intensity="2">Stark</button>
+              <button type="button" class="btn btn-outline-kkc js-editor-intensity-btn" data-intensity="3">Maximal</button>
+            </div>
+          </div>
+
+          <!-- Rückgängig / Zurücksetzen -->
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-secondary" id="thumb-editor-shapes-badge">0 Milchglas-Bereiche</span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-thumb-editor-undo" disabled title="Zuletzt gezeichnete Form wieder entfernen">
+              <i class="bi bi-arrow-counterclockwise me-1"></i> Letzte Form rückgängig
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-danger" id="btn-thumb-editor-clear" disabled title="Alle Milchglas-Formen entfernen">
+              <i class="bi bi-trash3 me-1"></i> Alle löschen
+            </button>
+          </div>
+        </div>
+
+        <!-- Liste der gezeichneten Bereiche zum gezielten Einzel-Löschen -->
+        <div id="thumb-editor-shapes-list" class="d-flex flex-wrap gap-1 mb-2 d-none"></div>
+
+        <!-- Interaktive Zeichenfläche (Canvas) -->
+        <div class="position-relative rounded-3 overflow-hidden bg-dark text-center shadow-sm border" style="min-height: 320px;">
+          <div id="thumb-editor-loading" class="p-5 text-white">
+            <div class="spinner-border text-light mb-2" role="status"></div>
+            <div class="small">Hochauflösendes Vorschaubild wird geladen...</div>
+          </div>
+          <canvas id="movie-thumb-editor-canvas"
+                  class="img-fluid d-none mx-auto"
+                  style="max-height: 62vh; cursor: crosshair; touch-action: none; user-select: none;"></canvas>
+        </div>
+      </div>
+
+      <div class="modal-footer bg-light d-flex flex-wrap justify-content-between gap-2">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          Abbrechen
+        </button>
+        <div class="d-flex flex-wrap gap-2">
+          <button type="button" class="btn btn-outline-danger" id="btn-editor-apply-fsk18">
+            <i class="bi bi-check2 me-1"></i> Unzensiert als FSK 18 Cover nutzen
+          </button>
+          <button type="button" class="btn btn-success fw-semibold px-4" id="btn-editor-save-fsk16">
+            <i class="bi bi-magic me-1"></i> <span id="btn-editor-save-fsk16-label">Als FSK 16 Cover übernehmen</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
