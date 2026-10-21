@@ -347,7 +347,7 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
                 <td class="fw-semibold"><?= View::e($item['title']) ?></td>
                 <td>
                   <?php if ($item['actor_id'] > 0): ?>
-                  <a href="#/actor?id=<?= (int)$item['actor_id'] ?>&amp;name=<?= urlencode((string)$item['actor_name']) ?>" class="text-decoration-none ec-text-primary fw-medium">
+                  <a href="#/actor?id=<?= (int)$item['actor_id'] ?>" class="text-decoration-none ec-text-primary fw-medium">
                     <?= View::e($item['actor_name']) ?>
                   </a>
                   <?php else: ?>
@@ -423,12 +423,12 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
                 if ($actor['status'] === 'active') {
                     $aBadge = 'badge-kkc-success';
                     $aLabel = 'Aktiv';
-                } elseif ($actor['status'] === 'blocked') {
+                } elseif ($actor['status'] === 'locked' || $actor['status'] === 'blocked') {
                     $aBadge = 'badge-kkc-danger';
                     $aLabel = 'Gesperrt';
                 } else {
                     $aBadge = 'badge-kkc-warning';
-                    $aLabel = 'In Prüfung';
+                    $aLabel = 'Wird geprüft';
                 }
               ?>
               <tr>
@@ -439,7 +439,7 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
                     <?php else: ?>
                     <span class="sidebar-actor-avatar" style="width: 28px; height: 28px;"><?= View::e($actorInitials) ?></span>
                     <?php endif; ?>
-                    <span class="fw-semibold"><?= View::e($actor['username']) ?></span>
+                    <a href="#/actor?id=<?= (int)$actor['id'] ?>" class="fw-semibold text-decoration-none text-body"><?= View::e($actor['username']) ?></a>
                   </div>
                 </td>
                 <td class="text-muted small">
@@ -447,7 +447,7 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
                 </td>
                 <td><span class="badge-kkc <?= $aBadge ?>"><?= $aLabel ?></span></td>
                 <td class="text-end">
-                  <a href="#/actor?id=<?= (int)$actor['id'] ?>&amp;name=<?= urlencode($actor['username']) ?>" class="btn btn-sm btn-outline-kkc py-1 px-2" title="Profil bearbeiten">
+                  <a href="#/actor?id=<?= (int)$actor['id'] ?>" class="btn btn-sm btn-outline-kkc py-1 px-2" title="Profil bearbeiten">
                     <i class="bi bi-pencil-square"></i>
                   </a>
                 </td>

@@ -97,44 +97,6 @@ class PreviewController
         ]);
     }
 
-    public function actors(): string
-    {
-        return View::render('Preview', 'section_placeholder', [
-            'icon'        => 'bi-people-fill',
-            'badge'       => 'Profile',
-            'title'       => 'Alle Profile anzeigen',
-            'subtitle'    => 'Verwalten Sie Ihre angelegten Darsteller-Profile, Freigabestatus und Steckbrief-Angaben.',
-            'routeKey'    => 'actors',
-            'legacyRoute' => '/Actors',
-        ]);
-    }
-
-    public function newActor(): string
-    {
-        return View::render('Preview', 'section_placeholder', [
-            'icon'        => 'bi-person-plus-fill',
-            'badge'       => 'Profile',
-            'title'       => 'Profil anlegen',
-            'subtitle'    => 'Erstellen Sie ein neues Darsteller-Profil für die Vermarktung Ihrer Inhalte.',
-            'routeKey'    => 'new-actor',
-            'legacyRoute' => '/New-Actor',
-        ]);
-    }
-
-    public function actorDetail(): string
-    {
-        $id = abs((int)$this->request->get('id', 1));
-        $name = trim((string)$this->request->get('name', 'Darsteller-Profil #' . $id));
-        return View::render('Preview', 'section_placeholder', [
-            'icon'        => 'bi-person-badge-fill',
-            'badge'       => 'Darsteller-Profil',
-            'title'       => 'Profil: ' . $name,
-            'subtitle'    => 'Bearbeiten Sie Profilbilder (FSK16 / FSK18), persönliche Merkmale und Über-mich-Texte.',
-            'routeKey'    => 'actor',
-            'legacyRoute' => '/Actor/' . $id,
-        ]);
-    }
-
     public function webmasterAds(): string
     {
         return View::render('Preview', 'section_placeholder', [

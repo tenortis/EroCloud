@@ -378,7 +378,8 @@ code, kbd, samp, pre, .font-monospace {
 /* ==========================================================================
    UI Components & Cards (KKC Tile Style with Pay4Coins Blue)
    ========================================================================== */
-.card-kkc {
+.card-kkc,
+.kkc-card {
   background-color: var(--kkc-surface);
   border: 1px solid var(--kkc-border);
   border-radius: 0.75rem;
@@ -387,8 +388,13 @@ code, kbd, samp, pre, .font-monospace {
   margin-bottom: 1.25rem;
 }
 
-.card-kkc:hover {
+.card-kkc:hover,
+.kkc-card:hover {
   border-color: var(--kkc-border-strong);
+}
+
+.cursor-pointer {
+  cursor: pointer;
 }
 
 .card-kkc-header {

@@ -7,6 +7,7 @@
 const App = {
   csrfToken: '',
   basePath: '',
+  usernameCheckTimer: null,
 
   init() {
     this.csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
@@ -74,10 +75,16 @@ const App = {
 
     // Aktiven Sidebar-Link hervorheben & nur das zugehörige Submenü öffnen
     let activeCollapseId = null;
+    const targetActorId = pathPart === 'actor' ? params.get('id') : null;
 
     document.querySelectorAll('.sidebar-link[data-route]').forEach(link => {
       const linkRoute = (link.getAttribute('data-route') || '').replace(/^#\/?/, '');
-      if (linkRoute === rawHash || linkRoute === pathPart) {
+      const linkActorId = link.getAttribute('data-actor-id');
+
+      const isMatch = (targetActorId && linkActorId === targetActorId)
+        || (!targetActorId && (linkRoute === rawHash || linkRoute === pathPart));
+
+      if (isMatch) {
         link.classList.add('active');
         const parentCollapse = link.closest('.collapse');
         if (parentCollapse) {
@@ -87,6 +94,11 @@ const App = {
         link.classList.remove('active');
       }
     });
+
+    // Falls eine Unterseite von Profile aufgerufen wird (z.B. #/actors, #/new-actor, #/actor), Submenü öffnen
+    if (!activeCollapseId && ['actors', 'new-actor', 'actor'].includes(pathPart)) {
+      activeCollapseId = 'submenu-actors';
+    }
 
     // Submenüs steuern: Nur das zur aktuellen Unterseite gehörende Submenü öffnen, alle anderen schließen
     document.querySelectorAll('.sidebar-submenu.collapse').forEach(collapseEl => {
@@ -143,7 +155,7 @@ const App = {
   },
 
   // ========================================================================
-  // 3. API-Key Kopierfunktion (im Modal) & Dynamische Events (Content-Regeln)
+  // 3. API-Key Kopierfunktion & Dynamische Fragment-Events
   // ========================================================================
   initApiKeyCopy() {
     const copyBtn = document.getElementById('btn-copy-api-key');
@@ -163,42 +175,264 @@ const App = {
   },
 
   initDynamicEvents() {
+    this.initContentRulesEvents();
+    this.initActorsEvents();
+  },
+
+  // Startseite: Content-Richtlinien bestätigen
+  initContentRulesEvents() {
     const submitRulesBtn = document.getElementById('btn-submit-content-rules');
     const chkRules = document.getElementById('chk-accept-content-rules');
-    if (submitRulesBtn && chkRules) {
-      submitRulesBtn.addEventListener('click', async () => {
-        if (!chkRules.checked) {
-          this.toast('Bitte setzen Sie zuerst das Häkchen zur Bestätigung der Nutzungsrichtlinien.', 'warning');
-          return;
+    if (!submitRulesBtn || !chkRules) return;
+
+    submitRulesBtn.addEventListener('click', async () => {
+      if (!chkRules.checked) {
+        this.toast('Bitte setzen Sie zuerst das Häkchen zur Bestätigung der Nutzungsrichtlinien.', 'warning');
+        return;
+      }
+      submitRulesBtn.disabled = true;
+      try {
+        const formData = new FormData();
+        formData.append('upload_content', '1');
+        formData.append('csrf_token', this.csrfToken);
+
+        const res = await fetch(`${this.basePath}/api.php?route=home/accept-rules`, {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+          const modalEl = document.getElementById('modal-content-rules');
+          if (modalEl) {
+            const bsModal = bootstrap.Modal.getInstance(modalEl);
+            if (bsModal) bsModal.hide();
+          }
+          this.toast(data.message || 'Nutzungsrichtlinien erfolgreich bestätigt.', 'success');
+          this.handleRoute();
+        } else {
+          this.toast(data.message || 'Fehler beim Speichern.', 'danger');
+          submitRulesBtn.disabled = false;
         }
-        submitRulesBtn.disabled = true;
+      } catch (err) {
+        this.toast('Verbindungsfehler: ' + err.message, 'danger');
+        submitRulesBtn.disabled = false;
+      }
+    });
+  },
+
+  // Profile (Actors): Live-Username-Check, Steckbrief speichern & FSK16/FSK18 Bild-Upload
+  initActorsEvents() {
+    // 1. Live-Verfügbarkeitsprüfung für Darsteller-Benutzernamen
+    const usernameInput = document.getElementById('actor-username-input');
+    const checkBtn = document.getElementById('btn-check-actor-username');
+    const feedbackEl = document.getElementById('actor-username-feedback');
+
+    const runUsernameCheck = async () => {
+      if (!usernameInput || !feedbackEl) return;
+      const val = usernameInput.value.trim();
+      if (val.length < 3) {
+        feedbackEl.className = 'small mt-1 text-muted';
+        feedbackEl.textContent = 'Bitte geben Sie mindestens 3 Zeichen ein.';
+        return;
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append('username', val);
+        const res = await fetch(`${this.basePath}/api.php?route=actors/check-username`, {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (data.sanitized && data.sanitized !== val) {
+          usernameInput.value = data.sanitized;
+        }
+        if (data.available) {
+          feedbackEl.className = 'small mt-1 text-success fw-medium';
+          feedbackEl.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i>${this.escapeHtml(data.message)}`;
+        } else {
+          feedbackEl.className = 'small mt-1 text-danger fw-medium';
+          feedbackEl.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-1"></i>${this.escapeHtml(data.message)}`;
+        }
+      } catch (_) {
+        // Silent ignore on network hiccup during typing
+      }
+    };
+
+    if (usernameInput) {
+      usernameInput.addEventListener('input', () => {
+        clearTimeout(this.usernameCheckTimer);
+        this.usernameCheckTimer = setTimeout(runUsernameCheck, 400);
+      });
+    }
+    if (checkBtn) {
+      checkBtn.addEventListener('click', runUsernameCheck);
+    }
+
+    // 2. Sexuelle Vorlieben: Alle auswählen / Auswahl aufheben
+    const btnSelectAll = document.getElementById('btn-prefs-select-all');
+    const btnDeselectAll = document.getElementById('btn-prefs-deselect-all');
+    if (btnSelectAll) {
+      btnSelectAll.addEventListener('click', () => {
+        document.querySelectorAll('.sexual-pref-checkbox').forEach(cb => { cb.checked = true; });
+      });
+    }
+    if (btnDeselectAll) {
+      btnDeselectAll.addEventListener('click', () => {
+        document.querySelectorAll('.sexual-pref-checkbox').forEach(cb => { cb.checked = false; });
+      });
+    }
+
+    // 3. Profil-Formular absenden (Neuanlage oder Aktualisierung)
+    const profileForm = document.getElementById('form-actor-profile');
+    if (profileForm) {
+      profileForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const mode = profileForm.getAttribute('data-mode') || 'edit';
+        const endpoint = mode === 'create' ? 'actors/create' : 'actors/update';
+
+        const submitBtns = document.querySelectorAll('[form="form-actor-profile"], #btn-submit-actor-profile');
+        submitBtns.forEach(b => { b.disabled = true; });
+
         try {
-          const formData = new FormData();
-          formData.append('upload_content', '1');
+          const formData = new FormData(profileForm);
           formData.append('csrf_token', this.csrfToken);
 
-          const res = await fetch(`${this.basePath}/api.php?route=home/accept-rules`, {
+          const res = await fetch(`${this.basePath}/api.php?route=${endpoint}`, {
             method: 'POST',
             body: formData
           });
           const data = await res.json();
+
           if (res.ok && data.status === 'success') {
-            const modalEl = document.getElementById('modal-content-rules');
-            if (modalEl) {
-              const bsModal = bootstrap.Modal.getInstance(modalEl);
-              if (bsModal) bsModal.hide();
+            this.toast(data.message || 'Profildaten erfolgreich gespeichert.', 'success');
+
+            if (mode === 'create' && data.actor_id) {
+              // Neues Profil in die linke Sidebar einfügen und direkt zur Bearbeitungsansicht wechseln
+              this.appendActorToSidebar(data.actor_id, data.username || '');
+              window.location.hash = `#/actor?id=${data.actor_id}`;
+            } else {
+              submitBtns.forEach(b => { b.disabled = false; });
             }
-            this.toast(data.message || 'Nutzungsrichtlinien erfolgreich bestätigt.', 'success');
-            this.handleRoute();
           } else {
-            this.toast(data.message || 'Fehler beim Speichern.', 'danger');
-            submitRulesBtn.disabled = false;
+            this.toast(data.message || 'Fehler beim Speichern des Profils.', 'danger');
+            submitBtns.forEach(b => { b.disabled = false; });
           }
         } catch (err) {
           this.toast('Verbindungsfehler: ' + err.message, 'danger');
-          submitRulesBtn.disabled = false;
+          submitBtns.forEach(b => { b.disabled = false; });
         }
       });
+    }
+
+    // 4. Direkt-Upload für FSK16- und FSK18-Profilbilder
+    document.querySelectorAll('.actor-image-upload-input').forEach(fileInput => {
+      fileInput.addEventListener('change', async () => {
+        const file = fileInput.files?.[0];
+        if (!file) return;
+
+        const actorId = fileInput.getAttribute('data-actor-id');
+        const fsk = fileInput.getAttribute('data-fsk');
+
+        if (file.size > 5 * 1024 * 1024) {
+          this.toast('Die ausgewählte Bilddatei ist größer als 5 MB.', 'warning');
+          fileInput.value = '';
+          return;
+        }
+
+        const btnTextEl = document.getElementById(`actor-img-btn-text-${fsk}`);
+        const originalBtnText = btnTextEl ? btnTextEl.textContent : '';
+        if (btnTextEl) {
+          btnTextEl.textContent = 'Wird hochgeladen...';
+        }
+        fileInput.disabled = true;
+
+        try {
+          const formData = new FormData();
+          formData.append('actor_id', actorId);
+          formData.append('fsk', fsk);
+          formData.append('image', file);
+          formData.append('csrf_token', this.csrfToken);
+
+          const res = await fetch(`${this.basePath}/api.php?route=actors/upload-image`, {
+            method: 'POST',
+            body: formData
+          });
+          const data = await res.json();
+
+          if (res.ok && data.status === 'success') {
+            this.toast(data.message || `FSK${fsk}-Profilbild gespeichert.`, 'success');
+
+            const previewImg = document.getElementById(`actor-img-preview-${fsk}`);
+            const placeholderEl = document.getElementById(`actor-img-placeholder-${fsk}`);
+            const cacheBustedUrl = `${data.image_url}?t=${Date.now()}`;
+
+            if (placeholderEl) {
+              placeholderEl.classList.add('d-none');
+            }
+            if (previewImg) {
+              previewImg.src = cacheBustedUrl;
+              previewImg.classList.remove('d-none');
+            }
+
+            // Falls FSK16-Bild aktualisiert wurde, auch das kleine Avatar-Icon in der Sidebar aktualisieren
+            if (String(fsk) === '16') {
+              this.updateSidebarActorAvatar(actorId, cacheBustedUrl);
+            }
+          } else {
+            this.toast(data.message || 'Fehler beim Bild-Upload.', 'danger');
+          }
+        } catch (err) {
+          this.toast('Upload-Fehler: ' + err.message, 'danger');
+        } finally {
+          if (btnTextEl) {
+            btnTextEl.textContent = originalBtnText;
+          }
+          fileInput.disabled = false;
+          fileInput.value = '';
+        }
+      });
+    });
+  },
+
+  appendActorToSidebar(actorId, username) {
+    const submenu = document.getElementById('submenu-actors');
+    if (!submenu) return;
+    if (submenu.querySelector(`[data-actor-id="${actorId}"]`)) return;
+
+    const initials = String(username || 'EC').substring(0, 2).toUpperCase();
+    const route = `#/actor?id=${actorId}`;
+    const link = document.createElement('a');
+    link.href = route;
+    link.className = 'sidebar-link';
+    link.setAttribute('data-route', route);
+    link.setAttribute('data-actor-id', String(actorId));
+    link.innerHTML = `
+      <span class="sidebar-actor-avatar">${this.escapeHtml(initials)}</span>
+      <span class="text-truncate">${this.escapeHtml(username)}</span>
+    `;
+    submenu.appendChild(link);
+  },
+
+  updateSidebarActorAvatar(actorId, imageUrl) {
+    const sidebarLink = document.querySelector(`.sidebar-link[data-actor-id="${actorId}"]`);
+    if (!sidebarLink) return;
+
+    const existingImg = sidebarLink.querySelector('img.sidebar-actor-img');
+    if (existingImg) {
+      existingImg.src = imageUrl;
+      return;
+    }
+
+    const badgeSpan = sidebarLink.querySelector('.sidebar-actor-avatar');
+    if (badgeSpan) {
+      const img = document.createElement('img');
+      img.src = imageUrl;
+      img.alt = '';
+      img.className = 'sidebar-actor-img rounded-circle object-fit-cover flex-shrink-0 border';
+      img.style.width = '22px';
+      img.style.height = '22px';
+      badgeSpan.replaceWith(img);
     }
   },
 

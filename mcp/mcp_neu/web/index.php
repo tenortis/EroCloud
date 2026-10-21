@@ -219,11 +219,11 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
               ? $mcpUrl . '/ProfilePicture/' . rawurlencode($sActor['avatar_fsk16'])
               : '';
           $sInitials = mb_strtoupper(mb_substr($sActor['username'], 0, 2));
-          $sRoute = '#/actor?id=' . (int)$sActor['id'] . '&name=' . urlencode($sActor['username']);
+          $sRoute = '#/actor?id=' . (int)$sActor['id'];
         ?>
-        <a href="<?= htmlspecialchars($sRoute, ENT_QUOTES, 'UTF-8') ?>" class="sidebar-link" data-route="<?= htmlspecialchars($sRoute, ENT_QUOTES, 'UTF-8') ?>">
+        <a href="<?= htmlspecialchars($sRoute, ENT_QUOTES, 'UTF-8') ?>" class="sidebar-link" data-route="<?= htmlspecialchars($sRoute, ENT_QUOTES, 'UTF-8') ?>" data-actor-id="<?= (int)$sActor['id'] ?>">
           <?php if ($sAvatarUrl !== ''): ?>
-          <img src="<?= htmlspecialchars($sAvatarUrl, ENT_QUOTES, 'UTF-8') ?>" alt="" class="rounded-circle object-fit-cover flex-shrink-0 border" style="width: 22px; height: 22px;">
+          <img src="<?= htmlspecialchars($sAvatarUrl, ENT_QUOTES, 'UTF-8') ?>" alt="" class="sidebar-actor-img rounded-circle object-fit-cover flex-shrink-0 border" style="width: 22px; height: 22px;">
           <?php else: ?>
           <span class="sidebar-actor-avatar"><?= htmlspecialchars($sInitials, ENT_QUOTES, 'UTF-8') ?></span>
           <?php endif; ?>

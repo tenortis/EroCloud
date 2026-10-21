@@ -67,6 +67,7 @@ class Router
     private static function registerDefaults(): void
     {
         $homeCtrl    = 'App\\Modules\\Home\\HomeController';
+        $actorsCtrl  = 'App\\Modules\\Actors\\ActorsController';
         $previewCtrl = 'App\\Modules\\Preview\\PreviewController';
 
         // 1. Startseite (Echtes Partner-Dashboard & Richtlinien-Bestätigung)
@@ -84,10 +85,14 @@ class Router
         self::register('photo-albums', $previewCtrl, 'photoAlbums');
         self::register('photo-album', $previewCtrl, 'photoAlbumDetail');
 
-        // 4. Profile (Darsteller)
-        self::register('actors', $previewCtrl, 'actors');
-        self::register('new-actor', $previewCtrl, 'newActor');
-        self::register('actor', $previewCtrl, 'actorDetail');
+        // 4. Profile (Echte Darsteller-Verwaltung & FSK16/FSK18 Bild-Upload)
+        self::register('actors', $actorsCtrl, 'list');
+        self::register('new-actor', $actorsCtrl, 'newActor');
+        self::register('actor', $actorsCtrl, 'detail');
+        self::register('actors/check-username', $actorsCtrl, 'checkUsername');
+        self::register('actors/create', $actorsCtrl, 'create');
+        self::register('actors/update', $actorsCtrl, 'update');
+        self::register('actors/upload-image', $actorsCtrl, 'uploadImage');
 
         // 5. Partnerprogramm (Webmaster)
         self::register('webmaster-ads', $previewCtrl, 'webmasterAds');

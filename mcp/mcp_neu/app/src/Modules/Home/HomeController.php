@@ -68,7 +68,7 @@ class HomeController
                 if ($status === 'active') {
                     $activeActorsCount++;
                 }
-                if ($status === 'blocked' || $status === 'inactive') {
+                if ($status === 'locked' || $status === 'blocked' || $status === 'inactive') {
                     $hasInactiveOrBlockedActor = true;
                 }
 

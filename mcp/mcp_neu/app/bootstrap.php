@@ -64,6 +64,7 @@ if (defined('SOURCEDIR')) {
     p4c_query("SET NAMES 'utf8mb4';", __FILE__, __LINE__);
 
     include_once SOURCEDIR . '/includes/klassen/merchant.inc.php';
+    include_once SOURCEDIR . '/includes/klassen/actor.inc.php';
     include_once SOURCEDIR . '/includes/klassen/movie.inc.php';
     include_once SOURCEDIR . '/includes/klassen/PhotoAlbum.inc.php';
     include_once SOURCEDIR . '/includes/klassen/sendSMTPmail.inc.php';
