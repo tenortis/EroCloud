@@ -11,7 +11,6 @@ if (!defined('SAFE_INC')) {
  * @var int                              $countOnline
  * @var int                              $countPending
  * @var int                              $countRejected
- * @var float                            $totalCommissionEur
  */
 ?>
 
@@ -20,7 +19,7 @@ if (!defined('SAFE_INC')) {
   <div>
     <h2 class="h4 fw-bold mb-1">Foto-Alben</h2>
     <p class="text-muted small mb-0">
-      Verwalten Sie Ihre hochgeladenen Foto-Alben, Coverbilder, Verkaufszahlen und Freigaben.
+      Verwalten Sie Ihre hochgeladenen Foto-Alben, Coverbilder, Verkaufspreise und Freigaben.
     </p>
   </div>
   <div>
@@ -30,7 +29,7 @@ if (!defined('SAFE_INC')) {
   </div>
 </div>
 
-<!-- KPI-Kacheln -->
+<!-- KPI-Kacheln (ohne Umsatzzahlen) -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-xl-3">
     <div class="kkc-stat-card">
@@ -70,12 +69,12 @@ if (!defined('SAFE_INC')) {
 
   <div class="col-6 col-xl-3">
     <div class="kkc-stat-card">
-      <div class="kkc-stat-icon bg-info bg-opacity-10 text-info">
-        <i class="bi bi-currency-euro"></i>
+      <div class="kkc-stat-icon <?= $countRejected > 0 ? 'bg-danger bg-opacity-10 text-danger' : 'bg-secondary bg-opacity-10 text-secondary' ?>">
+        <i class="bi bi-exclamation-octagon-fill"></i>
       </div>
       <div>
-        <div class="kkc-stat-label">Provision (Foto-Alben)</div>
-        <div class="kkc-stat-value"><?= number_format((float)$totalCommissionEur, 2, ',', '.') ?> €</div>
+        <div class="kkc-stat-label">Korrektur nötig / Abgelehnt</div>
+        <div class="kkc-stat-value <?= $countRejected > 0 ? 'text-danger' : 'text-muted' ?>"><?= (int)$countRejected ?></div>
       </div>
     </div>
   </div>
@@ -137,8 +136,6 @@ if (!defined('SAFE_INC')) {
               <th>Titel &amp; Details</th>
               <th>Darsteller</th>
               <th>Online ab</th>
-              <th class="text-center">Verkäufe</th>
-              <th class="text-end">Provision</th>
               <th>Status</th>
               <th class="text-end pe-4">Aktion</th>
             </tr>
@@ -201,10 +198,6 @@ if (!defined('SAFE_INC')) {
                   </span>
                 </td>
                 <td class="small text-muted"><?= htmlspecialchars((string)$alb['online_at'], ENT_QUOTES, 'UTF-8') ?></td>
-                <td class="text-center fw-semibold"><?= (int)$alb['buys'] ?>x</td>
-                <td class="text-end fw-bold text-success">
-                  <?= number_format((float)$alb['commission_eur'], 2, ',', '.') ?> €
-                </td>
                 <td>
                   <span class="badge bg-<?= htmlspecialchars((string)$alb['status_badge'], ENT_QUOTES, 'UTF-8') ?> bg-opacity-10 text-<?= htmlspecialchars((string)$alb['status_badge'], ENT_QUOTES, 'UTF-8') ?> border border-<?= htmlspecialchars((string)$alb['status_badge'], ENT_QUOTES, 'UTF-8') ?> border-opacity-25">
                     <i class="bi <?= htmlspecialchars((string)$alb['status_icon'], ENT_QUOTES, 'UTF-8') ?> me-1"></i>

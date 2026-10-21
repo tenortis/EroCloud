@@ -28,6 +28,10 @@ usage: 'Wird automatisch herangezogen bei allen Arbeiten am Neubau des MCP unter
    * Durchgehend **UTF-8** (keine `ISO-8859-1` Altlasten mehr).
    * Alle UI-Texte ausnahmslos in der höflichen **Sie-Form**.
    * **Kein Studio-Login (`G-...`) mehr:** Es wird ausschließlich der **Pay4Coins-Partner-Login** unterstützt.
+6. **Striktes Verbot von Umsatz-, Provisions- und Verkaufszahlen in der neuen EroCloud:**
+   * Die Partner sehen ihre echten Umsätze und Abrechnungen direkt in ihrer **EroCMS-Webseite** oder in ihrem **Pay4Coins-Account**.
+   * Darum dürfen im gesamten neuen EroCloud MCP (`mcp_neu` / später `mcp`) **keinerlei Umsatzzahlen, Provisionen oder Verkaufszahlen** (wie *Monatsumsatz*, *Provision (Gesamt)*, *Käufe Streaming*, *Käufe Download* oder *Verkäufe*) angezeigt werden – weder auf der Startseite (`#/startseite`), noch unter `#/movies` oder `#/photo-albums` oder bei zukünftigen Erweiterungen.
+   * EroCloud dient ausschließlich als Cloud-Content- & Profil-Management-Plattform.
 
 ---
 
@@ -123,7 +127,11 @@ mcp_neu/ (später: mcp/)
    * Alle Hauptmenüpunkte sind mit `white-space: nowrap` formatiert, sodass Einträge mit Zähler-Badge (`Content in der Cloud`) niemals mehrzeilig umbrechen.
    * Im Sidebar-Footer steht zentriert der rechtliche Hinweis (*„EroCloud ist ein Service der CIPA MEDIA S.L.“*), ohne technische Versions- oder PHP-Badges.
 2. **Startseite (`#/startseite` Dashboard):**
-   * **Obere KPI-Reihe (4 einheitliche Kennzahlen-Kacheln):** *Filme in der Cloud*, *Fotoalben online*, *Darsteller-Profile* und *Inhalte in Prüfung*.
-   * **Linke Hauptspalte:** *Schnellzugriff-Kachel* (4 Direktwahl-Kacheln) sowie Tabelle *Zuletzt hochgeladene Inhalte*.
+   * **Obere KPI-Reihe (4 einheitliche Kennzahlen-Kacheln ohne Umsätze):** *Filme in der Cloud*, *Fotoalben in der Cloud*, *Darsteller-Profile* und *Inhalte in Prüfung* (Summe aus Filmen und Fotoalben in Prüfung/Konvertierung).
+   * **Linke Hauptspalte:** *Schnellzugriff-Kachel* (4 Direktwahl-Kacheln) sowie Tabelle *Zuletzt hochgeladene Filme*.
    * **Rechte Spalte:** *Ihre Darsteller-Profile* (Kompaktübersicht mit Status & Direktbearbeitung, **ohne** Amoredea-Werbekachel) sowie *Account-Status & Content-Richtlinien*.
+3. **Content-Übersichten (`#/movies` & `#/photo-albums`):**
+   * **Obere 4 KPI-Kacheln:** *Gesamtanzahl*, *Online*, *In Prüfung / Konvertierung* sowie *Abgelehnt / Korrektur nötig* (**niemals** Provisionen oder Umsatzzahlen).
+   * **Tabellen-Spalten:** Zeigen ausschließlich Verwaltungs- und Statusdaten (*Status*, *ID*, *FSK16/FSK18 Vorschaubilder*, *Titel & technische Details / Verkaufspreis*, *Darsteller*, *Online ab*, *Aktion*) – **ohne** Spalten für Verkäufe oder Provisionen.
+
 

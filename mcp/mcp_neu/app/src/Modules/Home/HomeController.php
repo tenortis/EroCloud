@@ -14,7 +14,7 @@ use Merchant;
 
 /**
  * EroCloud MCP (v2.0) - HomeController
- * Lädt alle echten Partner-, Profil-, Content- und Umsatzdaten für die Startseite.
+ * Lädt alle echten Partner-, Profil- und Content-Daten für die Startseite (ohne Umsatzzahlen).
  */
 class HomeController
 {
@@ -165,9 +165,10 @@ class HomeController
         }
 
         // 5. Fotoalben des Partners laden & KPIs berechnen
-        $albumsTotal  = 0;
-        $albumsOnline = 0;
-        $photosTotal  = 0;
+        $albumsTotal   = 0;
+        $albumsOnline  = 0;
+        $albumsPending = 0;
+        $photosTotal   = 0;
 
         $rsAlbums = p4c_query("SELECT `id`, `album_id`, `number_of_photos`, `title`, `album_checked`, `released`, `actor_id`
             FROM `photo_albums`
@@ -189,41 +190,17 @@ class HomeController
                     $actors[$actorId]['albums_count']++;
                 }
 
-                $checked = (string)$a->album_checked;
+                $checked  = (string)$a->album_checked;
+                $released = abs((int)$a->released);
                 if ($checked !== '0000-00-00 00:00:00' && $checked !== '') {
                     $albumsOnline++;
+                } elseif ($released !== 2) {
+                    $albumsPending++;
                 }
             }
         }
 
-        // 6. Monatsumsatz berechnen (Videos + Fotoalben im aktuellen Monat analog home_stats.inc.php)
-        $currentMonthPrefix = date('Y-m-');
-
-        $rsVideoRev = p4c_query("SELECT SUM(`movies_access`.`actor_commision`) AS `comm`
-            FROM `movies_access`
-            LEFT JOIN `movies` ON `movies_access`.`movie_id` = `movies`.`file_id`
-            WHERE `movies`.`merchant_id` = '" . $merchantId . "'
-              AND `movies_access`.`buy_timestamp` LIKE '" . p4c_escape_string($currentMonthPrefix) . "%';", __FILE__, __LINE__);
-        $videoCents = 0.0;
-        if ($rsVideoRev && p4c_num_rows($rsVideoRev) > 0) {
-            $revObj = p4c_fetch_object($rsVideoRev);
-            $videoCents = (float)($revObj->comm ?? 0);
-        }
-
-        $rsAlbumRev = p4c_query("SELECT SUM(`photo_albums_access`.`actor_commision`) AS `comm`
-            FROM `photo_albums_access`
-            LEFT JOIN `photo_albums` ON `photo_albums_access`.`album_id` = `photo_albums`.`album_id`
-            WHERE `photo_albums`.`merchant_id` = '" . $merchantId . "'
-              AND `photo_albums_access`.`buy_timestamp` LIKE '" . p4c_escape_string($currentMonthPrefix) . "%';", __FILE__, __LINE__);
-        $albumCents = 0.0;
-        if ($rsAlbumRev && p4c_num_rows($rsAlbumRev) > 0) {
-            $revAlbumObj = p4c_fetch_object($rsAlbumRev);
-            $albumCents = (float)($revAlbumObj->comm ?? 0);
-        }
-
-        $videoEur = $videoCents / 100.0;
-        $albumEur = $albumCents / 100.0;
-        $totalEur = $videoEur + $albumEur;
+        $contentPending = $moviesPending + $albumsPending;
 
         return View::render('Home', 'dashboard', [
             'firstname'                 => $firstname,
@@ -240,10 +217,9 @@ class HomeController
             'moviesPending'             => $moviesPending,
             'albumsTotal'               => $albumsTotal,
             'albumsOnline'              => $albumsOnline,
+            'albumsPending'             => $albumsPending,
             'photosTotal'               => $photosTotal,
-            'videoEur'                  => $videoEur,
-            'albumEur'                  => $albumEur,
-            'totalEur'                  => $totalEur,
+            'contentPending'            => $contentPending,
             'recentContents'            => $recentContents,
         ]);
     }

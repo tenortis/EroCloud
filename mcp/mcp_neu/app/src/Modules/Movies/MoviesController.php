@@ -56,45 +56,11 @@ class MoviesController
             }
         }
 
-        // 2. Verkäufe & Provisionen pro Film (Streaming + Download) gruppiert laden
-        $salesMap = [];
-        $rsSales = p4c_query("SELECT
-                `movies_access`.`movie_id`,
-                `movies_access`.`buy_as`,
-                COUNT(*) AS `buys_cnt`,
-                SUM(`movies_access`.`actor_commision`) AS `comm_cents`
-            FROM `movies_access`
-            INNER JOIN `movies` ON `movies_access`.`movie_id` = `movies`.`file_id`
-            WHERE `movies`.`merchant_id` = '" . $merchantId . "'
-              AND `movies`.`status` != 'deleted'
-            GROUP BY `movies_access`.`movie_id`, `movies_access`.`buy_as`;", __FILE__, __LINE__);
-
-        if ($rsSales && p4c_num_rows($rsSales) > 0) {
-            while ($sRow = p4c_fetch_object($rsSales)) {
-                $fId   = (string)$sRow->movie_id;
-                $buyAs = (string)$sRow->buy_as;
-                if (!isset($salesMap[$fId])) {
-                    $salesMap[$fId] = [
-                        'streaming_buys' => 0,
-                        'download_buys'  => 0,
-                        'comm_cents'     => 0.0,
-                    ];
-                }
-                if ($buyAs === 'streaming') {
-                    $salesMap[$fId]['streaming_buys'] += abs((int)$sRow->buys_cnt);
-                } elseif ($buyAs === 'download') {
-                    $salesMap[$fId]['download_buys'] += abs((int)$sRow->buys_cnt);
-                }
-                $salesMap[$fId]['comm_cents'] += (float)($sRow->comm_cents ?? 0);
-            }
-        }
-
-        // 3. Alle nicht gelöschten Filme des Partners laden
-        $movies             = [];
-        $countOnline        = 0;
-        $countPending       = 0;
-        $countRejected      = 0;
-        $totalCommissionEur = 0.0;
+        // 2. Alle nicht gelöschten Filme des Partners laden (ohne Umsatz-/Verkaufszahlen)
+        $movies        = [];
+        $countOnline   = 0;
+        $countPending  = 0;
+        $countRejected = 0;
 
         $rsMovies = p4c_query("SELECT
                 `id`, `convert_status`, `file_id`, `checksum`, `filename`, `title`,
@@ -163,10 +129,6 @@ class MoviesController
                     $countPending++;
                 }
 
-                $sales   = $salesMap[$fileId] ?? ['streaming_buys' => 0, 'download_buys' => 0, 'comm_cents' => 0.0];
-                $commEur = $sales['comm_cents'] / 100.0;
-                $totalCommissionEur += $commEur;
-
                 $onlineAtFormatted = ($m->online_at !== '0000-00-00 00:00:00' && !empty($m->online_at))
                     ? date('d.m.Y H:i', strtotime((string)$m->online_at))
                     : '-';
@@ -187,20 +149,16 @@ class MoviesController
                     'online_at'       => $onlineAtFormatted,
                     'playtime_string' => (string)($m->playtime_string ?? ''),
                     'resolution'      => (string)($m->resolution ?? ''),
-                    'streaming_buys'  => $sales['streaming_buys'],
-                    'download_buys'   => $sales['download_buys'],
-                    'commission_eur'  => $commEur,
                 ];
             }
         }
 
         return View::render('Movies', 'list', [
-            'movies'             => $movies,
-            'countTotal'         => count($movies),
-            'countOnline'        => $countOnline,
-            'countPending'       => $countPending,
-            'countRejected'      => $countRejected,
-            'totalCommissionEur' => $totalCommissionEur,
+            'movies'        => $movies,
+            'countTotal'    => count($movies),
+            'countOnline'   => $countOnline,
+            'countPending'  => $countPending,
+            'countRejected' => $countRejected,
         ]);
     }
 

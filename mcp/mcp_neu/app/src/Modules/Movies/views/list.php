@@ -14,7 +14,6 @@ if (!defined('SAFE_INC')) {
  * @var int   $countOnline
  * @var int   $countPending
  * @var int   $countRejected
- * @var float $totalCommissionEur
  */
 ?>
 
@@ -25,7 +24,7 @@ if (!defined('SAFE_INC')) {
       <i class="bi bi-collection-play-fill ec-text-primary me-2"></i>Meine Filme in der EroCloud
     </h1>
     <p class="text-muted small mb-0">
-      Verwalten Sie hier alle hochgeladenen Filme, Vorschaubilder (FSK16 / FSK18), Preise sowie Ihre Streaming- und Download-Verkäufe.
+      Verwalten Sie hier alle hochgeladenen Filme, Vorschaubilder (FSK16 / FSK18), Preise und Kategorien.
     </p>
   </div>
 
@@ -37,7 +36,7 @@ if (!defined('SAFE_INC')) {
   </div>
 </div>
 
-<!-- 4 KPI-Kacheln -->
+<!-- 4 KPI-Kacheln (ohne Umsatzzahlen) -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-xl-3">
     <div class="card-kkc kpi-card h-100 mb-0">
@@ -71,21 +70,18 @@ if (!defined('SAFE_INC')) {
       <div>
         <div class="kpi-val text-warning"><?= (int)$countPending ?></div>
         <div class="kpi-label">In Prüfung / Konvertierung</div>
-        <?php if ($countRejected > 0): ?>
-          <small class="text-danger fw-semibold"><?= (int)$countRejected ?> abgelehnt</small>
-        <?php endif; ?>
       </div>
     </div>
   </div>
 
   <div class="col-6 col-xl-3">
     <div class="card-kkc kpi-card h-100 mb-0">
-      <div class="kpi-icon-box bg-info bg-opacity-10 text-info">
-        <i class="bi bi-cash-stack"></i>
+      <div class="kpi-icon-box <?= $countRejected > 0 ? 'bg-danger bg-opacity-10 text-danger' : 'bg-secondary bg-opacity-10 text-secondary' ?>">
+        <i class="bi bi-exclamation-octagon-fill"></i>
       </div>
       <div>
-        <div class="kpi-val"><?= number_format((float)$totalCommissionEur, 2, ',', '.') ?> €</div>
-        <div class="kpi-label">Provision (Gesamt)</div>
+        <div class="kpi-val <?= $countRejected > 0 ? 'text-danger' : 'text-muted' ?>"><?= (int)$countRejected ?></div>
+        <div class="kpi-label">Abgelehnt / Korrektur nötig</div>
       </div>
     </div>
   </div>
@@ -148,9 +144,6 @@ if (!defined('SAFE_INC')) {
             <th>Filmtitel</th>
             <th>Darsteller</th>
             <th>Online ab</th>
-            <th class="text-center">Käufe Streaming</th>
-            <th class="text-center">Käufe Download</th>
-            <th class="text-end">Provision</th>
             <th class="text-end">Aktion</th>
           </tr>
         </thead>
@@ -211,9 +204,6 @@ if (!defined('SAFE_INC')) {
               <?php endif; ?>
             </td>
             <td class="text-muted small text-nowrap"><?= htmlspecialchars((string)$m['online_at'], ENT_QUOTES, 'UTF-8') ?></td>
-            <td class="text-center fw-medium"><?= (int)$m['streaming_buys'] ?></td>
-            <td class="text-center fw-medium"><?= (int)$m['download_buys'] ?></td>
-            <td class="text-end fw-bold text-nowrap"><?= number_format((float)$m['commission_eur'], 2, ',', '.') ?> EUR</td>
             <td class="text-end">
               <a href="<?= htmlspecialchars((string)$m['edit_route'], ENT_QUOTES, 'UTF-8') ?>" class="btn btn-sm btn-outline-kkc py-1 px-2 text-nowrap">
                 <i class="bi bi-pencil-square me-1"></i> Bearbeiten

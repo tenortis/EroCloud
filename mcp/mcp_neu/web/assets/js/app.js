@@ -15,6 +15,20 @@ const App = {
     this.initTheme();
     this.initRouter();
     this.initApiKeyCopy();
+    this.initSessionKeepAlive();
+  },
+
+  // ========================================================================
+  // 0. Session Keep-Alive (Heartbeat alle 4 Minuten gegen GC-Timeout)
+  // ========================================================================
+  initSessionKeepAlive() {
+    setInterval(() => {
+      fetch(`${this.basePath}/api.php?route=ping`, {
+        method: 'GET',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        cache: 'no-store'
+      }).catch(() => {});
+    }, 4 * 60 * 1000);
   },
 
   // ========================================================================
@@ -73,6 +87,14 @@ const App = {
     const params = new URLSearchParams(queryPart || '');
     const apiRoute = pathPart || 'startseite';
 
+    // Veraltete Prototyp-Parameter (wie &name=LadyAyse) automatisch aus der Adresszeile bereinigen
+    if (pathPart === 'actor' && params.has('name')) {
+      params.delete('name');
+      const cleanQuery = params.toString();
+      const cleanHash = `#/actor${cleanQuery ? '?' + cleanQuery : ''}`;
+      window.history.replaceState(null, '', cleanHash);
+    }
+
     // Aktiven Sidebar-Link hervorheben & nur das zugehörige Submenü öffnen
     let activeCollapseId = null;
     const targetActorId = pathPart === 'actor' ? params.get('id') : null;
@@ -95,9 +117,15 @@ const App = {
       }
     });
 
-    // Falls eine Unterseite von Profile aufgerufen wird (z.B. #/actors, #/new-actor, #/actor), Submenü öffnen
-    if (!activeCollapseId && ['actors', 'new-actor', 'actor'].includes(pathPart)) {
-      activeCollapseId = 'submenu-actors';
+    // Falls eine Unterseite direkt aufgerufen wird, das passende Submenü öffnen
+    if (!activeCollapseId) {
+      if (['actors', 'new-actor', 'actor-new', 'actor'].includes(pathPart)) {
+        activeCollapseId = 'submenu-actors';
+      } else if (['movies', 'movie', 'photo-albums', 'photo-album'].includes(pathPart)) {
+        activeCollapseId = 'submenu-cloud';
+      } else if (['movie-upload', 'photo-album-upload'].includes(pathPart)) {
+        activeCollapseId = 'submenu-upload';
+      }
     }
 
     // Submenüs steuern: Nur das zur aktuellen Unterseite gehörende Submenü öffnen, alle anderen schließen
@@ -130,6 +158,11 @@ const App = {
       const res = await fetch(url);
 
       if (!res.ok) {
+        // Bei abgelaufener Sitzung (401) einmalig aktuellen Pfad neu laden (triggert Auto-Recovery in bootstrap.php)
+        if (res.status === 401) {
+          window.location.reload();
+          return;
+        }
         const errorData = await res.json().catch(() => ({ message: 'Ladefehler' }));
         contentArea.innerHTML = `
           <div class="alert alert-danger m-4">

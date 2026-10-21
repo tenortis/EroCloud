@@ -14,7 +14,7 @@ use App\Core\View;
 
 /**
  * Controller für die Foto-Alben-Verwaltung im neuen EroCloud MCP:
- * - #/photo-albums        (Übersicht aller Foto-Alben inkl. Verkäufe, Status & Schnellaktionen)
+ * - #/photo-albums        (Übersicht aller Foto-Alben inkl. Status & Schnellaktionen, ohne Umsatzzahlen)
  * - #/photo-album         (Einzelnes Foto-Album bearbeiten, Cover & Fotos verwalten)
  * - #/photo-album-upload  (Neues Foto-Album in 3 Schritten anlegen & Bilder hochladen)
  */
@@ -61,33 +61,11 @@ final class PhotoAlbumsController
             }
         }
 
-        // 3. Verkaufszahlen & Provisionen pro Foto-Album aggregiert vorladen
-        $salesByAlbumId = [];
-        $rsSales        = p4c_query("SELECT
-                `product_id`,
-                COUNT(*) AS `cnt`,
-                COALESCE(SUM(`amount_commission`), 0) AS `comm_cents`
-            FROM `merchants_sales`
-            WHERE `merchant_id` = '" . $merchantId . "'
-              AND `product_type` = 'photo_album_download'
-            GROUP BY `product_id`", __FILE__, __LINE__);
-
-        if ($rsSales) {
-            while ($s = p4c_fetch_object($rsSales)) {
-                $pId = abs((int)$s->product_id);
-                $salesByAlbumId[$pId] = [
-                    'buys'       => abs((int)$s->cnt),
-                    'comm_cents' => (float)$s->comm_cents,
-                ];
-            }
-        }
-
-        // 4. Alle nicht gelöschten Foto-Alben des Partners laden
-        $albums             = [];
-        $countOnline        = 0;
-        $countPending       = 0;
-        $countRejected      = 0;
-        $totalCommissionEur = 0.0;
+        // 3. Alle nicht gelöschten Foto-Alben des Partners laden (ohne Umsatz-/Verkaufszahlen)
+        $albums        = [];
+        $countOnline   = 0;
+        $countPending  = 0;
+        $countRejected = 0;
 
         $rsAlbums = p4c_query("SELECT *
             FROM `photo_albums`
@@ -153,13 +131,6 @@ final class PhotoAlbumsController
                     $countOnline++;
                 }
 
-                $sales = $salesByAlbumId[$albumDbId] ?? [
-                    'buys'       => 0,
-                    'comm_cents' => 0.0,
-                ];
-                $commEur             = $sales['comm_cents'] / 100.0;
-                $totalCommissionEur += $commEur;
-
                 $onlineAtFormatted = ($a->online_at !== '0000-00-00 00:00:00' && !empty($a->online_at))
                     ? date('d.m.Y H:i', strtotime((string)$a->online_at))
                     : '-';
@@ -182,20 +153,17 @@ final class PhotoAlbumsController
                     'poster_fsk16'     => $apiUrl . '/PhotoAlbumPoster/FSK16/' . rawurlencode($albumIdHash) . '?w=110&cs=' . rawurlencode($checksum),
                     'poster_fsk18'     => $apiUrl . '/PhotoAlbumPoster/FSK18/' . rawurlencode($albumIdHash) . '?w=110&cs=' . rawurlencode($checksum),
                     'online_at'        => $onlineAtFormatted,
-                    'buys'             => $sales['buys'],
-                    'commission_eur'   => $commEur,
                     'can_delete'       => ((string)$a->album_checked === '0000-00-00 00:00:00' && (int)$a->released !== 1 && !$isOnline),
                 ];
             }
         }
 
         return View::render('PhotoAlbums', 'list', [
-            'albums'             => $albums,
-            'countTotal'         => count($albums),
-            'countOnline'        => $countOnline,
-            'countPending'       => $countPending,
-            'countRejected'      => $countRejected,
-            'totalCommissionEur' => $totalCommissionEur,
+            'albums'        => $albums,
+            'countTotal'    => count($albums),
+            'countOnline'   => $countOnline,
+            'countPending'  => $countPending,
+            'countRejected' => $countRejected,
         ]);
     }
 

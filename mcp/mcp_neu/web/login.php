@@ -111,6 +111,10 @@ if ($data === 'ok') {
                 $_SESSION['merchant_username'] = $merchant->username('aes_decrypt');
                 $_SESSION['last_activity']     = time();
 
+                if (function_exists('mcp_neu_sync_auth_cookie')) {
+                    mcp_neu_sync_auth_cookie(abs((int)$merchant->id()), (string)$merchant->username('aes_decrypt'));
+                }
+
                 $cookiePayload = [
                     'pid' => $merchant->partner_id(),
                     'sid' => session_id(),

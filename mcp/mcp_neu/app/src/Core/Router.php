@@ -29,6 +29,18 @@ class Router
 
         $route = $request->route();
 
+        // Leichtgewichtiger Session-Keep-Alive Heartbeat
+        if ($route === 'ping') {
+            if (function_exists('mcp_neu_sync_auth_cookie') && !empty($_SESSION['merchant_id'])) {
+                mcp_neu_sync_auth_cookie(
+                    abs((int)$_SESSION['merchant_id']),
+                    (string)($_SESSION['merchant_username'] ?? '')
+                );
+            }
+            Response::json(['status' => 'ok', 'ts' => time()]);
+            return;
+        }
+
         if (empty(self::$routes)) {
             self::registerDefaults();
         }

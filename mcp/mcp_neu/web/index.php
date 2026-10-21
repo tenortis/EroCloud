@@ -31,11 +31,14 @@ if (isset($_GET['logout'])) {
 
     $_SESSION = [];
     @session_destroy();
+    if (function_exists('mcp_neu_clear_auth_cookie')) {
+        mcp_neu_clear_auth_cookie();
+    }
     header('Location: ' . $logoutUrl);
     exit;
 }
 
-// 2. Authentifizierungs-Prüfung (Echte MCP Partner-Session erforderlich)
+// 2. Authentifizierungs-Prüfung (inkl. automatischer Session-Recovery aus bootstrap.php)
 if (!function_exists('is_logged_in') || is_logged_in('mcp') !== true || empty($_SESSION['merchant_id'])) {
     header('Location: ' . LOGIN_URL . '?ref=erocloud');
     exit;

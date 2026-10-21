@@ -21,19 +21,11 @@ use App\Core\View;
 /** @var int $moviesPending */
 /** @var int $albumsTotal */
 /** @var int $albumsOnline */
+/** @var int $albumsPending */
 /** @var int $photosTotal */
-/** @var float $videoEur */
-/** @var float $albumEur */
-/** @var float $totalEur */
+/** @var int $contentPending */
 /** @var array $recentContents */
 
-$monate = [
-    1 => 'Januar', 2 => 'Februar', 3 => 'März', 4 => 'April',
-    5 => 'Mai', 6 => 'Juni', 7 => 'Juli', 8 => 'August',
-    9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Dezember'
-];
-$aktMonatName = $monate[(int)date('n')] ?? date('F');
-$aktJahr      = date('Y');
 $mcpUrl       = defined('MCP_URL') ? MCP_URL : 'https://erocloud.net';
 $domainName   = defined('DOMAIN') ? DOMAIN : 'erocloud.net';
 $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
@@ -48,11 +40,6 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
     <p class="text-muted mb-0">
       Ihre persönlichen Stammdaten wie Ihr Name und Ihre Anschrift sind für Endkunden nicht sichtbar. Nutzer sehen ausschließlich die Angaben, die Sie in Ihren Darsteller-Profilen hinterlegt haben.
     </p>
-  </div>
-  <div class="d-flex align-items-center gap-2">
-    <span class="badge-kkc badge-kkc-info px-3 py-2">
-      <i class="bi bi-calendar3 me-1"></i> Zeitraum: <?= View::e($aktMonatName . ' ' . $aktJahr) ?>
-    </span>
   </div>
 </div>
 
@@ -206,14 +193,14 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
 
   <div class="col-xl-3 col-md-6">
     <div class="card-kkc kpi-card h-100 mb-0">
-      <div class="kpi-icon-box bg-info bg-opacity-10 text-info">
-        <i class="bi bi-cash-coin"></i>
+      <div class="kpi-icon-box bg-warning bg-opacity-10 text-warning">
+        <i class="bi bi-hourglass-split"></i>
       </div>
       <div>
-        <div class="kpi-val"><?= number_format((float)$totalEur, 2, ',', '.') ?> €</div>
-        <div class="kpi-label">Umsatz im <?= View::e($aktMonatName) ?></div>
+        <div class="kpi-val"><?= (int)$contentPending ?></div>
+        <div class="kpi-label">Inhalte in Prüfung</div>
         <small class="text-muted">
-          Videos: <?= number_format((float)$videoEur, 2, ',', '.') ?> € · Fotos: <?= number_format((float)$albumEur, 2, ',', '.') ?> €
+          Filme: <?= (int)$moviesPending ?> · Fotoalben: <?= (int)$albumsPending ?>
         </small>
       </div>
     </div>
@@ -375,7 +362,7 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
 
   </div>
 
-  <!-- Rechte Spalte: Echte Darsteller-Profile & Umsatz-/Richtlinien-Box -->
+  <!-- Rechte Spalte: Echte Darsteller-Profile & Richtlinien-Box -->
   <div class="col-lg-5">
 
     <!-- Echte Darsteller-Profile im Überblick -->
