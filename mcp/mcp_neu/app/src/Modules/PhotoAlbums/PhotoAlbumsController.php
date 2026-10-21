@@ -101,6 +101,12 @@ final class PhotoAlbumsController
                     $countPending++;
                 } elseif ((string)$a->album_checked === '0000-00-00 00:00:00' && (int)$a->released === 0) {
                     $statusKey   = 'pending';
+                    $statusLabel = 'Entwurf (nicht eingereicht)';
+                    $statusBadge = 'secondary';
+                    $statusIcon  = 'bi-pencil-square';
+                    $countPending++;
+                } elseif ((string)$a->album_checked === '0000-00-00 00:00:00' && (int)$a->released === 1) {
+                    $statusKey   = 'pending';
                     $statusLabel = 'In Prüfung';
                     $statusBadge = 'warning';
                     $statusIcon  = 'bi-hourglass-split';
