@@ -137,8 +137,11 @@ final class PhotoAlbumsController
                     $countOnline++;
                 }
 
-                $onlineAtFormatted = ($a->online_at !== '0000-00-00 00:00:00' && !empty($a->online_at))
-                    ? date('d.m.Y H:i', strtotime((string)$a->online_at))
+                $onlineAtTs = ($a->online_at !== '0000-00-00 00:00:00' && !empty($a->online_at))
+                    ? (int)strtotime((string)$a->online_at)
+                    : 0;
+                $onlineAtFormatted = $onlineAtTs > 0
+                    ? date('d.m.Y H:i', $onlineAtTs)
                     : '-';
 
                 $priceEur = ((int)$a->amount_download) / 100.0;
@@ -156,9 +159,12 @@ final class PhotoAlbumsController
                     'status_badge'     => $statusBadge,
                     'status_icon'      => $statusIcon,
                     'edit_route'       => $editRoute,
-                    'poster_fsk16'     => $apiUrl . '/PhotoAlbumPoster/FSK16/' . rawurlencode($albumIdHash) . '?w=110&cs=' . rawurlencode($checksum),
-                    'poster_fsk18'     => $apiUrl . '/PhotoAlbumPoster/FSK18/' . rawurlencode($albumIdHash) . '?w=110&cs=' . rawurlencode($checksum),
+                    'poster_fsk16'     => $apiUrl . '/PhotoAlbumPoster/FSK16/' . rawurlencode($albumIdHash) . '?w=180&cs=' . rawurlencode($checksum),
+                    'poster_fsk18'     => $apiUrl . '/PhotoAlbumPoster/FSK18/' . rawurlencode($albumIdHash) . '?w=180&cs=' . rawurlencode($checksum),
+                    'zoom_fsk16'       => $apiUrl . '/PhotoAlbumPoster/FSK16/' . rawurlencode($albumIdHash) . '?w=640&cs=' . rawurlencode($checksum),
+                    'zoom_fsk18'       => $apiUrl . '/PhotoAlbumPoster/FSK18/' . rawurlencode($albumIdHash) . '?w=640&cs=' . rawurlencode($checksum),
                     'online_at'        => $onlineAtFormatted,
+                    'online_at_ts'     => $onlineAtTs,
                     'can_delete'       => ((string)$a->album_checked === '0000-00-00 00:00:00' && (int)$a->released !== 1 && !$isOnline),
                 ];
             }
@@ -166,6 +172,7 @@ final class PhotoAlbumsController
 
         return View::render('PhotoAlbums', 'list', [
             'albums'        => $albums,
+            'actorsMap'     => $actorsMap,
             'countTotal'    => count($albums),
             'countOnline'   => $countOnline,
             'countPending'  => $countPending,

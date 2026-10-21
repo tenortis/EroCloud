@@ -16,7 +16,7 @@ description: Das unveränderliche Grundgesetz für alle KI-Interaktionen in dies
     * **Konversation**: Deutsch 🇩🇪 (Du-Form)
     * **Code/Variablen**: Englisch 🇺🇸
     * **Kommentare/Docs**: Englisch 🇺🇸 (Tech) / Deutsch 🇩🇪 (Fachkonzepte)
-* **UI-Texte (Sie-Form):** Alle Texte in der Benutzeroberfläche (Labels, Hinweistexte, Modals, Tooltips) müssen ausnahmslos in der höflichen **Sie-Form** verfasst sein.
+* **UI-Texte (Du-Form):** Alle Texte in der Benutzeroberfläche für Creator/Partner in der EroCloud (Labels, Hinweistexte, Modals, Tooltips, Fehlermeldungen) müssen ausnahmslos in der persönlichen **Du-Form** (`du`, `dein`, `deine`, `dir`, `dich`) verfasst sein.
 
 ## 1. 🏗️ ARCHITEKTUR & STRUKTUR
 * **Projektbereiche:**

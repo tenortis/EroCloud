@@ -64,10 +64,13 @@ class MoviesController
 
         $rsMovies = p4c_query("SELECT
                 `id`, `convert_status`, `file_id`, `checksum`, `filename`, `title`,
-                `movie_checked`, `released`, `actor_id`, `online_at`, `playtime_string`, `resolution`
+                `movie_checked`, `released`, `actor_id`, `online_at`, `playtime_string`, `resolution`,
+                `amount_second`, `as_download`, `amount_download`, `preview`
             FROM `movies`
             WHERE `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted'
             ORDER BY `id` DESC;", __FILE__, __LINE__);
+
+        $nowTs = time();
 
         if ($rsMovies && p4c_num_rows($rsMovies) > 0) {
             while ($m = p4c_fetch_object($rsMovies)) {
@@ -129,9 +132,26 @@ class MoviesController
                     $countPending++;
                 }
 
-                $onlineAtFormatted = ($m->online_at !== '0000-00-00 00:00:00' && !empty($m->online_at))
-                    ? date('d.m.Y H:i', strtotime((string)$m->online_at))
+                $onlineAtTs = ($m->online_at !== '0000-00-00 00:00:00' && !empty($m->online_at))
+                    ? (int)strtotime((string)$m->online_at)
+                    : 0;
+                $onlineAtFormatted = $onlineAtTs > 0
+                    ? date('d.m.Y H:i', $onlineAtTs)
                     : '-';
+
+                $isPreview      = abs((int)($m->preview ?? 0)) === 1;
+                $asDownload     = abs((int)($m->as_download ?? 0)) === 1;
+                $amountSecond   = (float)($m->amount_second ?? 0.8);
+                $amountDownload = abs((int)($m->amount_download ?? 0));
+
+                if ($isPreview || $amountSecond <= 0.0) {
+                    $priceSummary = 'Kostenloser Trailer';
+                } else {
+                    $priceSummary = number_format($amountSecond, 1, ',', '.') . ' Coins/Sek.';
+                    if ($asDownload && $amountDownload > 0) {
+                        $priceSummary .= ' · DL: ' . number_format((float)$amountDownload, 2, ',', '.') . ' €';
+                    }
+                }
 
                 $movies[] = [
                     'id'              => $movieId,
@@ -144,17 +164,23 @@ class MoviesController
                     'status_badge'    => $statusBadge,
                     'status_icon'     => $statusIcon,
                     'edit_route'      => $editRoute,
-                    'poster_fsk16'    => $apiUrl . '/PlayerPoster/FSK16/' . rawurlencode($fileId) . '?w=110&cs=' . rawurlencode($checksum),
-                    'poster_fsk18'    => $apiUrl . '/PlayerPoster/FSK18/' . rawurlencode($fileId) . '?w=110&cs=' . rawurlencode($checksum),
+                    'poster_fsk16'    => $apiUrl . '/PlayerPoster/FSK16/' . rawurlencode($fileId) . '?w=180&cs=' . rawurlencode($checksum),
+                    'poster_fsk18'    => $apiUrl . '/PlayerPoster/FSK18/' . rawurlencode($fileId) . '?w=180&cs=' . rawurlencode($checksum),
+                    'zoom_fsk16'      => $apiUrl . '/PlayerPoster/FSK16/' . rawurlencode($fileId) . '?w=640&cs=' . rawurlencode($checksum),
+                    'zoom_fsk18'      => $apiUrl . '/PlayerPoster/FSK18/' . rawurlencode($fileId) . '?w=640&cs=' . rawurlencode($checksum),
                     'online_at'       => $onlineAtFormatted,
+                    'online_at_ts'    => $onlineAtTs,
+                    'is_scheduled'    => ($statusKey === 'online' && $onlineAtTs > $nowTs),
                     'playtime_string' => (string)($m->playtime_string ?? ''),
                     'resolution'      => (string)($m->resolution ?? ''),
+                    'price_summary'   => $priceSummary,
                 ];
             }
         }
 
         return View::render('Movies', 'list', [
             'movies'        => $movies,
+            'actorsMap'     => $actorsMap,
             'countTotal'    => count($movies),
             'countOnline'   => $countOnline,
             'countPending'  => $countPending,

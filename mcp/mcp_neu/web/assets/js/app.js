@@ -15,6 +15,7 @@ const App = {
     this.initTheme();
     this.initRouter();
     this.initApiKeyCopy();
+    this.initGlobalTopbarSearch();
     this.initSessionKeepAlive();
   },
 
@@ -145,6 +146,8 @@ const App = {
     const contentArea = document.getElementById('app-content');
     if (!contentArea) return;
 
+    this.hideThumbZoomPopover();
+
     contentArea.innerHTML = `
       <div class="d-flex align-items-center justify-content-center p-5">
         <div class="spinner-border ec-text-primary me-2" role="status"></div>
@@ -217,8 +220,460 @@ const App = {
   initDynamicEvents() {
     this.initContentRulesEvents();
     this.initActorsEvents();
+    this.initSmartContentTable();
+    this.initThumbnailHoverZoom();
     this.initMoviesEvents();
     this.initPhotoAlbumsEvents();
+  },
+
+  // Globale Schnellsuche in der Topbar: Filtert live auf #/movies oder #/photo-albums bzw. wechselt bei Enter zu #/movies
+  initGlobalTopbarSearch() {
+    const globalInput = document.getElementById('global-search-input');
+    if (!globalInput) return;
+
+    globalInput.addEventListener('input', () => {
+      const smartSearch = document.getElementById('smart-search-input');
+      if (smartSearch) {
+        smartSearch.value = globalInput.value;
+        smartSearch.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    });
+
+    globalInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const smartSearch = document.getElementById('smart-search-input');
+        if (!smartSearch && globalInput.value.trim() !== '') {
+          this.pendingGlobalSearch = globalInput.value.trim();
+          window.location.hash = '#/movies';
+        }
+      }
+    });
+  },
+
+  // ========================================================================
+  // 3a. Universelle Smart-Table (Live-Suche, Sortierung, KPI-Filter & Pagination)
+  // ========================================================================
+  initSmartContentTable() {
+    const container = document.getElementById('smart-table-container');
+    const tbody = document.getElementById('smart-table-body');
+    if (!container || !tbody) return;
+
+    const entityLabel = container.getAttribute('data-entity-label') || 'Einträgen';
+    const allRows = Array.from(tbody.querySelectorAll('.js-smart-row'));
+    const totalCount = allRows.length;
+    if (totalCount === 0) return;
+
+    const statusBtns = Array.from(document.querySelectorAll('.js-smart-status-btn'));
+    const kpiCards = Array.from(document.querySelectorAll('.js-smart-kpi-filter'));
+    const actorFilterSelect = document.getElementById('smart-actor-filter');
+    const sortSelect = document.getElementById('smart-sort-select');
+    const searchInput = document.getElementById('smart-search-input');
+    const searchClearBtn = document.getElementById('smart-search-clear');
+    const resetFiltersBtn = document.getElementById('smart-reset-filters-btn');
+    const emptyStateEl = document.getElementById('smart-table-empty');
+    const paginationBar = document.getElementById('smart-pagination-bar');
+    const paginationInfo = document.getElementById('smart-pagination-info');
+    const paginationBtns = document.getElementById('smart-pagination-buttons');
+    const pageSizeSelect = document.getElementById('smart-page-size');
+    const sortableHeaders = Array.from(container.querySelectorAll('.kkc-sortable-th'));
+
+    let state = {
+      status: 'all',
+      actorId: 'all',
+      query: '',
+      sortCol: 'id',
+      sortDir: 'desc',
+      page: 1,
+      pageSize: 25
+    };
+
+    // Falls eine Suche aus der Topbar übergeben wurde, direkt übernehmen
+    if (this.pendingGlobalSearch && searchInput) {
+      searchInput.value = this.pendingGlobalSearch;
+      state.query = this.pendingGlobalSearch.toLowerCase();
+      this.pendingGlobalSearch = '';
+    }
+
+    const syncStatusUI = () => {
+      statusBtns.forEach(btn => {
+        const isActive = (btn.getAttribute('data-filter') === state.status);
+        btn.classList.toggle('active', isActive);
+        btn.classList.toggle('btn-primary-kkc', isActive);
+        btn.classList.toggle('btn-outline-kkc', !isActive);
+      });
+      kpiCards.forEach(card => {
+        const isActive = (card.getAttribute('data-filter') === state.status);
+        card.classList.toggle('active-kpi-filter', isActive);
+      });
+    };
+
+    const syncSortUI = () => {
+      const combined = `${state.sortCol}:${state.sortDir}`;
+      if (sortSelect && Array.from(sortSelect.options).some(o => o.value === combined)) {
+        sortSelect.value = combined;
+      }
+      sortableHeaders.forEach(th => {
+        const col = th.getAttribute('data-sort-col');
+        const icon = th.querySelector('.sort-icon');
+        if (col === state.sortCol) {
+          th.classList.add('is-sorted');
+          if (icon) {
+            if (col === 'id' || col === 'online') {
+              icon.className = state.sortDir === 'asc'
+                ? 'bi bi-sort-numeric-down sort-icon'
+                : 'bi bi-sort-numeric-down-alt sort-icon';
+            } else {
+              icon.className = state.sortDir === 'asc'
+                ? 'bi bi-sort-alpha-down sort-icon'
+                : 'bi bi-sort-alpha-down-alt sort-icon';
+            }
+          }
+        } else {
+          th.classList.remove('is-sorted');
+          if (icon) {
+            icon.className = 'bi bi-arrow-down-up sort-icon';
+          }
+        }
+      });
+    };
+
+    const compareRows = (a, b) => {
+      const dir = state.sortDir === 'asc' ? 1 : -1;
+      const col = state.sortCol;
+
+      if (col === 'id' || col === 'online') {
+        const valA = parseInt(a.getAttribute(`data-${col}`) || '0', 10);
+        const valB = parseInt(b.getAttribute(`data-${col}`) || '0', 10);
+        if (valA !== valB) return (valA - valB) * dir;
+      } else {
+        const strA = a.getAttribute(`data-${col}`) || '';
+        const strB = b.getAttribute(`data-${col}`) || '';
+        const cmp = strA.localeCompare(strB, 'de', { numeric: true, sensitivity: 'base' });
+        if (cmp !== 0) return cmp * dir;
+      }
+
+      // Fallback Tie-Breaker: ID absteigend
+      const idA = parseInt(a.getAttribute('data-id') || '0', 10);
+      const idB = parseInt(b.getAttribute('data-id') || '0', 10);
+      return idB - idA;
+    };
+
+    const renderPaginationButtons = (totalPages) => {
+      if (!paginationBtns) return;
+      paginationBtns.innerHTML = '';
+      if (totalPages <= 1) return;
+
+      const createBtn = (labelHtml, targetPage, disabled = false, active = false, title = '') => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `kkc-page-btn${active ? ' active' : ''}`;
+        btn.disabled = disabled;
+        if (title) btn.title = title;
+        btn.innerHTML = labelHtml;
+        if (!disabled && !active) {
+          btn.addEventListener('click', () => {
+            state.page = targetPage;
+            updateTable(false);
+            container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          });
+        }
+        return btn;
+      };
+
+      // Zurück-Button
+      paginationBtns.appendChild(
+        createBtn('<i class="bi bi-chevron-left"></i>', state.page - 1, state.page <= 1, false, 'Vorherige Seite')
+      );
+
+      // Seitenzahlen mit kompakter Ellipse (max. 7 Buttons)
+      const pages = [];
+      if (totalPages <= 7) {
+        for (let i = 1; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        if (state.page > 3) pages.push('...');
+        const start = Math.max(2, state.page - 1);
+        const end = Math.min(totalPages - 1, state.page + 1);
+        for (let i = start; i <= end; i++) pages.push(i);
+        if (state.page < totalPages - 2) pages.push('...');
+        pages.push(totalPages);
+      }
+
+      pages.forEach(p => {
+        if (p === '...') {
+          const span = document.createElement('span');
+          span.className = 'px-1 text-muted small';
+          span.textContent = '…';
+          paginationBtns.appendChild(span);
+        } else {
+          paginationBtns.appendChild(
+            createBtn(String(p), p, false, p === state.page, `Seite ${p}`)
+          );
+        }
+      });
+
+      // Weiter-Button
+      paginationBtns.appendChild(
+        createBtn('<i class="bi bi-chevron-right"></i>', state.page + 1, state.page >= totalPages, false, 'Nächste Seite')
+      );
+    };
+
+    const updateTable = (resortDom = false) => {
+      if (searchClearBtn) {
+        searchClearBtn.classList.toggle('d-none', state.query === '');
+      }
+
+      if (resortDom) {
+        allRows.sort(compareRows);
+        const frag = document.createDocumentFragment();
+        allRows.forEach(r => frag.appendChild(r));
+        tbody.appendChild(frag);
+      }
+
+      // 1. Filtern nach Status, Darsteller & Suchbegriff (inkl. #ID)
+      const cleanQuery = state.query.trim();
+      const matchedRows = allRows.filter(row => {
+        const rStatus = row.getAttribute('data-status') || '';
+        const rActorId = row.getAttribute('data-actor-id') || '';
+        const rSearch = row.getAttribute('data-search') || '';
+
+        if (state.status !== 'all' && rStatus !== state.status) return false;
+        if (state.actorId !== 'all' && rActorId !== state.actorId) return false;
+        if (cleanQuery !== '' && !rSearch.includes(cleanQuery)) return false;
+        return true;
+      });
+
+      const matchedCount = matchedRows.length;
+      const totalPages = Math.max(1, Math.ceil(matchedCount / state.pageSize));
+      if (state.page > totalPages) state.page = totalPages;
+      if (state.page < 1) state.page = 1;
+
+      const startIdx = (state.page - 1) * state.pageSize;
+      const endIdx = Math.min(startIdx + state.pageSize, matchedCount);
+      const visibleSet = new Set(matchedRows.slice(startIdx, endIdx));
+
+      allRows.forEach(row => {
+        row.style.display = visibleSet.has(row) ? '' : 'none';
+      });
+
+      // Leerzustand bei 0 Treffern
+      if (emptyStateEl) {
+        emptyStateEl.classList.toggle('d-none', matchedCount > 0);
+      }
+      if (paginationBar) {
+        paginationBar.classList.toggle('d-none', matchedCount === 0);
+      }
+
+      if (paginationInfo && matchedCount > 0) {
+        const filterHint = matchedCount < totalCount ? ` (gefiltert aus ${totalCount})` : '';
+        paginationInfo.textContent = `Zeige ${startIdx + 1} bis ${endIdx} von ${matchedCount} ${entityLabel}${filterHint}`;
+      }
+
+      renderPaginationButtons(totalPages);
+    };
+
+    // Event: Status-Buttons & KPI-Kacheln
+    const setStatusFilter = (newStatus) => {
+      state.status = newStatus || 'all';
+      state.page = 1;
+      syncStatusUI();
+      updateTable(false);
+    };
+
+    statusBtns.forEach(btn => {
+      btn.addEventListener('click', () => setStatusFilter(btn.getAttribute('data-filter')));
+    });
+
+    kpiCards.forEach(card => {
+      card.addEventListener('click', () => setStatusFilter(card.getAttribute('data-filter')));
+    });
+
+    // Event: Darsteller-Filter
+    if (actorFilterSelect) {
+      actorFilterSelect.addEventListener('change', () => {
+        state.actorId = actorFilterSelect.value || 'all';
+        state.page = 1;
+        updateTable(false);
+      });
+    }
+
+    // Event: Sortier-Dropdown
+    if (sortSelect) {
+      sortSelect.addEventListener('change', () => {
+        const [col, dir] = (sortSelect.value || 'id:desc').split(':');
+        state.sortCol = col || 'id';
+        state.sortDir = dir || 'desc';
+        state.page = 1;
+        syncSortUI();
+        updateTable(true);
+      });
+    }
+
+    // Event: Klickbare Tabellen-Spaltenköpfe zum Sortieren
+    sortableHeaders.forEach(th => {
+      th.addEventListener('click', () => {
+        const col = th.getAttribute('data-sort-col');
+        if (!col) return;
+        if (state.sortCol === col) {
+          state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          state.sortCol = col;
+          state.sortDir = (col === 'id' || col === 'online') ? 'desc' : 'asc';
+        }
+        state.page = 1;
+        syncSortUI();
+        updateTable(true);
+      });
+    });
+
+    // Event: Echtzeit-Live-Suche
+    if (searchInput) {
+      searchInput.addEventListener('input', () => {
+        state.query = searchInput.value.toLowerCase();
+        state.page = 1;
+        updateTable(false);
+      });
+    }
+
+    if (searchClearBtn && searchInput) {
+      searchClearBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        state.query = '';
+        state.page = 1;
+        searchInput.focus();
+        updateTable(false);
+      });
+    }
+
+    // Event: Filter & Suche zurücksetzen
+    if (resetFiltersBtn) {
+      resetFiltersBtn.addEventListener('click', () => {
+        state.status = 'all';
+        state.actorId = 'all';
+        state.query = '';
+        state.page = 1;
+        if (searchInput) searchInput.value = '';
+        if (actorFilterSelect) actorFilterSelect.value = 'all';
+        syncStatusUI();
+        updateTable(false);
+      });
+    }
+
+    // Event: Einträge pro Seite (25 / 50 / 100 / Alle)
+    if (pageSizeSelect) {
+      pageSizeSelect.addEventListener('change', () => {
+        state.pageSize = parseInt(pageSizeSelect.value || '25', 10) || 25;
+        state.page = 1;
+        updateTable(false);
+      });
+    }
+
+    // Event: Ganze Tabellenzeile klickbar machen
+    allRows.forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('a, button, input, select, label, .js-stop-row-click')) {
+          return;
+        }
+        const editRoute = row.getAttribute('data-edit-route');
+        if (editRoute) {
+          this.hideThumbZoomPopover();
+          window.location.hash = editRoute;
+        }
+      });
+    });
+
+    // Initiales Rendering
+    syncStatusUI();
+    syncSortUI();
+    updateTable(false);
+  },
+
+  // ========================================================================
+  // 3a-2. Schwebende Großbild-Vorschau (Hover-Lupe für FSK16 & FSK18 Cover)
+  // ========================================================================
+  initThumbnailHoverZoom() {
+    const thumbs = document.querySelectorAll('.js-hover-zoom-thumb');
+    if (thumbs.length === 0) return;
+
+    let popover = document.getElementById('ec-thumb-zoom-popover');
+    if (!popover) {
+      popover = document.createElement('div');
+      popover.id = 'ec-thumb-zoom-popover';
+      popover.innerHTML = `
+        <div class="zoom-img-box mb-2">
+          <img id="ec-zoom-popover-img" src="" alt="Vorschau">
+          <span id="ec-zoom-popover-badge" class="badge position-absolute top-0 start-0 m-2 shadow-sm">FSK 16</span>
+        </div>
+        <div id="ec-zoom-popover-title" class="small fw-semibold text-truncate px-1"></div>
+      `;
+      document.body.appendChild(popover);
+    }
+
+    const imgEl = document.getElementById('ec-zoom-popover-img');
+    const badgeEl = document.getElementById('ec-zoom-popover-badge');
+    const titleEl = document.getElementById('ec-zoom-popover-title');
+
+    const positionPopover = (ev) => {
+      const popWidth = 340;
+      const popHeight = 235;
+      const offset = 18;
+      let left = ev.clientX + offset;
+      let top = ev.clientY - Math.round(popHeight / 2);
+
+      if (left + popWidth + 16 > window.innerWidth) {
+        left = ev.clientX - popWidth - offset;
+      }
+      if (top < 12) {
+        top = 12;
+      } else if (top + popHeight + 12 > window.innerHeight) {
+        top = window.innerHeight - popHeight - 12;
+      }
+
+      popover.style.left = `${left}px`;
+      popover.style.top = `${top}px`;
+    };
+
+    thumbs.forEach(thumb => {
+      thumb.addEventListener('mouseenter', (ev) => {
+        const src = thumb.getAttribute('data-zoom-src');
+        const fsk = thumb.getAttribute('data-zoom-fsk') || '16';
+        const title = thumb.getAttribute('data-zoom-title') || '';
+        if (!src || !imgEl) return;
+
+        imgEl.src = src;
+        if (badgeEl) {
+          badgeEl.textContent = `FSK ${fsk} Vorschau`;
+          badgeEl.className = `badge ${fsk === '18' ? 'bg-danger' : 'bg-success'} position-absolute top-0 start-0 m-2 shadow-sm`;
+        }
+        if (titleEl) {
+          titleEl.textContent = title;
+        }
+        positionPopover(ev);
+        popover.classList.add('is-visible');
+      });
+
+      thumb.addEventListener('mousemove', (ev) => {
+        if (popover.classList.contains('is-visible')) {
+          positionPopover(ev);
+        }
+      });
+
+      thumb.addEventListener('mouseleave', () => {
+        this.hideThumbZoomPopover();
+      });
+
+      thumb.addEventListener('click', () => {
+        this.hideThumbZoomPopover();
+      });
+    });
+  },
+
+  hideThumbZoomPopover() {
+    const popover = document.getElementById('ec-thumb-zoom-popover');
+    if (popover) {
+      popover.classList.remove('is-visible');
+    }
   },
 
   // Startseite: Content-Richtlinien bestätigen
@@ -479,45 +934,10 @@ const App = {
   },
 
   // ========================================================================
-  // 3b. Filme (Movies): Übersicht, Filter, Detail-Bearbeitung & 3-Step-Upload
+  // 3b. Filme (Movies): Detail-Bearbeitung & 3-Step-Upload
   // ========================================================================
   initMoviesEvents() {
-    // 1. Filter & Suche in der Film-Übersicht (#/movies)
-    const filterBtns = document.querySelectorAll('.js-movie-filter-btn');
-    const searchInput = document.getElementById('kkc-movies-search');
-    const movieRows = document.querySelectorAll('.js-movie-row');
-
-    const applyMovieFilter = () => {
-      const activeBtn = document.querySelector('.js-movie-filter-btn.active');
-      const statusFilter = activeBtn ? activeBtn.getAttribute('data-filter') : 'all';
-      const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
-
-      movieRows.forEach(row => {
-        const rowStatus = row.getAttribute('data-status') || '';
-        const rowSearch = row.getAttribute('data-search') || '';
-        const matchStatus = (statusFilter === 'all' || rowStatus === statusFilter);
-        const matchSearch = (query === '' || rowSearch.includes(query));
-        row.style.display = (matchStatus && matchSearch) ? '' : 'none';
-      });
-    };
-
-    filterBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        filterBtns.forEach(b => {
-          b.classList.remove('active', 'btn-kkc-primary');
-          b.classList.add('btn-outline-kkc');
-        });
-        btn.classList.remove('btn-outline-kkc');
-        btn.classList.add('active', 'btn-kkc-primary');
-        applyMovieFilter();
-      });
-    });
-
-    if (searchInput) {
-      searchInput.addEventListener('input', applyMovieFilter);
-    }
-
-    // 2. Film löschen (in Übersicht oder Detailansicht)
+    // 1. Film löschen (in Übersicht oder Detailansicht)
     const deleteBtns = document.querySelectorAll('.js-delete-movie-btn, #btn-delete-movie-detail');
     deleteBtns.forEach(btn => {
       btn.addEventListener('click', async () => {
@@ -843,45 +1263,10 @@ const App = {
   },
 
   // ========================================================================
-  // 3c. Foto-Alben (PhotoAlbums): Übersicht, Cover/Foto-Upload & Bearbeitung
+  // 3c. Foto-Alben (PhotoAlbums): Cover/Foto-Upload & Bearbeitung
   // ========================================================================
   initPhotoAlbumsEvents() {
-    // 1. Filter & Suche in der Foto-Alben-Übersicht (#/photo-albums)
-    const filterBtns = document.querySelectorAll('.js-album-filter-btn');
-    const searchInput = document.getElementById('kkc-albums-search');
-    const albumRows = document.querySelectorAll('.js-album-row');
-
-    const applyAlbumFilter = () => {
-      const activeBtn = document.querySelector('.js-album-filter-btn.active');
-      const statusFilter = activeBtn ? activeBtn.getAttribute('data-filter') : 'all';
-      const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
-
-      albumRows.forEach(row => {
-        const rowStatus = row.getAttribute('data-status') || '';
-        const rowSearch = row.getAttribute('data-search') || '';
-        const matchStatus = (statusFilter === 'all' || rowStatus === statusFilter);
-        const matchSearch = (query === '' || rowSearch.includes(query));
-        row.style.display = (matchStatus && matchSearch) ? '' : 'none';
-      });
-    };
-
-    filterBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        filterBtns.forEach(b => {
-          b.classList.remove('active', 'btn-kkc-primary');
-          b.classList.add('btn-outline-kkc');
-        });
-        btn.classList.remove('btn-outline-kkc');
-        btn.classList.add('active', 'btn-kkc-primary');
-        applyAlbumFilter();
-      });
-    });
-
-    if (searchInput) {
-      searchInput.addEventListener('input', applyAlbumFilter);
-    }
-
-    // 2. Foto-Album löschen
+    // 1. Foto-Album löschen
     document.querySelectorAll('.js-delete-photo-album-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const albumId = btn.getAttribute('data-album-id');
