@@ -22,12 +22,12 @@ if (!defined('SAFE_INC')) {
 
 <!-- 3 Kacheln: Film-Qualität, Render-Einstellungen, Foto-Alben-Qualität -->
 <div class="row g-4 mb-4">
-  <!-- 1. Allgemeine Hinweise zur Qualität Ihrer Filme -->
+  <!-- 1. Allgemeine Hinweise zur Qualität deiner Filme -->
   <div class="col-12 col-lg-4">
     <div class="kkc-card h-100">
       <div class="kkc-card-header">
         <h6 class="mb-0 fw-bold">
-          <i class="bi bi-camera-reels text-primary me-2"></i>Qualität Ihrer Filme
+          <i class="bi bi-camera-reels text-primary me-2"></i>Qualität deiner Filme
         </h6>
       </div>
       <div class="kkc-card-body">
@@ -38,25 +38,25 @@ if (!defined('SAFE_INC')) {
           </li>
           <li>
             <div class="fw-bold text-dark mb-1"><i class="bi bi-fonts text-primary me-1"></i> Aussagekräftiger Filmtitel</div>
-            <div class="text-muted">Wählen Sie einen Filmtitel, der den konkreten Inhalt und die Szene so treffend wie möglich beschreibt.</div>
+            <div class="text-muted">Wähle einen Filmtitel, der den konkreten Inhalt und die Szene so treffend wie möglich beschreibt.</div>
           </li>
           <li>
             <div class="fw-bold text-dark mb-1"><i class="bi bi-card-text text-primary me-1"></i> Ausführliche Beschreibung (SEO)</div>
             <div class="text-muted">
-              Verfassen Sie eine Beschreibung mit möglichst 200 Wörtern oder mehr und achten Sie auf korrekte Rechtschreibung sowie Groß- und Kleinschreibung.
-              Je detaillierter Ihr Text ist, desto besser wird Ihr Film über Suchmaschinen wie Google gefunden.
+              Verfasse eine Beschreibung mit möglichst 200 Wörtern oder mehr und achte auf korrekte Rechtschreibung sowie Groß- und Kleinschreibung.
+              Je detaillierter dein Text ist, desto besser wird dein Film über Suchmaschinen wie Google gefunden.
             </div>
           </li>
           <li>
             <div class="fw-bold text-dark mb-1"><i class="bi bi-brightness-high text-primary me-1"></i> Licht- und Tonverhältnisse</div>
-            <div class="text-muted">Achten Sie beim Dreh stets auf eine gute Ausleuchtung und eine klare, störungsfreie Tonaufnahme.</div>
+            <div class="text-muted">Achte beim Dreh stets auf eine gute Ausleuchtung und eine klare, störungsfreie Tonaufnahme.</div>
           </li>
         </ul>
       </div>
     </div>
   </div>
 
-  <!-- 2. So rendern Sie Ihre Filme richtig -->
+  <!-- 2. So renderst du deine Filme richtig -->
   <div class="col-12 col-lg-4">
     <div class="kkc-card h-100">
       <div class="kkc-card-header">
@@ -66,7 +66,7 @@ if (!defined('SAFE_INC')) {
       </div>
       <div class="kkc-card-body">
         <p class="text-muted small mb-3">
-          Mit den folgenden Export-Einstellungen erzielen Sie in gängigen Schnittprogrammen (z. B. Premiere Pro, DaVinci Resolve, Final Cut) ein optimales MP4-Ergebnis:
+          Mit den folgenden Export-Einstellungen erzielst du in gängigen Schnittprogrammen (z. B. Premiere Pro, DaVinci Resolve, Final Cut) ein optimales MP4-Ergebnis:
         </p>
         <div class="table-responsive">
           <table class="table table-sm small mb-0">
@@ -106,12 +106,12 @@ if (!defined('SAFE_INC')) {
     </div>
   </div>
 
-  <!-- 3. Hinweise zur Qualität Ihrer Foto-Alben -->
+  <!-- 3. Hinweise zur Qualität deiner Foto-Alben -->
   <div class="col-12 col-lg-4">
     <div class="kkc-card h-100">
       <div class="kkc-card-header">
         <h6 class="mb-0 fw-bold">
-          <i class="bi bi-images text-primary me-2"></i>Qualität Ihrer Foto-Alben
+          <i class="bi bi-images text-primary me-2"></i>Qualität deiner Foto-Alben
         </h6>
       </div>
       <div class="kkc-card-body">
@@ -126,11 +126,11 @@ if (!defined('SAFE_INC')) {
           </li>
           <li>
             <div class="fw-bold text-dark mb-1"><i class="bi bi-card-heading text-primary me-1"></i> Albumtitel &amp; Beschreibung</div>
-            <div class="text-muted">Beschreiben Sie das Shooting und das Outfit ausführlich, damit sowohl Kunden als auch Suchmaschinen Ihr Album optimal finden.</div>
+            <div class="text-muted">Beschreibe das Shooting und das Outfit ausführlich, damit sowohl Kunden als auch Suchmaschinen dein Album optimal finden.</div>
           </li>
           <li>
             <div class="fw-bold text-dark mb-1"><i class="bi bi-stars text-primary me-1"></i> Schärfe &amp; Auflösung</div>
-            <div class="text-muted">Veröffentlichen Sie nur scharfe, gut belichtete Aufnahmen, die Ihren eigenen Qualitätsansprüchen gerecht werden.</div>
+            <div class="text-muted">Veröffentliche nur scharfe, gut belichtete Aufnahmen, die deinen eigenen Qualitätsansprüchen gerecht werden.</div>
           </li>
         </ul>
       </div>
@@ -157,7 +157,7 @@ if (!defined('SAFE_INC')) {
             </h2>
             <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
               <div class="accordion-body text-muted small">
-                Wählen Sie in der linken Navigation unter <strong>Profile</strong> den Punkt <strong>Profil anlegen</strong>. Hinterlegen Sie dort Ihren Künstlernamen, Ihre Profilbilder (FSK16 &amp; FSK18) sowie Ihre Steckbrief-Angaben. Nach kurzer Prüfung durch unser Team wird Ihr Profil freigeschaltet.
+                Wähle in der linken Navigation unter <strong>Profile</strong> den Punkt <strong>Profil anlegen</strong>. Hinterlege dort deinen Künstlernamen, deine Profilbilder (FSK16 &amp; FSK18) sowie deine Steckbrief-Angaben. Nach kurzer Prüfung durch unser Team wird dein Profil freigeschaltet.
               </div>
             </div>
           </div>
@@ -170,7 +170,7 @@ if (!defined('SAFE_INC')) {
             </h2>
             <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
               <div class="accordion-body text-muted small">
-                Anhand Ihres Filmtitels, Ihrer Beschreibung und der Merkmale Ihres Darsteller-Profils schlägt unser System passende Kategorien automatisch vor und hebt diese <strong>gelb</strong> hervor. Sie können jederzeit weitere passende Kategorien ergänzen oder anpassen.
+                Anhand deines Filmtitels, deiner Beschreibung und der Merkmale deines Darsteller-Profils schlägt unser System passende Kategorien automatisch vor und hebt diese <strong>gelb</strong> hervor. Du kannst jederzeit weitere passende Kategorien ergänzen oder anpassen.
               </div>
             </div>
           </div>
@@ -183,7 +183,7 @@ if (!defined('SAFE_INC')) {
             </h2>
             <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
               <div class="accordion-body text-muted small">
-                Mit Ihrem persönlichen API-Key (abrufbar links im Menü unter <strong>Mein API-Key</strong>) können Sie Ihre Darsteller-Profile sowie deren Filme und Foto-Alben direkt auf Ihre eigene EroCMS-Webseite importieren. Behandeln Sie diesen Schlüssel bitte stets vertraulich.
+                Mit deinem persönlichen API-Key (abrufbar links im Menü unter <strong>Mein API-Key</strong>) kannst du deine Darsteller-Profile sowie deren Filme und Foto-Alben direkt auf deine eigene EroCMS-Webseite importieren. Behandle diesen Schlüssel bitte stets vertraulich.
               </div>
             </div>
           </div>
@@ -217,7 +217,7 @@ if (!defined('SAFE_INC')) {
             <div class="fw-bold text-primary mb-1">
               Umsätze &amp; Vermarktung <i class="bi bi-box-arrow-up-right ms-1"></i>
             </div>
-            <div class="text-muted">Tipps zur erfolgreichen Vermarktung Ihrer Inhalte über die EroCloud und Pay4Coins.</div>
+            <div class="text-muted">Tipps zur erfolgreichen Vermarktung deiner Inhalte über die EroCloud und Pay4Coins.</div>
           </a>
         </div>
       </div>

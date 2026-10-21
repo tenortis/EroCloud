@@ -103,7 +103,7 @@ class ActorsController
 
         $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
         if ($merchantId === 0) {
-            return '<div class="alert alert-danger m-4">Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.</div>';
+            return '<div class="alert alert-danger m-4">Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.</div>';
         }
 
         $merchant         = new \Merchant($mysql, $merchantId);
@@ -209,7 +209,7 @@ class ActorsController
 
         $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
         if ($merchantId === 0) {
-            return '<div class="alert alert-danger m-4">Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.</div>';
+            return '<div class="alert alert-danger m-4">Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.</div>';
         }
 
         $merchant         = new \Merchant($mysql, $merchantId);
@@ -228,7 +228,7 @@ class ActorsController
                 <i class="bi bi-exclamation-triangle-fill fs-3 text-warning"></i>
                 <div>
                   <div class="fw-bold">Profil-Limit erreicht (' . $countActors . ' von ' . $minActorProfiles . ' Profilen belegt)</div>
-                  <div class="small">Sie haben die maximale Anzahl Ihrer freigeschalteten Darsteller-Profile erreicht. Bitte kontaktieren Sie unseren Support, falls Sie weitere Profile anlegen möchten.</div>
+                  <div class="small">Du hast die maximale Anzahl deiner freigeschalteten Darsteller-Profile erreicht. Bitte kontaktiere unseren Support, falls du weitere Profile anlegen möchtest.</div>
                 </div>
               </div>
               <a href="#/actors" class="btn btn-sm btn-primary-kkc">Zur Profil-Übersicht</a>
@@ -297,7 +297,7 @@ class ActorsController
 
         $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
         if ($merchantId === 0) {
-            return '<div class="alert alert-danger m-4">Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.</div>';
+            return '<div class="alert alert-danger m-4">Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.</div>';
         }
 
         $actorId = abs((int)$this->request->get('id', 0));
@@ -329,7 +329,7 @@ class ActorsController
             <div class="alert alert-danger d-flex align-items-center justify-content-between flex-wrap gap-3 m-4">
               <div>
                 <i class="bi bi-exclamation-octagon-fill me-2"></i>
-                Das angeforderte Darsteller-Profil wurde nicht gefunden oder Sie besitzen keine Berechtigung.
+                Das angeforderte Darsteller-Profil wurde nicht gefunden oder du besitzt keine Berechtigung.
               </div>
               <a href="#/actors" class="btn btn-sm btn-outline-kkc">Zur Profil-Übersicht</a>
             </div>';
@@ -432,7 +432,7 @@ class ActorsController
                 'status'    => 'success',
                 'available' => false,
                 'sanitized' => $sanitized,
-                'message'   => 'Bitte geben Sie mindestens 3 gültige Zeichen (Buchstaben, Zahlen, Bindestrich oder Punkt) ein.',
+                'message'   => 'Bitte gib mindestens 3 gültige Zeichen (Buchstaben, Zahlen, Bindestrich oder Punkt) ein.',
             ]);
             return;
         }
@@ -468,13 +468,13 @@ class ActorsController
 
         $csrfToken = (string)$this->request->post('csrf_token', '');
         if (!Csrf::validate($csrfToken)) {
-            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte laden Sie die Seite neu.', 403);
+            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte lade die Seite neu.', 403);
             return;
         }
 
         $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
         if ($merchantId === 0) {
-            Response::error('Ihre Sitzung ist abgelaufen.', 401);
+            Response::error('Deine Sitzung ist abgelaufen.', 401);
             return;
         }
 
@@ -488,7 +488,7 @@ class ActorsController
         $countActors = abs((int)($cntObj->cnt ?? 0));
 
         if ($countActors >= $minActorProfiles) {
-            Response::error('Sie haben das Limit Ihrer freigeschalteten Darsteller-Profile bereits erreicht.', 400);
+            Response::error('Du hast das Limit deiner freigeschalteten Darsteller-Profile bereits erreicht.', 400);
             return;
         }
 
@@ -496,7 +496,7 @@ class ActorsController
         $username    = self::sanitizeUsername($rawUsername);
 
         if ($username === '' || strlen($username) < 3) {
-            Response::error('Bitte geben Sie einen gültigen Benutzernamen (mindestens 3 Zeichen) ein.', 400);
+            Response::error('Bitte gib einen gültigen Benutzernamen (mindestens 3 Zeichen) ein.', 400);
             return;
         }
 
@@ -506,7 +506,7 @@ class ActorsController
             LIMIT 1;", __FILE__, __LINE__);
 
         if ($rsCheck && p4c_num_rows($rsCheck) > 0) {
-            Response::error("Der Benutzername „{$username}“ ist bereits vergeben. Bitte wählen Sie einen anderen Namen.", 400);
+            Response::error("Der Benutzername „{$username}“ ist bereits vergeben. Bitte wähle einen anderen Namen.", 400);
             return;
         }
 
@@ -583,7 +583,7 @@ class ActorsController
             'status'   => 'success',
             'actor_id' => $actorId,
             'username' => $username,
-            'message'  => "Das Profil „{$username}“ wurde erfolgreich angelegt. Bitte laden Sie nun Ihre FSK16- und FSK18-Profilbilder hoch.",
+            'message'  => "Das Profil „{$username}“ wurde erfolgreich angelegt. Bitte lade nun deine FSK16- und FSK18-Profilbilder hoch.",
         ]);
     }
 
@@ -599,7 +599,7 @@ class ActorsController
 
         $csrfToken = (string)$this->request->post('csrf_token', '');
         if (!Csrf::validate($csrfToken)) {
-            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte laden Sie die Seite neu.', 403);
+            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte lade die Seite neu.', 403);
             return;
         }
 
@@ -619,7 +619,7 @@ class ActorsController
             LIMIT 1;", __FILE__, __LINE__);
 
         if (!$rsActor || p4c_num_rows($rsActor) === 0) {
-            Response::error('Sie besitzen keine Berechtigung zur Bearbeitung dieses Profils.', 403);
+            Response::error('Du besitzt keine Berechtigung zur Bearbeitung dieses Profils.', 403);
             return;
         }
 
@@ -679,7 +679,7 @@ class ActorsController
         Response::json([
             'status'   => 'success',
             'actor_id' => $actorId,
-            'message'  => 'Ihre Profildaten wurden erfolgreich gespeichert.',
+            'message'  => 'Deine Profildaten wurden erfolgreich gespeichert.',
         ]);
     }
 
@@ -695,7 +695,7 @@ class ActorsController
 
         $csrfToken = (string)$this->request->post('csrf_token', '');
         if (!Csrf::validate($csrfToken)) {
-            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte laden Sie die Seite neu.', 403);
+            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte lade die Seite neu.', 403);
             return;
         }
 
@@ -716,14 +716,14 @@ class ActorsController
             LIMIT 1;", __FILE__, __LINE__);
 
         if (!$rsActor || p4c_num_rows($rsActor) === 0) {
-            Response::error('Sie besitzen keine Berechtigung für dieses Darsteller-Profil.', 403);
+            Response::error('Du besitzt keine Berechtigung für dieses Darsteller-Profil.', 403);
             return;
         }
 
         $actorObj = p4c_fetch_object($rsActor);
 
         if (!isset($_FILES['image']) || !is_array($_FILES['image']) || (int)$_FILES['image']['error'] !== UPLOAD_ERR_OK) {
-            Response::error('Bitte wählen Sie eine gültige Bilddatei (JPG oder PNG) zum Hochladen aus.', 400);
+            Response::error('Bitte wähle eine gültige Bilddatei (JPG oder PNG) zum Hochladen aus.', 400);
             return;
         }
 
@@ -756,7 +756,7 @@ class ActorsController
 
         if (!is_dir($targetDir)) {
             if (!@mkdir($targetDir, 0755, true) && !is_dir($targetDir)) {
-                Response::error('Das Zielverzeichnis für Ihr Profilbild konnte nicht erstellt werden.', 500);
+                Response::error('Das Zielverzeichnis für dein Profilbild konnte nicht erstellt werden.', 500);
                 return;
             }
         }
@@ -802,7 +802,7 @@ class ActorsController
             'fsk'       => $fsk,
             'filename'  => $newFilename,
             'image_url' => $imageUrl,
-            'message'   => "Ihr FSK{$fsk}-Profilbild wurde erfolgreich hochgeladen und gespeichert.",
+            'message'   => "Dein FSK{$fsk}-Profilbild wurde erfolgreich hochgeladen und gespeichert.",
         ]);
     }
 

@@ -35,10 +35,10 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
   <div>
     <h1 class="h3 mb-1">
-      <?= $firstname !== '' ? 'Hallo ' . View::e($firstname) . ', schön dass Sie zurück sind!' : 'Meine Startseite' ?>
+      <?= $firstname !== '' ? 'Hallo ' . View::e($firstname) . ', schön dass du zurück bist!' : 'Meine Startseite' ?>
     </h1>
     <p class="text-muted mb-0">
-      Ihre persönlichen Stammdaten wie Ihr Name und Ihre Anschrift sind für Endkunden nicht sichtbar. Nutzer sehen ausschließlich die Angaben, die Sie in Ihren Darsteller-Profilen hinterlegt haben.
+      Deine persönlichen Stammdaten wie dein Name und deine Anschrift sind für Endkunden nicht sichtbar. Nutzer sehen ausschließlich die Angaben, die du in deinen Darsteller-Profilen hinterlegt hast.
     </p>
   </div>
 </div>
@@ -49,13 +49,13 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
   <div class="card-kkc-header ec-bg-primary-subtle">
     <div class="card-title ec-text-primary">
       <i class="bi bi-file-earmark-check-fill"></i>
-      <span>Aktualisierte Nutzungsrichtlinien zur Vermarktung Ihres Contents</span>
+      <span>Aktualisierte Nutzungsrichtlinien zur Vermarktung deines Contents</span>
     </div>
     <span class="badge-kkc badge-kkc-warning">Bestätigung erforderlich</span>
   </div>
   <div class="card-kkc-body">
     <p class="mb-2 fw-semibold">
-      Die Nutzungsrichtlinien zur Vermarktung Ihres Contents wurden aktualisiert. Bitte überprüfen Sie die Änderungen und bestätigen Sie Ihre Zustimmung.
+      Die Nutzungsrichtlinien zur Vermarktung deines Contents wurden aktualisiert. Bitte überprüfe die Änderungen und bestätige deine Zustimmung.
     </p>
     <p class="text-muted small mb-3">
       Die aktualisierten Nutzungsrichtlinien stellen klar, dass das Urheberrecht beim Partner verbleibt, während Cipa Media eine nicht-exklusive Lizenz zur Vermarktung erhält. Zudem wurde konkretisiert, dass Inhalte mindestens ein Jahr online bleiben, bevor sie gelöscht werden können, und dass bereits verkaufte Inhalte für Käufer weiterhin zugänglich bleiben, sofern keine technischen Einschränkungen vorliegen. Außerdem wird die Einhaltung gewerblicher Schutz- und Urheberrechte betont, um rechtliche Verstöße zu vermeiden.
@@ -72,13 +72,13 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
     <div class="modal-content shadow-lg">
       <div class="modal-header border-bottom">
         <h5 class="modal-title font-heading">
-          <i class="bi bi-shield-check ec-text-primary me-2"></i>Regeln zum Vermarkten Ihres Contents über <?= View::e($projectName) ?>
+          <i class="bi bi-shield-check ec-text-primary me-2"></i>Regeln zum Vermarkten deines Contents über <?= View::e($projectName) ?>
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body small">
         <div class="alert alert-warning py-2">
-          Bitte lesen Sie die nachfolgenden Vereinbarungen sorgfältig durch und bestätigen Sie diese am Ende des Dokuments.
+          Bitte lies die nachfolgenden Vereinbarungen sorgfältig durch und bestätige diese am Ende des Dokuments.
         </div>
 
         <div class="text-center my-3 p-3 rounded border" style="background-color: var(--kkc-surface-hover);">
@@ -131,7 +131,7 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
   <div class="d-flex align-items-center gap-2">
     <i class="bi bi-exclamation-triangle-fill fs-5"></i>
     <span>
-      Mindestens eines Ihrer <a href="#/actors" class="fw-bold text-reset">Darsteller-Profile</a> ist aktuell noch nicht aktiviert. Sollten Sie Fragen zur Freischaltung haben, wenden Sie sich bitte an unseren Support.
+      Mindestens eines deiner <a href="#/actors" class="fw-bold text-reset">Darsteller-Profile</a> ist aktuell noch nicht aktiviert. Solltest du Fragen zur Freischaltung haben, wende dich bitte an unseren Support.
     </span>
   </div>
   <button type="button" class="btn btn-sm btn-outline-kkc" data-bs-toggle="modal" data-bs-target="#modal-support">
@@ -306,7 +306,7 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
         <?php if (empty($recentContents)): ?>
         <div class="p-4 text-center text-muted">
           <i class="bi bi-film fs-2 d-block mb-2 ec-text-primary"></i>
-          Sie haben aktuell noch keine Filme in die EroCloud hochgeladen.
+          Du hast aktuell noch keine Filme in die EroCloud hochgeladen.
           <?php if ($actorsTotal > 0): ?>
           <div class="mt-3">
             <a href="#/movie-upload" class="btn btn-sm btn-primary-kkc">
@@ -370,7 +370,7 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
       <div class="card-kkc-header">
         <div class="card-title">
           <i class="bi bi-people-fill ec-text-primary"></i>
-          <span>Ihre Darsteller-Profile (<?= (int)$actorsTotal ?>)</span>
+          <span>Deine Darsteller-Profile (<?= (int)$actorsTotal ?>)</span>
         </div>
         <?php if ($canCreateActor): ?>
         <a href="#/new-actor" class="btn btn-sm btn-outline-kkc py-1" style="font-size: 0.78rem;">
@@ -382,7 +382,7 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
         <?php if (empty($actors)): ?>
         <div class="p-4 text-center text-muted">
           <i class="bi bi-person-plus fs-2 d-block mb-2 ec-text-primary"></i>
-          Sie haben noch kein Darsteller-Profil angelegt. Bitte erstellen Sie zunächst ein Profil, um Filme und Fotoalben hochladen zu können.
+          Du hast noch kein Darsteller-Profil angelegt. Bitte erstelle zunächst ein Profil, um Filme und Fotoalben hochladen zu können.
           <div class="mt-3">
             <a href="#/new-actor" class="btn btn-sm btn-primary-kkc">
               <i class="bi bi-person-plus-fill me-1"></i> Jetzt Profil anlegen
@@ -467,7 +467,7 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
           <div>
             <div class="fw-semibold">Content-Richtlinien akzeptiert</div>
             <div class="text-muted small">
-              Sie haben den Nutzungsrichtlinien zur Vermarktung Ihres Contents zugestimmt (am <?= View::e(date('d.m.Y H:i', strtotime($acceptContentRulesDate))) ?> Uhr).
+              Du hast den Nutzungsrichtlinien zur Vermarktung deines Contents zugestimmt (am <?= View::e(date('d.m.Y H:i', strtotime($acceptContentRulesDate))) ?> Uhr).
             </div>
           </div>
           <?php else: ?>
@@ -475,7 +475,7 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
           <div>
             <div class="fw-semibold">Zustimmung zu den Content-Richtlinien ausstehend</div>
             <div class="text-muted small">
-              Bitte bestätigen Sie oben die aktuellen Nutzungsrichtlinien zur Vermarktung Ihres Contents.
+              Bitte bestätige oben die aktuellen Nutzungsrichtlinien zur Vermarktung deines Contents.
             </div>
           </div>
           <?php endif; ?>
@@ -485,7 +485,7 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
           <div>
             <div class="fw-semibold">Support &amp; Hilfe bei Fragen</div>
             <div class="text-muted small mb-2">
-              Bei Fragen zur Freischaltung Ihrer Darsteller-Profile oder zur Konvertierung Ihrer Filme steht Ihnen unser Support jederzeit zur Verfügung.
+              Bei Fragen zur Freischaltung deiner Darsteller-Profile oder zur Konvertierung deiner Filme steht dir unser Support jederzeit zur Verfügung.
             </div>
             <button type="button" class="btn btn-sm btn-outline-kkc py-1" data-bs-toggle="modal" data-bs-target="#modal-support">
               <i class="bi bi-headset me-1"></i> Support kontaktieren

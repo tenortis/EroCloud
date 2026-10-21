@@ -7,7 +7,7 @@ if (!defined('SAFE_INC')) {
 
 /**
  * EroCloud MCP (v2.0) - Darsteller-Profil Formular (Neuanlage & Bearbeitung)
- * Alle UI-Texte strikt in höflicher Sie-Form (@master.md).
+ * Alle UI-Texte strikt in persönlicher Du-Form (@master.md).
  *
  * @var string $mode             'create' oder 'edit'
  * @var array  $actor            Darsteller-Datensatz
@@ -59,7 +59,7 @@ $backRoute = ($countActors > 1) ? '#/actors' : '#/startseite';
         <?php if ($isEdit): ?>
           Profil-ID #<?= $actorId ?> · Zugeordneter Content: <strong><?= (int)$actor['movies_count'] ?></strong> Filme, <strong><?= (int)$actor['albums_count'] ?></strong> Fotoalben
         <?php else: ?>
-          Legen Sie hier ein neues Darsteller-Profil an (<?= (int)$countActors ?> von <?= (int)$minActorProfiles ?> Profilen belegt).
+          Lege hier ein neues Darsteller-Profil an (<?= (int)$countActors ?> von <?= (int)$minActorProfiles ?> Profilen belegt).
         <?php endif; ?>
       </p>
     </div>
@@ -87,7 +87,7 @@ $backRoute = ($countActors > 1) ? '#/actors' : '#/startseite';
     <div class="small">
       <?= $actor['locked_reason'] !== ''
           ? htmlspecialchars((string)$actor['locked_reason'], ENT_QUOTES, 'UTF-8')
-          : 'Bitte wenden Sie sich bei Rückfragen an unseren Support.' ?>
+          : 'Bitte wende dich bei Rückfragen an unseren Support.' ?>
     </div>
   </div>
 </div>
@@ -95,7 +95,7 @@ $backRoute = ($countActors > 1) ? '#/actors' : '#/startseite';
 <div class="alert alert-warning d-flex align-items-center gap-3 py-2 px-3 mb-4 small">
   <i class="bi bi-hourglass-split fs-5 text-warning flex-shrink-0"></i>
   <div>
-    <strong>Hinweis:</strong> Ihr Profil befindet sich aktuell in der Prüfung durch unser Support-Team. Sie können Ihre Angaben und Profilbilder jederzeit bearbeiten und ergänzen.
+    <strong>Hinweis:</strong> Dein Profil befindet sich aktuell in der Prüfung durch unser Support-Team. Du kannst deine Angaben und Profilbilder jederzeit bearbeiten und ergänzen.
   </div>
 </div>
 <?php endif; ?>
@@ -247,7 +247,7 @@ $backRoute = ($countActors > 1) ? '#/actors' : '#/startseite';
           </div>
           <ul class="mb-0 ps-3">
             <li>Der Benutzername kann nach dem Anlegen <strong>nicht mehr geändert</strong> werden.</li>
-            <li>Direkt nach dem Speichern können Sie im nächsten Schritt Ihre <strong>FSK16- und FSK18-Profilbilder</strong> hochladen.</li>
+            <li>Direkt nach dem Speichern kannst du im nächsten Schritt deine <strong>FSK16- und FSK18-Profilbilder</strong> hochladen.</li>
           </ul>
         </div>
       </div>
@@ -268,14 +268,14 @@ $backRoute = ($countActors > 1) ? '#/actors' : '#/startseite';
     </div>
 
     <p class="text-muted small mb-3">
-      Beschreiben Sie sich, Ihre Vorlieben oder das, was Ihre Zuschauer über Sie wissen sollten, möglichst ausführlich. Gute Beschreibungstexte steigern Ihre Verkäufe und verbessern die Platzierung in Suchmaschinen.
+      Beschreibe dich, deine Vorlieben oder das, was deine Zuschauer über dich wissen sollten, möglichst ausführlich. Gute Beschreibungstexte steigern deine Verkäufe und verbessern die Platzierung in Suchmaschinen.
     </p>
 
     <textarea name="about_me"
               id="about_me"
               rows="5"
               class="form-control"
-              placeholder="Schreiben Sie hier einen ansprechenden Text über sich..."><?= htmlspecialchars((string)$actor['about_me'], ENT_QUOTES, 'UTF-8') ?></textarea>
+              placeholder="Schreibe hier einen ansprechenden Text über dich..."><?= htmlspecialchars((string)$actor['about_me'], ENT_QUOTES, 'UTF-8') ?></textarea>
   </div>
 
   <!-- Persönliche Angaben & Körperliche Merkmale -->
@@ -286,7 +286,7 @@ $backRoute = ($countActors > 1) ? '#/actors' : '#/startseite';
           <i class="bi bi-sliders ec-text-primary me-2"></i>Steckbrief &amp; körperliche Merkmale
         </h2>
         <p class="text-muted small mb-0">
-          Aktivieren Sie den Schalter „Anzeigen“ bei allen Merkmalen, die öffentlich in Ihrem Steckbrief sichtbar sein sollen.
+          Aktiviere den Schalter „Anzeigen“ bei allen Merkmalen, die öffentlich in deinem Steckbrief sichtbar sein sollen.
         </p>
       </div>
     </div>

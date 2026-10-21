@@ -23,7 +23,7 @@ class Router
     {
         // Authentifizierungs-Prüfung für alle API-Aufrufe
         if (!function_exists('is_logged_in') || is_logged_in('mcp') !== true) {
-            Response::error('Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut über Pay4Coins an.', 401);
+            Response::error('Deine Sitzung ist abgelaufen. Bitte melde dich erneut über Pay4Coins an.', 401);
             return;
         }
 

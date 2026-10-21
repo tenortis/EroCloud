@@ -83,9 +83,9 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
     <div class="alert alert-warning d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
       <div>
         <i class="bi bi-exclamation-triangle-fill me-2"></i>
-        <strong>Hinweis:</strong> Um ein Foto-Album anzulegen, benötigen Sie mindestens ein freigeschaltetes Darsteller-Profil.
+        <strong>Hinweis:</strong> Um ein Foto-Album anzulegen, benötigst du mindestens ein freigeschaltetes Darsteller-Profil.
       </div>
-      <a href="#/actor-new" class="btn btn-sm btn-kkc-primary">Jetzt Darsteller-Profil anlegen</a>
+      <a href="#/new-actor" class="btn btn-sm btn-kkc-primary">Jetzt Darsteller-Profil anlegen</a>
     </div>
   <?php endif; ?>
 
@@ -109,21 +109,27 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
 
               <div class="col-12">
                 <label class="form-label fw-semibold">Beschreibung <span class="text-danger">*</span></label>
-                <textarea name="description" class="form-control" rows="4" maxlength="2000" required
-                          placeholder="Beschreiben Sie Ihr Foto-Album ausführlich (mindestens 30 Zeichen)..."><?= htmlspecialchars($description, ENT_QUOTES, 'UTF-8') ?></textarea>
+                <textarea name="description" class="form-control" rows="10"
+                          style="min-height: 220px; line-height: 1.6;"
+                          maxlength="2000" required
+                          placeholder="Beschreibe dein Foto-Album ausführlich (mindestens 30 Zeichen)..."><?= htmlspecialchars($description, ENT_QUOTES, 'UTF-8') ?></textarea>
               </div>
 
-              <div class="col-12 col-md-6">
-                <label class="form-label fw-semibold">Darsteller-Profil <span class="text-danger">*</span></label>
-                <select name="actor_id" class="form-select" required>
-                  <option value="0">-- Bitte Darsteller auswählen --</option>
-                  <?php foreach ($actors as $act): ?>
-                    <option value="<?= (int)$act['id'] ?>" <?= $actorId === (int)$act['id'] ? 'selected' : '' ?>>
-                      <?= htmlspecialchars((string)$act['username'], ENT_QUOTES, 'UTF-8') ?>
-                    </option>
-                  <?php endforeach; ?>
-                </select>
-              </div>
+              <?php if (count($actors) === 1): ?>
+                <input type="hidden" name="actor_id" value="<?= (int)$actors[0]['id'] ?>">
+              <?php else: ?>
+                <div class="col-12 col-md-6">
+                  <label class="form-label fw-semibold">Darsteller-Profil <span class="text-danger">*</span></label>
+                  <select name="actor_id" class="form-select" required>
+                    <option value="0">-- Bitte Darsteller auswählen --</option>
+                    <?php foreach ($actors as $act): ?>
+                      <option value="<?= (int)$act['id'] ?>" <?= $actorId === (int)$act['id'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars((string)$act['username'], ENT_QUOTES, 'UTF-8') ?>
+                      </option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
+              <?php endif; ?>
 
               <div class="col-12 col-md-6">
                 <label class="form-label fw-semibold">Verkaufspreis (Download)</label>
@@ -141,7 +147,7 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
                 </select>
               </div>
 
-              <div class="col-12">
+              <div class="col-12 <?= count($actors) === 1 ? 'col-md-6' : '' ?>">
                 <label class="form-label fw-semibold">Veröffentlichungsdatum (Online ab)</label>
                 <input type="datetime-local" name="online_at" class="form-control"
                        value="<?= htmlspecialchars($onlineAt, ENT_QUOTES, 'UTF-8') ?>">
@@ -203,7 +209,7 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
         </div>
         <div class="kkc-card-body">
           <p class="text-muted small mb-3">
-            Bitte laden Sie sowohl ein jugendfreies <strong>FSK16-Coverbild</strong> als auch ein <strong>FSK18-Coverbild</strong> hoch (JPG oder PNG, max. 6 MB).
+            Bitte lade sowohl ein jugendfreies <strong>FSK16-Coverbild</strong> als auch ein <strong>FSK18-Coverbild</strong> hoch (JPG oder PNG, max. 6 MB).
           </p>
           <div class="row g-3">
             <div class="col-12 col-sm-6">
@@ -271,8 +277,8 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
             <?php if (empty($photos)): ?>
               <div class="col-12 text-center py-5 border rounded-3 bg-light text-muted small" id="album-photos-empty-hint">
                 <i class="bi bi-images fs-2 d-block mb-2 text-primary"></i>
-                Wählen Sie oben über <strong>„Fotos auswählen &amp; hochladen"</strong> mindestens 4 Fotos (JPG oder PNG) aus.
-                Sie können mehrere Dateien gleichzeitig markieren.
+                Wähle oben über <strong>„Fotos auswählen &amp; hochladen"</strong> mindestens 4 Fotos (JPG oder PNG) aus.
+                Du kannst mehrere Dateien gleichzeitig markieren.
               </div>
             <?php else: ?>
               <?php foreach ($photos as $ph): ?>
@@ -334,9 +340,9 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
                style="width: 72px; height: 72px;">
             <i class="bi bi-check2-all fs-1"></i>
           </div>
-          <h4 class="fw-bold mb-2">Ihr Foto-Album wurde erfolgreich eingereicht!</h4>
+          <h4 class="fw-bold mb-2">Dein Foto-Album wurde erfolgreich eingereicht!</h4>
           <p class="text-muted mb-4">
-            Vielen Dank! Ihr Foto-Album befindet sich nun in der Freigabeprüfung und geht nach erfolgreicher Kontrolle zum gewählten Startzeitpunkt automatisch online.
+            Vielen Dank! Dein Foto-Album befindet sich nun in der Freigabeprüfung und geht nach erfolgreicher Kontrolle zum gewählten Startzeitpunkt automatisch online.
           </p>
           <div class="d-flex justify-content-center flex-wrap gap-3">
             <?php if ($albumDbId > 0): ?>

@@ -34,7 +34,7 @@ final class PhotoAlbumsController
     {
         $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
         if ($merchantId === 0) {
-            return '<div class="alert alert-danger m-4">Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.</div>';
+            return '<div class="alert alert-danger m-4">Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.</div>';
         }
 
         $apiUrl = defined('API_URL') ? API_URL : 'https://api.erocloud.net';
@@ -187,7 +187,7 @@ final class PhotoAlbumsController
     {
         $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
         if ($merchantId === 0) {
-            return '<div class="alert alert-danger m-4">Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.</div>';
+            return '<div class="alert alert-danger m-4">Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.</div>';
         }
 
         $albumDbId = abs((int)$this->request->get('id', 0));
@@ -314,7 +314,7 @@ final class PhotoAlbumsController
     {
         $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
         if ($merchantId === 0) {
-            return '<div class="alert alert-danger m-4">Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.</div>';
+            return '<div class="alert alert-danger m-4">Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.</div>';
         }
 
         $step      = abs((int)$this->request->get('step', 1));
@@ -410,6 +410,9 @@ final class PhotoAlbumsController
         }
 
         $actors = $this->loadActiveMerchantActors($merchantId, (int)$draft['actor_id']);
+        if ((int)$draft['actor_id'] === 0 && count($actors) === 1) {
+            $draft['actor_id'] = (int)$actors[0]['id'];
+        }
 
         return View::render('PhotoAlbums', 'upload', [
             'step'   => $step,
@@ -528,7 +531,7 @@ final class PhotoAlbumsController
 
         Response::json([
             'status'   => 'ok',
-            'message'  => 'Die Basisdaten wurden gespeichert. Bitte laden Sie nun die Coverbilder und Fotos hoch.',
+            'message'  => 'Die Basisdaten wurden gespeichert. Bitte lade nun die Coverbilder und Fotos hoch.',
             'album_id' => $existingId,
             'redirect' => '#/photo-album-upload?step=2&album_id=' . $existingId,
         ]);
@@ -627,7 +630,7 @@ final class PhotoAlbumsController
 
         Response::json([
             'status'  => 'ok',
-            'message' => 'Ihre Änderungen am Foto-Album wurden erfolgreich gespeichert.',
+            'message' => 'Deine Änderungen am Foto-Album wurden erfolgreich gespeichert.',
         ]);
     }
 
@@ -655,7 +658,7 @@ final class PhotoAlbumsController
         $aObj = p4c_fetch_object($rsAlbum);
 
         if (!isset($_FILES['cover']) || !is_array($_FILES['cover']) || (int)$_FILES['cover']['error'] !== UPLOAD_ERR_OK) {
-            Response::error('Bitte wählen Sie eine gültige Bilddatei (JPG oder PNG) aus.', 400);
+            Response::error('Bitte wähle eine gültige Bilddatei (JPG oder PNG) aus.', 400);
         }
 
         $file     = $_FILES['cover'];
@@ -740,7 +743,7 @@ final class PhotoAlbumsController
         $albumIdHash = (string)$aObj->album_id;
 
         if (!isset($_FILES['photos']) || !is_array($_FILES['photos']['name'])) {
-            Response::error('Bitte wählen Sie mindestens eine Bilddatei zum Hochladen aus.', 400);
+            Response::error('Bitte wähle mindestens eine Bilddatei zum Hochladen aus.', 400);
         }
 
         $albumsBasePath = defined('PHOTO_ALBUMS_PATH') ? PHOTO_ALBUMS_PATH : (dirname(__DIR__, 5) . '/priv');
@@ -802,7 +805,7 @@ final class PhotoAlbumsController
         }
 
         if (empty($uploadedPhotos)) {
-            Response::error('Es konnten keine gültigen Fotos verarbeitet werden. Bitte achten Sie auf das Format (JPG/PNG) und max. 6 MB pro Bild.', 400);
+            Response::error('Es konnten keine gültigen Fotos verarbeitet werden. Bitte achte auf das Format (JPG/PNG) und max. 6 MB pro Bild.', 400);
         }
 
         $totalPhotos = $this->recalculatePhotoCount($albumDbId, $albumIdHash, $merchantId, $mysql);
@@ -851,7 +854,7 @@ final class PhotoAlbumsController
         $currentCnt = $cntRow ? abs((int)$cntRow->cnt) : 0;
 
         if ((int)$aObj->released === 1 && $currentCnt <= 4) {
-            Response::error('Ein freigegebenes Foto-Album muss mindestens 4 Fotos enthalten. Bitte laden Sie zuerst ein neues Foto hoch, bevor Sie dieses löschen.', 400);
+            Response::error('Ein freigegebenes Foto-Album muss mindestens 4 Fotos enthalten. Bitte lade zuerst ein neues Foto hoch, bevor du dieses löschst.', 400);
         }
 
         $albumsBasePath = defined('PHOTO_ALBUMS_PATH') ? PHOTO_ALBUMS_PATH : (dirname(__DIR__, 5) . '/priv');
@@ -898,13 +901,13 @@ final class PhotoAlbumsController
         $totalPhotos = $this->recalculatePhotoCount($albumDbId, $albumIdHash, $merchantId, $mysql);
 
         if (trim((string)$aObj->preview_image_fsk16) === '') {
-            Response::error('Bitte laden Sie ein jugendfreies FSK16-Coverbild für Ihr Foto-Album hoch.', 400);
+            Response::error('Bitte lade ein jugendfreies FSK16-Coverbild für dein Foto-Album hoch.', 400);
         }
         if (trim((string)$aObj->preview_image_fsk18) === '') {
-            Response::error('Bitte laden Sie ein FSK18-Coverbild für Ihr Foto-Album hoch.', 400);
+            Response::error('Bitte lade ein FSK18-Coverbild für dein Foto-Album hoch.', 400);
         }
         if ($totalPhotos < 4) {
-            Response::error('Ein Foto-Album muss mindestens 4 Fotos enthalten. Bitte laden Sie noch weitere Fotos hoch.', 400);
+            Response::error('Ein Foto-Album muss mindestens 4 Fotos enthalten. Bitte lade noch weitere Fotos hoch.', 400);
         }
 
         p4c_query("UPDATE `photo_albums` SET
@@ -922,7 +925,7 @@ final class PhotoAlbumsController
 
         Response::json([
             'status'   => 'ok',
-            'message'  => 'Ihr Foto-Album wurde erfolgreich fertiggestellt und zur Prüfung eingereicht.',
+            'message'  => 'Dein Foto-Album wurde erfolgreich fertiggestellt und zur Prüfung eingereicht.',
             'redirect' => '#/photo-album-upload?step=3&album_id=' . $albumDbId,
         ]);
     }
@@ -952,7 +955,7 @@ final class PhotoAlbumsController
         $isAlbumOnline = ($rsOnline && p4c_num_rows($rsOnline) > 0);
 
         if ((string)$aObj->album_checked !== '0000-00-00 00:00:00' || (int)$aObj->released === 1 || $isAlbumOnline) {
-            Response::error('Bereits geprüfte oder veröffentlichte Foto-Alben können aus Sicherheitsgründen nicht direkt gelöscht werden. Bitte wenden Sie sich bei Bedarf an den Support.', 400);
+            Response::error('Bereits geprüfte oder veröffentlichte Foto-Alben können aus Sicherheitsgründen nicht direkt gelöscht werden. Bitte wende dich bei Bedarf an den Support.', 400);
         }
 
         p4c_query("UPDATE `photo_albums` SET `status` = 'deleted', `deleted_datetime` = '0000-00-00 00:00:00' WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
@@ -1010,7 +1013,7 @@ final class PhotoAlbumsController
     ): void {
         $lenTitle = function_exists('mb_strlen') ? mb_strlen($title, 'UTF-8') : strlen($title);
         if ($lenTitle < 5 || $lenTitle > 100) {
-            Response::error('Bitte geben Sie einen Albumtitel zwischen 5 und 100 Zeichen ein.', 400);
+            Response::error('Bitte gib einen Albumtitel zwischen 5 und 100 Zeichen ein.', 400);
         }
         if (function_exists('email_in_string') && email_in_string($title)) {
             Response::error('Der Albumtitel darf keine E-Mail-Adresse enthalten.', 400);
@@ -1021,7 +1024,7 @@ final class PhotoAlbumsController
 
         $lenDesc = function_exists('mb_strlen') ? mb_strlen($description, 'UTF-8') : strlen($description);
         if ($lenDesc < 30 || $lenDesc > 2000) {
-            Response::error('Bitte geben Sie eine ausführliche Beschreibung mit mindestens 30 Zeichen (max. 2.000 Zeichen) ein.', 400);
+            Response::error('Bitte gib eine ausführliche Beschreibung mit mindestens 30 Zeichen (max. 2.000 Zeichen) ein.', 400);
         }
         if (function_exists('email_in_string') && email_in_string($description)) {
             Response::error('Die Beschreibung darf keine E-Mail-Adresse enthalten.', 400);
@@ -1031,7 +1034,7 @@ final class PhotoAlbumsController
         }
 
         if ($actorId <= 0) {
-            Response::error('Bitte wählen Sie ein Darsteller-Profil für dieses Foto-Album aus.', 400);
+            Response::error('Bitte wähle ein Darsteller-Profil für dieses Foto-Album aus.', 400);
         }
         $rsAct = p4c_query("SELECT `id` FROM `actors` WHERE `id` = '" . $actorId . "' AND `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted' LIMIT 1;", __FILE__, __LINE__);
         if (!$rsAct || p4c_num_rows($rsAct) === 0) {
@@ -1041,13 +1044,13 @@ final class PhotoAlbumsController
         if ($validateOnlineAt) {
             $ts = strtotime($onlineAtRaw);
             if ($ts === false) {
-                Response::error('Bitte geben Sie ein gültiges Veröffentlichungsdatum an.', 400);
+                Response::error('Bitte gib ein gültiges Veröffentlichungsdatum an.', 400);
             }
         }
 
         // Preis in Cent: 0 (kostenlos) oder 100..5000 (1,00 EUR bis 50,00 EUR in 100er-Schritten)
         if ($amountDownload < 0 || $amountDownload > 5000 || ($amountDownload % 100 !== 0)) {
-            Response::error('Bitte wählen Sie einen gültigen Verkaufspreis zwischen 0,00 € und 50,00 € aus.', 400);
+            Response::error('Bitte wähle einen gültigen Verkaufspreis zwischen 0,00 € und 50,00 € aus.', 400);
         }
 
         if ($metaTitle !== '') {
@@ -1107,7 +1110,7 @@ final class PhotoAlbumsController
             $token = (string)$this->request->post('csrf_token', '');
         }
         if (!Csrf::validate($token)) {
-            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte laden Sie die Seite neu.', 403);
+            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte lade die Seite neu.', 403);
         }
     }
 
@@ -1115,7 +1118,7 @@ final class PhotoAlbumsController
     {
         $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
         if ($merchantId === 0) {
-            Response::error('Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.', 401);
+            Response::error('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.', 401);
         }
         return $merchantId;
     }
@@ -1127,6 +1130,11 @@ final class PhotoAlbumsController
         }
         $decoded = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $decoded = html_entity_decode($decoded, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        return str_replace(["\r\n", "\r"], "\n", $decoded);
+        $decoded = (string)preg_replace('/<\s*br\s*\/?\s*>/i', "\n", $decoded);
+        $decoded = (string)preg_replace('/<\/\s*p\s*>\s*<\s*p[^>]*>/i', "\n\n", $decoded);
+        $decoded = (string)preg_replace('/<\/?\s*p[^>]*>/i', '', $decoded);
+        $decoded = str_replace(["\r\n", "\r"], "\n", $decoded);
+        $decoded = (string)preg_replace("/\n{3,}/", "\n\n", $decoded);
+        return trim($decoded);
     }
 }

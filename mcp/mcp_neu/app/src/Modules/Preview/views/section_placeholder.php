@@ -53,7 +53,7 @@ use App\Core\View;
           </div>
           <h5 class="fw-bold mb-2"><?= View::e($title) ?></h5>
           <p class="text-muted small mx-auto mb-3" style="max-width: 540px;">
-            Diese Ansicht wurde per <strong>SPA-Fetch ohne Seiten-Reload</strong> geladen. Sobald Sie mit dem Grundgerüst und dem Farbschema zufrieden sind, wird hier die vollständige Geschäftslogik der bisherigen Route <code><?= View::e($legacyRoute) ?></code> implementiert.
+            Diese Ansicht wurde per <strong>SPA-Fetch ohne Seiten-Reload</strong> geladen. Sobald du mit dem Grundgerüst und dem Farbschema zufrieden bist, wird hier die vollständige Geschäftslogik der bisherigen Route <code><?= View::e($legacyRoute) ?></code> implementiert.
           </p>
           <div class="d-flex justify-content-center gap-2 flex-wrap">
             <button type="button" class="btn btn-sm btn-primary-kkc" onclick="App.toast('Beispiel-Aktion für „<?= View::e($title) ?>“ erfolgreich ausgelöst.', 'info')">
@@ -70,7 +70,7 @@ use App\Core\View;
           <div class="col-md-4">
             <div class="p-3 rounded border h-100" style="border-color: var(--kkc-border) !important;">
               <div class="fw-semibold mb-1"><i class="bi bi-check2-square ec-text-primary me-1"></i> Schritt 1: Basisdaten</div>
-              <div class="text-muted small">Übersichtliche Formulareingaben mit direkter Validierung in der Sie-Form.</div>
+              <div class="text-muted small">Übersichtliche Formulareingaben mit direkter Validierung in der Du-Form.</div>
             </div>
           </div>
           <div class="col-md-4">

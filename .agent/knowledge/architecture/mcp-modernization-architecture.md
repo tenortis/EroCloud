@@ -26,7 +26,7 @@ usage: 'Wird automatisch herangezogen bei allen Arbeiten am Neubau des MCP unter
    * `declare(strict_types=1);` und `define('SAFE_INC', 1);`
    * Datenbankzugriff über die zentralen `p4c_*` Wrapper (`p4c_query($sql, __FILE__, __LINE__)`) und zentrales Error-Logging in `/var/www/web1/htdocs/log/.errorlog`.
    * Durchgehend **UTF-8** (keine `ISO-8859-1` Altlasten mehr).
-   * Alle UI-Texte ausnahmslos in der höflichen **Sie-Form**.
+   * Alle UI-Texte ausnahmslos in der persönlichen **Du-Form** (`du`, `dein`, `deine`, `dir`, `dich`).
    * **Kein Studio-Login (`G-...`) mehr:** Es wird ausschließlich der **Pay4Coins-Partner-Login** unterstützt.
 6. **Striktes Verbot von Umsatz-, Provisions- und Verkaufszahlen in der neuen EroCloud:**
    * Die Partner sehen ihre echten Umsätze und Abrechnungen direkt in ihrer **EroCMS-Webseite** oder in ihrem **Pay4Coins-Account**.
@@ -108,7 +108,7 @@ mcp_neu/ (später: mcp/)
 ## 3. 🔐 Login-Flow (Pay4Coins Single-Sign-On)
 
 1. **Ausgeloggter Zustand (`/Startseite` $\rightarrow$ `Home/views/guest.php`):**
-   * Zeigt das moderne EroCloud-Infoportal im hellen Kachel-Design (in höflicher **Sie-Form**, ohne Studio-Login).
+   * Zeigt das moderne EroCloud-Infoportal im hellen Kachel-Design (in persönlicher **Du-Form**, ohne Studio-Login).
    * Der Login-Button führt zu `https://login.pay4coins.com?ref=erocloud`.
 2. **Automatischer Login über Pay4Coins (`web/login.php?pid=XXXXXXXXXX`):**
    * Prüft die 10-stellige `pid` und berechnet `loginHash($pid)` (Browser-Fingerprint + `pid`).
@@ -129,7 +129,7 @@ mcp_neu/ (später: mcp/)
 2. **Startseite (`#/startseite` Dashboard):**
    * **Obere KPI-Reihe (4 einheitliche Kennzahlen-Kacheln ohne Umsätze):** *Filme in der Cloud*, *Fotoalben in der Cloud*, *Darsteller-Profile* und *Inhalte in Prüfung* (Summe aus Filmen und Fotoalben in Prüfung/Konvertierung).
    * **Linke Hauptspalte:** *Schnellzugriff-Kachel* (4 Direktwahl-Kacheln) sowie Tabelle *Zuletzt hochgeladene Filme*.
-   * **Rechte Spalte:** *Ihre Darsteller-Profile* (Kompaktübersicht mit Status & Direktbearbeitung, **ohne** Amoredea-Werbekachel) sowie *Account-Status & Content-Richtlinien*.
+   * **Rechte Spalte:** *Deine Darsteller-Profile* (Kompaktübersicht mit Status & Direktbearbeitung, **ohne** Amoredea-Werbekachel) sowie *Account-Status & Content-Richtlinien*.
 3. **Content-Übersichten (`#/movies` & `#/photo-albums`):**
    * **Obere 4 KPI-Kacheln:** *Gesamtanzahl*, *Online*, *In Prüfung / Konvertierung* sowie *Abgelehnt / Korrektur nötig* (**niemals** Provisionen oder Umsatzzahlen).
    * **Tabellen-Spalten:** Zeigen ausschließlich Verwaltungs- und Statusdaten (*Status*, *ID*, *FSK16/FSK18 Vorschaubilder*, *Titel & technische Details / Verkaufspreis*, *Darsteller*, *Online ab*, *Aktion*) – **ohne** Spalten für Verkäufe oder Provisionen.

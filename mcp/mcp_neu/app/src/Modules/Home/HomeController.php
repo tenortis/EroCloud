@@ -34,7 +34,7 @@ class HomeController
 
         $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
         if ($merchantId <= 0) {
-            return '<div class="alert alert-warning">Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut über Pay4Coins an.</div>';
+            return '<div class="alert alert-warning">Deine Sitzung ist abgelaufen. Bitte melde dich erneut über Pay4Coins an.</div>';
         }
 
         $merchant = new Merchant($mysql, $merchantId);
@@ -54,8 +54,14 @@ class HomeController
         $activeActorsCount = 0;
         $hasInactiveOrBlockedActor = false;
         $actorMap = [];
+        $genderLabels = [
+            'f' => 'Weiblich',
+            'm' => 'Männlich',
+            't' => 'Transgender',
+        ];
 
-        $rsActors = p4c_query("SELECT `id`, `username`, `status`, `profile_image_fsk16`
+        $rsActors = p4c_query("SELECT `id`, `username`, `status`, `locked_reason`, `profile_image_fsk16`, `profile_image_fsk18`,
+                `gender`, `age`, `star_sign`, `body_height`, `body_weight`, `hair_color`, `eye_color`, `cup_size`, `sexual_orientation`, `marital_status`
             FROM `actors`
             WHERE `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted'
             ORDER BY `username` ASC;", __FILE__, __LINE__);
@@ -72,14 +78,27 @@ class HomeController
                     $hasInactiveOrBlockedActor = true;
                 }
 
+                $genderCode = (string)($row->gender ?? 'f');
                 $actorMap[$actorId] = (string)$row->username;
                 $actors[$actorId] = [
-                    'id'           => $actorId,
-                    'username'     => (string)$row->username,
-                    'status'       => $status,
-                    'avatar_fsk16' => (string)$row->profile_image_fsk16,
-                    'movies_count' => 0,
-                    'albums_count' => 0,
+                    'id'                 => $actorId,
+                    'username'           => (string)$row->username,
+                    'status'             => $status,
+                    'locked_reason'      => self::decodeLegacyText((string)($row->locked_reason ?? '')),
+                    'avatar_fsk16'       => trim((string)($row->profile_image_fsk16 ?? '')),
+                    'avatar_fsk18'       => trim((string)($row->profile_image_fsk18 ?? '')),
+                    'gender_label'       => $genderLabels[$genderCode] ?? 'Weiblich',
+                    'age'                => abs((int)($row->age ?? 0)),
+                    'star_sign'          => self::decodeLegacyText((string)($row->star_sign ?? '')),
+                    'body_height'        => abs((int)($row->body_height ?? 0)),
+                    'body_weight'        => abs((int)($row->body_weight ?? 0)),
+                    'hair_color'         => self::decodeLegacyText((string)($row->hair_color ?? '')),
+                    'eye_color'          => self::decodeLegacyText((string)($row->eye_color ?? '')),
+                    'cup_size'           => self::decodeLegacyText((string)($row->cup_size ?? '')),
+                    'sexual_orientation' => self::decodeLegacyText((string)($row->sexual_orientation ?? '')),
+                    'marital_status'     => self::decodeLegacyText((string)($row->marital_status ?? '')),
+                    'movies_count'       => 0,
+                    'albums_count'       => 0,
                 ];
             }
         }
@@ -240,7 +259,7 @@ class HomeController
 
         $confirmed = (string)$this->request->post('upload_content', '');
         if ($confirmed !== '1' && $confirmed !== 'true' && $confirmed !== 'on') {
-            Response::error('Bitte bestätigen Sie die Nutzungsrichtlinien über das Kontrollkästchen.', 400);
+            Response::error('Bitte bestätige die Nutzungsrichtlinien über das Kontrollkästchen.', 400);
         }
 
         p4c_query("UPDATE `merchants` SET `accept_content_rules` = '" . date('Y-m-d H:i:s') . "'
@@ -250,7 +269,7 @@ class HomeController
 
         Response::json([
             'status'  => 'success',
-            'message' => 'Vielen Dank! Ihre Zustimmung zu den Nutzungsrichtlinien wurde gespeichert.',
+            'message' => 'Vielen Dank! Deine Zustimmung zu den Nutzungsrichtlinien wurde gespeichert.',
         ]);
     }
 
@@ -284,5 +303,18 @@ class HomeController
                 }
             }
         }
+    }
+
+    /**
+     * Dekodiert eventuell vorhandene Legacy-HTML-Entities (z.B. &auml; -> ä) sauber nach UTF-8.
+     */
+    private static function decodeLegacyText(string $text): string
+    {
+        if ($text === '') {
+            return '';
+        }
+        $decoded = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $decoded = html_entity_decode($decoded, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        return str_replace(["\r\n", "\r"], "\n", $decoded);
     }
 }

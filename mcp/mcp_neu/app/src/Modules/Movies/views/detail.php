@@ -179,7 +179,7 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
   <div class="alert alert-danger d-flex align-items-start gap-3 mb-4 shadow-sm">
     <i class="bi bi-exclamation-triangle-fill fs-3 text-danger"></i>
     <div>
-      <h6 class="fw-bold mb-1">Ihr Film konnte leider noch nicht freigegeben werden</h6>
+      <h6 class="fw-bold mb-1">Dein Film konnte leider noch nicht freigegeben werden</h6>
       <?php if ($rejectionInfo['reason'] !== ''): ?>
         <div class="fw-semibold mb-1">Grund: <?= htmlspecialchars($rejectionInfo['reason'], ENT_QUOTES, 'UTF-8') ?></div>
       <?php endif; ?>
@@ -187,7 +187,7 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
         <p class="mb-1 small"><?= nl2br(htmlspecialchars($rejectionInfo['text'], ENT_QUOTES, 'UTF-8')) ?></p>
       <?php endif; ?>
       <div class="small text-muted mt-1">
-        Bitte passen Sie die Angaben entsprechend an und klicken Sie anschließend auf <strong>„Änderungen speichern"</strong>, damit Ihr Film erneut geprüft werden kann.
+        Bitte passe die Angaben entsprechend an und klicke anschließend auf <strong>„Änderungen speichern"</strong>, damit dein Film erneut geprüft werden kann.
       </div>
     </div>
   </div>
@@ -196,9 +196,10 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
 <div id="movie-detail-alert-box"></div>
 
 <form id="kkc-movie-edit-form" data-movie-id="<?= $movieId ?>" data-playtime-seconds="<?= $playtimeSeconds ?>">
+  <input type="hidden" name="movie_id" value="<?= $movieId ?>">
   <input type="hidden" name="id" value="<?= $movieId ?>">
-  <input type="hidden" name="preview_image_fsk16" id="input-preview-fsk16" value="<?= $fsk16 ?>">
-  <input type="hidden" name="preview_image_fsk18" id="input-preview-fsk18" value="<?= $fsk18 ?>">
+  <input type="hidden" name="fsk16" id="input-preview-fsk16" value="<?= $fsk16 ?>">
+  <input type="hidden" name="fsk18" id="input-preview-fsk18" value="<?= $fsk18 ?>">
 
   <div class="row g-4">
     <!-- Linke Spalte: Video-Player + Vorschaubilder (FSK16 / FSK18) -->
@@ -214,7 +215,7 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
             <div class="ratio ratio-16x9 rounded-3 overflow-hidden bg-dark shadow-sm">
               <video controls preload="metadata" poster="<?= htmlspecialchars($playerPosterUrl, ENT_QUOTES, 'UTF-8') ?>" class="w-100 h-100">
                 <source src="<?= htmlspecialchars($playerVideoUrl, ENT_QUOTES, 'UTF-8') ?>" type="video/mp4">
-                Ihr Browser unterstützt leider keine HTML5-Videowiedergabe.
+                Dein Browser unterstützt leider keine HTML5-Videowiedergabe.
               </video>
             </div>
           <?php else: ?>
@@ -222,7 +223,7 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
               <div class="spinner-border text-primary mb-2" role="status"></div>
               <h6 class="fw-bold mb-1">Video wird aktuell konvertiert</h6>
               <p class="text-muted small mb-0">
-                Sobald die Konvertierung abgeschlossen ist, stehen Ihnen hier der Video-Player sowie die automatisch generierten Vorschaubilder zur Verfügung.
+                Sobald die Konvertierung abgeschlossen ist, stehen dir hier der Video-Player sowie die automatisch generierten Vorschaubilder zur Verfügung.
               </p>
             </div>
           <?php endif; ?>
@@ -236,7 +237,7 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
         </div>
         <div class="kkc-card-body">
           <p class="text-muted small mb-3">
-            Wählen Sie jeweils ein Vorschaubild für den <strong>FSK16-Bereich</strong> (jugendfrei) und den <strong>FSK18-Bereich</strong> aus oder laden Sie eigene Coverbilder (JPG/PNG, max. 6 MB) hoch.
+            Wähle jeweils ein Vorschaubild für den <strong>FSK16-Bereich</strong> (jugendfrei) und den <strong>FSK18-Bereich</strong> aus oder lade eigene Coverbilder (JPG/PNG, max. 6 MB) hoch.
           </p>
 
           <!-- Aktuelle Auswahl nebeneinander -->
@@ -317,7 +318,7 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
           <?php else: ?>
             <div class="alert alert-light border small mb-0">
               <i class="bi bi-info-circle me-1 text-primary"></i>
-              Automatische Szenenbilder werden während der Video-Konvertierung erstellt. Sie können jedoch jederzeit eigene Coverbilder für FSK16 und FSK18 hochladen.
+              Automatische Szenenbilder werden während der Video-Konvertierung erstellt. Du kannst jedoch jederzeit eigene Coverbilder für FSK16 und FSK18 hochladen.
             </div>
           <?php endif; ?>
         </div>
@@ -339,32 +340,37 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
               <input type="text" name="title" id="movie-title-input" class="form-control"
                      maxlength="100" required
                      value="<?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?>"
-                     placeholder="Geben Sie einen aussagekräftigen Filmtitel ein (mind. 5 Zeichen)">
+                     placeholder="Gib einen aussagekräftigen Filmtitel ein (mind. 5 Zeichen)">
             </div>
 
             <!-- Beschreibung -->
             <div class="col-12">
               <label class="form-label fw-semibold">Filmbeschreibung <span class="text-danger">*</span></label>
-              <textarea name="description" id="movie-desc-input" class="form-control" rows="4"
+              <textarea name="description" id="movie-desc-input" class="form-control" rows="10"
+                        style="min-height: 220px; line-height: 1.6;"
                         maxlength="2000" required
-                        placeholder="Beschreiben Sie den Inhalt des Films ausführlich (mind. 30 Zeichen)..."><?= htmlspecialchars($description, ENT_QUOTES, 'UTF-8') ?></textarea>
+                        placeholder="Beschreibe den Inhalt des Films ausführlich (mind. 30 Zeichen)..."><?= htmlspecialchars($description, ENT_QUOTES, 'UTF-8') ?></textarea>
             </div>
 
-            <!-- Darsteller-Profil -->
-            <div class="col-12 col-md-6">
-              <label class="form-label fw-semibold">Darsteller-Profil <span class="text-danger">*</span></label>
-              <select name="actor_id" class="form-select" required>
-                <option value="0">-- Bitte Darsteller auswählen --</option>
-                <?php foreach ($actors as $act): ?>
-                  <option value="<?= (int)$act['id'] ?>" <?= $actorId === (int)$act['id'] ? 'selected' : '' ?>>
-                    <?= htmlspecialchars((string)$act['username'], ENT_QUOTES, 'UTF-8') ?>
-                  </option>
-                <?php endforeach; ?>
-              </select>
-            </div>
+            <!-- Darsteller-Profil (nur anzeigen, wenn mehrere Darsteller vorhanden sind) -->
+            <?php if (count($actors) === 1): ?>
+              <input type="hidden" name="actor_id" value="<?= (int)$actors[0]['id'] ?>">
+            <?php else: ?>
+              <div class="col-12 col-md-6">
+                <label class="form-label fw-semibold">Darsteller-Profil <span class="text-danger">*</span></label>
+                <select name="actor_id" class="form-select" required>
+                  <option value="0">-- Bitte Darsteller auswählen --</option>
+                  <?php foreach ($actors as $act): ?>
+                    <option value="<?= (int)$act['id'] ?>" <?= $actorId === (int)$act['id'] ? 'selected' : '' ?>>
+                      <?= htmlspecialchars((string)$act['username'], ENT_QUOTES, 'UTF-8') ?>
+                    </option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+            <?php endif; ?>
 
             <!-- Sichtbar für Website -->
-            <div class="col-12 col-md-6">
+            <div class="col-12 <?= count($actors) === 1 ? '' : 'col-md-6' ?>">
               <label class="form-label fw-semibold">Sichtbarkeit / Portal</label>
               <select name="visible_for_website" class="form-select">
                 <?php foreach ($websites as $ws): ?>
@@ -389,78 +395,88 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
               <?php endif; ?>
             </div>
 
-            <!-- Hauptkategorie & Kostenlose Vorschau -->
+            <!-- Hauptkategorie -->
             <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Hauptkategorie</label>
               <select name="category_master" class="form-select">
-                <option value="porn" <?= $categoryMaster === 'porn' ? 'selected' : '' ?>>Porn (Hardcore / FSK18)</option>
-                <option value="erotic" <?= $categoryMaster === 'erotic' ? 'selected' : '' ?>>Erotik / Softcore</option>
+                <option value="porn" <?= $categoryMaster === 'porn' ? 'selected' : '' ?>>Porno (Hardcore / FSK18)</option>
+                <option value="fetish" <?= ($categoryMaster === 'fetish' || $categoryMaster === 'erotic') ? 'selected' : '' ?>>Fetisch (SM, BDSM u.a.)</option>
               </select>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Preisgestaltung (Streaming & Download) -->
+      <!-- Preisgestaltung (Streaming, Download & Trailer-Option) -->
       <div class="kkc-card mb-4">
         <div class="kkc-card-header">
           <h6 class="mb-0 fw-bold"><i class="bi bi-coin me-2 text-primary"></i>Preise &amp; Verkaufsoptionen</h6>
         </div>
         <div class="kkc-card-body">
-          <div class="row g-3 align-items-end">
-            <!-- Streaming-Preis pro Sekunde -->
-            <div class="col-12 col-md-6">
-              <label class="form-label fw-semibold">Streaming-Preis (Coins pro Sekunde)</label>
-              <select name="amount_second" id="movie-amount-second" class="form-select">
-                <?php foreach ($amountSecondOptions as $opt): ?>
-                  <option value="<?= $opt ?>" <?= $amountSecond === $opt ? 'selected' : '' ?>>
-                    <?= str_replace('.', ',', $opt) ?> Coins / Sekunde
-                  </option>
-                <?php endforeach; ?>
-              </select>
-            </div>
-
-            <!-- Live-Berechnung Gesamtpreis für kompletten Stream -->
-            <div class="col-12 col-md-6">
-              <div class="p-2 px-3 rounded-3 bg-primary bg-opacity-10 border border-primary border-opacity-25 d-flex align-items-center justify-content-between">
-                <span class="small fw-semibold text-primary">Gesamtpreis Stream:</span>
-                <span class="fw-bold text-primary fs-6">
-                  ca. <span id="movie-calc-coins"><?= $streamingCoins ?></span> Coins
-                </span>
-              </div>
-            </div>
-
-            <!-- Als Download anbieten -->
-            <div class="col-12 col-md-6">
-              <div class="form-check form-switch mt-2">
-                <input class="form-check-input" type="checkbox" role="switch" id="movie-as-download"
-                       name="as_download" value="1" <?= $asDownload === 1 ? 'checked' : '' ?>>
-                <label class="form-check-label fw-semibold" for="movie-as-download">
-                  Film zusätzlich als Komplett-Download anbieten
-                </label>
-              </div>
-            </div>
-
-            <!-- Download-Preis in EUR -->
-            <div class="col-12 col-md-6" id="movie-download-price-wrap" style="<?= $asDownload === 1 ? '' : 'opacity:0.5;' ?>">
-              <label class="form-label fw-semibold">Download-Verkaufspreis (EUR)</label>
-              <select name="amount_download" id="movie-amount-download" class="form-select" <?= $asDownload === 1 ? '' : 'disabled' ?>>
-                <?php foreach ($downloadEurOptions as $eur): ?>
-                  <option value="<?= $eur ?>" <?= $amountDownload === $eur ? 'selected' : '' ?>>
-                    <?= number_format($eur, 2, ',', '.') ?> € (ca. <?= $eur * 32 ?> Coins)
-                  </option>
-                <?php endforeach; ?>
-              </select>
-            </div>
-
-            <!-- Kostenlose Vorschau (Trailer) -->
+          <div class="row g-3">
+            <!-- Kostenloser Trailer / Vorstellungsvideo -->
             <div class="col-12">
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="movie-preview-switch"
-                       name="preview" value="1" <?= $preview === 1 ? 'checked' : '' ?>>
-                <label class="form-check-label" for="movie-preview-switch">
-                  Kostenlosen Kurz-Trailer für Besucher aktivieren (empfohlen für höhere Verkaufszahlen)
-                </label>
+              <div class="p-3 rounded-3 border <?= $preview === 1 ? 'bg-primary bg-opacity-10 border-primary border-opacity-25' : 'bg-light' ?>" id="movie-trailer-box">
+                <div class="form-check form-switch mb-1">
+                  <input class="form-check-input" type="checkbox" role="switch" id="movie-preview-switch"
+                         name="trailer" value="1" <?= $preview === 1 ? 'checked' : '' ?>>
+                  <label class="form-check-label fw-bold" for="movie-preview-switch">
+                    Dieses Video ist ein kostenloser Trailer / Vorstellungsvideo
+                  </label>
+                </div>
+                <div class="text-muted small">
+                  Schalte diesen Schalter ein, wenn dieses Video ein Trailer oder ein kurzes Vorstellungsvideo ist und deinen Besuchern komplett kostenlos (0 Coins) angeboten werden soll.
+                </div>
+              </div>
+            </div>
+
+            <!-- Preis-Felder (werden bei aktivem Trailer-Schalter automatisch deaktiviert) -->
+            <div class="col-12" id="movie-pricing-fields-wrap" style="<?= $preview === 1 ? 'opacity:0.45; pointer-events:none;' : '' ?>">
+              <div class="row g-3 align-items-end">
+                <!-- Streaming-Preis pro Sekunde -->
+                <div class="col-12 col-md-6">
+                  <label class="form-label fw-semibold">Streaming-Preis (Coins pro Sekunde)</label>
+                  <select name="amount_second" id="movie-amount-second" class="form-select" <?= $preview === 1 ? 'disabled' : '' ?>>
+                    <?php foreach ($amountSecondOptions as $opt): ?>
+                      <option value="<?= $opt ?>" <?= $amountSecond === $opt ? 'selected' : '' ?>>
+                        <?= str_replace('.', ',', $opt) ?> Coins / Sekunde
+                      </option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
+
+                <!-- Live-Berechnung Gesamtpreis für kompletten Stream -->
+                <div class="col-12 col-md-6">
+                  <div class="p-2 px-3 rounded-3 bg-primary bg-opacity-10 border border-primary border-opacity-25 d-flex align-items-center justify-content-between">
+                    <span class="small fw-semibold text-primary">Gesamtpreis Stream:</span>
+                    <span class="fw-bold text-primary fs-6">
+                      ca. <span id="movie-calc-coins"><?= $preview === 1 ? 0 : $streamingCoins ?></span> Coins
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Als Download anbieten -->
+                <div class="col-12 col-md-6">
+                  <div class="form-check form-switch mt-2">
+                    <input class="form-check-input" type="checkbox" role="switch" id="movie-as-download"
+                           name="as_download" value="1" <?= $asDownload === 1 ? 'checked' : '' ?> <?= $preview === 1 ? 'disabled' : '' ?>>
+                    <label class="form-check-label fw-semibold" for="movie-as-download">
+                      Film zusätzlich als Komplett-Download anbieten
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Download-Preis in EUR -->
+                <div class="col-12 col-md-6" id="movie-download-price-wrap" style="<?= $asDownload === 1 ? '' : 'opacity:0.5;' ?>">
+                  <label class="form-label fw-semibold">Download-Verkaufspreis (EUR)</label>
+                  <select name="amount_download" id="movie-amount-download" class="form-select" <?= ($asDownload === 1 && $preview !== 1) ? '' : 'disabled' ?>>
+                    <?php foreach ($downloadEurOptions as $eur): ?>
+                      <option value="<?= $eur ?>" <?= $amountDownload === $eur ? 'selected' : '' ?>>
+                        <?= number_format($eur, 2, ',', '.') ?> € (ca. <?= $eur * 32 ?> Coins)
+                      </option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
@@ -477,7 +493,7 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
           <div class="accordion" id="movieCategoriesAccordion">
             <?php foreach ($categoryGroups as $idx => $group): ?>
               <?php
-              $gId      = (int)$group['id'];
+              $gId      = htmlspecialchars((string)$group['id'], ENT_QUOTES, 'UTF-8');
               $isOpen   = ($idx === 0 || (int)$group['selected_count'] > 0);
               $collapse = 'catCollapse_' . $gId;
               ?>
@@ -511,7 +527,7 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
                             <input type="checkbox"
                                    class="form-check-input mt-0 js-movie-cat-checkbox"
                                    data-group-id="<?= $gId ?>"
-                                   name="categories[]"
+                                   name="category_slave[]"
                                    value="<?= htmlspecialchars($nameId, ENT_QUOTES, 'UTF-8') ?>"
                                    <?= $isChecked ? 'checked' : '' ?>>
                             <span class="text-truncate"><?= htmlspecialchars((string)$catItem['label'], ENT_QUOTES, 'UTF-8') ?></span>

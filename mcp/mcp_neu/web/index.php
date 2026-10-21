@@ -180,7 +180,7 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
       <a class="sidebar-link sidebar-submenu-toggle" data-bs-toggle="collapse" href="#submenu-cloud" role="button" aria-expanded="false" aria-controls="submenu-cloud">
         <i class="bi bi-cloud-fill"></i>
         <span class="text-nowrap">Content in der Cloud</span>
-        <span id="sidebar-movies-count" class="sidebar-count-badge ms-auto me-1" title="Anzahl Ihrer Filme in der Cloud"><?= (int)$countMovies ?></span>
+        <span id="sidebar-movies-count" class="sidebar-count-badge ms-auto me-1" title="Anzahl deiner Filme in der Cloud"><?= (int)$countMovies ?></span>
         <i class="bi bi-chevron-right chevron-icon ms-0"></i>
       </a>
       <div class="collapse sidebar-submenu" id="submenu-cloud">
@@ -395,7 +395,7 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <label class="form-label small text-muted">Ihr persönlicher API-Schlüssel:</label>
+        <label class="form-label small text-muted">Dein persönlicher API-Schlüssel:</label>
         <div class="input-group mb-2">
           <input type="text" id="input-api-key" class="form-control font-monospace text-center fw-bold" value="<?= htmlspecialchars($apiKey, ENT_QUOTES, 'UTF-8') ?>" readonly>
           <button type="button" id="btn-copy-api-key" class="btn btn-primary-kkc">
@@ -404,16 +404,10 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
         </div>
         <div class="alert alert-warning d-flex align-items-center gap-2 py-2 px-3 small mb-3">
           <i class="bi bi-exclamation-triangle-fill fs-5"></i>
-          <span>Behandeln Sie den API-Key bitte stets vertraulich wie die PIN für Ihr Bankkonto.</span>
+          <span>Behandle den API-Key bitte stets vertraulich wie die PIN für dein Bankkonto.</span>
         </div>
-        <p class="text-muted small mb-2">
-          Der API-Key ermöglicht es Ihnen, Darsteller und deren Content aus der EroCloud direkt auf Ihre eigene Webseite zu importieren.
-        </p>
         <p class="text-muted small mb-0">
-          Weitere Informationen zum Import von Filmen auf Ihre eigene Webseite finden Sie hier:<br>
-          <a href="https://pay4coins.net/2018/07/11/erocloud-wie-importiere-ich-darsteller-auf-meine-webseite/" target="_blank" rel="noopener" class="ec-text-primary text-break">
-            https://pay4coins.net/2018/07/11/erocloud-wie-importiere-ich-darsteller-auf-meine-webseite/
-          </a>
+          Der API-Key ermöglicht es dir, Darsteller und deren Content aus der EroCloud direkt auf deine eigene Webseite zu importieren.
         </p>
       </div>
       <div class="modal-footer border-top">
@@ -435,7 +429,7 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
       </div>
       <div class="modal-body">
         <p class="text-muted small mb-3">
-          Bei Fragen zu Ihrem Account, zur Freischaltung von Profilen oder zum Upload von Filmen und Fotoalben steht Ihnen unser Support-Team gerne zur Verfügung:
+          Bei Fragen zu deinem Account, zur Freischaltung von Profilen oder zum Upload von Filmen und Fotoalben steht dir unser Support-Team gerne zur Verfügung:
         </p>
         <div class="p-3 rounded border mb-3" style="background-color: var(--kkc-surface-hover); border-color: var(--kkc-border) !important;">
           <div class="d-flex align-items-center gap-3 mb-2">

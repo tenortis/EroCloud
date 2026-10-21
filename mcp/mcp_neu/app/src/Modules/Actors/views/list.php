@@ -7,7 +7,7 @@ if (!defined('SAFE_INC')) {
 
 /**
  * EroCloud MCP (v2.0) - Alle Darsteller-Profile (#/actors)
- * Alle UI-Texte strikt in höflicher Sie-Form (@master.md).
+ * Alle UI-Texte strikt in persönlicher Du-Form (@master.md).
  *
  * @var array $actors
  * @var int   $countActors
@@ -26,7 +26,7 @@ if (!defined('SAFE_INC')) {
       <i class="bi bi-people-fill ec-text-primary me-2"></i>Meine Darsteller-Profile
     </h1>
     <p class="text-muted small mb-0">
-      Verwalten Sie hier Ihre Darsteller-Profile, Steckbrief-Angaben sowie Ihre FSK16- und FSK18-Profilbilder.
+      Verwalte hier deine Darsteller-Profile, Steckbrief-Angaben sowie deine FSK16- und FSK18-Profilbilder.
     </p>
   </div>
 
@@ -102,9 +102,9 @@ if (!defined('SAFE_INC')) {
   <div class="kpi-icon-box ec-bg-primary-subtle ec-text-primary mx-auto mb-3" style="width: 56px; height: 56px; font-size: 1.5rem;">
     <i class="bi bi-person-plus-fill"></i>
   </div>
-  <h2 class="h5 font-heading fw-bold mb-2">Sie haben noch kein Darsteller-Profil angelegt</h2>
+  <h2 class="h5 font-heading fw-bold mb-2">Du hast noch kein Darsteller-Profil angelegt</h2>
   <p class="text-muted small mx-auto mb-4" style="max-width: 520px;">
-    Um Filme und Fotoalben in Ihre EroCloud hochzuladen, legen Sie bitte zunächst Ihr erstes Darsteller-Profil an.
+    Um Filme und Fotoalben in deine EroCloud hochzuladen, lege bitte zunächst dein erstes Darsteller-Profil an.
   </p>
   <a href="#/new-actor" class="btn btn-primary-kkc px-4">
     <i class="bi bi-person-plus-fill me-1"></i> Jetzt erstes Profil anlegen
@@ -175,7 +175,7 @@ if (!defined('SAFE_INC')) {
                 <?php if ($actor['fsk16_url'] !== ''): ?>
                   <i class="bi bi-check-circle-fill text-success small" title="FSK16-Bild vorhanden"></i>
                 <?php else: ?>
-                  <i class="bi bi-exclamation-circle-fill text-warning small" title="Bitte laden Sie ein FSK16-Bild hoch"></i>
+                  <i class="bi bi-exclamation-circle-fill text-warning small" title="Bitte lade ein FSK16-Bild hoch"></i>
                 <?php endif; ?>
               </div>
               <?php if ($actor['fsk16_url'] !== ''): ?>
@@ -204,7 +204,7 @@ if (!defined('SAFE_INC')) {
                 <?php if ($actor['fsk18_url'] !== ''): ?>
                   <i class="bi bi-check-circle-fill text-success small" title="FSK18-Bild vorhanden"></i>
                 <?php else: ?>
-                  <i class="bi bi-exclamation-circle-fill text-warning small" title="Bitte laden Sie ein FSK18-Bild hoch"></i>
+                  <i class="bi bi-exclamation-circle-fill text-warning small" title="Bitte lade ein FSK18-Bild hoch"></i>
                 <?php endif; ?>
               </div>
               <?php if ($actor['fsk18_url'] !== ''): ?>

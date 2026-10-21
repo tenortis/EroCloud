@@ -40,7 +40,7 @@ class MoviesController
     {
         $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
         if ($merchantId === 0) {
-            return '<div class="alert alert-danger m-4">Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.</div>';
+            return '<div class="alert alert-danger m-4">Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.</div>';
         }
 
         $apiUrl = defined('API_URL') ? API_URL : 'https://api.erocloud.net';
@@ -197,7 +197,7 @@ class MoviesController
 
         $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
         if ($merchantId === 0) {
-            return '<div class="alert alert-danger m-4">Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.</div>';
+            return '<div class="alert alert-danger m-4">Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.</div>';
         }
 
         $movieId = abs((int)$this->request->get('id', 0));
@@ -351,7 +351,7 @@ class MoviesController
 
         $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
         if ($merchantId === 0) {
-            return '<div class="alert alert-danger m-4">Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.</div>';
+            return '<div class="alert alert-danger m-4">Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.</div>';
         }
 
         $step    = abs((int)$this->request->get('step', 1));
@@ -429,6 +429,11 @@ class MoviesController
         $actors   = $this->loadActiveMerchantActors($merchantId, (int)$draft['actor_id']);
         $websites = $this->loadMerchantWebsites($merchant, (string)$draft['visible_for_website']);
 
+        // Falls nur 1 Darsteller-Profil existiert, dieses automatisch vorauswählen
+        if ((int)$draft['actor_id'] === 0 && count($actors) === 1) {
+            $draft['actor_id'] = (int)$actors[0]['id'];
+        }
+
         // Falls noch keine Website gewählt wurde und der Partner eigene Domains hat, erste Domain vorauswählen
         if ($draft['visible_for_website'] === '' && !empty($websites)) {
             $draft['visible_for_website'] = (string)$websites[0]['value'];
@@ -462,25 +467,24 @@ class MoviesController
             return;
         }
 
-        $csrfToken = (string)$this->request->post('csrf_token', '');
-        if (!Csrf::validate($csrfToken)) {
-            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte laden Sie die Seite neu.', 403);
+        if (!$this->hasValidCsrf()) {
+            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte lade die Seite neu.', 403);
             return;
         }
 
         $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
         if ($merchantId === 0) {
-            Response::error('Ihre Sitzung ist abgelaufen.', 401);
+            Response::error('Deine Sitzung ist abgelaufen.', 401);
             return;
         }
 
-        $movieId  = abs((int)$this->request->post('movie_id', 0));
+        $movieId  = abs((int)$this->request->post('movie_id', $this->request->post('id', 0)));
         $merchant = new \Merchant($mysql, $merchantId);
         $errors   = [];
 
         $title = $this->cleanMovieTitle((string)$this->request->post('title', ''));
         if ($title === '') {
-            $errors[] = 'Bitte geben Sie einen aussagekräftigen Filmtitel an.';
+            $errors[] = 'Bitte gib einen aussagekräftigen Filmtitel an.';
         } elseif (mb_strlen($title, 'UTF-8') > 65) {
             $errors[] = 'Der Filmtitel darf maximal 65 Zeichen lang sein.';
         }
@@ -489,15 +493,18 @@ class MoviesController
         $description = trim(strip_tags((string)$this->request->post('description', ''), $allowedTags));
         $description = str_replace(self::ZERO_WIDTH_SPACES, '', $description);
         if ($description === '') {
-            $errors[] = 'Bitte geben Sie eine aussagekräftige Beschreibung des Films an.';
+            $errors[] = 'Bitte gib eine aussagekräftige Beschreibung des Films an.';
         }
 
         $categoryMaster = trim((string)$this->request->post('category_master', 'porn'));
+        if ($categoryMaster === 'erotic') {
+            $categoryMaster = 'fetish';
+        }
         if (!in_array($categoryMaster, ['porn', 'fetish'], true)) {
             $categoryMaster = 'porn';
         }
 
-        $rawSlaves = $_POST['category_slave'] ?? [];
+        $rawSlaves = $_POST['category_slave'] ?? ($_POST['categories'] ?? []);
         $validSlaves = [];
         if (is_array($rawSlaves)) {
             foreach ($rawSlaves as $s) {
@@ -508,24 +515,29 @@ class MoviesController
             }
         }
         if (count($validSlaves) < 1) {
-            $errors[] = 'Bitte wählen Sie mindestens 1 passende Unterkategorie für den Film aus.';
+            $errors[] = 'Bitte wähle mindestens 1 passende Unterkategorie für den Film aus.';
         }
         $categorySlave = implode(',', array_unique($validSlaves));
 
         $actorId = abs((int)$this->request->post('actor_id', 0));
         if ($actorId <= 0) {
-            $errors[] = 'Bitte wählen Sie ein aktives Darsteller-Profil aus.';
+            $actors = $this->loadActiveMerchantActors($merchantId);
+            if (count($actors) === 1) {
+                $actorId = (int)$actors[0]['id'];
+            } else {
+                $errors[] = 'Bitte wähle ein aktives Darsteller-Profil aus.';
+            }
         }
 
         $rawOnlineAt = trim((string)$this->request->post('online_at', ''));
         $onlineAt    = $rawOnlineAt !== '' ? date('Y-m-d H:i', strtotime($rawOnlineAt)) : date('Y-m-d H:i', strtotime('+90 minutes'));
 
-        $isTrailer = $this->request->post('trailer') !== null;
+        $isTrailer = ($this->request->post('trailer') !== null || $this->request->post('preview') !== null);
         $amountSecond = $isTrailer
             ? '0.0'
             : number_format(max(0.0, min(100.0, (float)$this->request->post('amount_second', 0.8))), 1, '.', '');
 
-        $asDownload = abs((int)$this->request->post('as_download', 1)) === 1 ? 1 : 0;
+        $asDownload = abs((int)$this->request->post('as_download', 0)) === 1 ? 1 : 0;
         $amountDownload = $isTrailer
             ? 0
             : max(0, min(150, abs((int)$this->request->post('amount_download', 10))));
@@ -546,7 +558,7 @@ class MoviesController
             }
         }
         if ($visibleWebsite === '') {
-            $errors[] = 'Bitte wählen Sie eine gültige Website für die Veröffentlichung aus.';
+            $errors[] = 'Bitte wähle eine gültige Website für die Veröffentlichung aus.';
         }
 
         // Prüfung auf doppelten Filmtitel
@@ -558,7 +570,7 @@ class MoviesController
                   AND `id` != '" . $movieId . "'
                 LIMIT 1;", __FILE__, __LINE__);
             if ($rsDup && p4c_num_rows($rsDup) > 0) {
-                $errors[] = 'Sie haben bereits einen anderen Film mit diesem Titel hochgeladen. Bitte wählen Sie einen eindeutigen Titel.';
+                $errors[] = 'Du hast bereits einen anderen Film mit diesem Titel hochgeladen. Bitte wähle einen eindeutigen Titel.';
             }
         }
 
@@ -638,9 +650,10 @@ class MoviesController
         $_SESSION['upload_movie'] = ['movie_id' => $movieId];
 
         Response::json([
-            'status'   => 'success',
+            'status'   => 'ok',
             'movie_id' => $movieId,
-            'message'  => 'Schritt 1 gespeichert. Bitte wählen Sie nun Ihre Videodatei zum Hochladen aus.',
+            'redirect' => '#/movie-upload?step=2&movie_id=' . $movieId,
+            'message'  => 'Schritt 1 gespeichert. Bitte wähle nun deine Videodatei zum Hochladen aus.',
         ]);
     }
 
@@ -654,14 +667,13 @@ class MoviesController
             return;
         }
 
-        $csrfToken = (string)$this->request->post('csrf_token', '');
-        if (!Csrf::validate($csrfToken)) {
-            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte laden Sie die Seite neu.', 403);
+        if (!$this->hasValidCsrf()) {
+            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte lade die Seite neu.', 403);
             return;
         }
 
         $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
-        $movieId    = abs((int)$this->request->post('movie_id', 0));
+        $movieId    = abs((int)$this->request->post('movie_id', $this->request->post('id', 0)));
 
         if ($merchantId === 0 || $movieId === 0) {
             Response::error('Ungültige Film-ID oder abgelaufene Sitzung.', 400);
@@ -680,14 +692,15 @@ class MoviesController
             return;
         }
 
-        if (!isset($_FILES['movie']) || !is_array($_FILES['movie']) || (int)$_FILES['movie']['error'] !== UPLOAD_ERR_OK) {
-            $errCode = isset($_FILES['movie']['error']) ? (int)$_FILES['movie']['error'] : -1;
-            Response::error("Fehler beim Datei-Upload (Code: {$errCode}). Bitte prüfen Sie die Dateigröße (max. 2,0 GB).", 400);
+        $fileUpload = $_FILES['movie'] ?? ($_FILES['video'] ?? null);
+        if (!is_array($fileUpload) || (int)$fileUpload['error'] !== UPLOAD_ERR_OK) {
+            $errCode = is_array($fileUpload) && isset($fileUpload['error']) ? (int)$fileUpload['error'] : -1;
+            Response::error("Fehler beim Datei-Upload (Code: {$errCode}). Bitte prüfe die Dateigröße (max. 2,0 GB).", 400);
             return;
         }
 
-        $fileName    = (string)$_FILES['movie']['name'];
-        $tmpFileName = (string)$_FILES['movie']['tmp_name'];
+        $fileName    = (string)$fileUpload['name'];
+        $tmpFileName = (string)$fileUpload['tmp_name'];
         $extension   = strtolower((string)pathinfo($fileName, PATHINFO_EXTENSION));
         $allowedExts = ['avi', 'flv', 'm4v', 'mkv', 'mov', 'mp4', 'mpg', 'wmv'];
 
@@ -770,9 +783,10 @@ class MoviesController
         }
 
         Response::json([
-            'status'   => 'success',
+            'status'   => 'ok',
             'movie_id' => $movieId,
-            'message'  => 'Ihre Videodatei wurde erfolgreich hochgeladen und wird nun konvertiert.',
+            'redirect' => '#/movie-upload?step=3&movie_id=' . $movieId,
+            'message'  => 'Deine Videodatei wurde erfolgreich hochgeladen und wird nun konvertiert.',
         ]);
     }
 
@@ -788,14 +802,13 @@ class MoviesController
             return;
         }
 
-        $csrfToken = (string)$this->request->post('csrf_token', '');
-        if (!Csrf::validate($csrfToken)) {
-            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte laden Sie die Seite neu.', 403);
+        if (!$this->hasValidCsrf()) {
+            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte lade die Seite neu.', 403);
             return;
         }
 
         $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
-        $movieId    = abs((int)$this->request->post('movie_id', 0));
+        $movieId    = abs((int)$this->request->post('movie_id', $this->request->post('id', 0)));
 
         if ($merchantId === 0 || $movieId === 0) {
             Response::error('Ungültige Film-ID oder abgelaufene Sitzung.', 400);
@@ -810,7 +823,7 @@ class MoviesController
             LIMIT 1;", __FILE__, __LINE__);
 
         if (!$rsMovie || p4c_num_rows($rsMovie) === 0) {
-            Response::error('Sie besitzen keine Berechtigung zur Bearbeitung dieses Films.', 403);
+            Response::error('Du besitzt keine Berechtigung zur Bearbeitung dieses Films.', 403);
             return;
         }
 
@@ -819,7 +832,7 @@ class MoviesController
 
         $title = $this->cleanMovieTitle((string)$this->request->post('title', ''));
         if ($title === '') {
-            $errors[] = 'Bitte geben Sie einen aussagekräftigen Filmtitel an.';
+            $errors[] = 'Bitte gib einen aussagekräftigen Filmtitel an.';
         } elseif (mb_strlen($title, 'UTF-8') > 65) {
             $errors[] = 'Der Filmtitel darf maximal 65 Zeichen lang sein.';
         }
@@ -833,7 +846,7 @@ class MoviesController
                   AND `id` != '" . $movieId . "'
                 LIMIT 1;", __FILE__, __LINE__);
             if ($rsDup && p4c_num_rows($rsDup) > 0) {
-                $errors[] = 'Sie haben bereits einen anderen Film mit diesem Titel hochgeladen.';
+                $errors[] = 'Du hast bereits einen anderen Film mit diesem Titel hochgeladen.';
             }
         }
 
@@ -841,37 +854,45 @@ class MoviesController
         $description = trim(strip_tags((string)$this->request->post('description', ''), $allowedTags));
         $description = str_replace(self::ZERO_WIDTH_SPACES, '', $description);
         if ($description === '') {
-            $errors[] = 'Bitte geben Sie eine aussagekräftige Beschreibung des Films an.';
+            $errors[] = 'Bitte gib eine aussagekräftige Beschreibung des Films an.';
         }
 
         $actorId = abs((int)$this->request->post('actor_id', (int)$mObj->actor_id));
         if ($actorId <= 0) {
-            $errors[] = 'Bitte wählen Sie ein Darsteller-Profil aus.';
+            $actors = $this->loadActiveMerchantActors($merchantId, (int)$mObj->actor_id);
+            if (count($actors) === 1) {
+                $actorId = (int)$actors[0]['id'];
+            } else {
+                $errors[] = 'Bitte wähle ein Darsteller-Profil aus.';
+            }
         }
 
         $fsk16 = (string)$mObj->preview_image_fsk16;
         $fsk18 = (string)$mObj->preview_image_fsk18;
         if ((int)$mObj->convert_status > 1) {
-            $postFsk16 = abs((int)$this->request->post('fsk16', 0));
-            $postFsk18 = abs((int)$this->request->post('fsk18', 0));
+            $postFsk16 = abs((int)$this->request->post('fsk16', $this->request->post('preview_image_fsk16', (int)$mObj->preview_image_fsk16)));
+            $postFsk18 = abs((int)$this->request->post('fsk18', $this->request->post('preview_image_fsk18', (int)$mObj->preview_image_fsk18)));
             if ($postFsk16 <= 0) {
-                $errors[] = 'Bitte wählen Sie ein FSK16-Vorschaubild aus.';
+                $errors[] = 'Bitte wähle ein FSK16-Vorschaubild aus.';
             } else {
                 $fsk16 = (string)$postFsk16;
             }
             if ($postFsk18 <= 0) {
-                $errors[] = 'Bitte wählen Sie ein FSK18-Vorschaubild aus.';
+                $errors[] = 'Bitte wähle ein FSK18-Vorschaubild aus.';
             } else {
                 $fsk18 = (string)$postFsk18;
             }
         }
 
         $categoryMaster = trim((string)$this->request->post('category_master', 'porn'));
+        if ($categoryMaster === 'erotic') {
+            $categoryMaster = 'fetish';
+        }
         if (!in_array($categoryMaster, ['porn', 'fetish'], true)) {
-            $errors[] = 'Bitte wählen Sie eine Hauptkategorie (Porno oder Fetisch) aus.';
+            $errors[] = 'Bitte wähle eine Hauptkategorie (Porno oder Fetisch) aus.';
         }
 
-        $rawSlaves   = $_POST['category_slave'] ?? [];
+        $rawSlaves   = $_POST['category_slave'] ?? ($_POST['categories'] ?? []);
         $validSlaves = [];
         if (is_array($rawSlaves)) {
             foreach ($rawSlaves as $s) {
@@ -882,7 +903,7 @@ class MoviesController
             }
         }
         if (count($validSlaves) < 1) {
-            $errors[] = 'Bitte wählen Sie mindestens 1 passende Unterkategorie aus.';
+            $errors[] = 'Bitte wähle mindestens 1 passende Unterkategorie aus.';
         }
         $categorySlave = implode(',', array_unique($validSlaves));
 
@@ -896,12 +917,12 @@ class MoviesController
             ? date('Y-m-d H:i', strtotime($rawOnlineAt))
             : date('Y-m-d H:i', strtotime((string)$mObj->online_at));
 
-        $isTrailer = $this->request->post('trailer') !== null;
+        $isTrailer = ($this->request->post('trailer') !== null || $this->request->post('preview') !== null);
         $amountSecond = $isTrailer
             ? '0.0'
             : number_format(max(0.0, min(100.0, (float)$this->request->post('amount_second', $mObj->amount_second))), 1, '.', '');
 
-        $asDownload = abs((int)$this->request->post('as_download', (int)$mObj->as_download)) === 1 ? 1 : 0;
+        $asDownload = abs((int)$this->request->post('as_download', 0)) === 1 ? 1 : 0;
         $amountDownload = $isTrailer
             ? 0
             : max(0, min(150, abs((int)$this->request->post('amount_download', (int)$mObj->amount_download))));
@@ -981,9 +1002,9 @@ class MoviesController
         }
 
         Response::json([
-            'status'   => 'success',
+            'status'   => 'ok',
             'movie_id' => $movieId,
-            'message'  => 'Ihre Änderungen wurden gespeichert. Der Film wird nun geprüft und veröffentlicht.',
+            'message'  => 'Deine Änderungen wurden gespeichert. Der Film wird nun geprüft und veröffentlicht.',
         ]);
     }
 
@@ -997,14 +1018,13 @@ class MoviesController
             return;
         }
 
-        $csrfToken = (string)$this->request->post('csrf_token', '');
-        if (!Csrf::validate($csrfToken)) {
-            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte laden Sie die Seite neu.', 403);
+        if (!$this->hasValidCsrf()) {
+            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte lade die Seite neu.', 403);
             return;
         }
 
         $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
-        $movieId    = abs((int)$this->request->post('movie_id', 0));
+        $movieId    = abs((int)$this->request->post('movie_id', $this->request->post('id', 0)));
         $fsk        = abs((int)$this->request->post('fsk', 0));
 
         if ($merchantId === 0 || $movieId === 0 || !in_array($fsk, [16, 18], true)) {
@@ -1020,21 +1040,22 @@ class MoviesController
             LIMIT 1;", __FILE__, __LINE__);
 
         if (!$rsMovie || p4c_num_rows($rsMovie) === 0) {
-            Response::error('Sie besitzen keine Berechtigung für diesen Film.', 403);
+            Response::error('Du besitzt keine Berechtigung für diesen Film.', 403);
             return;
         }
 
-        if (!isset($_FILES['movie_poster']) || !is_array($_FILES['movie_poster']) || (int)$_FILES['movie_poster']['error'] !== UPLOAD_ERR_OK) {
-            Response::error('Bitte wählen Sie eine gültige Bilddatei (JPG oder PNG, max. 5 MB) aus.', 400);
+        $posterUpload = $_FILES['movie_poster'] ?? ($_FILES['poster'] ?? null);
+        if (!is_array($posterUpload) || (int)$posterUpload['error'] !== UPLOAD_ERR_OK) {
+            Response::error('Bitte wähle eine gültige Bilddatei (JPG oder PNG, max. 6 MB) aus.', 400);
             return;
         }
 
-        $fileTmp  = (string)$_FILES['movie_poster']['tmp_name'];
-        $fileName = (string)$_FILES['movie_poster']['name'];
-        $fileSize = abs((int)$_FILES['movie_poster']['size']);
+        $fileTmp  = (string)$posterUpload['tmp_name'];
+        $fileName = (string)$posterUpload['name'];
+        $fileSize = abs((int)$posterUpload['size']);
 
-        if ($fileSize === 0 || $fileSize > 5242880) {
-            Response::error('Die Bilddatei darf maximal 5 MB groß sein.', 400);
+        if ($fileSize === 0 || $fileSize > 6291456) {
+            Response::error('Die Bilddatei darf maximal 6 MB groß sein.', 400);
             return;
         }
 
@@ -1104,11 +1125,12 @@ class MoviesController
         $thumbUrl = $mcpUrl . '/thumb.php?movie_id=' . rawurlencode((string)$mObj->file_id) . '&thumb_number=' . $imgId . '&w=186&t=' . time();
 
         Response::json([
-            'status'       => 'success',
+            'status'       => 'ok',
             'fsk'          => $fsk,
             'thumb_number' => $imgId,
             'thumb_url'    => $thumbUrl,
-            'message'      => "Ihr eigenes FSK{$fsk}-Vorschaubild wurde erfolgreich hochgeladen und ausgewählt.",
+            'preview_url'  => $thumbUrl,
+            'message'      => "Dein eigenes FSK{$fsk}-Vorschaubild wurde erfolgreich hochgeladen und ausgewählt.",
         ]);
     }
 
@@ -1122,14 +1144,13 @@ class MoviesController
             return;
         }
 
-        $csrfToken = (string)$this->request->post('csrf_token', '');
-        if (!Csrf::validate($csrfToken)) {
-            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte laden Sie die Seite neu.', 403);
+        if (!$this->hasValidCsrf()) {
+            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte lade die Seite neu.', 403);
             return;
         }
 
         $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
-        $movieId    = abs((int)$this->request->post('movie_id', 0));
+        $movieId    = abs((int)$this->request->post('movie_id', $this->request->post('id', 0)));
 
         if ($merchantId === 0 || $movieId === 0) {
             Response::error('Ungültige Film-ID.', 400);
@@ -1189,7 +1210,7 @@ class MoviesController
         }
 
         Response::json([
-            'status'  => 'success',
+            'status'  => 'ok',
             'message' => 'Der Film wurde erfolgreich gelöscht.',
         ]);
     }
@@ -1359,6 +1380,18 @@ class MoviesController
         return trim($title);
     }
 
+    private function hasValidCsrf(): bool
+    {
+        $token = $this->request->header('X-CSRF-Token');
+        if ($token === '') {
+            $token = (string)$this->request->post('csrf_token', '');
+        }
+        if ($token === '') {
+            $token = (string)$this->request->post('_csrf', '');
+        }
+        return Csrf::validate($token);
+    }
+
     private static function decodeLegacyText(string $text): string
     {
         if ($text === '') {
@@ -1366,6 +1399,11 @@ class MoviesController
         }
         $decoded = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $decoded = html_entity_decode($decoded, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        return str_replace(["\r\n", "\r"], "\n", $decoded);
+        $decoded = (string)preg_replace('/<\s*br\s*\/?\s*>/i', "\n", $decoded);
+        $decoded = (string)preg_replace('/<\/\s*p\s*>\s*<\s*p[^>]*>/i', "\n\n", $decoded);
+        $decoded = (string)preg_replace('/<\/?\s*p[^>]*>/i', '', $decoded);
+        $decoded = str_replace(["\r\n", "\r"], "\n", $decoded);
+        $decoded = (string)preg_replace("/\n{3,}/", "\n\n", $decoded);
+        return trim($decoded);
     }
 }

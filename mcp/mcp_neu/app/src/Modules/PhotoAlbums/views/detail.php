@@ -146,7 +146,7 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
   <div class="alert alert-danger d-flex align-items-start gap-3 mb-4 shadow-sm">
     <i class="bi bi-exclamation-triangle-fill fs-3 text-danger"></i>
     <div>
-      <h6 class="fw-bold mb-1">Ihr Foto-Album konnte leider noch nicht freigegeben werden</h6>
+      <h6 class="fw-bold mb-1">Dein Foto-Album konnte leider noch nicht freigegeben werden</h6>
       <?php if ($rejectionInfo['reason'] !== ''): ?>
         <div class="fw-semibold mb-1">Grund: <?= htmlspecialchars($rejectionInfo['reason'], ENT_QUOTES, 'UTF-8') ?></div>
       <?php endif; ?>
@@ -154,7 +154,7 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
         <p class="mb-1 small"><?= nl2br(htmlspecialchars($rejectionInfo['text'], ENT_QUOTES, 'UTF-8')) ?></p>
       <?php endif; ?>
       <div class="small text-muted mt-1">
-        Bitte korrigieren Sie die Angaben oder Bilder und klicken Sie anschließend auf <strong>„Änderungen speichern"</strong>.
+        Bitte korrigiere die Angaben oder Bilder und klicke anschließend auf <strong>„Änderungen speichern"</strong>.
       </div>
     </div>
   </div>
@@ -172,7 +172,7 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
       </div>
       <div class="kkc-card-body">
         <p class="text-muted small mb-3">
-          Laden Sie jeweils ein Coverbild für den <strong>FSK16-Bereich</strong> (jugendfrei) und den <strong>FSK18-Bereich</strong> hoch (JPG oder PNG, max. 6 MB).
+          Lade jeweils ein Coverbild für den <strong>FSK16-Bereich</strong> (jugendfrei) und den <strong>FSK18-Bereich</strong> hoch (JPG oder PNG, max. 6 MB).
         </p>
         <div class="row g-3">
           <!-- FSK 16 Cover -->
@@ -242,7 +242,7 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
         <div class="row g-2" id="album-photos-grid">
           <?php if (empty($photos)): ?>
             <div class="col-12 text-center py-4 text-muted small" id="album-photos-empty-hint">
-              Noch keine Fotos im Album vorhanden. Bitte laden Sie mindestens 4 Fotos hoch.
+              Noch keine Fotos im Album vorhanden. Bitte lade mindestens 4 Fotos hoch.
             </div>
           <?php else: ?>
             <?php foreach ($photos as $ph): ?>
@@ -292,21 +292,27 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
 
             <div class="col-12">
               <label class="form-label fw-semibold">Beschreibung <span class="text-danger">*</span></label>
-              <textarea name="description" class="form-control" rows="4" maxlength="2000" required
-                        placeholder="Beschreiben Sie Ihr Foto-Album ausführlich (mind. 30 Zeichen)..."><?= htmlspecialchars($description, ENT_QUOTES, 'UTF-8') ?></textarea>
+              <textarea name="description" class="form-control" rows="10"
+                        style="min-height: 220px; line-height: 1.6;"
+                        maxlength="2000" required
+                        placeholder="Beschreibe dein Foto-Album ausführlich (mind. 30 Zeichen)..."><?= htmlspecialchars($description, ENT_QUOTES, 'UTF-8') ?></textarea>
             </div>
 
-            <div class="col-12 col-md-6">
-              <label class="form-label fw-semibold">Darsteller-Profil <span class="text-danger">*</span></label>
-              <select name="actor_id" class="form-select" required>
-                <option value="0">-- Bitte Darsteller auswählen --</option>
-                <?php foreach ($actors as $act): ?>
-                  <option value="<?= (int)$act['id'] ?>" <?= $actorId === (int)$act['id'] ? 'selected' : '' ?>>
-                    <?= htmlspecialchars((string)$act['username'], ENT_QUOTES, 'UTF-8') ?>
-                  </option>
-                <?php endforeach; ?>
-              </select>
-            </div>
+            <?php if (count($actors) === 1): ?>
+              <input type="hidden" name="actor_id" value="<?= (int)$actors[0]['id'] ?>">
+            <?php else: ?>
+              <div class="col-12 col-md-6">
+                <label class="form-label fw-semibold">Darsteller-Profil <span class="text-danger">*</span></label>
+                <select name="actor_id" class="form-select" required>
+                  <option value="0">-- Bitte Darsteller auswählen --</option>
+                  <?php foreach ($actors as $act): ?>
+                    <option value="<?= (int)$act['id'] ?>" <?= $actorId === (int)$act['id'] ? 'selected' : '' ?>>
+                      <?= htmlspecialchars((string)$act['username'], ENT_QUOTES, 'UTF-8') ?>
+                    </option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+            <?php endif; ?>
 
             <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Verkaufspreis (Download)</label>
@@ -324,7 +330,7 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
               </select>
             </div>
 
-            <div class="col-12">
+            <div class="col-12 <?= count($actors) === 1 ? 'col-md-6' : '' ?>">
               <label class="form-label fw-semibold">Veröffentlichungsdatum (Online ab)</label>
               <?php if ($canEditOnlineAt): ?>
                 <input type="datetime-local" name="online_at" class="form-control"

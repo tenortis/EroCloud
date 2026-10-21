@@ -208,11 +208,11 @@ const App = {
     copyBtn.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(input.value);
-        this.toast('Ihr API-Key wurde in die Zwischenablage kopiert.', 'success');
+        this.toast('Dein API-Key wurde in die Zwischenablage kopiert.', 'success');
       } catch (_) {
         input.select();
         document.execCommand('copy');
-        this.toast('Ihr API-Key wurde in die Zwischenablage kopiert.', 'success');
+        this.toast('Dein API-Key wurde in die Zwischenablage kopiert.', 'success');
       }
     });
   },
@@ -684,7 +684,7 @@ const App = {
 
     submitRulesBtn.addEventListener('click', async () => {
       if (!chkRules.checked) {
-        this.toast('Bitte setzen Sie zuerst das Häkchen zur Bestätigung der Nutzungsrichtlinien.', 'warning');
+        this.toast('Bitte setze zuerst das Häkchen zur Bestätigung der Nutzungsrichtlinien.', 'warning');
         return;
       }
       submitRulesBtn.disabled = true;
@@ -729,7 +729,7 @@ const App = {
       const val = usernameInput.value.trim();
       if (val.length < 3) {
         feedbackEl.className = 'small mt-1 text-muted';
-        feedbackEl.textContent = 'Bitte geben Sie mindestens 3 Zeichen ein.';
+        feedbackEl.textContent = 'Bitte gib mindestens 3 Zeichen ein.';
         return;
       }
 
@@ -945,7 +945,7 @@ const App = {
         const movieTitle = btn.getAttribute('data-movie-title') || (`#${movieId}`);
         if (!movieId) return;
 
-        if (!window.confirm(`Möchten Sie den Film „${movieTitle}" wirklich unwiderruflich löschen?`)) {
+        if (!window.confirm(`Möchtest du den Film „${movieTitle}" wirklich unwiderruflich löschen?`)) {
           return;
         }
 
@@ -979,26 +979,63 @@ const App = {
       });
     });
 
-    // 3. Live-Berechnung Streaming-Coins & Download-Switch
+    // 3. Live-Berechnung Streaming-Coins, Download-Switch & Trailer-Schalter
     const amountSecSelect = document.getElementById('movie-amount-second');
     const calcCoinsSpan = document.getElementById('movie-calc-coins');
     const editForm = document.getElementById('kkc-movie-edit-form');
-    if (amountSecSelect && calcCoinsSpan && editForm) {
-      const playtimeSec = parseFloat(editForm.getAttribute('data-playtime-seconds') || '0');
-      amountSecSelect.addEventListener('change', () => {
-        const rate = parseFloat(amountSecSelect.value || '0.8');
-        calcCoinsSpan.textContent = String(Math.round(playtimeSec * rate));
-      });
-    }
-
+    const previewSwitch = document.getElementById('movie-preview-switch');
+    const pricingWrap = document.getElementById('movie-pricing-fields-wrap');
+    const trailerBox = document.getElementById('movie-trailer-box');
     const asDownloadSwitch = document.getElementById('movie-as-download');
     const downloadWrap = document.getElementById('movie-download-price-wrap');
     const downloadSelect = document.getElementById('movie-amount-download');
+
+    const recalcStreamingCoins = () => {
+      if (!calcCoinsSpan || !editForm) return;
+      if (previewSwitch && previewSwitch.checked) {
+        calcCoinsSpan.textContent = '0';
+        return;
+      }
+      const playtimeSec = parseFloat(editForm.getAttribute('data-playtime-seconds') || '0');
+      const rate = parseFloat(amountSecSelect ? (amountSecSelect.value || '0.8') : '0.8');
+      calcCoinsSpan.textContent = String(Math.round(playtimeSec * rate));
+    };
+
+    if (amountSecSelect) {
+      amountSecSelect.addEventListener('change', recalcStreamingCoins);
+    }
+
     if (asDownloadSwitch && downloadWrap && downloadSelect) {
       asDownloadSwitch.addEventListener('change', () => {
-        const enabled = asDownloadSwitch.checked;
+        const isTrailer = previewSwitch ? previewSwitch.checked : false;
+        const enabled = asDownloadSwitch.checked && !isTrailer;
         downloadSelect.disabled = !enabled;
-        downloadWrap.style.opacity = enabled ? '1' : '0.5';
+        downloadWrap.style.opacity = asDownloadSwitch.checked ? '1' : '0.5';
+      });
+    }
+
+    if (previewSwitch) {
+      previewSwitch.addEventListener('change', () => {
+        const isTrailer = previewSwitch.checked;
+        if (pricingWrap) {
+          pricingWrap.style.opacity = isTrailer ? '0.45' : '1';
+          pricingWrap.style.pointerEvents = isTrailer ? 'none' : '';
+        }
+        if (trailerBox) {
+          trailerBox.className = isTrailer
+            ? 'p-3 rounded-3 border bg-primary bg-opacity-10 border-primary border-opacity-25'
+            : 'p-3 rounded-3 border bg-light';
+        }
+        if (amountSecSelect) {
+          amountSecSelect.disabled = isTrailer;
+        }
+        if (asDownloadSwitch) {
+          asDownloadSwitch.disabled = isTrailer;
+        }
+        if (downloadSelect) {
+          downloadSelect.disabled = isTrailer || !(asDownloadSwitch && asDownloadSwitch.checked);
+        }
+        recalcStreamingCoins();
       });
     }
 
@@ -1037,7 +1074,7 @@ const App = {
         });
         btn.classList.remove('btn-outline-secondary');
         btn.classList.add(fsk === '16' ? 'btn-success' : 'btn-danger');
-        this.toast(`Vorschaubild #${num} für FSK${fsk} ausgewählt. Bitte speichern Sie Ihre Änderungen.`, 'info');
+        this.toast(`Vorschaubild #${num} für FSK${fsk} ausgewählt. Bitte speichere deine Änderungen.`, 'info');
       });
     });
 
@@ -1148,7 +1185,7 @@ const App = {
               window.location.hash = data.redirect;
             }
           } else {
-            this.toast(data.message || 'Bitte überprüfen Sie Ihre Eingaben.', 'danger');
+            this.toast(data.message || 'Bitte überprüfe deine Eingaben.', 'danger');
             if (submitBtn) submitBtn.disabled = false;
           }
         } catch (err) {
@@ -1167,7 +1204,7 @@ const App = {
       btnStartUpload.addEventListener('click', () => {
         const file = videoFileInput.files?.[0];
         if (!file) {
-          this.toast('Bitte wählen Sie zuerst eine Videodatei auf Ihrem Gerät aus.', 'warning');
+          this.toast('Bitte wähle zuerst eine Videodatei auf deinem Gerät aus.', 'warning');
           return;
         }
 
@@ -1273,7 +1310,7 @@ const App = {
         const albumTitle = btn.getAttribute('data-album-title') || (`#${albumId}`);
         if (!albumId) return;
 
-        if (!window.confirm(`Möchten Sie das Foto-Album „${albumTitle}" wirklich löschen?`)) {
+        if (!window.confirm(`Möchtest du das Foto-Album „${albumTitle}" wirklich löschen?`)) {
           return;
         }
 
@@ -1333,7 +1370,7 @@ const App = {
               window.location.hash = data.redirect;
             }
           } else {
-            this.toast(data.message || 'Bitte prüfen Sie Ihre Eingaben.', 'danger');
+            this.toast(data.message || 'Bitte prüfe deine Eingaben.', 'danger');
             if (submitBtn) submitBtn.disabled = false;
           }
         } catch (err) {
@@ -1472,7 +1509,7 @@ const App = {
         const fileId = btn.getAttribute('data-file-id');
         if (!albumId || !fileId) return;
 
-        if (!window.confirm('Möchten Sie dieses Foto wirklich aus dem Album entfernen?')) {
+        if (!window.confirm('Möchtest du dieses Foto wirklich aus dem Album entfernen?')) {
           return;
         }
 
@@ -1553,7 +1590,7 @@ const App = {
               window.location.hash = data.redirect;
             }
           } else {
-            this.toast(data.message || 'Bitte vervollständigen Sie zuerst alle Bilder.', 'warning');
+            this.toast(data.message || 'Bitte vervollständige zuerst alle Bilder.', 'warning');
             btnPublishAlbum.disabled = false;
           }
         } catch (err) {

@@ -28,7 +28,7 @@ final class PreviewController
             'icon'        => 'bi-megaphone-fill',
             'badge'       => 'Partnerprogramm',
             'title'       => 'Kunden werben',
-            'subtitle'    => 'Verwalten Sie Ihre Werbekampagnen und Tracking-Links zur Neukundengewinnung.',
+            'subtitle'    => 'Verwalte deine Werbekampagnen und Tracking-Links zur Neukundengewinnung.',
             'routeKey'    => 'webmaster-ads',
             'legacyRoute' => '/Webmaster/Ads',
         ]);
@@ -40,7 +40,7 @@ final class PreviewController
             'icon'        => 'bi-layers-fill',
             'badge'       => 'Partnerprogramm',
             'title'       => 'Alle Werbebanner',
-            'subtitle'    => 'Wählen Sie passende Werbemittel und Banner-Formate für Ihre Webseiten aus.',
+            'subtitle'    => 'Wähle passende Werbemittel und Banner-Formate für deine Webseiten aus.',
             'routeKey'    => 'webmaster-newads',
             'legacyRoute' => '/Webmaster/NewAds',
         ]);
@@ -52,7 +52,7 @@ final class PreviewController
             'icon'        => 'bi-bar-chart-line-fill',
             'badge'       => 'Partnerprogramm',
             'title'       => 'Partnerprogramm-Statistiken',
-            'subtitle'    => 'Auswertung Ihrer Klicks, Impressionen und geworbenen Kunden im Zeitverlauf.',
+            'subtitle'    => 'Auswertung deiner Klicks, Impressionen und geworbenen Kunden im Zeitverlauf.',
             'routeKey'    => 'webmaster-stats',
             'legacyRoute' => '/Webmaster/Statistics',
         ]);
@@ -64,7 +64,7 @@ final class PreviewController
             'icon'        => 'bi-person-heart',
             'badge'       => 'Partnerprogramm',
             'title'       => 'Darsteller werben',
-            'subtitle'    => 'Ihr persönlicher Empfehlungslink zur Gewinnung neuer Darsteller und Produzenten.',
+            'subtitle'    => 'Dein persönlicher Empfehlungslink zur Gewinnung neuer Darsteller und Produzenten.',
             'routeKey'    => 'webmaster-advertise-partner',
             'legacyRoute' => '/Webmaster/Advertise-Partner',
         ]);

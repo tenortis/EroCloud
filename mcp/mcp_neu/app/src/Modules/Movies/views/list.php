@@ -7,7 +7,7 @@ if (!defined('SAFE_INC')) {
 
 /**
  * EroCloud MCP (v2.0) - Filme in der Cloud (#/movies)
- * Alle UI-Texte strikt in höflicher Sie-Form (@master.md).
+ * Alle UI-Texte strikt in persönlicher Du-Form (@master.md).
  * Keine Anzeige von Umsätzen, Provisionen oder Verkaufszahlen (@mcp-modernization-architecture.md).
  *
  * @var array $movies
@@ -26,7 +26,7 @@ if (!defined('SAFE_INC')) {
       <i class="bi bi-collection-play-fill ec-text-primary me-2"></i>Meine Filme in der EroCloud
     </h1>
     <p class="text-muted small mb-0">
-      Verwalten Sie hier alle hochgeladenen Filme, Vorschaubilder (FSK16 / FSK18), Preise und Kategorien. Bewegen Sie die Maus über ein Vorschaubild, um es vergrößert anzuzeigen.
+      Verwalte hier alle hochgeladenen Filme, Vorschaubilder (FSK16 / FSK18), Preise und Kategorien. Bewege die Maus über ein Vorschaubild, um es vergrößert anzuzeigen.
     </p>
   </div>
 
@@ -95,9 +95,9 @@ if (!defined('SAFE_INC')) {
   <div class="kpi-icon-box ec-bg-primary-subtle ec-text-primary mx-auto mb-3" style="width: 56px; height: 56px; font-size: 1.5rem;">
     <i class="bi bi-film"></i>
   </div>
-  <h2 class="h5 font-heading fw-bold mb-2">Sie haben noch keine Filme hochgeladen</h2>
+  <h2 class="h5 font-heading fw-bold mb-2">Du hast noch keine Filme hochgeladen</h2>
   <p class="text-muted small mx-auto mb-4" style="max-width: 520px;">
-    Laden Sie jetzt Ihren ersten Film in die EroCloud hoch und verwalten Sie Ihre Inhalte zentral an einem Ort.
+    Lade jetzt deinen ersten Film in die EroCloud hoch und verwalte deine Inhalte zentral an einem Ort.
   </p>
   <a href="#/movie-upload" class="btn btn-primary-kkc px-4">
     <i class="bi bi-cloud-arrow-up-fill me-1"></i> Jetzt ersten Film hochladen
@@ -305,7 +305,7 @@ if (!defined('SAFE_INC')) {
     <div id="smart-table-empty" class="p-5 text-center text-muted d-none">
       <i class="bi bi-search fs-2 d-block mb-2 ec-text-primary"></i>
       <div class="fw-semibold text-body mb-1">Keine passenden Filme gefunden</div>
-      <div class="small mb-3">Bitte passen Sie Ihren Suchbegriff oder den gewählten Status-Filter an.</div>
+      <div class="small mb-3">Bitte passe deinen Suchbegriff oder den gewählten Status-Filter an.</div>
       <button type="button" id="smart-reset-filters-btn" class="btn btn-sm btn-outline-kkc">
         <i class="bi bi-arrow-counterclockwise me-1"></i> Filter &amp; Suche zurücksetzen
       </button>
