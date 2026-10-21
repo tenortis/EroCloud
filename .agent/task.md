@@ -75,11 +75,11 @@
     - [ ] **Phase 2B: Optional Local Text LLM (`llama.cpp` Server + Uncensored GGUF Model) for Semantic Context Checking & Multi-Language Text/VTT Translation**
     - [ ] **Phase 4: Separate Video Frame / Sprite-Grid Vision AI Analysis**
 
-- [ ] **MCP Complete Modernization (`mcp_neu` -> KKC `app/` & `web/` Architecture)**
+- [x] **MCP Complete Modernization (`mcp_neu` -> KKC `app/` & `web/` Architecture)**
     - [x] Analyze Pay4Coins SSO login (`mcp/login.php`) and MCP routing (`mcp/.htaccess`, `mcp/index.php`)
     - [x] Document architecture blueprint (`app/` & `web/` separation, SPA fragment loading, Pay4Coins-Blue theme) in `.agent/knowledge/architecture/mcp-modernization-architecture.md`
     - [x] Build clickable interactive layout prototype in `mcp/mcp_neu/app/` and `mcp/mcp_neu/web/` with all current MCP sidebar menu entries, KKC tile design in Pay4Coins-Blue (`#0284C7` / `#4297D7`), and zero-reload SPA navigation
     - [x] Implement live Pay4Coins SSO login (`mcp/mcp_neu/web/login.php`), live MCP session authentication (`is_logged_in('mcp')`), and database-backed `Startseite` dashboard (`HomeController` & `views/dashboard.php`)
     - [x] Implement live `Profile / Actors` module (`ActorsController`, `views/list.php`, `views/form.php`) with live username check, Steckbrief editor, `actor_checksum()` sync, and AJAX FSK16/FSK18 profile image upload
     - [x] Implement `Movies` (`#/movies`, `#/movie`, `#/movie-upload`) and `Photo-Albums` (`#/photo-albums`, `#/photo-album`, `#/photo-album-upload`) modules in `mcp_neu`
-    - [ ] Implement live `FAQ` module (`#/faq`) and finalize `mcp_neu` production readiness
+    - [x] Implement live `FAQ` module (`#/faq`) and finalize `mcp_neu` production readiness
