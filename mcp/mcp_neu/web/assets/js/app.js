@@ -177,6 +177,8 @@ const App = {
   initDynamicEvents() {
     this.initContentRulesEvents();
     this.initActorsEvents();
+    this.initMoviesEvents();
+    this.initPhotoAlbumsEvents();
   },
 
   // Startseite: Content-Richtlinien bestätigen
@@ -433,6 +435,707 @@ const App = {
       img.style.width = '22px';
       img.style.height = '22px';
       badgeSpan.replaceWith(img);
+    }
+  },
+
+  // ========================================================================
+  // 3b. Filme (Movies): Übersicht, Filter, Detail-Bearbeitung & 3-Step-Upload
+  // ========================================================================
+  initMoviesEvents() {
+    // 1. Filter & Suche in der Film-Übersicht (#/movies)
+    const filterBtns = document.querySelectorAll('.js-movie-filter-btn');
+    const searchInput = document.getElementById('kkc-movies-search');
+    const movieRows = document.querySelectorAll('.js-movie-row');
+
+    const applyMovieFilter = () => {
+      const activeBtn = document.querySelector('.js-movie-filter-btn.active');
+      const statusFilter = activeBtn ? activeBtn.getAttribute('data-filter') : 'all';
+      const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+      movieRows.forEach(row => {
+        const rowStatus = row.getAttribute('data-status') || '';
+        const rowSearch = row.getAttribute('data-search') || '';
+        const matchStatus = (statusFilter === 'all' || rowStatus === statusFilter);
+        const matchSearch = (query === '' || rowSearch.includes(query));
+        row.style.display = (matchStatus && matchSearch) ? '' : 'none';
+      });
+    };
+
+    filterBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterBtns.forEach(b => {
+          b.classList.remove('active', 'btn-kkc-primary');
+          b.classList.add('btn-outline-kkc');
+        });
+        btn.classList.remove('btn-outline-kkc');
+        btn.classList.add('active', 'btn-kkc-primary');
+        applyMovieFilter();
+      });
+    });
+
+    if (searchInput) {
+      searchInput.addEventListener('input', applyMovieFilter);
+    }
+
+    // 2. Film löschen (in Übersicht oder Detailansicht)
+    const deleteBtns = document.querySelectorAll('.js-delete-movie-btn, #btn-delete-movie-detail');
+    deleteBtns.forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const movieId = btn.getAttribute('data-movie-id');
+        const movieTitle = btn.getAttribute('data-movie-title') || (`#${movieId}`);
+        if (!movieId) return;
+
+        if (!window.confirm(`Möchten Sie den Film „${movieTitle}" wirklich unwiderruflich löschen?`)) {
+          return;
+        }
+
+        btn.disabled = true;
+        try {
+          const formData = new FormData();
+          formData.append('id', movieId);
+          formData.append('_csrf', this.csrfToken);
+
+          const res = await fetch(`${this.basePath}/api.php?route=movies/delete`, {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': this.csrfToken },
+            body: formData
+          });
+          const data = await res.json();
+          if (res.ok && data.status === 'ok') {
+            this.toast(data.message || 'Film wurde gelöscht.', 'success');
+            if (window.location.hash.startsWith('#/movie?')) {
+              window.location.hash = '#/movies';
+            } else {
+              this.handleRoute();
+            }
+          } else {
+            this.toast(data.message || 'Der Film konnte nicht gelöscht werden.', 'danger');
+            btn.disabled = false;
+          }
+        } catch (err) {
+          this.toast('Verbindungsfehler: ' + err.message, 'danger');
+          btn.disabled = false;
+        }
+      });
+    });
+
+    // 3. Live-Berechnung Streaming-Coins & Download-Switch
+    const amountSecSelect = document.getElementById('movie-amount-second');
+    const calcCoinsSpan = document.getElementById('movie-calc-coins');
+    const editForm = document.getElementById('kkc-movie-edit-form');
+    if (amountSecSelect && calcCoinsSpan && editForm) {
+      const playtimeSec = parseFloat(editForm.getAttribute('data-playtime-seconds') || '0');
+      amountSecSelect.addEventListener('change', () => {
+        const rate = parseFloat(amountSecSelect.value || '0.8');
+        calcCoinsSpan.textContent = String(Math.round(playtimeSec * rate));
+      });
+    }
+
+    const asDownloadSwitch = document.getElementById('movie-as-download');
+    const downloadWrap = document.getElementById('movie-download-price-wrap');
+    const downloadSelect = document.getElementById('movie-amount-download');
+    if (asDownloadSwitch && downloadWrap && downloadSelect) {
+      asDownloadSwitch.addEventListener('change', () => {
+        const enabled = asDownloadSwitch.checked;
+        downloadSelect.disabled = !enabled;
+        downloadWrap.style.opacity = enabled ? '1' : '0.5';
+      });
+    }
+
+    // 4. Kategorien-Zähler pro Akkordeon-Gruppe aktualisieren
+    document.querySelectorAll('.js-movie-cat-checkbox').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const groupId = cb.getAttribute('data-group-id');
+        if (!groupId) return;
+        const checkedCount = document.querySelectorAll(`.js-movie-cat-checkbox[data-group-id="${groupId}"]:checked`).length;
+        const badge = document.querySelector(`.js-cat-group-count[data-group-id="${groupId}"]`);
+        if (badge) {
+          badge.textContent = `${checkedCount} gewählt`;
+        }
+      });
+    });
+
+    // 5. Automatisch generiertes Vorschaubild (1..10) für FSK16 / FSK18 auswählen
+    document.querySelectorAll('.js-select-movie-thumb').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const fsk = btn.getAttribute('data-fsk');
+        const num = btn.getAttribute('data-num');
+        const url = btn.getAttribute('data-url');
+        if (!fsk || !num) return;
+
+        const hiddenInput = document.getElementById(`input-preview-fsk${fsk}`);
+        const previewImg = document.getElementById(`current-fsk${fsk}-preview`);
+        const badgeNum = document.getElementById(`badge-fsk${fsk}-num`);
+
+        if (hiddenInput) hiddenInput.value = num;
+        if (previewImg && url) previewImg.src = url;
+        if (badgeNum) badgeNum.textContent = `Bild #${num}`;
+
+        document.querySelectorAll(`.js-select-movie-thumb[data-fsk="${fsk}"]`).forEach(b => {
+          b.classList.remove(fsk === '16' ? 'btn-success' : 'btn-danger');
+          b.classList.add('btn-outline-secondary');
+        });
+        btn.classList.remove('btn-outline-secondary');
+        btn.classList.add(fsk === '16' ? 'btn-success' : 'btn-danger');
+        this.toast(`Vorschaubild #${num} für FSK${fsk} ausgewählt. Bitte speichern Sie Ihre Änderungen.`, 'info');
+      });
+    });
+
+    // 6. Eigenes FSK16 / FSK18 Poster für Film hochladen
+    document.querySelectorAll('.js-movie-poster-upload').forEach(input => {
+      input.addEventListener('change', async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+
+        const movieId = input.getAttribute('data-movie-id');
+        const fsk = input.getAttribute('data-fsk');
+
+        if (file.size > 6 * 1024 * 1024) {
+          this.toast('Das Coverbild darf maximal 6 MB groß sein.', 'warning');
+          input.value = '';
+          return;
+        }
+
+        input.disabled = true;
+        try {
+          const formData = new FormData();
+          formData.append('movie_id', movieId);
+          formData.append('fsk', fsk);
+          formData.append('poster', file);
+          formData.append('_csrf', this.csrfToken);
+
+          const res = await fetch(`${this.basePath}/api.php?route=movies/upload-poster`, {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': this.csrfToken },
+            body: formData
+          });
+          const data = await res.json();
+
+          if (res.ok && data.status === 'ok') {
+            this.toast(data.message || `Eigenes FSK${fsk}-Coverbild gespeichert.`, 'success');
+            const hiddenInput = document.getElementById(`input-preview-fsk${fsk}`);
+            const previewImg = document.getElementById(`current-fsk${fsk}-preview`);
+            const badgeNum = document.getElementById(`badge-fsk${fsk}-num`);
+
+            if (hiddenInput && data.thumb_number) hiddenInput.value = String(data.thumb_number);
+            if (previewImg && data.preview_url) previewImg.src = data.preview_url;
+            if (badgeNum && data.thumb_number) badgeNum.textContent = `Eigenes Bild (#${data.thumb_number})`;
+          } else {
+            this.toast(data.message || 'Fehler beim Hochladen des Coverbilds.', 'danger');
+          }
+        } catch (err) {
+          this.toast('Upload-Fehler: ' + err.message, 'danger');
+        } finally {
+          input.disabled = false;
+          input.value = '';
+        }
+      });
+    });
+
+    // 7. Film-Bearbeitungsformular speichern (#/movie?id=...)
+    if (editForm) {
+      editForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btns = document.querySelectorAll('#btn-save-movie-top, #btn-save-movie-bottom');
+        btns.forEach(b => { b.disabled = true; });
+
+        try {
+          const formData = new FormData(editForm);
+          formData.append('_csrf', this.csrfToken);
+
+          const res = await fetch(`${this.basePath}/api.php?route=movies/update`, {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': this.csrfToken },
+            body: formData
+          });
+          const data = await res.json();
+
+          if (res.ok && data.status === 'ok') {
+            this.toast(data.message || 'Änderungen erfolgreich gespeichert.', 'success');
+          } else {
+            this.toast(data.message || 'Fehler beim Speichern des Films.', 'danger');
+          }
+        } catch (err) {
+          this.toast('Verbindungsfehler: ' + err.message, 'danger');
+        } finally {
+          btns.forEach(b => { b.disabled = false; });
+        }
+      });
+    }
+
+    // 8. Film-Upload Schritt 1 speichern (#/movie-upload)
+    const step1Form = document.getElementById('kkc-movie-step1-form');
+    if (step1Form) {
+      step1Form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = document.getElementById('btn-submit-movie-step1');
+        if (submitBtn) submitBtn.disabled = true;
+
+        try {
+          const formData = new FormData(step1Form);
+          formData.append('_csrf', this.csrfToken);
+
+          const res = await fetch(`${this.basePath}/api.php?route=movies/save-step1`, {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': this.csrfToken },
+            body: formData
+          });
+          const data = await res.json();
+
+          if (res.ok && data.status === 'ok') {
+            this.toast(data.message || 'Basisdaten gespeichert.', 'success');
+            if (data.redirect) {
+              window.location.hash = data.redirect;
+            }
+          } else {
+            this.toast(data.message || 'Bitte überprüfen Sie Ihre Eingaben.', 'danger');
+            if (submitBtn) submitBtn.disabled = false;
+          }
+        } catch (err) {
+          this.toast('Verbindungsfehler: ' + err.message, 'danger');
+          if (submitBtn) submitBtn.disabled = false;
+        }
+      });
+    }
+
+    // 9. Film-Upload Schritt 2: Videodatei mit Live-Fortschrittsbalken hochladen
+    const btnStartUpload = document.getElementById('btn-start-movie-file-upload');
+    const btnCancelUpload = document.getElementById('btn-cancel-movie-file-upload');
+    const videoFileInput = document.getElementById('movie-video-file-input');
+
+    if (btnStartUpload && videoFileInput) {
+      btnStartUpload.addEventListener('click', () => {
+        const file = videoFileInput.files?.[0];
+        if (!file) {
+          this.toast('Bitte wählen Sie zuerst eine Videodatei auf Ihrem Gerät aus.', 'warning');
+          return;
+        }
+
+        const maxBytes = 2 * 1024 * 1024 * 1024;
+        if (file.size > maxBytes) {
+          this.toast('Die Videodatei überschreitet das Limit von 2,0 GB.', 'danger');
+          return;
+        }
+
+        const movieId = btnStartUpload.getAttribute('data-movie-id') || '0';
+        const progressWrap = document.getElementById('movie-upload-progress-wrap');
+        const progressBar = document.getElementById('movie-upload-progress-bar');
+        const percentBadge = document.getElementById('movie-upload-percent-badge');
+        const bytesInfo = document.getElementById('movie-upload-bytes-info');
+        const statusText = document.getElementById('movie-upload-status-text');
+
+        if (progressWrap) progressWrap.classList.remove('d-none');
+        btnStartUpload.disabled = true;
+        videoFileInput.disabled = true;
+        if (btnCancelUpload) btnCancelUpload.classList.remove('d-none');
+
+        const formData = new FormData();
+        formData.append('movie_id', movieId);
+        formData.append('video', file);
+        formData.append('_csrf', this.csrfToken);
+
+        const xhr = new XMLHttpRequest();
+        this.activeMovieUploadXhr = xhr;
+
+        xhr.upload.addEventListener('progress', (ev) => {
+          if (!ev.lengthComputable) return;
+          const pct = Math.min(100, Math.round((ev.loaded / ev.total) * 100));
+          const loadedMb = (ev.loaded / (1024 * 1024)).toFixed(1);
+          const totalMb = (ev.total / (1024 * 1024)).toFixed(1);
+          if (progressBar) progressBar.style.width = `${pct}%`;
+          if (percentBadge) percentBadge.textContent = `${pct} %`;
+          if (bytesInfo) bytesInfo.textContent = `${loadedMb} MB / ${totalMb} MB`;
+          if (pct === 100 && statusText) {
+            statusText.textContent = 'Datei übertragen – Server prüft Videodaten...';
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          this.activeMovieUploadXhr = null;
+          try {
+            const data = JSON.parse(xhr.responseText || '{}');
+            if (xhr.status >= 200 && xhr.status < 300 && data.status === 'ok') {
+              this.toast(data.message || 'Videodatei erfolgreich hochgeladen.', 'success');
+              if (data.redirect) {
+                window.location.hash = data.redirect;
+              }
+              return;
+            }
+            this.toast(data.message || 'Fehler beim Video-Upload.', 'danger');
+          } catch (_) {
+            this.toast('Unerwartete Antwort vom Server beim Video-Upload.', 'danger');
+          }
+          btnStartUpload.disabled = false;
+          videoFileInput.disabled = false;
+          if (btnCancelUpload) btnCancelUpload.classList.add('d-none');
+        });
+
+        xhr.addEventListener('error', () => {
+          this.activeMovieUploadXhr = null;
+          this.toast('Netzwerkfehler während der Dateiübertragung.', 'danger');
+          btnStartUpload.disabled = false;
+          videoFileInput.disabled = false;
+          if (btnCancelUpload) btnCancelUpload.classList.add('d-none');
+        });
+
+        xhr.addEventListener('abort', () => {
+          this.activeMovieUploadXhr = null;
+          this.toast('Der Video-Upload wurde abgebrochen.', 'warning');
+          btnStartUpload.disabled = false;
+          videoFileInput.disabled = false;
+          if (progressBar) progressBar.style.width = '0%';
+          if (btnCancelUpload) btnCancelUpload.classList.add('d-none');
+        });
+
+        xhr.open('POST', `${this.basePath}/api.php?route=movies/upload-file`, true);
+        xhr.setRequestHeader('X-CSRF-Token', this.csrfToken);
+        xhr.send(formData);
+      });
+    }
+
+    if (btnCancelUpload) {
+      btnCancelUpload.addEventListener('click', () => {
+        if (this.activeMovieUploadXhr) {
+          this.activeMovieUploadXhr.abort();
+        }
+      });
+    }
+  },
+
+  // ========================================================================
+  // 3c. Foto-Alben (PhotoAlbums): Übersicht, Cover/Foto-Upload & Bearbeitung
+  // ========================================================================
+  initPhotoAlbumsEvents() {
+    // 1. Filter & Suche in der Foto-Alben-Übersicht (#/photo-albums)
+    const filterBtns = document.querySelectorAll('.js-album-filter-btn');
+    const searchInput = document.getElementById('kkc-albums-search');
+    const albumRows = document.querySelectorAll('.js-album-row');
+
+    const applyAlbumFilter = () => {
+      const activeBtn = document.querySelector('.js-album-filter-btn.active');
+      const statusFilter = activeBtn ? activeBtn.getAttribute('data-filter') : 'all';
+      const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+      albumRows.forEach(row => {
+        const rowStatus = row.getAttribute('data-status') || '';
+        const rowSearch = row.getAttribute('data-search') || '';
+        const matchStatus = (statusFilter === 'all' || rowStatus === statusFilter);
+        const matchSearch = (query === '' || rowSearch.includes(query));
+        row.style.display = (matchStatus && matchSearch) ? '' : 'none';
+      });
+    };
+
+    filterBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterBtns.forEach(b => {
+          b.classList.remove('active', 'btn-kkc-primary');
+          b.classList.add('btn-outline-kkc');
+        });
+        btn.classList.remove('btn-outline-kkc');
+        btn.classList.add('active', 'btn-kkc-primary');
+        applyAlbumFilter();
+      });
+    });
+
+    if (searchInput) {
+      searchInput.addEventListener('input', applyAlbumFilter);
+    }
+
+    // 2. Foto-Album löschen
+    document.querySelectorAll('.js-delete-photo-album-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const albumId = btn.getAttribute('data-album-id');
+        const albumTitle = btn.getAttribute('data-album-title') || (`#${albumId}`);
+        if (!albumId) return;
+
+        if (!window.confirm(`Möchten Sie das Foto-Album „${albumTitle}" wirklich löschen?`)) {
+          return;
+        }
+
+        btn.disabled = true;
+        try {
+          const formData = new FormData();
+          formData.append('id', albumId);
+          formData.append('_csrf', this.csrfToken);
+
+          const res = await fetch(`${this.basePath}/api.php?route=photo-albums/delete`, {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': this.csrfToken },
+            body: formData
+          });
+          const data = await res.json();
+
+          if (res.ok && data.status === 'ok') {
+            this.toast(data.message || 'Foto-Album gelöscht.', 'success');
+            if (window.location.hash.startsWith('#/photo-album?')) {
+              window.location.hash = '#/photo-albums';
+            } else {
+              this.handleRoute();
+            }
+          } else {
+            this.toast(data.message || 'Das Foto-Album konnte nicht gelöscht werden.', 'danger');
+            btn.disabled = false;
+          }
+        } catch (err) {
+          this.toast('Verbindungsfehler: ' + err.message, 'danger');
+          btn.disabled = false;
+        }
+      });
+    });
+
+    // 3. Foto-Album Schritt 1 speichern (#/photo-album-upload)
+    const step1Form = document.getElementById('kkc-photo-album-step1-form');
+    if (step1Form) {
+      step1Form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = document.getElementById('btn-submit-photo-album-step1');
+        if (submitBtn) submitBtn.disabled = true;
+
+        try {
+          const formData = new FormData(step1Form);
+          formData.append('_csrf', this.csrfToken);
+
+          const res = await fetch(`${this.basePath}/api.php?route=photo-albums/save-step1`, {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': this.csrfToken },
+            body: formData
+          });
+          const data = await res.json();
+
+          if (res.ok && data.status === 'ok') {
+            this.toast(data.message || 'Basisdaten gespeichert.', 'success');
+            if (data.redirect) {
+              window.location.hash = data.redirect;
+            }
+          } else {
+            this.toast(data.message || 'Bitte prüfen Sie Ihre Eingaben.', 'danger');
+            if (submitBtn) submitBtn.disabled = false;
+          }
+        } catch (err) {
+          this.toast('Verbindungsfehler: ' + err.message, 'danger');
+          if (submitBtn) submitBtn.disabled = false;
+        }
+      });
+    }
+
+    // 4. Foto-Album Bearbeitungsformular speichern (#/photo-album?id=...)
+    const editForm = document.getElementById('kkc-photo-album-edit-form');
+    if (editForm) {
+      editForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btns = document.querySelectorAll('#btn-save-photo-album-top, #btn-save-photo-album-bottom');
+        btns.forEach(b => { b.disabled = true; });
+
+        try {
+          const formData = new FormData(editForm);
+          formData.append('_csrf', this.csrfToken);
+
+          const res = await fetch(`${this.basePath}/api.php?route=photo-albums/update`, {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': this.csrfToken },
+            body: formData
+          });
+          const data = await res.json();
+
+          if (res.ok && data.status === 'ok') {
+            this.toast(data.message || 'Foto-Album erfolgreich aktualisiert.', 'success');
+          } else {
+            this.toast(data.message || 'Fehler beim Speichern des Foto-Albums.', 'danger');
+          }
+        } catch (err) {
+          this.toast('Verbindungsfehler: ' + err.message, 'danger');
+        } finally {
+          btns.forEach(b => { b.disabled = false; });
+        }
+      });
+    }
+
+    // 5. FSK16 / FSK18 Cover für Foto-Album hochladen
+    document.querySelectorAll('.js-album-cover-upload').forEach(input => {
+      input.addEventListener('change', async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+
+        const albumId = input.getAttribute('data-album-id');
+        const fsk = input.getAttribute('data-fsk');
+
+        if (file.size > 6 * 1024 * 1024) {
+          this.toast('Das Coverbild darf maximal 6 MB groß sein.', 'warning');
+          input.value = '';
+          return;
+        }
+
+        input.disabled = true;
+        try {
+          const formData = new FormData();
+          formData.append('album_id', albumId);
+          formData.append('fsk', fsk);
+          formData.append('cover', file);
+          formData.append('_csrf', this.csrfToken);
+
+          const res = await fetch(`${this.basePath}/api.php?route=photo-albums/upload-cover`, {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': this.csrfToken },
+            body: formData
+          });
+          const data = await res.json();
+
+          if (res.ok && data.status === 'ok') {
+            this.toast(data.message || `FSK${fsk}-Cover gespeichert.`, 'success');
+            const imgEl = document.getElementById(`album-cover-fsk${fsk}-img`);
+            if (imgEl && data.preview_url) {
+              imgEl.src = data.preview_url;
+            }
+          } else {
+            this.toast(data.message || 'Fehler beim Hochladen des Coverbilds.', 'danger');
+          }
+        } catch (err) {
+          this.toast('Upload-Fehler: ' + err.message, 'danger');
+        } finally {
+          input.disabled = false;
+          input.value = '';
+        }
+      });
+    });
+
+    // 6. Mehrere Fotos ins Album hochladen
+    document.querySelectorAll('.js-album-photos-upload').forEach(input => {
+      input.addEventListener('change', async () => {
+        const files = input.files;
+        if (!files || files.length === 0) return;
+
+        const albumId = input.getAttribute('data-album-id');
+        const statusBox = document.getElementById('album-photos-upload-status');
+        if (statusBox) statusBox.classList.remove('d-none');
+        input.disabled = true;
+
+        try {
+          const formData = new FormData();
+          formData.append('album_id', albumId);
+          formData.append('_csrf', this.csrfToken);
+          for (let i = 0; i < files.length; i++) {
+            formData.append('photos[]', files[i]);
+          }
+
+          const res = await fetch(`${this.basePath}/api.php?route=photo-albums/upload-photos`, {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': this.csrfToken },
+            body: formData
+          });
+          const data = await res.json();
+
+          if (res.ok && data.status === 'ok') {
+            this.toast(data.message || 'Fotos erfolgreich hochgeladen.', 'success');
+            this.handleRoute();
+          } else {
+            this.toast(data.message || 'Fehler beim Hochladen der Fotos.', 'danger');
+          }
+        } catch (err) {
+          this.toast('Upload-Fehler: ' + err.message, 'danger');
+        } finally {
+          if (statusBox) statusBox.classList.add('d-none');
+          input.disabled = false;
+          input.value = '';
+        }
+      });
+    });
+
+    // 7. Einzelnes Foto aus dem Album löschen
+    document.querySelectorAll('.js-delete-album-photo-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const albumId = btn.getAttribute('data-album-id');
+        const fileId = btn.getAttribute('data-file-id');
+        if (!albumId || !fileId) return;
+
+        if (!window.confirm('Möchten Sie dieses Foto wirklich aus dem Album entfernen?')) {
+          return;
+        }
+
+        btn.disabled = true;
+        try {
+          const formData = new FormData();
+          formData.append('album_id', albumId);
+          formData.append('file_id', fileId);
+          formData.append('_csrf', this.csrfToken);
+
+          const res = await fetch(`${this.basePath}/api.php?route=photo-albums/delete-photo`, {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': this.csrfToken },
+            body: formData
+          });
+          const data = await res.json();
+
+          if (res.ok && data.status === 'ok') {
+            this.toast(data.message || 'Foto entfernt.', 'success');
+            const card = document.querySelector(`.js-album-photo-card[data-file-id="${fileId}"]`);
+            if (card) card.remove();
+
+            const countEls = document.querySelectorAll('#album-photos-grid-count, #badge-album-photo-count');
+            countEls.forEach(el => {
+              if (typeof data.total_photos !== 'undefined') {
+                el.textContent = String(data.total_photos);
+              }
+            });
+          } else {
+            this.toast(data.message || 'Foto konnte nicht gelöscht werden.', 'danger');
+            btn.disabled = false;
+          }
+        } catch (err) {
+          this.toast('Verbindungsfehler: ' + err.message, 'danger');
+          btn.disabled = false;
+        }
+      });
+    });
+
+    // 8. Foto-Zoom-Modal öffnen
+    document.querySelectorAll('.js-zoom-album-photo').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const zoomUrl = link.getAttribute('data-zoom-url');
+        const imgEl = document.getElementById('modal-album-photo-zoom-img');
+        const modalEl = document.getElementById('modalAlbumPhotoZoom');
+        if (imgEl && zoomUrl && modalEl) {
+          imgEl.src = zoomUrl;
+          const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+          modal.show();
+        }
+      });
+    });
+
+    // 9. Foto-Album in Schritt 2 fertigstellen & zur Prüfung einreichen
+    const btnPublishAlbum = document.getElementById('btn-publish-photo-album');
+    if (btnPublishAlbum) {
+      btnPublishAlbum.addEventListener('click', async () => {
+        const albumId = btnPublishAlbum.getAttribute('data-album-id');
+        if (!albumId) return;
+
+        btnPublishAlbum.disabled = true;
+        try {
+          const formData = new FormData();
+          formData.append('album_id', albumId);
+          formData.append('_csrf', this.csrfToken);
+
+          const res = await fetch(`${this.basePath}/api.php?route=photo-albums/publish`, {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': this.csrfToken },
+            body: formData
+          });
+          const data = await res.json();
+
+          if (res.ok && data.status === 'ok') {
+            this.toast(data.message || 'Foto-Album erfolgreich eingereicht.', 'success');
+            if (data.redirect) {
+              window.location.hash = data.redirect;
+            }
+          } else {
+            this.toast(data.message || 'Bitte vervollständigen Sie zuerst alle Bilder.', 'warning');
+            btnPublishAlbum.disabled = false;
+          }
+        } catch (err) {
+          this.toast('Verbindungsfehler: ' + err.message, 'danger');
+          btnPublishAlbum.disabled = false;
+        }
+      });
     }
   },
 

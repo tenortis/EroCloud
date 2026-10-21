@@ -1,0 +1,1110 @@
+<?php
+declare(strict_types=1);
+
+namespace App\Modules\PhotoAlbums;
+
+if (!defined('SAFE_INC')) {
+    die('Hacking attempt...');
+}
+
+use App\Core\Csrf;
+use App\Core\Request;
+use App\Core\Response;
+use App\Core\View;
+
+/**
+ * Controller für die Foto-Alben-Verwaltung im neuen EroCloud MCP:
+ * - #/photo-albums        (Übersicht aller Foto-Alben inkl. Verkäufe, Status & Schnellaktionen)
+ * - #/photo-album         (Einzelnes Foto-Album bearbeiten, Cover & Fotos verwalten)
+ * - #/photo-album-upload  (Neues Foto-Album in 3 Schritten anlegen & Bilder hochladen)
+ */
+final class PhotoAlbumsController
+{
+    private Request $request;
+
+    public function __construct(Request $request)
+    {
+        $this->request = $request;
+    }
+
+    /**
+     * GET: Übersicht aller Foto-Alben des eingeloggten Partners (#/photo-albums)
+     */
+    public function list(): string
+    {
+        $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
+        if ($merchantId === 0) {
+            return '<div class="alert alert-danger m-4">Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.</div>';
+        }
+
+        $apiUrl = defined('API_URL') ? API_URL : 'https://api.erocloud.net';
+
+        // 1. Darsteller-Namen des Partners für schnelle Zuordnung vorladen
+        $actorsMap = [];
+        $rsActors  = p4c_query("SELECT `id`, `username`
+            FROM `actors`
+            WHERE `merchant_id` = '" . $merchantId . "'", __FILE__, __LINE__);
+        if ($rsActors) {
+            while ($act = p4c_fetch_object($rsActors)) {
+                $actorsMap[abs((int)$act->id)] = self::decodeLegacyText((string)$act->username);
+            }
+        }
+
+        // 2. Online-Status aller Foto-Alben dieses Partners in einem Set vorladen
+        $onlineAlbumHashes = [];
+        $rsOnline          = p4c_query("SELECT `album_id`
+            FROM `photo_albums_online`
+            WHERE `merchant_id` = '" . $merchantId . "'", __FILE__, __LINE__);
+        if ($rsOnline) {
+            while ($on = p4c_fetch_object($rsOnline)) {
+                $onlineAlbumHashes[(string)$on->album_id] = true;
+            }
+        }
+
+        // 3. Verkaufszahlen & Provisionen pro Foto-Album aggregiert vorladen
+        $salesByAlbumId = [];
+        $rsSales        = p4c_query("SELECT
+                `product_id`,
+                COUNT(*) AS `cnt`,
+                COALESCE(SUM(`amount_commission`), 0) AS `comm_cents`
+            FROM `merchants_sales`
+            WHERE `merchant_id` = '" . $merchantId . "'
+              AND `product_type` = 'photo_album_download'
+            GROUP BY `product_id`", __FILE__, __LINE__);
+
+        if ($rsSales) {
+            while ($s = p4c_fetch_object($rsSales)) {
+                $pId = abs((int)$s->product_id);
+                $salesByAlbumId[$pId] = [
+                    'buys'       => abs((int)$s->cnt),
+                    'comm_cents' => (float)$s->comm_cents,
+                ];
+            }
+        }
+
+        // 4. Alle nicht gelöschten Foto-Alben des Partners laden
+        $albums             = [];
+        $countOnline        = 0;
+        $countPending       = 0;
+        $countRejected      = 0;
+        $totalCommissionEur = 0.0;
+
+        $rsAlbums = p4c_query("SELECT *
+            FROM `photo_albums`
+            WHERE `merchant_id` = '" . $merchantId . "'
+              AND `status` != 'deleted'
+            ORDER BY `id` DESC;", __FILE__, __LINE__);
+
+        if ($rsAlbums && p4c_num_rows($rsAlbums) > 0) {
+            while ($a = p4c_fetch_object($rsAlbums)) {
+                $albumDbId   = abs((int)$a->id);
+                $albumIdHash = (string)$a->album_id;
+                $actorId     = abs((int)$a->actor_id);
+                $checksum    = (string)($a->checksum ?? '');
+                $numPhotos   = abs((int)$a->number_of_photos);
+                $hasFsk16    = trim((string)$a->preview_image_fsk16) !== '';
+                $hasFsk18    = trim((string)$a->preview_image_fsk18) !== '';
+                $isComplete  = ($numPhotos >= 4 && $hasFsk16 && $hasFsk18);
+                $isOnline    = isset($onlineAlbumHashes[$albumIdHash]);
+
+                // Status-Logik analog zu legacy ajax/photo_albums.php
+                $statusKey   = 'pending';
+                $statusLabel = 'Wartet auf Freigabe';
+                $statusBadge = 'warning';
+                $statusIcon  = 'bi-hourglass-split';
+                $editRoute   = '#/photo-album?id=' . $albumDbId;
+
+                if (!$isComplete) {
+                    $statusKey   = 'incomplete';
+                    $statusLabel = 'Fotos fehlen (mind. 4 + Cover)';
+                    $statusBadge = 'secondary';
+                    $statusIcon  = 'bi-cloud-arrow-up';
+                    $editRoute   = '#/photo-album-upload?step=2&album_id=' . $albumDbId;
+                    $countPending++;
+                } elseif ((string)$a->album_checked === '0000-00-00 00:00:00' && (int)$a->released === 0) {
+                    $statusKey   = 'pending';
+                    $statusLabel = 'In Prüfung';
+                    $statusBadge = 'warning';
+                    $statusIcon  = 'bi-hourglass-split';
+                    $countPending++;
+                } elseif ((string)$a->album_checked === '0000-00-00 00:00:00' && (int)$a->released === 2) {
+                    $statusKey   = 'rejected';
+                    $statusLabel = 'Korrektur erforderlich';
+                    $statusBadge = 'danger';
+                    $statusIcon  = 'bi-exclamation-triangle-fill';
+                    $countRejected++;
+                } elseif ((string)$a->album_checked !== '0000-00-00 00:00:00' && (int)$a->released === 0) {
+                    $statusKey   = 'blocked';
+                    $statusLabel = 'Gesperrt / Abgelehnt';
+                    $statusBadge = 'danger';
+                    $statusIcon  = 'bi-slash-circle';
+                    $countRejected++;
+                } elseif ((string)$a->album_checked !== '0000-00-00 00:00:00' && (int)$a->released === 1 && !$isOnline) {
+                    $statusKey   = 'scheduled';
+                    $statusLabel = 'Geplant für ' . date('d.m.Y H:i', strtotime((string)$a->online_at));
+                    $statusBadge = 'info';
+                    $statusIcon  = 'bi-calendar-event';
+                    $countPending++;
+                } elseif ((string)$a->album_checked !== '0000-00-00 00:00:00' && (int)$a->released === 1 && $isOnline) {
+                    $statusKey   = 'online';
+                    $statusLabel = 'Online & aktiv';
+                    $statusBadge = 'success';
+                    $statusIcon  = 'bi-check-circle-fill';
+                    $countOnline++;
+                }
+
+                $sales = $salesByAlbumId[$albumDbId] ?? [
+                    'buys'       => 0,
+                    'comm_cents' => 0.0,
+                ];
+                $commEur             = $sales['comm_cents'] / 100.0;
+                $totalCommissionEur += $commEur;
+
+                $onlineAtFormatted = ($a->online_at !== '0000-00-00 00:00:00' && !empty($a->online_at))
+                    ? date('d.m.Y H:i', strtotime((string)$a->online_at))
+                    : '-';
+
+                $priceEur = ((int)$a->amount_download) / 100.0;
+
+                $albums[] = [
+                    'id'               => $albumDbId,
+                    'album_id'         => $albumIdHash,
+                    'title'            => self::decodeLegacyText(trim((string)$a->title) !== '' ? (string)$a->title : 'Unbenanntes Foto-Album #' . $albumDbId),
+                    'actor_id'         => $actorId,
+                    'actor_name'       => $actorsMap[$actorId] ?? '-',
+                    'number_of_photos' => $numPhotos,
+                    'price_eur'        => $priceEur,
+                    'status_key'       => $statusKey,
+                    'status_label'     => $statusLabel,
+                    'status_badge'     => $statusBadge,
+                    'status_icon'      => $statusIcon,
+                    'edit_route'       => $editRoute,
+                    'poster_fsk16'     => $apiUrl . '/PhotoAlbumPoster/FSK16/' . rawurlencode($albumIdHash) . '?w=110&cs=' . rawurlencode($checksum),
+                    'poster_fsk18'     => $apiUrl . '/PhotoAlbumPoster/FSK18/' . rawurlencode($albumIdHash) . '?w=110&cs=' . rawurlencode($checksum),
+                    'online_at'        => $onlineAtFormatted,
+                    'buys'             => $sales['buys'],
+                    'commission_eur'   => $commEur,
+                    'can_delete'       => ((string)$a->album_checked === '0000-00-00 00:00:00' && (int)$a->released !== 1 && !$isOnline),
+                ];
+            }
+        }
+
+        return View::render('PhotoAlbums', 'list', [
+            'albums'             => $albums,
+            'countTotal'         => count($albums),
+            'countOnline'        => $countOnline,
+            'countPending'       => $countPending,
+            'countRejected'      => $countRejected,
+            'totalCommissionEur' => $totalCommissionEur,
+        ]);
+    }
+
+    /**
+     * GET: Einzelnes Foto-Album bearbeiten (#/photo-album?id=...)
+     */
+    public function detail(): string
+    {
+        $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
+        if ($merchantId === 0) {
+            return '<div class="alert alert-danger m-4">Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.</div>';
+        }
+
+        $albumDbId = abs((int)$this->request->get('id', 0));
+        if ($albumDbId === 0) {
+            return $this->list();
+        }
+
+        $rsAlbum = p4c_query("SELECT *
+            FROM `photo_albums`
+            WHERE `id` = '" . $albumDbId . "'
+              AND `merchant_id` = '" . $merchantId . "'
+              AND `status` != 'deleted'
+            LIMIT 1;", __FILE__, __LINE__);
+
+        if (!$rsAlbum || p4c_num_rows($rsAlbum) === 0) {
+            return '
+            <div class="alert alert-danger d-flex align-items-center justify-content-between flex-wrap gap-3 m-4">
+              <div>
+                <i class="bi bi-exclamation-octagon-fill me-2"></i>
+                Das angeforderte Foto-Album wurde nicht gefunden oder wurde bereits gelöscht.
+              </div>
+              <a href="#/photo-albums" class="btn btn-sm btn-outline-kkc">Zur Foto-Alben-Übersicht</a>
+            </div>';
+        }
+
+        $aObj        = p4c_fetch_object($rsAlbum);
+        $albumIdHash = (string)$aObj->album_id;
+        $actorId     = abs((int)$aObj->actor_id);
+        $checksum    = (string)($aObj->checksum ?? '');
+        $apiUrl      = defined('API_URL') ? API_URL : 'https://api.erocloud.net';
+        $mcpUrl      = defined('MCP_URL') ? MCP_URL : 'https://erocloud.net';
+
+        // Prüfen, ob das Album in photo_albums_online steht
+        $rsOnline      = p4c_query("SELECT `id` FROM `photo_albums_online` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "' AND `merchant_id` = '" . $merchantId . "' LIMIT 1;", __FILE__, __LINE__);
+        $isAlbumOnline = ($rsOnline && p4c_num_rows($rsOnline) > 0);
+
+        // Ablehnungsgrund laden, falls released == 2
+        $rejectionInfo = null;
+        if ((string)$aObj->album_checked === '0000-00-00 00:00:00' && (int)$aObj->released === 2) {
+            $rsRejHist = p4c_query("SELECT * FROM `rejection_reason_photo_album_history` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "' ORDER BY `datetime` DESC LIMIT 1;", __FILE__, __LINE__);
+            if ($rsRejHist && p4c_num_rows($rsRejHist) > 0) {
+                $rejHistObj = p4c_fetch_object($rsRejHist);
+                $shortTitle = '';
+                if (!empty($rejHistObj->id_name) && (string)$rejHistObj->id_name !== 'free_text') {
+                    $rsRejShort = p4c_query("SELECT `de_short` FROM `rejection_reason_photo_album` WHERE `id_name` = '" . p4c_escape_string((string)$rejHistObj->id_name) . "' LIMIT 1;", __FILE__, __LINE__);
+                    if ($rsRejShort && p4c_num_rows($rsRejShort) > 0) {
+                        $shortObj   = p4c_fetch_object($rsRejShort);
+                        $shortTitle = self::decodeLegacyText((string)$shortObj->de_short);
+                    }
+                }
+                $rejectionInfo = [
+                    'reason' => $shortTitle,
+                    'text'   => self::decodeLegacyText((string)($rejHistObj->text ?? '')),
+                ];
+            }
+        }
+
+        // Alle Fotos des Albums laden
+        $photos   = [];
+        $rsPhotos = p4c_query("SELECT *
+            FROM `photo_albums_photos`
+            WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "'
+              AND `merchant_id` = '" . $merchantId . "'
+              AND `status` != 'deleted'
+            ORDER BY `id` ASC;", __FILE__, __LINE__);
+
+        if ($rsPhotos) {
+            while ($p = p4c_fetch_object($rsPhotos)) {
+                $pFileId  = (string)$p->file_id;
+                $photos[] = [
+                    'id'        => abs((int)$p->id),
+                    'file_id'   => $pFileId,
+                    'filename'  => (string)$p->filename,
+                    'thumb_url' => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=200',
+                    'zoom_url'  => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=900',
+                ];
+            }
+        }
+
+        $onlineAt = ($aObj->online_at !== '0000-00-00 00:00:00' && !empty($aObj->online_at))
+            ? date('Y-m-d\TH:i', strtotime((string)$aObj->online_at))
+            : date('Y-m-d\TH:i', strtotime('+90 minutes'));
+
+        $actors = $this->loadActiveMerchantActors($merchantId, $actorId);
+
+        $albumData = [
+            'id'                 => $albumDbId,
+            'album_id'           => $albumIdHash,
+            'title'              => self::decodeLegacyText((string)$aObj->title),
+            'description'        => self::decodeLegacyText((string)$aObj->description),
+            'actor_id'           => $actorId,
+            'online_at'          => $onlineAt,
+            'online_at_display'  => ($aObj->online_at !== '0000-00-00 00:00:00' && !empty($aObj->online_at))
+                ? date('d.m.Y H:i', strtotime((string)$aObj->online_at))
+                : '-',
+            'can_edit_online_at' => (((string)$aObj->album_checked === '0000-00-00 00:00:00' && !$isAlbumOnline) || strtotime((string)$aObj->online_at) > time()),
+            'amount_download'    => abs((int)$aObj->amount_download), // in Cent (0, 100, 200 ... 5000)
+            'number_of_photos'   => count($photos),
+            'has_fsk16'          => trim((string)$aObj->preview_image_fsk16) !== '',
+            'has_fsk18'          => trim((string)$aObj->preview_image_fsk18) !== '',
+            'poster_fsk16_url'   => $apiUrl . '/PhotoAlbumPoster/FSK16/' . rawurlencode($albumIdHash) . '?w=240&cs=' . rawurlencode($checksum) . '&t=' . time(),
+            'poster_fsk18_url'   => $apiUrl . '/PhotoAlbumPoster/FSK18/' . rawurlencode($albumIdHash) . '?w=240&cs=' . rawurlencode($checksum) . '&t=' . time(),
+            'album_checked'      => (string)$aObj->album_checked,
+            'released'           => (int)$aObj->released,
+            'is_online'          => $isAlbumOnline,
+            'can_delete'         => ((string)$aObj->album_checked === '0000-00-00 00:00:00' && (int)$aObj->released !== 1 && !$isAlbumOnline),
+            'meta_title'         => self::decodeLegacyText((string)$aObj->meta_title),
+            'meta_description'   => self::decodeLegacyText((string)$aObj->meta_description),
+            'seo_url'            => (string)$aObj->seo_url,
+        ];
+
+        return View::render('PhotoAlbums', 'detail', [
+            'album'         => $albumData,
+            'photos'        => $photos,
+            'actors'        => $actors,
+            'rejectionInfo' => $rejectionInfo,
+        ]);
+    }
+
+    /**
+     * GET: Neues Foto-Album in 3 Schritten anlegen (#/photo-album-upload)
+     */
+    public function upload(): string
+    {
+        $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
+        if ($merchantId === 0) {
+            return '<div class="alert alert-danger m-4">Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.</div>';
+        }
+
+        $step      = abs((int)$this->request->get('step', 1));
+        $albumDbId = abs((int)$this->request->get('album_id', 0));
+        if (!in_array($step, [1, 2, 3], true)) {
+            $step = 1;
+        }
+
+        if ($albumDbId === 0 && isset($_SESSION['upload_photo_album']['album_id'])) {
+            $albumDbId = abs((int)$_SESSION['upload_photo_album']['album_id']);
+        }
+
+        $apiUrl = defined('API_URL') ? API_URL : 'https://api.erocloud.net';
+        $mcpUrl = defined('MCP_URL') ? MCP_URL : 'https://erocloud.net';
+
+        $draft = [
+            'id'               => 0,
+            'album_id'         => '',
+            'title'            => '',
+            'description'      => '',
+            'actor_id'         => 0,
+            'online_at'        => date('Y-m-d\TH:i', strtotime('+90 minutes')),
+            'amount_download'  => 500, // Standard: 5,00 EUR (500 Cent)
+            'has_fsk16'        => false,
+            'has_fsk18'        => false,
+            'poster_fsk16_url' => '',
+            'poster_fsk18_url' => '',
+            'meta_title'       => '',
+            'meta_description' => '',
+            'seo_url'          => '',
+        ];
+        $photos = [];
+
+        if ($albumDbId > 0) {
+            $rsDraft = p4c_query("SELECT *
+                FROM `photo_albums`
+                WHERE `id` = '" . $albumDbId . "'
+                  AND `merchant_id` = '" . $merchantId . "'
+                  AND `status` != 'deleted'
+                LIMIT 1;", __FILE__, __LINE__);
+
+            if ($rsDraft && p4c_num_rows($rsDraft) > 0) {
+                $dObj        = p4c_fetch_object($rsDraft);
+                $albumIdHash = (string)$dObj->album_id;
+                $checksum    = (string)($dObj->checksum ?? '');
+
+                $draft = [
+                    'id'               => abs((int)$dObj->id),
+                    'album_id'         => $albumIdHash,
+                    'title'            => self::decodeLegacyText((string)$dObj->title),
+                    'description'      => self::decodeLegacyText((string)$dObj->description),
+                    'actor_id'         => abs((int)$dObj->actor_id),
+                    'online_at'        => ($dObj->online_at !== '0000-00-00 00:00:00' && !empty($dObj->online_at))
+                        ? date('Y-m-d\TH:i', strtotime((string)$dObj->online_at))
+                        : date('Y-m-d\TH:i', strtotime('+90 minutes')),
+                    'amount_download'  => abs((int)$dObj->amount_download),
+                    'has_fsk16'        => trim((string)$dObj->preview_image_fsk16) !== '',
+                    'has_fsk18'        => trim((string)$dObj->preview_image_fsk18) !== '',
+                    'poster_fsk16_url' => $apiUrl . '/PhotoAlbumPoster/FSK16/' . rawurlencode($albumIdHash) . '?w=240&cs=' . rawurlencode($checksum) . '&t=' . time(),
+                    'poster_fsk18_url' => $apiUrl . '/PhotoAlbumPoster/FSK18/' . rawurlencode($albumIdHash) . '?w=240&cs=' . rawurlencode($checksum) . '&t=' . time(),
+                    'meta_title'       => self::decodeLegacyText((string)$dObj->meta_title),
+                    'meta_description' => self::decodeLegacyText((string)$dObj->meta_description),
+                    'seo_url'          => (string)$dObj->seo_url,
+                ];
+
+                $rsPhotos = p4c_query("SELECT *
+                    FROM `photo_albums_photos`
+                    WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "'
+                      AND `merchant_id` = '" . $merchantId . "'
+                      AND `status` != 'deleted'
+                    ORDER BY `id` ASC;", __FILE__, __LINE__);
+
+                if ($rsPhotos) {
+                    while ($p = p4c_fetch_object($rsPhotos)) {
+                        $pFileId  = (string)$p->file_id;
+                        $photos[] = [
+                            'id'        => abs((int)$p->id),
+                            'file_id'   => $pFileId,
+                            'filename'  => (string)$p->filename,
+                            'thumb_url' => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=200',
+                            'zoom_url'  => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=900',
+                        ];
+                    }
+                }
+            } elseif ($step === 2) {
+                $step      = 1;
+                $albumDbId = 0;
+            }
+        }
+
+        if ($step === 3) {
+            unset($_SESSION['upload_photo_album']);
+        }
+
+        $actors = $this->loadActiveMerchantActors($merchantId, (int)$draft['actor_id']);
+
+        return View::render('PhotoAlbums', 'upload', [
+            'step'   => $step,
+            'album'  => $draft,
+            'photos' => $photos,
+            'actors' => $actors,
+        ]);
+    }
+
+    /**
+     * POST: Speichert Schritt 1 beim Anlegen eines neuen Foto-Albums (photo-albums/save-step1)
+     */
+    public function saveStep1(): void
+    {
+        global $mysql;
+
+        $this->requireValidCsrf();
+        $merchantId = $this->requireMerchantId();
+
+        $existingId      = abs((int)$this->request->post('album_id', 0));
+        $title           = trim((string)$this->request->post('title', ''));
+        $description     = trim((string)$this->request->post('description', ''));
+        $actorId         = abs((int)$this->request->post('actor_id', 0));
+        $onlineAtRaw     = trim((string)$this->request->post('online_at', ''));
+        $amountDownload  = abs((int)$this->request->post('amount_download', 500));
+        $metaTitle       = trim((string)$this->request->post('meta_title', ''));
+        $metaDescription = trim((string)$this->request->post('meta_description', ''));
+        $seoUrl          = trim((string)$this->request->post('seo_url', ''));
+
+        $this->validateAlbumInput(
+            $merchantId,
+            $title,
+            $description,
+            $actorId,
+            $onlineAtRaw,
+            true,
+            $amountDownload,
+            $metaTitle,
+            $metaDescription,
+            $seoUrl
+        );
+
+        $onlineAtSql = date('Y-m-d H:i:s', strtotime($onlineAtRaw));
+        $storageDir  = defined('PHOTO_ALBUMS_DEFAULT_DIR') ? PHOTO_ALBUMS_DEFAULT_DIR : 'photo_albums';
+
+        if ($existingId > 0) {
+            $rsCheck = p4c_query("SELECT `id` FROM `photo_albums` WHERE `id` = '" . $existingId . "' AND `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted' LIMIT 1;", __FILE__, __LINE__);
+            if (!$rsCheck || p4c_num_rows($rsCheck) === 0) {
+                $existingId = 0;
+            }
+        }
+
+        if ($existingId === 0) {
+            p4c_query("INSERT INTO `photo_albums` SET
+                `merchant_id`         = '" . $merchantId . "',
+                `actor_id`            = '" . $actorId . "',
+                `storage_location`    = '" . p4c_escape_string($storageDir) . "',
+                `number_of_photos`    = '0',
+                `preview_image_fsk16` = '',
+                `preview_image_fsk18` = '',
+                `title`               = '" . p4c_escape_string($title) . "',
+                `description`         = '" . p4c_escape_string($description) . "',
+                `meta_title`          = '" . p4c_escape_string($metaTitle) . "',
+                `meta_description`    = '" . p4c_escape_string($metaDescription) . "',
+                `seo_url`             = '" . p4c_escape_string($seoUrl) . "',
+                `online_at`           = '" . p4c_escape_string($onlineAtSql) . "',
+                `amount_webmaster`    = '10',
+                `amount_download`     = '" . $amountDownload . "',
+                `album_checked`       = '0000-00-00 00:00:00',
+                `released`            = '0';", __FILE__, __LINE__);
+
+            $existingId  = abs((int)p4c_insert_id());
+            $albumIdHash = strtolower(md5($existingId . '_' . time() . '_' . $merchantId));
+
+            p4c_query("UPDATE `photo_albums` SET `album_id` = '" . p4c_escape_string($albumIdHash) . "' WHERE `id` = '" . $existingId . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
+        } else {
+            p4c_query("UPDATE `photo_albums` SET
+                `actor_id`         = '" . $actorId . "',
+                `title`            = '" . p4c_escape_string($title) . "',
+                `description`      = '" . p4c_escape_string($description) . "',
+                `meta_title`       = '" . p4c_escape_string($metaTitle) . "',
+                `meta_description` = '" . p4c_escape_string($metaDescription) . "',
+                `seo_url`          = '" . p4c_escape_string($seoUrl) . "',
+                `online_at`        = '" . p4c_escape_string($onlineAtSql) . "',
+                `amount_download`  = '" . $amountDownload . "'
+                WHERE `id` = '" . $existingId . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
+        }
+
+        if (function_exists('photo_album_checksum') && class_exists('PhotoAlbum')) {
+            $aObj     = new \PhotoAlbum($mysql, $existingId);
+            $checksum = photo_album_checksum($aObj);
+            p4c_query("UPDATE `photo_albums` SET `checksum` = '" . p4c_escape_string((string)$checksum) . "' WHERE `id` = '" . $existingId . "';", __FILE__, __LINE__);
+        }
+
+        $_SESSION['upload_photo_album']['album_id'] = $existingId;
+
+        if (function_exists('log_action')) {
+            log_action('Foto-Album Upload Schritt 1 gespeichert (Album-ID: ' . $existingId . ')');
+        }
+
+        Response::json([
+            'status'   => 'ok',
+            'message'  => 'Die Basisdaten wurden gespeichert. Bitte laden Sie nun die Coverbilder und Fotos hoch.',
+            'album_id' => $existingId,
+            'redirect' => '#/photo-album-upload?step=2&album_id=' . $existingId,
+        ]);
+    }
+
+    /**
+     * POST: Aktualisiert ein bestehendes Foto-Album (photo-albums/update)
+     */
+    public function update(): void
+    {
+        global $mysql;
+
+        $this->requireValidCsrf();
+        $merchantId = $this->requireMerchantId();
+
+        $albumDbId = abs((int)$this->request->post('id', 0));
+        if ($albumDbId === 0) {
+            Response::error('Ungültige Foto-Album-ID.', 400);
+        }
+
+        $rsAlbum = p4c_query("SELECT * FROM `photo_albums` WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted' LIMIT 1;", __FILE__, __LINE__);
+        if (!$rsAlbum || p4c_num_rows($rsAlbum) === 0) {
+            Response::error('Das angeforderte Foto-Album wurde nicht gefunden.', 404);
+        }
+
+        $aObj        = p4c_fetch_object($rsAlbum);
+        $albumIdHash = (string)$aObj->album_id;
+
+        $rsOnline      = p4c_query("SELECT `id` FROM `photo_albums_online` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "' AND `merchant_id` = '" . $merchantId . "' LIMIT 1;", __FILE__, __LINE__);
+        $isAlbumOnline = ($rsOnline && p4c_num_rows($rsOnline) > 0);
+        $canEditOnline = (((string)$aObj->album_checked === '0000-00-00 00:00:00' && !$isAlbumOnline) || strtotime((string)$aObj->online_at) > time());
+
+        $title           = trim((string)$this->request->post('title', ''));
+        $description     = trim((string)$this->request->post('description', ''));
+        $actorId         = abs((int)$this->request->post('actor_id', 0));
+        $onlineAtRaw     = trim((string)$this->request->post('online_at', ''));
+        $amountDownload  = abs((int)$this->request->post('amount_download', 500));
+        $metaTitle       = trim((string)$this->request->post('meta_title', ''));
+        $metaDescription = trim((string)$this->request->post('meta_description', ''));
+        $seoUrl          = trim((string)$this->request->post('seo_url', ''));
+
+        $this->validateAlbumInput(
+            $merchantId,
+            $title,
+            $description,
+            $actorId,
+            $onlineAtRaw,
+            $canEditOnline,
+            $amountDownload,
+            $metaTitle,
+            $metaDescription,
+            $seoUrl
+        );
+
+        $onlineAtSql = $canEditOnline && $onlineAtRaw !== ''
+            ? date('Y-m-d H:i:s', strtotime($onlineAtRaw))
+            : (string)$aObj->online_at;
+
+        // Falls das Album zur Korrektur markiert war (released == 2), wieder auf released = 0 setzen
+        $newReleased = ((string)$aObj->album_checked === '0000-00-00 00:00:00' && (int)$aObj->released === 2)
+            ? 0
+            : (int)$aObj->released;
+
+        p4c_query("UPDATE `photo_albums` SET
+            `actor_id`         = '" . $actorId . "',
+            `title`            = '" . p4c_escape_string($title) . "',
+            `description`      = '" . p4c_escape_string($description) . "',
+            `meta_title`       = '" . p4c_escape_string($metaTitle) . "',
+            `meta_description` = '" . p4c_escape_string($metaDescription) . "',
+            `seo_url`          = '" . p4c_escape_string($seoUrl) . "',
+            `online_at`        = '" . p4c_escape_string($onlineAtSql) . "',
+            `amount_download`  = '" . $amountDownload . "',
+            `released`         = '" . $newReleased . "'
+            WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
+
+        if (function_exists('photo_album_checksum') && class_exists('PhotoAlbum')) {
+            $aClass   = new \PhotoAlbum($mysql, $albumDbId);
+            $checksum = photo_album_checksum($aClass);
+            p4c_query("UPDATE `photo_albums` SET `checksum` = '" . p4c_escape_string((string)$checksum) . "' WHERE `id` = '" . $albumDbId . "';", __FILE__, __LINE__);
+        }
+
+        if (function_exists('log_action')) {
+            log_action('Foto-Album #' . $albumDbId . ' aktualisiert');
+        }
+
+        Response::json([
+            'status'  => 'ok',
+            'message' => 'Ihre Änderungen am Foto-Album wurden erfolgreich gespeichert.',
+        ]);
+    }
+
+    /**
+     * POST: Lädt ein FSK16- oder FSK18-Coverbild für das Foto-Album hoch (photo-albums/upload-cover)
+     */
+    public function uploadCover(): void
+    {
+        global $mysql;
+
+        $this->requireValidCsrf();
+        $merchantId = $this->requireMerchantId();
+
+        $albumDbId = abs((int)$this->request->post('album_id', 0));
+        $fsk       = trim((string)$this->request->post('fsk', ''));
+
+        if ($albumDbId === 0 || !in_array($fsk, ['16', '18'], true)) {
+            Response::error('Ungültige Parameter für den Cover-Upload.', 400);
+        }
+
+        $rsAlbum = p4c_query("SELECT * FROM `photo_albums` WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted' LIMIT 1;", __FILE__, __LINE__);
+        if (!$rsAlbum || p4c_num_rows($rsAlbum) === 0) {
+            Response::error('Das angeforderte Foto-Album wurde nicht gefunden.', 404);
+        }
+        $aObj = p4c_fetch_object($rsAlbum);
+
+        if (!isset($_FILES['cover']) || !is_array($_FILES['cover']) || (int)$_FILES['cover']['error'] !== UPLOAD_ERR_OK) {
+            Response::error('Bitte wählen Sie eine gültige Bilddatei (JPG oder PNG) aus.', 400);
+        }
+
+        $file     = $_FILES['cover'];
+        $fileSize = (int)$file['size'];
+        if ($fileSize <= 0 || $fileSize > 6 * 1024 * 1024) {
+            Response::error('Das Coverbild darf maximal 6 MB groß sein.', 400);
+        }
+
+        $ext = strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION));
+        if (!in_array($ext, ['jpg', 'jpeg', 'png'], true)) {
+            Response::error('Es sind nur Bilder im Format JPG, JPEG oder PNG zulässig.', 400);
+        }
+
+        $imgInfo = @getimagesize((string)$file['tmp_name']);
+        if ($imgInfo === false) {
+            Response::error('Die hochgeladene Datei ist kein gültiges Bild.', 400);
+        }
+
+        $albumsBasePath = defined('PHOTO_ALBUMS_PATH') ? PHOTO_ALBUMS_PATH : (dirname(__DIR__, 5) . '/priv');
+        $storageDir     = (string)$aObj->storage_location !== '' ? (string)$aObj->storage_location : (defined('PHOTO_ALBUMS_DEFAULT_DIR') ? PHOTO_ALBUMS_DEFAULT_DIR : 'photo_albums');
+        $targetDir      = rtrim($albumsBasePath, '/\\') . '/' . $storageDir . '/' . $merchantId . '/' . $albumDbId;
+
+        if (!is_dir($targetDir)) {
+            @mkdir($targetDir, 0777, true);
+        }
+
+        // Bisheriges Cover löschen, falls vorhanden
+        $oldCol  = ($fsk === '16') ? 'preview_image_fsk16' : 'preview_image_fsk18';
+        $oldFile = trim((string)($aObj->$oldCol ?? ''));
+        if ($oldFile !== '' && is_file($targetDir . '/' . $oldFile)) {
+            @unlink($targetDir . '/' . $oldFile);
+        }
+
+        $newFilename = strtolower(md5($albumDbId . '_' . microtime(true))) . '_' . $fsk . '.' . $ext;
+        $destFile    = $targetDir . '/' . $newFilename;
+
+        if (!@move_uploaded_file((string)$file['tmp_name'], $destFile)) {
+            Response::error('Das Coverbild konnte nicht auf dem Server gespeichert werden.', 500);
+        }
+        @chmod($destFile, 0777);
+
+        p4c_query("UPDATE `photo_albums` SET `" . $oldCol . "` = '" . p4c_escape_string($newFilename) . "' WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
+
+        $checksum = (string)($aObj->checksum ?? '');
+        if (function_exists('photo_album_checksum') && class_exists('PhotoAlbum')) {
+            $aClass   = new \PhotoAlbum($mysql, $albumDbId);
+            $checksum = (string)photo_album_checksum($aClass);
+            p4c_query("UPDATE `photo_albums` SET `checksum` = '" . p4c_escape_string($checksum) . "' WHERE `id` = '" . $albumDbId . "';", __FILE__, __LINE__);
+        }
+
+        $apiUrl     = defined('API_URL') ? API_URL : 'https://api.erocloud.net';
+        $previewUrl = $apiUrl . '/PhotoAlbumPoster/FSK' . $fsk . '/' . rawurlencode((string)$aObj->album_id) . '?w=240&cs=' . rawurlencode($checksum) . '&t=' . time();
+
+        Response::json([
+            'status'      => 'ok',
+            'message'     => 'Das FSK' . $fsk . '-Coverbild wurde erfolgreich aktualisiert.',
+            'fsk'         => $fsk,
+            'preview_url' => $previewUrl,
+        ]);
+    }
+
+    /**
+     * POST: Lädt ein oder mehrere Fotos in ein Foto-Album hoch (photo-albums/upload-photos)
+     */
+    public function uploadPhotos(): void
+    {
+        global $mysql;
+
+        $this->requireValidCsrf();
+        $merchantId = $this->requireMerchantId();
+
+        $albumDbId = abs((int)$this->request->post('album_id', 0));
+        if ($albumDbId === 0) {
+            Response::error('Ungültige Foto-Album-ID.', 400);
+        }
+
+        $rsAlbum = p4c_query("SELECT * FROM `photo_albums` WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted' LIMIT 1;", __FILE__, __LINE__);
+        if (!$rsAlbum || p4c_num_rows($rsAlbum) === 0) {
+            Response::error('Das angeforderte Foto-Album wurde nicht gefunden.', 404);
+        }
+        $aObj        = p4c_fetch_object($rsAlbum);
+        $albumIdHash = (string)$aObj->album_id;
+
+        if (!isset($_FILES['photos']) || !is_array($_FILES['photos']['name'])) {
+            Response::error('Bitte wählen Sie mindestens eine Bilddatei zum Hochladen aus.', 400);
+        }
+
+        $albumsBasePath = defined('PHOTO_ALBUMS_PATH') ? PHOTO_ALBUMS_PATH : (dirname(__DIR__, 5) . '/priv');
+        $storageDir     = (string)$aObj->storage_location !== '' ? (string)$aObj->storage_location : (defined('PHOTO_ALBUMS_DEFAULT_DIR') ? PHOTO_ALBUMS_DEFAULT_DIR : 'photo_albums');
+        $imagesDir      = rtrim($albumsBasePath, '/\\') . '/' . $storageDir . '/' . $merchantId . '/' . $albumDbId . '/images';
+
+        if (!is_dir($imagesDir)) {
+            @mkdir($imagesDir, 0777, true);
+        }
+
+        $mcpUrl         = defined('MCP_URL') ? MCP_URL : 'https://erocloud.net';
+        $uploadedPhotos = [];
+        $fileCount      = count($_FILES['photos']['name']);
+
+        for ($i = 0; $i < $fileCount; $i++) {
+            $err = (int)($_FILES['photos']['error'][$i] ?? UPLOAD_ERR_NO_FILE);
+            if ($err !== UPLOAD_ERR_OK) {
+                continue;
+            }
+
+            $tmpName  = (string)$_FILES['photos']['tmp_name'][$i];
+            $origName = (string)$_FILES['photos']['name'][$i];
+            $size     = (int)$_FILES['photos']['size'][$i];
+
+            if ($size <= 0 || $size > 6 * 1024 * 1024) {
+                continue;
+            }
+
+            $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+            if (!in_array($ext, ['jpg', 'jpeg', 'png'], true)) {
+                continue;
+            }
+
+            if (@getimagesize($tmpName) === false) {
+                continue;
+            }
+
+            $newFileName = 'IMG_' . date('Ymd_His') . '_' . $i . '_' . random_int(100, 999) . '.' . $ext;
+            $destPath    = $imagesDir . '/' . $newFileName;
+
+            if (@move_uploaded_file($tmpName, $destPath)) {
+                @chmod($destPath, 0777);
+                $photoFileId = strtolower(md5($albumDbId . '_' . $newFileName . '_' . microtime(true)));
+
+                p4c_query("INSERT INTO `photo_albums_photos` SET
+                    `file_id`         = '" . p4c_escape_string($photoFileId) . "',
+                    `album_id`        = '" . p4c_escape_string($albumIdHash) . "',
+                    `merchant_id`     = '" . $merchantId . "',
+                    `filename`        = '" . p4c_escape_string($newFileName) . "',
+                    `upload_datetime` = '" . date('Y-m-d H:i:s') . "',
+                    `status`          = '';", __FILE__, __LINE__);
+
+                $uploadedPhotos[] = [
+                    'file_id'   => $photoFileId,
+                    'filename'  => $newFileName,
+                    'thumb_url' => $mcpUrl . '/AlbumPhoto/' . rawurlencode($photoFileId) . '?w=200',
+                    'zoom_url'  => $mcpUrl . '/AlbumPhoto/' . rawurlencode($photoFileId) . '?w=900',
+                ];
+            }
+        }
+
+        if (empty($uploadedPhotos)) {
+            Response::error('Es konnten keine gültigen Fotos verarbeitet werden. Bitte achten Sie auf das Format (JPG/PNG) und max. 6 MB pro Bild.', 400);
+        }
+
+        $totalPhotos = $this->recalculatePhotoCount($albumDbId, $albumIdHash, $merchantId, $mysql);
+
+        Response::json([
+            'status'       => 'ok',
+            'message'      => count($uploadedPhotos) . ' Foto(s) erfolgreich zum Album hinzugefügt.',
+            'photos'       => $uploadedPhotos,
+            'total_photos' => $totalPhotos,
+        ]);
+    }
+
+    /**
+     * POST: Löscht ein einzelnes Foto aus einem Foto-Album (photo-albums/delete-photo)
+     */
+    public function deletePhoto(): void
+    {
+        global $mysql;
+
+        $this->requireValidCsrf();
+        $merchantId = $this->requireMerchantId();
+
+        $albumDbId   = abs((int)$this->request->post('album_id', 0));
+        $photoFileId = trim((string)$this->request->post('file_id', ''));
+
+        if ($albumDbId === 0 || $photoFileId === '') {
+            Response::error('Ungültige Parameter zum Löschen des Fotos.', 400);
+        }
+
+        $rsAlbum = p4c_query("SELECT * FROM `photo_albums` WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted' LIMIT 1;", __FILE__, __LINE__);
+        if (!$rsAlbum || p4c_num_rows($rsAlbum) === 0) {
+            Response::error('Das zugehörige Foto-Album wurde nicht gefunden.', 404);
+        }
+        $aObj        = p4c_fetch_object($rsAlbum);
+        $albumIdHash = (string)$aObj->album_id;
+
+        $rsPhoto = p4c_query("SELECT * FROM `photo_albums_photos` WHERE `file_id` = '" . p4c_escape_string($photoFileId) . "' AND `album_id` = '" . p4c_escape_string($albumIdHash) . "' AND `merchant_id` = '" . $merchantId . "' LIMIT 1;", __FILE__, __LINE__);
+        if (!$rsPhoto || p4c_num_rows($rsPhoto) === 0) {
+            Response::error('Das gewählte Foto wurde nicht gefunden.', 404);
+        }
+        $pObj = p4c_fetch_object($rsPhoto);
+
+        // Wenn das Album bereits geprüft oder online ist, müssen mindestens 4 Fotos im Album verbleiben
+        $rsCount    = p4c_query("SELECT COUNT(*) AS `cnt` FROM `photo_albums_photos` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "' AND `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted';", __FILE__, __LINE__);
+        $cntRow     = $rsCount ? p4c_fetch_object($rsCount) : null;
+        $currentCnt = $cntRow ? abs((int)$cntRow->cnt) : 0;
+
+        if ((int)$aObj->released === 1 && $currentCnt <= 4) {
+            Response::error('Ein freigegebenes Foto-Album muss mindestens 4 Fotos enthalten. Bitte laden Sie zuerst ein neues Foto hoch, bevor Sie dieses löschen.', 400);
+        }
+
+        $albumsBasePath = defined('PHOTO_ALBUMS_PATH') ? PHOTO_ALBUMS_PATH : (dirname(__DIR__, 5) . '/priv');
+        $storageDir     = (string)$aObj->storage_location !== '' ? (string)$aObj->storage_location : (defined('PHOTO_ALBUMS_DEFAULT_DIR') ? PHOTO_ALBUMS_DEFAULT_DIR : 'photo_albums');
+        $filePath       = rtrim($albumsBasePath, '/\\') . '/' . $storageDir . '/' . $merchantId . '/' . $albumDbId . '/images/' . (string)$pObj->filename;
+
+        if (is_file($filePath)) {
+            @unlink($filePath);
+        }
+
+        p4c_query("DELETE FROM `photo_albums_photos` WHERE `id` = '" . abs((int)$pObj->id) . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
+
+        $totalPhotos = $this->recalculatePhotoCount($albumDbId, $albumIdHash, $merchantId, $mysql);
+
+        Response::json([
+            'status'       => 'ok',
+            'message'      => 'Das Foto wurde aus dem Album entfernt.',
+            'file_id'      => $photoFileId,
+            'total_photos' => $totalPhotos,
+        ]);
+    }
+
+    /**
+     * POST: Schließt Schritt 2 des Foto-Album-Uploads ab (photo-albums/publish)
+     */
+    public function publish(): void
+    {
+        $this->requireValidCsrf();
+        $merchantId = $this->requireMerchantId();
+
+        $albumDbId = abs((int)$this->request->post('album_id', 0));
+        if ($albumDbId === 0) {
+            Response::error('Ungültige Foto-Album-ID.', 400);
+        }
+
+        $rsAlbum = p4c_query("SELECT * FROM `photo_albums` WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted' LIMIT 1;", __FILE__, __LINE__);
+        if (!$rsAlbum || p4c_num_rows($rsAlbum) === 0) {
+            Response::error('Das angeforderte Foto-Album wurde nicht gefunden.', 404);
+        }
+        $aObj = p4c_fetch_object($rsAlbum);
+
+        if (trim((string)$aObj->preview_image_fsk16) === '') {
+            Response::error('Bitte laden Sie ein jugendfreies FSK16-Coverbild für Ihr Foto-Album hoch.', 400);
+        }
+        if (trim((string)$aObj->preview_image_fsk18) === '') {
+            Response::error('Bitte laden Sie ein FSK18-Coverbild für Ihr Foto-Album hoch.', 400);
+        }
+        if (abs((int)$aObj->number_of_photos) < 4) {
+            Response::error('Ein Foto-Album muss mindestens 4 Fotos enthalten. Bitte laden Sie noch weitere Fotos hoch.', 400);
+        }
+
+        unset($_SESSION['upload_photo_album']);
+
+        if (function_exists('log_action')) {
+            log_action('Foto-Album #' . $albumDbId . ' vollständig hochgeladen und zur Prüfung eingereicht');
+        }
+
+        Response::json([
+            'status'   => 'ok',
+            'message'  => 'Ihr Foto-Album wurde erfolgreich fertiggestellt und zur Prüfung eingereicht.',
+            'redirect' => '#/photo-album-upload?step=3&album_id=' . $albumDbId,
+        ]);
+    }
+
+    /**
+     * POST: Löscht ein noch nicht veröffentlichtes Foto-Album (photo-albums/delete)
+     */
+    public function delete(): void
+    {
+        $this->requireValidCsrf();
+        $merchantId = $this->requireMerchantId();
+
+        $albumDbId = abs((int)$this->request->post('id', 0));
+        if ($albumDbId === 0) {
+            Response::error('Ungültige Foto-Album-ID.', 400);
+        }
+
+        $rsAlbum = p4c_query("SELECT * FROM `photo_albums` WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted' LIMIT 1;", __FILE__, __LINE__);
+        if (!$rsAlbum || p4c_num_rows($rsAlbum) === 0) {
+            Response::error('Das angeforderte Foto-Album wurde nicht gefunden.', 404);
+        }
+
+        $aObj        = p4c_fetch_object($rsAlbum);
+        $albumIdHash = (string)$aObj->album_id;
+
+        $rsOnline      = p4c_query("SELECT `id` FROM `photo_albums_online` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "' AND `merchant_id` = '" . $merchantId . "' LIMIT 1;", __FILE__, __LINE__);
+        $isAlbumOnline = ($rsOnline && p4c_num_rows($rsOnline) > 0);
+
+        if ((string)$aObj->album_checked !== '0000-00-00 00:00:00' || (int)$aObj->released === 1 || $isAlbumOnline) {
+            Response::error('Bereits geprüfte oder veröffentlichte Foto-Alben können aus Sicherheitsgründen nicht direkt gelöscht werden. Bitte wenden Sie sich bei Bedarf an den Support.', 400);
+        }
+
+        p4c_query("UPDATE `photo_albums` SET `status` = 'deleted' WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
+        p4c_query("UPDATE `photo_albums_photos` SET `status` = 'deleted' WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
+
+        if (function_exists('log_action')) {
+            log_action('Foto-Album #' . $albumDbId . ' gelöscht');
+        }
+
+        Response::json([
+            'status'   => 'ok',
+            'message'  => 'Das Foto-Album wurde erfolgreich gelöscht.',
+            'redirect' => '#/photo-albums',
+        ]);
+    }
+
+    /**
+     * Aktualisiert number_of_photos und checksum in photo_albums.
+     */
+    private function recalculatePhotoCount(int $albumDbId, string $albumIdHash, int $merchantId, $mysql): int
+    {
+        $rsCnt = p4c_query("SELECT COUNT(*) AS `cnt`
+            FROM `photo_albums_photos`
+            WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "'
+              AND `merchant_id` = '" . $merchantId . "'
+              AND `status` != 'deleted';", __FILE__, __LINE__);
+
+        $row   = $rsCnt ? p4c_fetch_object($rsCnt) : null;
+        $total = $row ? abs((int)$row->cnt) : 0;
+
+        p4c_query("UPDATE `photo_albums` SET `number_of_photos` = '" . $total . "' WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
+
+        if (function_exists('photo_album_checksum') && class_exists('PhotoAlbum')) {
+            $aClass   = new \PhotoAlbum($mysql, $albumDbId);
+            $checksum = photo_album_checksum($aClass);
+            p4c_query("UPDATE `photo_albums` SET `checksum` = '" . p4c_escape_string((string)$checksum) . "' WHERE `id` = '" . $albumDbId . "';", __FILE__, __LINE__);
+        }
+
+        return $total;
+    }
+
+    /**
+     * Validiert die Eingabedaten für ein Foto-Album.
+     */
+    private function validateAlbumInput(
+        int $merchantId,
+        string $title,
+        string $description,
+        int $actorId,
+        string $onlineAtRaw,
+        bool $validateOnlineAt,
+        int $amountDownload,
+        string $metaTitle,
+        string $metaDescription,
+        string $seoUrl
+    ): void {
+        $lenTitle = function_exists('mb_strlen') ? mb_strlen($title, 'UTF-8') : strlen($title);
+        if ($lenTitle < 5 || $lenTitle > 100) {
+            Response::error('Bitte geben Sie einen Albumtitel zwischen 5 und 100 Zeichen ein.', 400);
+        }
+        if (function_exists('email_in_string') && email_in_string($title)) {
+            Response::error('Der Albumtitel darf keine E-Mail-Adresse enthalten.', 400);
+        }
+        if (function_exists('url_in_string') && url_in_string($title)) {
+            Response::error('Der Albumtitel darf keine Internetadresse (URL) enthalten.', 400);
+        }
+
+        $lenDesc = function_exists('mb_strlen') ? mb_strlen($description, 'UTF-8') : strlen($description);
+        if ($lenDesc < 30 || $lenDesc > 2000) {
+            Response::error('Bitte geben Sie eine ausführliche Beschreibung mit mindestens 30 Zeichen (max. 2.000 Zeichen) ein.', 400);
+        }
+        if (function_exists('email_in_string') && email_in_string($description)) {
+            Response::error('Die Beschreibung darf keine E-Mail-Adresse enthalten.', 400);
+        }
+        if (function_exists('url_in_string') && url_in_string($description)) {
+            Response::error('Die Beschreibung darf keine Internetadresse (URL) enthalten.', 400);
+        }
+
+        if ($actorId <= 0) {
+            Response::error('Bitte wählen Sie ein Darsteller-Profil für dieses Foto-Album aus.', 400);
+        }
+        $rsAct = p4c_query("SELECT `id` FROM `actors` WHERE `id` = '" . $actorId . "' AND `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted' LIMIT 1;", __FILE__, __LINE__);
+        if (!$rsAct || p4c_num_rows($rsAct) === 0) {
+            Response::error('Das gewählte Darsteller-Profil ist ungültig.', 400);
+        }
+
+        if ($validateOnlineAt) {
+            $ts = strtotime($onlineAtRaw);
+            if ($ts === false) {
+                Response::error('Bitte geben Sie ein gültiges Veröffentlichungsdatum an.', 400);
+            }
+        }
+
+        // Preis in Cent: 0 (kostenlos) oder 100..5000 (1,00 EUR bis 50,00 EUR in 100er-Schritten)
+        if ($amountDownload < 0 || $amountDownload > 5000 || ($amountDownload % 100 !== 0)) {
+            Response::error('Bitte wählen Sie einen gültigen Verkaufspreis zwischen 0,00 € und 50,00 € aus.', 400);
+        }
+
+        if ($metaTitle !== '') {
+            $lenMt = function_exists('mb_strlen') ? mb_strlen($metaTitle, 'UTF-8') : strlen($metaTitle);
+            if ($lenMt < 5 || $lenMt > 80) {
+                Response::error('Der optionale Meta-Titel muss zwischen 5 und 80 Zeichen lang sein.', 400);
+            }
+        }
+        if ($metaDescription !== '') {
+            $lenMd = function_exists('mb_strlen') ? mb_strlen($metaDescription, 'UTF-8') : strlen($metaDescription);
+            if ($lenMd < 5 || $lenMd > 160) {
+                Response::error('Die optionale Meta-Beschreibung muss zwischen 5 und 160 Zeichen lang sein.', 400);
+            }
+        }
+        if ($seoUrl !== '' && !preg_match('/^[a-zA-Z0-9-]+$/', $seoUrl)) {
+            Response::error('Die optionale SEO-URL darf nur aus Buchstaben, Zahlen und Bindestrichen bestehen.', 400);
+        }
+    }
+
+    /**
+     * Lädt alle freigegebenen Darsteller-Profile des Partners.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function loadActiveMerchantActors(int $merchantId, int $includeActorId = 0): array
+    {
+        $actors = [];
+        $rs     = p4c_query("SELECT `id`, `username`
+            FROM `actors`
+            WHERE `merchant_id` = '" . $merchantId . "'
+              AND `status` != 'deleted'
+              AND (
+                  (`profile_checked` != '0000-00-00 00:00:00' AND `released` = '1')
+                  OR `id` = '" . abs((int)$includeActorId) . "'
+              )
+            ORDER BY `username` ASC;", __FILE__, __LINE__);
+
+        if ($rs) {
+            while ($row = p4c_fetch_object($rs)) {
+                $actors[] = [
+                    'id'       => abs((int)$row->id),
+                    'username' => self::decodeLegacyText((string)$row->username),
+                ];
+            }
+        }
+
+        return $actors;
+    }
+
+    private function requireValidCsrf(): void
+    {
+        $token = $this->request->header('X-CSRF-Token');
+        if ($token === '') {
+            $token = (string)$this->request->post('_csrf', '');
+        }
+        if (!Csrf::validate($token)) {
+            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte laden Sie die Seite neu.', 403);
+        }
+    }
+
+    private function requireMerchantId(): int
+    {
+        $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
+        if ($merchantId === 0) {
+            Response::error('Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.', 401);
+        }
+        return $merchantId;
+    }
+
+    private static function decodeLegacyText(string $value): string
+    {
+        if ($value === '') {
+            return '';
+        }
+        return html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
+}

@@ -81,4 +81,5 @@
     - [x] Build clickable interactive layout prototype in `mcp/mcp_neu/app/` and `mcp/mcp_neu/web/` with all current MCP sidebar menu entries, KKC tile design in Pay4Coins-Blue (`#0284C7` / `#4297D7`), and zero-reload SPA navigation
     - [x] Implement live Pay4Coins SSO login (`mcp/mcp_neu/web/login.php`), live MCP session authentication (`is_logged_in('mcp')`), and database-backed `Startseite` dashboard (`HomeController` & `views/dashboard.php`)
     - [x] Implement live `Profile / Actors` module (`ActorsController`, `views/list.php`, `views/form.php`) with live username check, Steckbrief editor, `actor_checksum()` sync, and AJAX FSK16/FSK18 profile image upload
-    - [ ] Implement `Movies` (`#/movies`, `#/movie`, `#/movie-upload`) and `Photo-Albums` (`#/photo-albums`, `#/photo-album`, `#/photo-album-upload`) modules in `mcp_neu`
+    - [x] Implement `Movies` (`#/movies`, `#/movie`, `#/movie-upload`) and `Photo-Albums` (`#/photo-albums`, `#/photo-album`, `#/photo-album-upload`) modules in `mcp_neu`
+    - [ ] Implement live `FAQ` module (`#/faq`) and finalize `mcp_neu` production readiness

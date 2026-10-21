@@ -66,28 +66,45 @@ class Router
 
     private static function registerDefaults(): void
     {
-        $homeCtrl    = 'App\\Modules\\Home\\HomeController';
-        $actorsCtrl  = 'App\\Modules\\Actors\\ActorsController';
-        $previewCtrl = 'App\\Modules\\Preview\\PreviewController';
+        $homeCtrl        = 'App\\Modules\\Home\\HomeController';
+        $actorsCtrl      = 'App\\Modules\\Actors\\ActorsController';
+        $moviesCtrl      = 'App\\Modules\\Movies\\MoviesController';
+        $photoAlbumsCtrl = 'App\\Modules\\PhotoAlbums\\PhotoAlbumsController';
+        $previewCtrl     = 'App\\Modules\\Preview\\PreviewController';
 
         // 1. Startseite (Echtes Partner-Dashboard & Richtlinien-Bestätigung)
         self::register('startseite', $homeCtrl, 'view');
         self::register('home', $homeCtrl, 'view');
         self::register('home/accept-rules', $homeCtrl, 'acceptRules');
 
-        // 2. Content hochladen
-        self::register('movie-upload', $previewCtrl, 'movieUpload');
-        self::register('photo-album-upload', $previewCtrl, 'photoAlbumUpload');
+        // 2. Content hochladen (Filme & Foto-Alben in 3 Schritten)
+        self::register('movie-upload', $moviesCtrl, 'upload');
+        self::register('movies/save-step1', $moviesCtrl, 'saveStep1');
+        self::register('movies/upload-file', $moviesCtrl, 'uploadFile');
 
-        // 3. Content in der Cloud
-        self::register('movies', $previewCtrl, 'movies');
-        self::register('movie', $previewCtrl, 'movieDetail');
-        self::register('photo-albums', $previewCtrl, 'photoAlbums');
-        self::register('photo-album', $previewCtrl, 'photoAlbumDetail');
+        self::register('photo-album-upload', $photoAlbumsCtrl, 'upload');
+        self::register('photo-albums/save-step1', $photoAlbumsCtrl, 'saveStep1');
+        self::register('photo-albums/publish', $photoAlbumsCtrl, 'publish');
+
+        // 3. Content in der Cloud (Filme & Foto-Alben verwalten)
+        self::register('movies', $moviesCtrl, 'list');
+        self::register('movie', $moviesCtrl, 'detail');
+        self::register('movies/update', $moviesCtrl, 'update');
+        self::register('movies/upload-poster', $moviesCtrl, 'uploadPoster');
+        self::register('movies/delete', $moviesCtrl, 'delete');
+
+        self::register('photo-albums', $photoAlbumsCtrl, 'list');
+        self::register('photo-album', $photoAlbumsCtrl, 'detail');
+        self::register('photo-albums/update', $photoAlbumsCtrl, 'update');
+        self::register('photo-albums/upload-cover', $photoAlbumsCtrl, 'uploadCover');
+        self::register('photo-albums/upload-photos', $photoAlbumsCtrl, 'uploadPhotos');
+        self::register('photo-albums/delete-photo', $photoAlbumsCtrl, 'deletePhoto');
+        self::register('photo-albums/delete', $photoAlbumsCtrl, 'delete');
 
         // 4. Profile (Echte Darsteller-Verwaltung & FSK16/FSK18 Bild-Upload)
         self::register('actors', $actorsCtrl, 'list');
         self::register('new-actor', $actorsCtrl, 'newActor');
+        self::register('actor-new', $actorsCtrl, 'newActor');
         self::register('actor', $actorsCtrl, 'detail');
         self::register('actors/check-username', $actorsCtrl, 'checkUsername');
         self::register('actors/create', $actorsCtrl, 'create');

@@ -1,0 +1,1385 @@
+<?php
+declare(strict_types=1);
+
+namespace App\Modules\Movies;
+
+use App\Core\Csrf;
+use App\Core\Request;
+use App\Core\Response;
+use App\Core\View;
+
+if (!defined('SAFE_INC')) {
+    die("Hacking attempt...");
+}
+
+/**
+ * EroCloud MCP (v2.0) - Filme in der Cloud & Film-Upload Controller (Movies)
+ * Verwaltet die Film-Übersicht, Detailbearbeitung, Vorschaubilder sowie den 3-stufigen Film-Upload.
+ */
+class MoviesController
+{
+    private Request $request;
+
+    private const REPLACE_TITLE_CHARS = [
+        '°', '^', '²', '§', '$', '%', '{', '[', ']', '}', '´', '`', '~', "'", '_', ';', '<', '>',
+    ];
+
+    private const ZERO_WIDTH_SPACES = [
+        "\xE2\x80\x8B", "\xE2\x80\x8C", "\xE2\x80\x8D", "\xEF\xBF\xBD",
+    ];
+
+    public function __construct(Request $request)
+    {
+        $this->request = $request;
+    }
+
+    /**
+     * GET: Alle Filme des Partners in der Cloud anzeigen (#/movies)
+     */
+    public function list(): string
+    {
+        $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
+        if ($merchantId === 0) {
+            return '<div class="alert alert-danger m-4">Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.</div>';
+        }
+
+        $apiUrl = defined('API_URL') ? API_URL : 'https://api.erocloud.net';
+
+        // 1. Nicht gelöschte Darsteller-Profile des Partners laden
+        $actorsMap = [];
+        $rsActors = p4c_query("SELECT `id`, `username`, `status`
+            FROM `actors`
+            WHERE `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted';", __FILE__, __LINE__);
+        if ($rsActors && p4c_num_rows($rsActors) > 0) {
+            while ($aObj = p4c_fetch_object($rsActors)) {
+                $actorsMap[abs((int)$aObj->id)] = (string)$aObj->username;
+            }
+        }
+
+        // 2. Verkäufe & Provisionen pro Film (Streaming + Download) gruppiert laden
+        $salesMap = [];
+        $rsSales = p4c_query("SELECT
+                `movies_access`.`movie_id`,
+                `movies_access`.`buy_as`,
+                COUNT(*) AS `buys_cnt`,
+                SUM(`movies_access`.`actor_commision`) AS `comm_cents`
+            FROM `movies_access`
+            INNER JOIN `movies` ON `movies_access`.`movie_id` = `movies`.`file_id`
+            WHERE `movies`.`merchant_id` = '" . $merchantId . "'
+              AND `movies`.`status` != 'deleted'
+            GROUP BY `movies_access`.`movie_id`, `movies_access`.`buy_as`;", __FILE__, __LINE__);
+
+        if ($rsSales && p4c_num_rows($rsSales) > 0) {
+            while ($sRow = p4c_fetch_object($rsSales)) {
+                $fId   = (string)$sRow->movie_id;
+                $buyAs = (string)$sRow->buy_as;
+                if (!isset($salesMap[$fId])) {
+                    $salesMap[$fId] = [
+                        'streaming_buys' => 0,
+                        'download_buys'  => 0,
+                        'comm_cents'     => 0.0,
+                    ];
+                }
+                if ($buyAs === 'streaming') {
+                    $salesMap[$fId]['streaming_buys'] += abs((int)$sRow->buys_cnt);
+                } elseif ($buyAs === 'download') {
+                    $salesMap[$fId]['download_buys'] += abs((int)$sRow->buys_cnt);
+                }
+                $salesMap[$fId]['comm_cents'] += (float)($sRow->comm_cents ?? 0);
+            }
+        }
+
+        // 3. Alle nicht gelöschten Filme des Partners laden
+        $movies             = [];
+        $countOnline        = 0;
+        $countPending       = 0;
+        $countRejected      = 0;
+        $totalCommissionEur = 0.0;
+
+        $rsMovies = p4c_query("SELECT
+                `id`, `convert_status`, `file_id`, `checksum`, `filename`, `title`,
+                `movie_checked`, `released`, `actor_id`, `online_at`, `playtime_string`, `resolution`
+            FROM `movies`
+            WHERE `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted'
+            ORDER BY `id` DESC;", __FILE__, __LINE__);
+
+        if ($rsMovies && p4c_num_rows($rsMovies) > 0) {
+            while ($m = p4c_fetch_object($rsMovies)) {
+                $actorId = abs((int)$m->actor_id);
+                if ($actorId > 0 && !isset($actorsMap[$actorId])) {
+                    continue;
+                }
+
+                $movieId    = abs((int)$m->id);
+                $fileId     = (string)$m->file_id;
+                $checksum   = (string)$m->checksum;
+                $filename   = trim((string)$m->filename);
+                $convStatus = (int)$m->convert_status;
+                $checked    = (string)$m->movie_checked;
+                $released   = (int)$m->released;
+
+                $statusKey   = 'pending';
+                $statusLabel = 'In Bearbeitung';
+                $statusBadge = 'badge-kkc-neutral';
+                $statusIcon  = 'bi-clock';
+                $editRoute   = '#/movie?id=' . $movieId;
+
+                if ($filename === '') {
+                    $statusKey   = 'pending';
+                    $statusLabel = 'Filmdatei hochladen';
+                    $statusBadge = 'badge-kkc-warning';
+                    $statusIcon  = 'bi-cloud-arrow-up-fill';
+                    $editRoute   = '#/movie-upload?step=2&movie_id=' . $movieId;
+                    $countPending++;
+                } elseif ($convStatus <= 1) {
+                    $statusKey   = 'pending';
+                    $statusLabel = 'Wird konvertiert';
+                    $statusBadge = 'badge-kkc-info';
+                    $statusIcon  = 'bi-gear-wide-connected';
+                    $countPending++;
+                } elseif ($checked !== '0000-00-00 00:00:00' && $checked !== '') {
+                    $statusKey   = 'online';
+                    $statusLabel = 'Online';
+                    $statusBadge = 'badge-kkc-success';
+                    $statusIcon  = 'bi-check-circle-fill';
+                    $countOnline++;
+                } elseif ($checked === '0000-00-00 00:00:00' && $released === 1) {
+                    $statusKey   = 'pending';
+                    $statusLabel = 'Wird geprüft';
+                    $statusBadge = 'badge-kkc-warning';
+                    $statusIcon  = 'bi-hourglass-split';
+                    $countPending++;
+                } elseif ($checked === '0000-00-00 00:00:00' && $released === 2) {
+                    $statusKey   = 'rejected';
+                    $statusLabel = 'Abgelehnt';
+                    $statusBadge = 'badge-kkc-danger';
+                    $statusIcon  = 'bi-x-circle-fill';
+                    $countRejected++;
+                } elseif ($convStatus === 2) {
+                    $statusKey   = 'pending';
+                    $statusLabel = 'Jetzt veröffentlichen';
+                    $statusBadge = 'badge-kkc-warning';
+                    $statusIcon  = 'bi-exclamation-circle-fill';
+                    $countPending++;
+                }
+
+                $sales   = $salesMap[$fileId] ?? ['streaming_buys' => 0, 'download_buys' => 0, 'comm_cents' => 0.0];
+                $commEur = $sales['comm_cents'] / 100.0;
+                $totalCommissionEur += $commEur;
+
+                $onlineAtFormatted = ($m->online_at !== '0000-00-00 00:00:00' && !empty($m->online_at))
+                    ? date('d.m.Y H:i', strtotime((string)$m->online_at))
+                    : '-';
+
+                $movies[] = [
+                    'id'              => $movieId,
+                    'file_id'         => $fileId,
+                    'title'           => self::decodeLegacyText(trim((string)$m->title) !== '' ? (string)$m->title : 'Unbenannter Film #' . $movieId),
+                    'actor_id'        => $actorId,
+                    'actor_name'      => $actorsMap[$actorId] ?? '-',
+                    'status_key'      => $statusKey,
+                    'status_label'    => $statusLabel,
+                    'status_badge'    => $statusBadge,
+                    'status_icon'     => $statusIcon,
+                    'edit_route'      => $editRoute,
+                    'poster_fsk16'    => $apiUrl . '/PlayerPoster/FSK16/' . rawurlencode($fileId) . '?w=110&cs=' . rawurlencode($checksum),
+                    'poster_fsk18'    => $apiUrl . '/PlayerPoster/FSK18/' . rawurlencode($fileId) . '?w=110&cs=' . rawurlencode($checksum),
+                    'online_at'       => $onlineAtFormatted,
+                    'playtime_string' => (string)($m->playtime_string ?? ''),
+                    'resolution'      => (string)($m->resolution ?? ''),
+                    'streaming_buys'  => $sales['streaming_buys'],
+                    'download_buys'   => $sales['download_buys'],
+                    'commission_eur'  => $commEur,
+                ];
+            }
+        }
+
+        return View::render('Movies', 'list', [
+            'movies'             => $movies,
+            'countTotal'         => count($movies),
+            'countOnline'        => $countOnline,
+            'countPending'       => $countPending,
+            'countRejected'      => $countRejected,
+            'totalCommissionEur' => $totalCommissionEur,
+        ]);
+    }
+
+    /**
+     * GET: Einzelnen Film bearbeiten (#/movie?id=...)
+     */
+    public function detail(): string
+    {
+        global $mysql;
+
+        $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
+        if ($merchantId === 0) {
+            return '<div class="alert alert-danger m-4">Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.</div>';
+        }
+
+        $movieId = abs((int)$this->request->get('id', 0));
+        if ($movieId === 0) {
+            return $this->list();
+        }
+
+        $rsMovie = p4c_query("SELECT *
+            FROM `movies`
+            WHERE `id` = '" . $movieId . "'
+              AND `merchant_id` = '" . $merchantId . "'
+              AND `status` != 'deleted'
+            LIMIT 1;", __FILE__, __LINE__);
+
+        if (!$rsMovie || p4c_num_rows($rsMovie) === 0) {
+            return '
+            <div class="alert alert-danger d-flex align-items-center justify-content-between flex-wrap gap-3 m-4">
+              <div>
+                <i class="bi bi-exclamation-octagon-fill me-2"></i>
+                Der angeforderte Film wurde nicht gefunden oder wurde bereits gelöscht.
+              </div>
+              <a href="#/movies" class="btn btn-sm btn-outline-kkc">Zur Film-Übersicht</a>
+            </div>';
+        }
+
+        $mObj = p4c_fetch_object($rsMovie);
+
+        // Falls noch keine Videodatei hochgeladen wurde, direkt zu Schritt 2 des Film-Uploads leiten
+        if (trim((string)$mObj->filename) === '') {
+            $_GET['step']     = 2;
+            $_GET['movie_id'] = $movieId;
+            return $this->upload();
+        }
+
+        $mcpUrl    = defined('MCP_URL') ? MCP_URL : 'https://erocloud.net';
+        $fileId    = (string)$mObj->file_id;
+        $actorId   = abs((int)$mObj->actor_id);
+        $title     = self::decodeLegacyText((string)$mObj->title);
+        $desc      = self::decodeLegacyText((string)$mObj->description);
+        $onlineAt  = ($mObj->online_at !== '0000-00-00 00:00:00' && !empty($mObj->online_at))
+            ? date('Y-m-d\TH:i', strtotime((string)$mObj->online_at))
+            : date('Y-m-d\TH:i');
+
+        // Prüfen, ob Film bereits in movies_online eingetragen ist
+        $rsOnline      = p4c_query("SELECT `id` FROM `movies_online` WHERE `file_id` = '" . p4c_escape_string($fileId) . "' AND `merchant_id` = '" . $merchantId . "' LIMIT 1;", __FILE__, __LINE__);
+        $isMovieOnline = ($rsOnline && p4c_num_rows($rsOnline) > 0);
+
+        // Ablehnungsgrund laden, falls released == 2
+        $rejectionInfo = null;
+        if ((string)$mObj->movie_checked === '0000-00-00 00:00:00' && (int)$mObj->released === 2) {
+            $rsRejHist = p4c_query("SELECT * FROM `rejection_reason_movie_history` WHERE `movie_file_id` = '" . p4c_escape_string($fileId) . "' ORDER BY `datetime` DESC LIMIT 1;", __FILE__, __LINE__);
+            if ($rsRejHist && p4c_num_rows($rsRejHist) > 0) {
+                $rejHistObj = p4c_fetch_object($rsRejHist);
+                $shortTitle = '';
+                if (!empty($rejHistObj->id_name) && (string)$rejHistObj->id_name !== 'free_text') {
+                    $rsRejShort = p4c_query("SELECT `de_short` FROM `rejection_reason_movie` WHERE `id_name` = '" . p4c_escape_string((string)$rejHistObj->id_name) . "' LIMIT 1;", __FILE__, __LINE__);
+                    if ($rsRejShort && p4c_num_rows($rsRejShort) > 0) {
+                        $shortObj   = p4c_fetch_object($rsRejShort);
+                        $shortTitle = self::decodeLegacyText((string)$shortObj->de_short);
+                    }
+                }
+                $rejectionInfo = [
+                    'reason' => $shortTitle,
+                    'text'   => self::decodeLegacyText((string)($rejHistObj->text ?? '')),
+                ];
+            }
+        }
+
+        // Verfügbare automatisch generierte Vorschaubilder (1..10) ermitteln
+        $availableThumbs = [];
+        $moviesPath      = defined('MOVIES_PATH') ? MOVIES_PATH : (dirname(__DIR__, 5) . '/priv');
+        $storageLoc      = (string)$mObj->storage_location;
+        $baseFilename    = substr((string)$mObj->filename, 0, -4);
+
+        for ($i = 1; $i <= 10; $i++) {
+            $thumbBase = rtrim($moviesPath, '/\\') . '/' . $storageLoc . '/' . $merchantId . '/' . $movieId . '/thumb_' . $baseFilename . '_' . $i;
+            if (is_file($thumbBase . '.jpg') || is_file($thumbBase . '.jpeg') || is_file($thumbBase . '.png')) {
+                $availableThumbs[] = [
+                    'num' => $i,
+                    'url' => $mcpUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=' . $i . '&w=186',
+                ];
+            }
+        }
+
+        // Kategorien inkl. System-Auto-Erkennung laden
+        $categoryGroups = $this->loadCategoriesWithAutoDetection(
+            $actorId,
+            $title,
+            $desc,
+            (string)$mObj->category_slave
+        );
+
+        // Aktive Darsteller & Partner-Websites laden
+        $merchant = new \Merchant($mysql, $merchantId);
+        $actors   = $this->loadActiveMerchantActors($merchantId, $actorId);
+        $websites = $this->loadMerchantWebsites($merchant, (string)$mObj->visible_for_website);
+
+        $movieData = [
+            'id'                  => $movieId,
+            'file_id'             => $fileId,
+            'title'               => $title,
+            'description'         => $desc,
+            'online_at'           => $onlineAt,
+            'online_at_display'   => ($mObj->online_at !== '0000-00-00 00:00:00' && !empty($mObj->online_at))
+                ? date('d.m.Y H:i', strtotime((string)$mObj->online_at))
+                : '-',
+            'can_edit_online_at'  => (((string)$mObj->movie_checked === '0000-00-00 00:00:00' && !$isMovieOnline) || strtotime((string)$mObj->online_at) > time()),
+            'playtime_seconds'    => round((float)$mObj->playtime_seconds),
+            'playtime_string'     => (string)($mObj->playtime_string ?? '0:00'),
+            'resolution'          => (string)($mObj->resolution ?? ''),
+            'amount_second'       => number_format((float)$mObj->amount_second, 1, '.', ''),
+            'streaming_coins'     => (int)round((float)$mObj->playtime_seconds * (float)$mObj->amount_second),
+            'as_download'         => abs((int)$mObj->as_download) === 1 ? 1 : 0,
+            'amount_download'     => abs((int)$mObj->amount_download),
+            'preview'             => abs((int)$mObj->preview) === 1 ? 1 : 0,
+            'fsk16'               => abs((int)$mObj->preview_image_fsk16),
+            'fsk18'               => abs((int)$mObj->preview_image_fsk18),
+            'custom_fsk16_url'    => $mcpUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=11&w=186&t=' . time(),
+            'custom_fsk18_url'    => $mcpUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=12&w=186&t=' . time(),
+            'player_poster_url'   => $mcpUrl . '/PlayerPoster/' . rawurlencode($fileId) . '&w=1280&h=720',
+            'player_video_url'    => $mcpUrl . '/Player/' . rawurlencode($fileId),
+            'convert_status'      => (int)$mObj->convert_status,
+            'movie_checked'       => (string)$mObj->movie_checked,
+            'released'            => (int)$mObj->released,
+            'is_online'           => $isMovieOnline,
+            'can_delete'          => ((string)$mObj->movie_checked === '0000-00-00 00:00:00' && (int)$mObj->released !== 1 && !$isMovieOnline),
+            'actor_id'            => $actorId,
+            'visible_for_website' => (string)$mObj->visible_for_website,
+            'category_master'     => (string)$mObj->category_master !== '' ? (string)$mObj->category_master : 'porn',
+            'meta_title'          => self::decodeLegacyText((string)$mObj->meta_title),
+            'meta_description'    => self::decodeLegacyText((string)$mObj->meta_description),
+            'seo_url'             => (string)$mObj->seo_url,
+        ];
+
+        return View::render('Movies', 'detail', [
+            'movie'           => $movieData,
+            'availableThumbs' => $availableThumbs,
+            'categoryGroups'  => $categoryGroups,
+            'actors'          => $actors,
+            'websites'        => $websites,
+            'rejectionInfo'   => $rejectionInfo,
+        ]);
+    }
+
+    /**
+     * GET: Neuen Film in 3 Schritten hochladen (#/movie-upload)
+     */
+    public function upload(): string
+    {
+        global $mysql;
+
+        $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
+        if ($merchantId === 0) {
+            return '<div class="alert alert-danger m-4">Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.</div>';
+        }
+
+        $step    = abs((int)$this->request->get('step', 1));
+        $movieId = abs((int)$this->request->get('movie_id', 0));
+        if (!in_array($step, [1, 2, 3], true)) {
+            $step = 1;
+        }
+
+        $merchant          = new \Merchant($mysql, $merchantId);
+        $isPublicAllowed   = $this->isPublicUploadAllowed($merchant, $merchantId);
+        $defaultWebsite    = $isPublicAllowed ? 'public' : '';
+
+        $draft = [
+            'id'                  => 0,
+            'title'               => '',
+            'description'         => '',
+            'online_at'           => date('Y-m-d\TH:i', strtotime('+90 minutes')),
+            'amount_second'       => '0.8',
+            'as_download'         => 1,
+            'amount_download'     => 10,
+            'preview'             => 0,
+            'actor_id'            => 0,
+            'visible_for_website' => $defaultWebsite,
+            'category_master'     => 'porn',
+            'category_slave'      => '',
+            'meta_title'          => '',
+            'meta_description'    => '',
+            'seo_url'             => '',
+        ];
+
+        // Falls eine movie_id übergeben wurde oder in der Session liegt, vorhandenen Entwurf laden
+        if ($movieId === 0 && isset($_SESSION['upload_movie']['movie_id'])) {
+            $movieId = abs((int)$_SESSION['upload_movie']['movie_id']);
+        }
+
+        if ($movieId > 0) {
+            $rsDraft = p4c_query("SELECT *
+                FROM `movies`
+                WHERE `id` = '" . $movieId . "'
+                  AND `merchant_id` = '" . $merchantId . "'
+                  AND `status` != 'deleted'
+                LIMIT 1;", __FILE__, __LINE__);
+
+            if ($rsDraft && p4c_num_rows($rsDraft) > 0) {
+                $dObj  = p4c_fetch_object($rsDraft);
+                $draft = [
+                    'id'                  => abs((int)$dObj->id),
+                    'title'               => self::decodeLegacyText((string)$dObj->title),
+                    'description'         => self::decodeLegacyText((string)$dObj->description),
+                    'online_at'           => ($dObj->online_at !== '0000-00-00 00:00:00' && !empty($dObj->online_at))
+                        ? date('Y-m-d\TH:i', strtotime((string)$dObj->online_at))
+                        : date('Y-m-d\TH:i', strtotime('+90 minutes')),
+                    'amount_second'       => number_format((float)$dObj->amount_second, 1, '.', ''),
+                    'as_download'         => abs((int)$dObj->as_download) === 1 ? 1 : 0,
+                    'amount_download'     => abs((int)$dObj->amount_download),
+                    'preview'             => abs((int)$dObj->preview) === 1 ? 1 : 0,
+                    'actor_id'            => abs((int)$dObj->actor_id),
+                    'visible_for_website' => (string)$dObj->visible_for_website,
+                    'category_master'     => (string)$dObj->category_master !== '' ? (string)$dObj->category_master : 'porn',
+                    'category_slave'      => (string)$dObj->category_slave,
+                    'meta_title'          => self::decodeLegacyText((string)$dObj->meta_title),
+                    'meta_description'    => self::decodeLegacyText((string)$dObj->meta_description),
+                    'seo_url'             => (string)$dObj->seo_url,
+                ];
+            } elseif ($step === 2) {
+                $step    = 1;
+                $movieId = 0;
+            }
+        }
+
+        if ($step === 3) {
+            unset($_SESSION['upload_movie']);
+        }
+
+        $actors   = $this->loadActiveMerchantActors($merchantId, (int)$draft['actor_id']);
+        $websites = $this->loadMerchantWebsites($merchant, (string)$draft['visible_for_website']);
+
+        // Falls noch keine Website gewählt wurde und der Partner eigene Domains hat, erste Domain vorauswählen
+        if ($draft['visible_for_website'] === '' && !empty($websites)) {
+            $draft['visible_for_website'] = (string)$websites[0]['value'];
+        }
+
+        $categoryGroups = $this->loadCategoriesWithAutoDetection(
+            (int)$draft['actor_id'],
+            (string)$draft['title'],
+            (string)$draft['description'],
+            (string)$draft['category_slave']
+        );
+
+        return View::render('Movies', 'upload', [
+            'step'           => $step,
+            'movie'          => $draft,
+            'actors'         => $actors,
+            'websites'       => $websites,
+            'categoryGroups' => $categoryGroups,
+        ]);
+    }
+
+    /**
+     * POST: Speichert Schritt 1 des Film-Uploads (movies/save-step1)
+     */
+    public function saveStep1(): void
+    {
+        global $mysql;
+
+        if (!$this->request->isPost()) {
+            Response::error('Ungültige Anfrage-Methode.', 405);
+            return;
+        }
+
+        $csrfToken = (string)$this->request->post('csrf_token', '');
+        if (!Csrf::validate($csrfToken)) {
+            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte laden Sie die Seite neu.', 403);
+            return;
+        }
+
+        $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
+        if ($merchantId === 0) {
+            Response::error('Ihre Sitzung ist abgelaufen.', 401);
+            return;
+        }
+
+        $movieId  = abs((int)$this->request->post('movie_id', 0));
+        $merchant = new \Merchant($mysql, $merchantId);
+        $errors   = [];
+
+        $title = $this->cleanMovieTitle((string)$this->request->post('title', ''));
+        if ($title === '') {
+            $errors[] = 'Bitte geben Sie einen aussagekräftigen Filmtitel an.';
+        } elseif (mb_strlen($title, 'UTF-8') > 65) {
+            $errors[] = 'Der Filmtitel darf maximal 65 Zeichen lang sein.';
+        }
+
+        $allowedTags = '<ul><ol><li><u><em><strong><h1><h2><h3><h4><h5><h6><pre><address><p><br>';
+        $description = trim(strip_tags((string)$this->request->post('description', ''), $allowedTags));
+        $description = str_replace(self::ZERO_WIDTH_SPACES, '', $description);
+        if ($description === '') {
+            $errors[] = 'Bitte geben Sie eine aussagekräftige Beschreibung des Films an.';
+        }
+
+        $categoryMaster = trim((string)$this->request->post('category_master', 'porn'));
+        if (!in_array($categoryMaster, ['porn', 'fetish'], true)) {
+            $categoryMaster = 'porn';
+        }
+
+        $rawSlaves = $_POST['category_slave'] ?? [];
+        $validSlaves = [];
+        if (is_array($rawSlaves)) {
+            foreach ($rawSlaves as $s) {
+                $sClean = trim(strip_tags((string)$s));
+                if ($sClean !== '') {
+                    $validSlaves[] = $sClean;
+                }
+            }
+        }
+        if (count($validSlaves) < 1) {
+            $errors[] = 'Bitte wählen Sie mindestens 1 passende Unterkategorie für den Film aus.';
+        }
+        $categorySlave = implode(',', array_unique($validSlaves));
+
+        $actorId = abs((int)$this->request->post('actor_id', 0));
+        if ($actorId <= 0) {
+            $errors[] = 'Bitte wählen Sie ein aktives Darsteller-Profil aus.';
+        }
+
+        $rawOnlineAt = trim((string)$this->request->post('online_at', ''));
+        $onlineAt    = $rawOnlineAt !== '' ? date('Y-m-d H:i', strtotime($rawOnlineAt)) : date('Y-m-d H:i', strtotime('+90 minutes'));
+
+        $isTrailer = $this->request->post('trailer') !== null;
+        $amountSecond = $isTrailer
+            ? '0.0'
+            : number_format(max(0.0, min(100.0, (float)$this->request->post('amount_second', 0.8))), 1, '.', '');
+
+        $asDownload = abs((int)$this->request->post('as_download', 1)) === 1 ? 1 : 0;
+        $amountDownload = $isTrailer
+            ? 0
+            : max(0, min(150, abs((int)$this->request->post('amount_download', 10))));
+
+        $visibleWebsite = trim(strip_tags((string)$this->request->post('visible_for_website', '')));
+        if ($visibleWebsite === 'public') {
+            if (!$this->isPublicUploadAllowed($merchant, $merchantId)) {
+                $visibleWebsite = '';
+            }
+        } elseif ($visibleWebsite !== '') {
+            $rsSite = p4c_query("SELECT `id` FROM `sites`
+                WHERE `partner_id` = '" . p4c_escape_string((string)$merchant->partner_id()) . "'
+                  AND `domain` = '" . p4c_escape_string($visibleWebsite) . "'
+                  AND `status` = '1'
+                LIMIT 1;", __FILE__, __LINE__);
+            if (!$rsSite || p4c_num_rows($rsSite) === 0) {
+                $visibleWebsite = '';
+            }
+        }
+        if ($visibleWebsite === '') {
+            $errors[] = 'Bitte wählen Sie eine gültige Website für die Veröffentlichung aus.';
+        }
+
+        // Prüfung auf doppelten Filmtitel
+        if ($title !== '') {
+            $rsDup = p4c_query("SELECT `id` FROM `movies`
+                WHERE `title` = '" . p4c_escape_string($title) . "'
+                  AND `merchant_id` = '" . $merchantId . "'
+                  AND `status` != 'deleted'
+                  AND `id` != '" . $movieId . "'
+                LIMIT 1;", __FILE__, __LINE__);
+            if ($rsDup && p4c_num_rows($rsDup) > 0) {
+                $errors[] = 'Sie haben bereits einen anderen Film mit diesem Titel hochgeladen. Bitte wählen Sie einen eindeutigen Titel.';
+            }
+        }
+
+        if (!empty($errors)) {
+            Response::error(implode(' ', $errors), 400);
+            return;
+        }
+
+        $metaTitle = mb_substr($title, 0, 65, 'UTF-8');
+        $seoUrl    = function_exists('seo_url') ? (string)seo_url($title) : '';
+        $metaDesc  = trim(strip_tags((string)$this->request->post('meta_description', '')));
+        $metaDesc  = str_replace(["\n", "\r"], ' ', $metaDesc);
+        if ($metaDesc === '') {
+            $metaDesc = mb_substr(trim(strip_tags($description)), 0, 156, 'UTF-8');
+        } else {
+            $metaDesc = mb_substr($metaDesc, 0, 156, 'UTF-8');
+        }
+
+        $movieExists = false;
+        if ($movieId > 0) {
+            $rsExisting = p4c_query("SELECT `id` FROM `movies` WHERE `id` = '" . $movieId . "' AND `merchant_id` = '" . $merchantId . "' LIMIT 1;", __FILE__, __LINE__);
+            $movieExists = ($rsExisting && p4c_num_rows($rsExisting) > 0);
+        }
+
+        if ($movieExists) {
+            p4c_query("UPDATE `movies` SET
+                `actor_id`            = '" . $actorId . "',
+                `title`               = '" . p4c_escape_string($title) . "',
+                `description`         = '" . p4c_escape_string($description) . "',
+                `meta_title`          = '" . p4c_escape_string($metaTitle) . "',
+                `meta_description`    = '" . p4c_escape_string($metaDesc) . "',
+                `seo_url`             = '" . p4c_escape_string($seoUrl) . "',
+                `online_at`           = '" . p4c_escape_string($onlineAt) . "',
+                `amount_second`       = '" . abs((float)$amountSecond) . "',
+                `amount_webmaster`    = '10',
+                `as_download`         = '" . $asDownload . "',
+                `amount_download`     = '" . $amountDownload . "',
+                `category_master`     = '" . p4c_escape_string($categoryMaster) . "',
+                `category_slave`      = '" . p4c_escape_string($categorySlave) . "',
+                `visible_for_website` = '" . p4c_escape_string($visibleWebsite) . "',
+                `preview`             = '" . ($isTrailer ? 1 : 0) . "'
+                WHERE `id` = '" . $movieId . "' AND `merchant_id` = '" . $merchantId . "'
+                LIMIT 1;", __FILE__, __LINE__);
+        } else {
+            $fileId     = md5($merchantId . '_' . microtime(true));
+            $storageDir = defined('MOVIES_DEFAULT_DIR') ? MOVIES_DEFAULT_DIR : 'movies';
+
+            p4c_query("INSERT INTO `movies` SET
+                `actor_id`            = '" . $actorId . "',
+                `file_id`             = '" . p4c_escape_string($fileId) . "',
+                `merchant_id`         = '" . $merchantId . "',
+                `storage_location`    = '" . p4c_escape_string($storageDir) . "',
+                `title`               = '" . p4c_escape_string($title) . "',
+                `description`         = '" . p4c_escape_string($description) . "',
+                `meta_title`          = '" . p4c_escape_string($metaTitle) . "',
+                `meta_description`    = '" . p4c_escape_string($metaDesc) . "',
+                `seo_url`             = '" . p4c_escape_string($seoUrl) . "',
+                `online_at`           = '" . p4c_escape_string($onlineAt) . "',
+                `amount_second`       = '" . abs((float)$amountSecond) . "',
+                `amount_webmaster`    = '10',
+                `as_download`         = '" . $asDownload . "',
+                `amount_download`     = '" . $amountDownload . "',
+                `category_master`     = '" . p4c_escape_string($categoryMaster) . "',
+                `category_slave`      = '" . p4c_escape_string($categorySlave) . "',
+                `visible_for_website` = '" . p4c_escape_string($visibleWebsite) . "',
+                `preview`             = '" . ($isTrailer ? 1 : 0) . "',
+                `admin_infos`         = '';", __FILE__, __LINE__);
+
+            $movieId = abs((int)p4c_insert_id());
+        }
+
+        if ($movieId === 0) {
+            Response::error('Der Film-Entwurf konnte nicht gespeichert werden.', 500);
+            return;
+        }
+
+        $_SESSION['upload_movie'] = ['movie_id' => $movieId];
+
+        Response::json([
+            'status'   => 'success',
+            'movie_id' => $movieId,
+            'message'  => 'Schritt 1 gespeichert. Bitte wählen Sie nun Ihre Videodatei zum Hochladen aus.',
+        ]);
+    }
+
+    /**
+     * POST: Lädt die eigentliche Videodatei in Schritt 2 hoch (movies/upload-file)
+     */
+    public function uploadFile(): void
+    {
+        if (!$this->request->isPost()) {
+            Response::error('Ungültige Anfrage-Methode.', 405);
+            return;
+        }
+
+        $csrfToken = (string)$this->request->post('csrf_token', '');
+        if (!Csrf::validate($csrfToken)) {
+            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte laden Sie die Seite neu.', 403);
+            return;
+        }
+
+        $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
+        $movieId    = abs((int)$this->request->post('movie_id', 0));
+
+        if ($merchantId === 0 || $movieId === 0) {
+            Response::error('Ungültige Film-ID oder abgelaufene Sitzung.', 400);
+            return;
+        }
+
+        $rsMovie = p4c_query("SELECT *
+            FROM `movies`
+            WHERE `id` = '" . $movieId . "'
+              AND `merchant_id` = '" . $merchantId . "'
+              AND (`filename` = '' OR `convert_status` = '0')
+            LIMIT 1;", __FILE__, __LINE__);
+
+        if (!$rsMovie || p4c_num_rows($rsMovie) === 0) {
+            Response::error('Für diesen Film wurde bereits eine Videodatei hochgeladen oder der Film existiert nicht.', 400);
+            return;
+        }
+
+        if (!isset($_FILES['movie']) || !is_array($_FILES['movie']) || (int)$_FILES['movie']['error'] !== UPLOAD_ERR_OK) {
+            $errCode = isset($_FILES['movie']['error']) ? (int)$_FILES['movie']['error'] : -1;
+            Response::error("Fehler beim Datei-Upload (Code: {$errCode}). Bitte prüfen Sie die Dateigröße (max. 2,0 GB).", 400);
+            return;
+        }
+
+        $fileName    = (string)$_FILES['movie']['name'];
+        $tmpFileName = (string)$_FILES['movie']['tmp_name'];
+        $extension   = strtolower((string)pathinfo($fileName, PATHINFO_EXTENSION));
+        $allowedExts = ['avi', 'flv', 'm4v', 'mkv', 'mov', 'mp4', 'mpg', 'wmv'];
+
+        if (!in_array($extension, $allowedExts, true)) {
+            Response::error('Ungültiges Dateiformat. Erlaubt sind: avi, flv, m4v, mkv, mov, mp4, mpg, wmv.', 400);
+            return;
+        }
+
+        // Video-Metadaten mit getID3 auslesen (analog upload_movie.php)
+        $playTime    = '0:00';
+        $playTimeSec = 0;
+        $width       = 1920;
+        $height      = 1080;
+
+        $getId3Path = defined('MCP_DIR') ? MCP_DIR . '/includes/getid3/getid3.php' : (dirname(__DIR__, 4) . '/includes/getid3/getid3.php');
+        if (file_exists($getId3Path)) {
+            include_once $getId3Path;
+            if (class_exists('getID3')) {
+                $getID3   = new \getID3();
+                $fileinfo = @$getID3->analyze($tmpFileName);
+                if (!empty($fileinfo['playtime_string'])) {
+                    $playTime = (string)$fileinfo['playtime_string'];
+                }
+                if (isset($fileinfo['playtime_seconds'])) {
+                    $playTimeSec = (int)round((float)$fileinfo['playtime_seconds']);
+                }
+                if (!empty($fileinfo['video']['resolution_x']) && !empty($fileinfo['video']['resolution_y'])) {
+                    $rx = (int)round((float)$fileinfo['video']['resolution_x']);
+                    $ry = (int)round((float)$fileinfo['video']['resolution_y']);
+                    if ($rx > 0 && $ry > 0) {
+                        $width  = $rx;
+                        $height = $ry;
+                    }
+                }
+            }
+        }
+
+        $movieObj   = p4c_fetch_object($rsMovie);
+        $moviesPath = defined('MOVIES_PATH') ? MOVIES_PATH : (dirname(__DIR__, 5) . '/priv');
+        $targetDir  = rtrim($moviesPath, '/\\') . '/' . $movieObj->storage_location . '/' . $merchantId . '/' . $movieId;
+
+        if (!is_dir($targetDir)) {
+            if (!@mkdir($targetDir, 0777, true) && !is_dir($targetDir)) {
+                Response::error('Das Zielverzeichnis für den Film konnte auf dem Server nicht angelegt werden.', 500);
+                return;
+            }
+        }
+
+        $targetFileName = $movieId . '_' . $movieObj->file_id . '.' . $extension;
+        $targetFilePath = $targetDir . '/' . $targetFileName;
+
+        if (!@move_uploaded_file($tmpFileName, $targetFilePath) || !is_file($targetFilePath)) {
+            Response::error('Die Videodatei konnte nicht auf dem Server gespeichert werden.', 500);
+            return;
+        }
+
+        $resolution = $width . 'x' . $height;
+        $amountOwn  = (int)round((float)$playTimeSec * (float)$movieObj->amount_second);
+        $released   = ((string)$this->request->post('released', '') === '1' || (string)$this->request->post('released', '') === 'true');
+
+        $releaseSql = '';
+        if ($released) {
+            $releaseSql = ", `create_datetime` = '" . date('Y-m-d H:i:s') . "', `movie_checked` = '0000-00-00 00:00:00', `released` = '1'";
+        }
+
+        p4c_query("UPDATE `movies` SET
+            `filename`         = '" . p4c_escape_string($targetFileName) . "',
+            `playtime_string`  = '" . p4c_escape_string($playTime) . "',
+            `playtime_seconds` = '" . p4c_escape_string((string)$playTimeSec) . "',
+            `resolution`       = '" . p4c_escape_string($resolution) . "',
+            `amount_own`       = '" . abs($amountOwn) . "'
+            {$releaseSql}
+            WHERE `id` = '" . $movieId . "' AND `merchant_id` = '" . $merchantId . "'
+            LIMIT 1;", __FILE__, __LINE__);
+
+        unset($_SESSION['upload_movie']);
+
+        if (function_exists('log_action')) {
+            log_action("Videodatei hochgeladen für Film-ID {$movieId} ({$targetFileName})");
+        }
+
+        Response::json([
+            'status'   => 'success',
+            'movie_id' => $movieId,
+            'message'  => 'Ihre Videodatei wurde erfolgreich hochgeladen und wird nun konvertiert.',
+        ]);
+    }
+
+    /**
+     * POST: Aktualisiert einen bestehenden Film und gibt ihn zur Prüfung frei (movies/update)
+     */
+    public function update(): void
+    {
+        global $mysql;
+
+        if (!$this->request->isPost()) {
+            Response::error('Ungültige Anfrage-Methode.', 405);
+            return;
+        }
+
+        $csrfToken = (string)$this->request->post('csrf_token', '');
+        if (!Csrf::validate($csrfToken)) {
+            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte laden Sie die Seite neu.', 403);
+            return;
+        }
+
+        $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
+        $movieId    = abs((int)$this->request->post('movie_id', 0));
+
+        if ($merchantId === 0 || $movieId === 0) {
+            Response::error('Ungültige Film-ID oder abgelaufene Sitzung.', 400);
+            return;
+        }
+
+        $rsMovie = p4c_query("SELECT *
+            FROM `movies`
+            WHERE `id` = '" . $movieId . "'
+              AND `merchant_id` = '" . $merchantId . "'
+              AND `status` != 'deleted'
+            LIMIT 1;", __FILE__, __LINE__);
+
+        if (!$rsMovie || p4c_num_rows($rsMovie) === 0) {
+            Response::error('Sie besitzen keine Berechtigung zur Bearbeitung dieses Films.', 403);
+            return;
+        }
+
+        $mObj   = p4c_fetch_object($rsMovie);
+        $errors = [];
+
+        $title = $this->cleanMovieTitle((string)$this->request->post('title', ''));
+        if ($title === '') {
+            $errors[] = 'Bitte geben Sie einen aussagekräftigen Filmtitel an.';
+        } elseif (mb_strlen($title, 'UTF-8') > 65) {
+            $errors[] = 'Der Filmtitel darf maximal 65 Zeichen lang sein.';
+        }
+
+        // Duplikatsprüfung
+        if ($title !== '') {
+            $rsDup = p4c_query("SELECT `id` FROM `movies`
+                WHERE `title` = '" . p4c_escape_string($title) . "'
+                  AND `merchant_id` = '" . $merchantId . "'
+                  AND `status` != 'deleted'
+                  AND `id` != '" . $movieId . "'
+                LIMIT 1;", __FILE__, __LINE__);
+            if ($rsDup && p4c_num_rows($rsDup) > 0) {
+                $errors[] = 'Sie haben bereits einen anderen Film mit diesem Titel hochgeladen.';
+            }
+        }
+
+        $allowedTags = '<ul><ol><li><u><em><strong><h1><h2><h3><h4><h5><h6><pre><address><p><br>';
+        $description = trim(strip_tags((string)$this->request->post('description', ''), $allowedTags));
+        $description = str_replace(self::ZERO_WIDTH_SPACES, '', $description);
+        if ($description === '') {
+            $errors[] = 'Bitte geben Sie eine aussagekräftige Beschreibung des Films an.';
+        }
+
+        $actorId = abs((int)$this->request->post('actor_id', (int)$mObj->actor_id));
+        if ($actorId <= 0) {
+            $errors[] = 'Bitte wählen Sie ein Darsteller-Profil aus.';
+        }
+
+        $fsk16 = (string)$mObj->preview_image_fsk16;
+        $fsk18 = (string)$mObj->preview_image_fsk18;
+        if ((int)$mObj->convert_status > 1) {
+            $postFsk16 = abs((int)$this->request->post('fsk16', 0));
+            $postFsk18 = abs((int)$this->request->post('fsk18', 0));
+            if ($postFsk16 <= 0) {
+                $errors[] = 'Bitte wählen Sie ein FSK16-Vorschaubild aus.';
+            } else {
+                $fsk16 = (string)$postFsk16;
+            }
+            if ($postFsk18 <= 0) {
+                $errors[] = 'Bitte wählen Sie ein FSK18-Vorschaubild aus.';
+            } else {
+                $fsk18 = (string)$postFsk18;
+            }
+        }
+
+        $categoryMaster = trim((string)$this->request->post('category_master', 'porn'));
+        if (!in_array($categoryMaster, ['porn', 'fetish'], true)) {
+            $errors[] = 'Bitte wählen Sie eine Hauptkategorie (Porno oder Fetisch) aus.';
+        }
+
+        $rawSlaves   = $_POST['category_slave'] ?? [];
+        $validSlaves = [];
+        if (is_array($rawSlaves)) {
+            foreach ($rawSlaves as $s) {
+                $sClean = trim(strip_tags((string)$s));
+                if ($sClean !== '') {
+                    $validSlaves[] = $sClean;
+                }
+            }
+        }
+        if (count($validSlaves) < 1) {
+            $errors[] = 'Bitte wählen Sie mindestens 1 passende Unterkategorie aus.';
+        }
+        $categorySlave = implode(',', array_unique($validSlaves));
+
+        if (!empty($errors)) {
+            Response::error(implode(' ', $errors), 400);
+            return;
+        }
+
+        $rawOnlineAt = trim((string)$this->request->post('online_at', ''));
+        $onlineAt    = $rawOnlineAt !== ''
+            ? date('Y-m-d H:i', strtotime($rawOnlineAt))
+            : date('Y-m-d H:i', strtotime((string)$mObj->online_at));
+
+        $isTrailer = $this->request->post('trailer') !== null;
+        $amountSecond = $isTrailer
+            ? '0.0'
+            : number_format(max(0.0, min(100.0, (float)$this->request->post('amount_second', $mObj->amount_second))), 1, '.', '');
+
+        $asDownload = abs((int)$this->request->post('as_download', (int)$mObj->as_download)) === 1 ? 1 : 0;
+        $amountDownload = $isTrailer
+            ? 0
+            : max(0, min(150, abs((int)$this->request->post('amount_download', (int)$mObj->amount_download))));
+
+        $merchant       = new \Merchant($mysql, $merchantId);
+        $visibleWebsite = trim(strip_tags((string)$this->request->post('visible_for_website', (string)$mObj->visible_for_website)));
+        if ($visibleWebsite === '') {
+            $visibleWebsite = (string)$mObj->visible_for_website;
+        }
+
+        $metaTitle = mb_substr($title, 0, 65, 'UTF-8');
+        $seoUrl    = function_exists('seo_url') ? (string)seo_url($title) : (string)$mObj->seo_url;
+        $metaDesc  = trim(strip_tags((string)$this->request->post('meta_description', '')));
+        $metaDesc  = str_replace(["\n", "\r"], ' ', $metaDesc);
+        if ($metaDesc === '') {
+            $metaDesc = mb_substr(trim(strip_tags($description)), 0, 156, 'UTF-8');
+        } else {
+            $metaDesc = mb_substr($metaDesc, 0, 156, 'UTF-8');
+        }
+
+        $checksumData = [
+            'merchant_id'      => $merchantId,
+            'fsk16'            => $fsk16,
+            'fsk18'            => $fsk18,
+            'title'            => $title,
+            'description'      => $description,
+            'meta_title'       => $metaTitle,
+            'meta_description' => $metaDesc,
+            'seo_url'          => $seoUrl,
+            'online_at'        => $onlineAt,
+            'amount_second'    => $amountSecond,
+            'amount_own'       => $mObj->amount_own,
+            'amount_webmaster' => $mObj->amount_webmaster,
+            'as_download'      => $asDownload,
+            'amount_download'  => $amountDownload,
+        ];
+        $checksum = function_exists('movie_checksum') ? (string)movie_checksum($checksumData) : md5(json_encode($checksumData));
+
+        $createDateSql = ((int)$mObj->convert_status === 2 && (int)$mObj->released === 0)
+            ? "`create_datetime` = '" . date('Y-m-d H:i:s') . "',"
+            : '';
+
+        p4c_query("UPDATE `movies` SET
+            {$createDateSql}
+            `actor_id`            = '" . $actorId . "',
+            `checksum`            = '" . p4c_escape_string($checksum) . "',
+            `preview_image_fsk16` = '" . abs((int)$fsk16) . "',
+            `preview_image_fsk18` = '" . abs((int)$fsk18) . "',
+            `title`               = '" . p4c_escape_string($title) . "',
+            `description`         = '" . p4c_escape_string($description) . "',
+            `meta_title`          = '" . p4c_escape_string($metaTitle) . "',
+            `meta_description`    = '" . p4c_escape_string($metaDesc) . "',
+            `seo_url`             = '" . p4c_escape_string($seoUrl) . "',
+            `online_at`           = '" . p4c_escape_string($onlineAt) . "',
+            `amount_second`       = '" . abs((float)$amountSecond) . "',
+            `as_download`         = '" . $asDownload . "',
+            `amount_download`     = '" . $amountDownload . "',
+            `category_master`     = '" . p4c_escape_string($categoryMaster) . "',
+            `category_slave`      = '" . p4c_escape_string($categorySlave) . "',
+            `visible_for_website` = '" . p4c_escape_string($visibleWebsite) . "',
+            `preview`             = '" . ($isTrailer ? 1 : 0) . "',
+            `movie_checked`       = '0000-00-00 00:00:00',
+            `released`            = '1'
+            WHERE `id` = '" . $movieId . "' AND `merchant_id` = '" . $merchantId . "'
+            LIMIT 1;", __FILE__, __LINE__);
+
+        // Falls Film bereits in movies_online existiert, Kategorien synchronisieren
+        $fileId = (string)$mObj->file_id;
+        p4c_query("UPDATE `movies_online` SET
+            `category_master` = '" . p4c_escape_string($categoryMaster) . "',
+            `category_slave`  = '" . p4c_escape_string($categorySlave) . "'
+            WHERE `file_id` = '" . p4c_escape_string($fileId) . "' AND `merchant_id` = '" . $merchantId . "'
+            LIMIT 1;", __FILE__, __LINE__);
+
+        if (function_exists('log_action')) {
+            log_action("Film bearbeitet und zur Prüfung eingereicht: {$title} (ID: {$movieId})");
+        }
+
+        Response::json([
+            'status'   => 'success',
+            'movie_id' => $movieId,
+            'message'  => 'Ihre Änderungen wurden gespeichert. Der Film wird nun geprüft und veröffentlicht.',
+        ]);
+    }
+
+    /**
+     * POST: Lädt ein eigenes FSK16- oder FSK18-Vorschaubild für einen Film hoch (movies/upload-poster)
+     */
+    public function uploadPoster(): void
+    {
+        if (!$this->request->isPost()) {
+            Response::error('Ungültige Anfrage-Methode.', 405);
+            return;
+        }
+
+        $csrfToken = (string)$this->request->post('csrf_token', '');
+        if (!Csrf::validate($csrfToken)) {
+            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte laden Sie die Seite neu.', 403);
+            return;
+        }
+
+        $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
+        $movieId    = abs((int)$this->request->post('movie_id', 0));
+        $fsk        = abs((int)$this->request->post('fsk', 0));
+
+        if ($merchantId === 0 || $movieId === 0 || !in_array($fsk, [16, 18], true)) {
+            Response::error('Ungültige Parameter für den Vorschaubild-Upload.', 400);
+            return;
+        }
+
+        $rsMovie = p4c_query("SELECT *
+            FROM `movies`
+            WHERE `id` = '" . $movieId . "'
+              AND `merchant_id` = '" . $merchantId . "'
+              AND `status` != 'deleted'
+            LIMIT 1;", __FILE__, __LINE__);
+
+        if (!$rsMovie || p4c_num_rows($rsMovie) === 0) {
+            Response::error('Sie besitzen keine Berechtigung für diesen Film.', 403);
+            return;
+        }
+
+        if (!isset($_FILES['movie_poster']) || !is_array($_FILES['movie_poster']) || (int)$_FILES['movie_poster']['error'] !== UPLOAD_ERR_OK) {
+            Response::error('Bitte wählen Sie eine gültige Bilddatei (JPG oder PNG, max. 5 MB) aus.', 400);
+            return;
+        }
+
+        $fileTmp  = (string)$_FILES['movie_poster']['tmp_name'];
+        $fileName = (string)$_FILES['movie_poster']['name'];
+        $fileSize = abs((int)$_FILES['movie_poster']['size']);
+
+        if ($fileSize === 0 || $fileSize > 5242880) {
+            Response::error('Die Bilddatei darf maximal 5 MB groß sein.', 400);
+            return;
+        }
+
+        $extension = strtolower((string)pathinfo($fileName, PATHINFO_EXTENSION));
+        if (!in_array($extension, ['jpg', 'jpeg', 'png'], true)) {
+            Response::error('Es sind ausschließlich Bilddateien im Format JPG, JPEG oder PNG erlaubt.', 400);
+            return;
+        }
+
+        $imgInfo = @getimagesize($fileTmp);
+        if ($imgInfo === false || !in_array($imgInfo[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG], true)) {
+            Response::error('Die hochgeladene Datei ist kein gültiges Bild.', 400);
+            return;
+        }
+
+        $mObj       = p4c_fetch_object($rsMovie);
+        $imgId      = ($fsk === 16) ? 11 : 12;
+        $moviesPath = defined('MOVIES_PATH') ? MOVIES_PATH : (dirname(__DIR__, 5) . '/priv');
+        $targetDir  = rtrim($moviesPath, '/\\') . '/' . $mObj->storage_location . '/' . $merchantId . '/' . $movieId;
+
+        if (!is_dir($targetDir)) {
+            @mkdir($targetDir, 0777, true);
+        }
+
+        // Bestehende eigene Vorschaubilder (jpg/jpeg/png) für diese img_id bereinigen
+        $baseThumbPrefix = $targetDir . '/thumb_' . $movieId . '_' . strtolower((string)$mObj->file_id) . '_' . $imgId;
+        foreach (['jpg', 'jpeg', 'png'] as $ext) {
+            if (is_file($baseThumbPrefix . '.' . $ext)) {
+                @unlink($baseThumbPrefix . '.' . $ext);
+            }
+        }
+
+        $targetPath = $baseThumbPrefix . '.' . $extension;
+        if (!@move_uploaded_file($fileTmp, $targetPath) || !is_file($targetPath)) {
+            Response::error('Das Vorschaubild konnte nicht auf dem Server gespeichert werden.', 500);
+            return;
+        }
+
+        $colName = ($fsk === 16) ? 'preview_image_fsk16' : 'preview_image_fsk18';
+        $checksumData = [
+            'merchant_id'      => $merchantId,
+            'fsk16'            => time(),
+            'fsk18'            => time(),
+            'title'            => $mObj->title,
+            'description'      => $mObj->description,
+            'meta_title'       => $mObj->meta_title,
+            'meta_description' => $mObj->meta_description,
+            'seo_url'          => $mObj->seo_url,
+            'online_at'        => $mObj->online_at,
+            'amount_second'    => $mObj->amount_second,
+            'amount_own'       => $mObj->amount_own,
+            'amount_webmaster' => $mObj->amount_webmaster,
+            'as_download'      => $mObj->as_download,
+            'amount_download'  => $mObj->amount_download,
+        ];
+        $checksum = function_exists('movie_checksum') ? (string)movie_checksum($checksumData) : md5(json_encode($checksumData));
+
+        p4c_query("UPDATE `movies` SET
+            `" . $colName . "` = '" . $imgId . "',
+            `checksum`      = '" . p4c_escape_string($checksum) . "',
+            `movie_checked` = '0000-00-00 00:00:00',
+            `released`      = '1'
+            WHERE `id` = '" . $movieId . "' AND `merchant_id` = '" . $merchantId . "'
+            LIMIT 1;", __FILE__, __LINE__);
+
+        $mcpUrl   = defined('MCP_URL') ? MCP_URL : 'https://erocloud.net';
+        $thumbUrl = $mcpUrl . '/thumb.php?movie_id=' . rawurlencode((string)$mObj->file_id) . '&thumb_number=' . $imgId . '&w=186&t=' . time();
+
+        Response::json([
+            'status'       => 'success',
+            'fsk'          => $fsk,
+            'thumb_number' => $imgId,
+            'thumb_url'    => $thumbUrl,
+            'message'      => "Ihr eigenes FSK{$fsk}-Vorschaubild wurde erfolgreich hochgeladen und ausgewählt.",
+        ]);
+    }
+
+    /**
+     * POST: Soft-Delete eines noch nicht veröffentlichten Films (movies/delete)
+     */
+    public function delete(): void
+    {
+        if (!$this->request->isPost()) {
+            Response::error('Ungültige Anfrage-Methode.', 405);
+            return;
+        }
+
+        $csrfToken = (string)$this->request->post('csrf_token', '');
+        if (!Csrf::validate($csrfToken)) {
+            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte laden Sie die Seite neu.', 403);
+            return;
+        }
+
+        $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
+        $movieId    = abs((int)$this->request->post('movie_id', 0));
+
+        if ($merchantId === 0 || $movieId === 0) {
+            Response::error('Ungültige Film-ID.', 400);
+            return;
+        }
+
+        $rsMovie = p4c_query("SELECT *
+            FROM `movies`
+            WHERE `id` = '" . $movieId . "' AND `merchant_id` = '" . $merchantId . "'
+            LIMIT 1;", __FILE__, __LINE__);
+
+        if (!$rsMovie || p4c_num_rows($rsMovie) === 0) {
+            Response::error('Der Film wurde nicht gefunden.', 404);
+            return;
+        }
+
+        $mObj   = p4c_fetch_object($rsMovie);
+        $fileId = (string)$mObj->file_id;
+
+        // Prüfen, ob der Film jemals freigegeben war, online ist oder Käufe besitzt (analog movie.php)
+        $isPublishedOrPurchased = ((string)$mObj->movie_checked !== '0000-00-00 00:00:00' && (string)$mObj->movie_checked !== '');
+
+        if (!$isPublishedOrPurchased) {
+            $rsOnline = p4c_query("SELECT `id` FROM `movies_online` WHERE `file_id` = '" . p4c_escape_string($fileId) . "' LIMIT 1;", __FILE__, __LINE__);
+            if ($rsOnline && p4c_num_rows($rsOnline) > 0) {
+                $isPublishedOrPurchased = true;
+            }
+        }
+
+        if (!$isPublishedOrPurchased) {
+            $rsAccess = p4c_query("SELECT `id` FROM `movies_access` WHERE `movie_id` = '" . p4c_escape_string($fileId) . "' LIMIT 1;", __FILE__, __LINE__);
+            if ($rsAccess && p4c_num_rows($rsAccess) > 0) {
+                $isPublishedOrPurchased = true;
+            }
+        }
+
+        $deletedDatetime = $isPublishedOrPurchased ? date('Y-m-d H:i:s') : '0000-00-00 00:00:00';
+
+        p4c_query("UPDATE `movies` SET
+            `status`           = 'deleted',
+            `deleted_datetime` = '" . $deletedDatetime . "'
+            WHERE `id` = '" . $movieId . "' AND `merchant_id` = '" . $merchantId . "'
+            LIMIT 1;", __FILE__, __LINE__);
+
+        p4c_query("UPDATE `movies_online` SET
+            `status`           = 'deleted',
+            `deleted_datetime` = '" . $deletedDatetime . "'
+            WHERE `file_id` = '" . p4c_escape_string($fileId) . "'
+            LIMIT 1;", __FILE__, __LINE__);
+
+        if (isset($_SESSION['upload_movie']['movie_id']) && (int)$_SESSION['upload_movie']['movie_id'] === $movieId) {
+            unset($_SESSION['upload_movie']);
+        }
+
+        if (function_exists('log_action')) {
+            log_action("Film gelöscht: ID {$movieId}");
+        }
+
+        Response::json([
+            'status'  => 'success',
+            'message' => 'Der Film wurde erfolgreich gelöscht.',
+        ]);
+    }
+
+    /**
+     * Lädt alle Film-Kategorien gruppiert inkl. System-Auto-Erkennung (Gelb-Hervorhebung).
+     */
+    private function loadCategoriesWithAutoDetection(int $actorId, string $title, string $description, string $savedSlavesCsv): array
+    {
+        $savedSlaves = $savedSlavesCsv !== '' ? array_map('trim', explode(',', $savedSlavesCsv)) : [];
+
+        $actorCategories = [];
+        if ($actorId > 0) {
+            $rsActorCat = p4c_query("SELECT `actor_categories` FROM `actors` WHERE `id` = '" . $actorId . "' LIMIT 1;", __FILE__, __LINE__);
+            if ($rsActorCat && p4c_num_rows($rsActorCat) > 0) {
+                $aRow = p4c_fetch_object($rsActorCat);
+                if (!empty($aRow->actor_categories)) {
+                    $actorCategories = array_map('trim', explode(',', (string)$aRow->actor_categories));
+                }
+            }
+        }
+
+        $searchText = mb_strtolower(strip_tags($title . ' ' . $description), 'UTF-8');
+
+        $groupDefs = [
+            ['id' => 'cat_people', 'title' => 'Anzahl der Personen & sexuelle Orientierung', 'group' => 'number_of_people'],
+            ['id' => 'cat_body',   'title' => 'Körper und Aussehen',                         'group' => 'look_and_body'],
+            ['id' => 'cat_fetish', 'title' => 'Fetisch',                                     'group' => 'fetish'],
+            ['id' => 'cat_other',  'title' => 'Sonstige',                                    'group' => 'porn'],
+        ];
+
+        $result = [];
+        foreach ($groupDefs as $gDef) {
+            $rsCats = p4c_query("SELECT * FROM `movie_categories` WHERE `category_group` = '" . p4c_escape_string($gDef['group']) . "';", __FILE__, __LINE__);
+            $items         = [];
+            $selectedCount = 0;
+
+            if ($rsCats && p4c_num_rows($rsCats) > 0) {
+                while ($cObj = p4c_fetch_object($rsCats)) {
+                    $nameId   = (string)$cObj->name_id;
+                    $deVal    = self::decodeLegacyText((string)$cObj->de_name_value);
+                    $deText   = self::decodeLegacyText((string)($cObj->de_name_text ?? ''));
+                    $moreWords = self::decodeLegacyText((string)($cObj->more_search_words ?? ''));
+
+                    $isSaved = in_array($nameId, $savedSlaves, true);
+                    $isSystemDetected = false;
+
+                    if ($searchText !== '') {
+                        if (mb_strpos($searchText, mb_strtolower($nameId, 'UTF-8')) !== false
+                            || mb_strpos($searchText, mb_strtolower($deVal, 'UTF-8')) !== false
+                        ) {
+                            $isSystemDetected = true;
+                        } elseif ($moreWords !== '') {
+                            foreach (explode(',', mb_strtolower($moreWords, 'UTF-8')) as $w) {
+                                $w = trim($w);
+                                if ($w !== '' && mb_strpos($searchText, $w) !== false) {
+                                    $isSystemDetected = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (!$isSystemDetected && !empty($actorCategories) && in_array($nameId, $actorCategories, true)) {
+                        $isSystemDetected = true;
+                    }
+
+                    $isChecked = ($isSaved || $isSystemDetected);
+                    if ($isChecked) {
+                        $selectedCount++;
+                    }
+
+                    $items[] = [
+                        'name_id'            => $nameId,
+                        'label'              => $deVal,
+                        'hint'               => $deText,
+                        'is_checked'         => $isChecked,
+                        'is_system_detected' => $isSystemDetected,
+                    ];
+                }
+            }
+
+            $result[] = [
+                'id'             => $gDef['id'],
+                'title'          => $gDef['title'],
+                'selected_count' => $selectedCount,
+                'items'          => $items,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Lädt alle aktiven Darsteller-Profile des Partners für das Auswahl-Dropdown.
+     */
+    private function loadActiveMerchantActors(int $merchantId, int $currentActorId = 0): array
+    {
+        $actors = [];
+        $rsActors = p4c_query("SELECT `id`, `username`, `status`
+            FROM `actors`
+            WHERE `merchant_id` = '" . $merchantId . "'
+              AND (`status` = 'active' OR `id` = '" . $currentActorId . "')
+              AND `status` != 'deleted'
+            ORDER BY `username` ASC;", __FILE__, __LINE__);
+
+        if ($rsActors && p4c_num_rows($rsActors) > 0) {
+            while ($aObj = p4c_fetch_object($rsActors)) {
+                $actors[] = [
+                    'id'       => abs((int)$aObj->id),
+                    'username' => (string)$aObj->username,
+                ];
+            }
+        }
+        return $actors;
+    }
+
+    /**
+     * Lädt alle freigeschalteten Websites des Partners inkl. Whitelist-Prüfung für 'public'.
+     */
+    private function loadMerchantWebsites(\Merchant $merchant, string $currentValue = ''): array
+    {
+        $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
+        $websites   = [];
+
+        if ($this->isPublicUploadAllowed($merchant, $merchantId, $currentValue)) {
+            $websites[] = [
+                'value' => 'public',
+                'label' => 'alle Partnerwebsites',
+            ];
+        }
+
+        $rsSites = p4c_query("SELECT `domain`
+            FROM `sites`
+            WHERE `partner_id` = '" . p4c_escape_string((string)$merchant->partner_id()) . "'
+              AND `status` = '1'
+            ORDER BY `domain` ASC;", __FILE__, __LINE__);
+
+        if ($rsSites && p4c_num_rows($rsSites) > 0) {
+            while ($sObj = p4c_fetch_object($rsSites)) {
+                $websites[] = [
+                    'value' => (string)$sObj->domain,
+                    'label' => (string)$sObj->domain,
+                ];
+            }
+        }
+
+        return $websites;
+    }
+
+    private function isPublicUploadAllowed(\Merchant $merchant, int $merchantId, string $currentValue = ''): bool
+    {
+        $allowedPartners  = ['CCRVWMVD67'];
+        $allowedMerchants = [10061];
+
+        return in_array((string)$merchant->partner_id(), $allowedPartners, true)
+            || in_array($merchantId, $allowedMerchants, true)
+            || $currentValue === 'public';
+    }
+
+    private function cleanMovieTitle(string $rawTitle): string
+    {
+        $title = trim(str_replace(self::REPLACE_TITLE_CHARS, '', $rawTitle));
+        $title = str_replace(self::ZERO_WIDTH_SPACES, '', $title);
+        $title = str_replace(['#?', '?en'], ['#', 'en'], $title);
+        $title = str_replace(['&#8364;', '&euro;', 'Â€', '€', 'â‚¬', '&#x20AC;'], 'EUR', $title);
+        return trim($title);
+    }
+
+    private static function decodeLegacyText(string $text): string
+    {
+        if ($text === '') {
+            return '';
+        }
+        return html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
+}
