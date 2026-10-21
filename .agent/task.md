@@ -74,3 +74,10 @@
         - [x] Integrate Top-Compliance-Banner and dedicated jQuery-UI tabs (`BRAM & KI-Analyse` and `Audio & Transkript (.vtt)`) into `/Film-pruefen/{id}` and `/Film-bearbeiten/{id}` with automatic recalculation on save
     - [ ] **Phase 2B: Optional Local Text LLM (`llama.cpp` Server + Uncensored GGUF Model) for Semantic Context Checking & Multi-Language Text/VTT Translation**
     - [ ] **Phase 4: Separate Video Frame / Sprite-Grid Vision AI Analysis**
+
+- [ ] **MCP Complete Modernization (`mcp_neu` -> KKC `app/` & `web/` Architecture)**
+    - [x] Analyze Pay4Coins SSO login (`mcp/login.php`) and MCP routing (`mcp/.htaccess`, `mcp/index.php`)
+    - [x] Document architecture blueprint (`app/` & `web/` separation, SPA fragment loading, Pay4Coins-Blue theme) in `.agent/knowledge/architecture/mcp-modernization-architecture.md`
+    - [x] Build clickable interactive layout prototype in `mcp/mcp_neu/app/` and `mcp/mcp_neu/web/` with all current MCP sidebar menu entries, KKC tile design in Pay4Coins-Blue (`#0284C7` / `#4297D7`), and zero-reload SPA navigation
+    - [ ] Implement live Pay4Coins SSO login (`mcp/mcp_neu/web/login.php`) and database-backed `Startseite` dashboard
+    - [ ] Implement Actors, Movies, and Photo-Albums modules in `mcp_neu`

@@ -1,0 +1,114 @@
+---
+name: mcp-modernization-architecture
+description: Architektur-Blaupause und Migrationsplan fuer den kompletten Neubau des EroCloud Merchant-Control-Panels (MCP) nach dem Vorbild des KKC (app/ & web/ Trennung, SPA-Fragment-Loading, Pay4Coins-Blau Theme).
+usage: 'Wird automatisch herangezogen bei allen Arbeiten am Neubau des MCP unter /mcp/mcp_neu/ (spaeter /mcp/).'
+---
+
+# MCP Modernisierungs-Architektur (`app/` & `web/` nach KKC-Vorbild)
+
+> **Kontext-Referenz:** Diese Dokumentation ergänzt `@master.md` sowie `@server-and-system-environment.md` und definiert die verbindliche Softwarearchitektur für den kompletten Neubau des **EroCloud Merchant-Control-Panels (MCP)**.
+
+---
+
+## 1. 🎯 Zielsetzung & Grundprinzipien
+
+1. **Greenfield-Neubau statt Altcode-Flickwerk:**
+   Bestehende Legacy-Dateien in `/htdocs/mcp/` werden nicht mehr einzeln umgebaut, sondern parallel in einer modernen Architektur von Grund auf neu entwickelt.
+2. **Trennung von `app/` und `web/` (KKC-Architektur):**
+   * **`web/` (Öffentliches DocumentRoot):** Enthält ausschließlich den Einstiegspunkt (`index.php`), den AJAX-Dispatcher (`api.php`), den Pay4Coins-SSO-Endpunkt (`login.php`), Medien-Proxys sowie statische Assets (`assets/css`, `assets/js`, `assets/img`, `assets/fonts`).
+   * **`app/` (Geschützter Anwendungskern):** Durch `.htaccess` (`Require all denied`) vollständig gegen direkten Browser-Zugriff gesperrt. Enthält Bootstrap, Core-Klassen, Models, Module (Controller + Views).
+3. **Dynamisches Nachladen ohne Seiten-Reload (SPA-Architektur):**
+   Wie im KKC (`KKC-EroCMS/htdocs/kkc`) lädt ein Klick in der linken Sidebar nicht die gesamte Seite neu, sondern ruft über reines Vanilla-JavaScript (`fetch('api.php?route=...')`) das jeweilige HTML-Fragment ab und rendert es verzögerungsfrei in `#app-content`.
+4. **Look & Feel (KKC-Kacheldesign in Pay4Coins-Blau):**
+   * Helles, freundliches Standard-Theme (**Light Mode Default** mit `#F8FAFC` Hintergrund und weißen Kacheln `#FFFFFF`, optionaler Dark-Mode-Toggle in der Topbar).
+   * Statt des EroCMS-Rots (`#EF4444` im KKC) wird als Primärfarbe das **Pay4Coins-Blau** (`#4297D7` / `#0284C7`, Hover `#0369A1`, Subtle `rgba(66, 151, 215, 0.10)`) verwendet.
+5. **100 % Einhaltung von `@master.md` & PHP 8.4.27 Kompatibilität:**
+   * `declare(strict_types=1);` und `define('SAFE_INC', 1);`
+   * Datenbankzugriff über die zentralen `p4c_*` Wrapper (`p4c_query($sql, __FILE__, __LINE__)`) und zentrales Error-Logging in `/var/www/web1/htdocs/log/.errorlog`.
+   * Durchgehend **UTF-8** (keine `ISO-8859-1` Altlasten mehr).
+   * Alle UI-Texte ausnahmslos in der höflichen **Sie-Form**.
+   * **Kein Studio-Login (`G-...`) mehr:** Es wird ausschließlich der **Pay4Coins-Partner-Login** unterstützt.
+
+---
+
+## 2. 📂 Ordnerstruktur & URL-Strategie (Entwicklung $\rightarrow$ Go-Live)
+
+### 2.1 Phase A: Parallelbetrieb während der Neuentwicklung (`/htdocs/mcp/mcp_neu/`)
+Während der Entwicklungsphase liegt das neue System unter `/htdocs/mcp/mcp_neu/`:
+* **Entwicklungs-URL:** `https://erocloud.net/mcp_neu/web/` (bzw. `https://erocloud.net/mcp_neu/web/Startseite`)
+* **Session-Sharing:** Da das neue System unter derselben Domain (`erocloud.net`) läuft wie das aktuelle Live-MCP, wird die bestehende PHP-Session (`PHPSESSID` aus `/var/www/web1/tmp`) nahtlos geteilt. Ein im Live-System über Pay4Coins eingeloggter Partner ist unter `/mcp_neu/web/Startseite` sofort angemeldet.
+
+### 2.2 Phase B: Späterer Go-Live (`/htdocs/mcp/`)
+Nach Fertigstellung aller Module:
+1. Das alte `/htdocs/mcp/` wird entfernt bzw. archiviert.
+2. Die Ordner `app/` und `web/` liegen dann direkt unter `/htdocs/mcp/app/` und `/htdocs/mcp/web/`.
+3. **Domain-Routing für `https://erocloud.net/Startseite`:**
+   * **Option 1 (LiveConfig DocumentRoot):** Das Zielverzeichnis der Domain `erocloud.net` wird in LiveConfig auf `/mcp/web/` gestellt (analog zum KKC). Dadurch liegt `/mcp/app/` physisch außerhalb des Webroots.
+   * **Option 2 (`.htaccess` Weiterleitung in `/mcp/.htaccess`):** Falls das DocumentRoot in LiveConfig auf `/mcp/` bleibt, leitet eine zentrale `.htaccess` in `/mcp/` alle Aufrufe transparent auf `web/` weiter, während `/mcp/app/.htaccess` (`Require all denied`) den App-Kern schützt.
+4. **Dynamische Pfadauflösung in `app/bootstrap.php`:**
+   `bootstrap.php` sucht die zentrale `config.inc.php` dynamisch in den übergeordneten Ebenen, sodass beim späteren Verschieben von `/mcp/mcp_neu/` nach `/mcp/` **keine einzige Codezeile** angepasst werden muss.
+
+### 2.3 Verzeichnisbaum im Detail
+
+```text
+mcp_neu/ (später: mcp/)
+├── app/
+│   ├── .htaccess                  # Require all denied (Kein direkter Web-Zugriff)
+│   ├── bootstrap.php              # Lädt config.inc.php, functions.inc.php, Session, Autoloader
+│   └── src/
+│       ├── Core/
+│       │   ├── Autoloader.php     # PSR-4 Autoloader für Namespace App\
+│       │   ├── Auth.php           # Pay4Coins SSO & MCP-Session-Prüfung (nur Merchant)
+│       │   ├── Controller.php     # Basis-Controller für alle Module
+│       │   ├── Csrf.php           # CSRF-Token-Schutz für POST-Requests
+│       │   ├── Request.php        # Gekapselter Zugriff auf GET/POST/Route
+│       │   ├── Response.php       # HTML-Fragment & JSON-Antworten
+│       │   ├── Router.php         # Zentrales Routing für api.php
+│       │   └── View.php           # Template-Renderer & XSS-Escaping View::e()
+│       ├── Models/
+│       │   ├── MerchantModel.php  # Kapselt Partner-Stammdaten, API-Key & Content-Regeln
+│       │   ├── ActorModel.php     # Darsteller-Profile & Freischaltstatus
+│       │   ├── MovieModel.php     # Filme, Upload-Status & Prüfzustand
+│       │   └── PhotoAlbumModel.php# Fotoalben & Bilder
+│       └── Modules/
+│           ├── Home/
+│           │   ├── HomeController.php
+│           │   └── views/
+│           │       ├── dashboard.php   # Eingeloggtes Partner-Dashboard (Kachel-Layout)
+│           │       └── guest.php       # Öffentliche Landingpage (Pay4Coins-Login)
+│           ├── Actors/
+│           ├── Movies/
+│           ├── PhotoAlbums/
+│           ├── Webmaster/
+│           └── Support/
+└── web/
+    ├── .htaccess                  # RewriteEngine (/Startseite -> index.php), Security-Header
+    ├── index.php                  # App-Shell (Sidebar, Topbar, #app-content) bzw. Guest-View
+    ├── api.php                    # Zentraler AJAX-Dispatcher für SPA-Navigation
+    ├── login.php                  # Pay4Coins Auto-Login (?pid=XXXXXXXXXX)
+    └── assets/
+        ├── css/
+        │   ├── bootstrap.min.css
+        │   ├── bootstrap-icons.css
+        │   ├── fonts.css
+        │   └── theme.css          # KKC-Designsystem adaptiert auf Pay4Coins-Blau (#4297D7)
+        ├── js/
+        │   ├── bootstrap.bundle.min.js
+        │   └── app.js             # Vanilla-JS SPA-Router, Theme-Toggle, Modals, Toasts
+        ├── fonts/
+        └── img/
+```
+
+---
+
+## 3. 🔐 Login-Flow (Pay4Coins Single-Sign-On)
+
+1. **Ausgeloggter Zustand (`/Startseite` $\rightarrow$ `Home/views/guest.php`):**
+   * Zeigt das moderne EroCloud-Infoportal im hellen Kachel-Design (in höflicher **Sie-Form**, ohne Studio-Login).
+   * Der Login-Button führt zu `https://login.pay4coins.com?ref=erocloud`.
+2. **Automatischer Login über Pay4Coins (`web/login.php?pid=XXXXXXXXXX`):**
+   * Prüft die 10-stellige `pid` und berechnet `loginHash($pid)` (Browser-Fingerprint + `pid`).
+   * Verifiziert den Login via cURL bei `https://api.pay4coins.com/remote/merchant_login.php`.
+   * Ruft bei `'ok'` die Stammdaten von `https://api.pay4coins.com/remote/erocloud_merchant_data.php` ab, legt den Partner in `merchants` an bzw. aktualisiert ihn (AES-verschlüsselt mit `AES_KEY`), setzt die MCP-Session (`$_SESSION['logged_id'] = 'mcp'`, `$_SESSION['logged_in_as'] = 'merchant'`, `$_SESSION['merchant_id']`) und leitet auf `Startseite` weiter.
+3. **Eingeloggter Zustand (`/Startseite` $\rightarrow$ `web/index.php` + `#/startseite`):**
+   * Rendert die App-Shell (Topbar + linke Sidebar mit Darsteller-Profilen, Upload-/Cloud-Menü, API-Key-Modal, FAQ/Support/Impressum) und lädt per JS das Partner-Dashboard (`api.php?route=home/view`).

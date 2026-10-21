@@ -1,0 +1,633 @@
+/* ==========================================================================
+   EroCloud MCP Theme Stylesheet (Pay4Coins Blue Brand Identity)
+   Architektur-Vorbild: KKC-EroCMS | Standard: Hellmodus (Light Mode Default)
+   Markenfarbe: Pay4Coins-Blau (#4297D7 / #0284C7)
+   ========================================================================== */
+
+:root,
+[data-bs-theme="light"] {
+  /* Pay4Coins Blue Brand Colors */
+  --kkc-primary: #0284C7;
+  --kkc-primary-hover: #0369A1;
+  --kkc-primary-subtle: rgba(2, 132, 199, 0.10);
+  --p4c-brand-blue: #4297D7;
+
+  /* Backgrounds & Surfaces (Light Mode) */
+  --kkc-bg: #F8FAFC;
+  --kkc-topbar-bg: #FFFFFF;
+  --kkc-surface: #FFFFFF;
+  --kkc-surface-hover: #F1F5F9;
+  --kkc-border: #E2E8F0;
+  --kkc-border-strong: #CBD5E1;
+
+  /* Sidebar (Light Mode) */
+  --kkc-sidebar-bg: #FFFFFF;
+  --kkc-sidebar-border: #E2E8F0;
+  --kkc-sidebar-text: #475569;
+  --kkc-sidebar-hover: #0F172A;
+  --kkc-sidebar-hover-bg: #F1F5F9;
+  --kkc-sidebar-active: #0284C7;
+  --kkc-sidebar-active-bg: rgba(2, 132, 199, 0.10);
+
+  /* Typography Colors */
+  --kkc-text: #0F172A;
+  --kkc-text-muted: #64748B;
+  --kkc-text-inverse: #FFFFFF;
+
+  /* Table Header */
+  --kkc-table-th-bg: #F8FAFC;
+  --kkc-table-th-color: #475569;
+  --kkc-table-border: #E2E8F0;
+  --kkc-table-hover: #F8FAFC;
+
+  /* Functional Status Colors */
+  --kkc-success: #059669;
+  --kkc-warning: #D97706;
+  --kkc-danger: #E11D48;
+  --kkc-info: #0284C7;
+
+  /* Bootstrap Theme Overrides */
+  --bs-primary: #0284C7;
+  --bs-primary-rgb: 2, 132, 199;
+  --bs-body-bg: var(--kkc-bg);
+  --bs-body-color: var(--kkc-text);
+  --bs-border-color: var(--kkc-border);
+  --bs-card-bg: var(--kkc-surface);
+  --bs-card-border-color: var(--kkc-border);
+  --bs-modal-bg: var(--kkc-surface);
+  --bs-modal-border-color: var(--kkc-border);
+}
+
+[data-bs-theme="dark"] {
+  /* Pay4Coins Blue Brand Colors (Dark Mode) */
+  --kkc-primary: #38BDF8;
+  --kkc-primary-hover: #0284C7;
+  --kkc-primary-subtle: rgba(56, 189, 248, 0.15);
+  --p4c-brand-blue: #4297D7;
+
+  /* Backgrounds & Surfaces (Dark Mode) */
+  --kkc-bg: #0B0F19;
+  --kkc-topbar-bg: #111625;
+  --kkc-surface: #151B2B;
+  --kkc-surface-hover: #1C2438;
+  --kkc-border: #1E293B;
+  --kkc-border-strong: #334155;
+
+  /* Sidebar (Dark Mode) */
+  --kkc-sidebar-bg: #0B0F19;
+  --kkc-sidebar-border: #1E293B;
+  --kkc-sidebar-text: #94A3B8;
+  --kkc-sidebar-hover: #FFFFFF;
+  --kkc-sidebar-hover-bg: rgba(255, 255, 255, 0.05);
+  --kkc-sidebar-active: #FFFFFF;
+  --kkc-sidebar-active-bg: #1E293B;
+
+  /* Typography Colors */
+  --kkc-text: #F8FAFC;
+  --kkc-text-muted: #94A3B8;
+  --kkc-text-inverse: #0F172A;
+
+  /* Table Header */
+  --kkc-table-th-bg: #111625;
+  --kkc-table-th-color: #94A3B8;
+  --kkc-table-border: #1E293B;
+  --kkc-table-hover: #1C2438;
+
+  /* Functional Status Colors */
+  --kkc-success: #10B981;
+  --kkc-warning: #F59E0B;
+  --kkc-danger: #F43F5E;
+  --kkc-info: #38BDF8;
+
+  /* Bootstrap Theme Overrides */
+  --bs-primary: #38BDF8;
+  --bs-primary-rgb: 56, 189, 248;
+  --bs-body-bg: var(--kkc-bg);
+  --bs-body-color: var(--kkc-text);
+  --bs-border-color: var(--kkc-border);
+  --bs-card-bg: var(--kkc-surface);
+  --bs-card-border-color: var(--kkc-border);
+  --bs-modal-bg: var(--kkc-surface);
+  --bs-modal-border-color: var(--kkc-border);
+}
+
+/* Brand Utility Classes */
+.ec-text-primary {
+  color: var(--kkc-primary) !important;
+}
+
+.ec-bg-primary-subtle {
+  background-color: var(--kkc-primary-subtle) !important;
+}
+
+/* ==========================================================================
+   Typography
+   ========================================================================== */
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6,
+.font-heading {
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--kkc-text);
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.885rem;
+  background-color: var(--kkc-bg);
+  color: var(--kkc-text);
+  min-height: 100vh;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+code, kbd, samp, pre, .font-monospace {
+  font-family: "Consolas", "Courier New", monospace !important;
+}
+
+/* ==========================================================================
+   App Frame & Layout
+   ========================================================================== */
+.app-wrapper {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* Sidebar */
+.app-sidebar {
+  width: 265px;
+  background-color: var(--kkc-sidebar-bg);
+  border-right: 1px solid var(--kkc-sidebar-border);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1030;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.sidebar-brand {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.15rem;
+  border-bottom: 1px solid var(--kkc-sidebar-border);
+}
+
+.sidebar-nav {
+  padding: 0.85rem 0.75rem;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.sidebar-heading {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--kkc-text-muted);
+  padding: 0.5rem 0.75rem 0.25rem;
+  margin-top: 0.35rem;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.58rem 0.8rem;
+  border-radius: 0.5rem;
+  color: var(--kkc-sidebar-text);
+  font-weight: 500;
+  font-size: 0.865rem;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  position: relative;
+  margin-bottom: 0.15rem;
+  cursor: pointer;
+}
+
+.sidebar-link > i {
+  font-size: 1.1rem;
+  transition: color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.sidebar-link:hover {
+  color: var(--kkc-sidebar-hover);
+  background-color: var(--kkc-sidebar-hover-bg);
+}
+
+.sidebar-link.active {
+  color: var(--kkc-sidebar-active) !important;
+  background-color: var(--kkc-sidebar-active-bg) !important;
+  font-weight: 600;
+}
+
+.sidebar-link.active > i {
+  color: var(--kkc-primary) !important;
+}
+
+.sidebar-link.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 15%;
+  bottom: 15%;
+  width: 3.5px;
+  background-color: var(--kkc-primary);
+  border-radius: 0 4px 4px 0;
+}
+
+/* Submenu Collapsible in Sidebar */
+.sidebar-submenu-toggle .chevron-icon {
+  margin-left: auto;
+  font-size: 0.78rem !important;
+  transition: transform 0.2s ease;
+  color: var(--kkc-text-muted);
+}
+
+.sidebar-submenu-toggle[aria-expanded="true"] .chevron-icon {
+  transform: rotate(90deg);
+  color: var(--kkc-primary);
+}
+
+.sidebar-submenu {
+  padding-left: 0.75rem;
+  margin-left: 0.65rem;
+  border-left: 1px dashed var(--kkc-border-strong);
+  margin-bottom: 0.35rem;
+}
+
+.sidebar-submenu .sidebar-link {
+  padding: 0.45rem 0.7rem;
+  font-size: 0.83rem;
+}
+
+.sidebar-actor-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background-color: var(--kkc-primary-subtle);
+  color: var(--kkc-primary);
+  font-size: 0.68rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid rgba(2, 132, 199, 0.25);
+}
+
+.sidebar-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.18rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #ffffff !important;
+  background-color: var(--kkc-primary);
+  border-radius: 999px;
+}
+
+.sidebar-footer {
+  padding: 0.85rem 1.15rem;
+  border-top: 1px solid var(--kkc-sidebar-border);
+  font-size: 0.75rem;
+  color: var(--kkc-text-muted);
+}
+
+/* Main Content Area */
+.app-main {
+  flex: 1;
+  margin-left: 265px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Topbar */
+.app-topbar {
+  height: 64px;
+  background-color: var(--kkc-topbar-bg);
+  border-bottom: 1px solid var(--kkc-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 1020;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+#theme-toggle {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  line-height: 1 !important;
+}
+
+.topbar-search {
+  max-width: 380px;
+  width: 100%;
+}
+
+.topbar-search .form-control {
+  background-color: var(--kkc-surface);
+  border: 1px solid var(--kkc-border);
+  color: var(--kkc-text);
+  padding-left: 2.25rem;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  transition: all 0.15s ease;
+}
+
+.topbar-search .form-control:focus {
+  border-color: var(--kkc-primary);
+  box-shadow: 0 0 0 3px var(--kkc-primary-subtle);
+}
+
+.topbar-search .search-icon {
+  position: absolute;
+  left: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--kkc-text-muted);
+}
+
+/* Content Container */
+.app-content {
+  padding: 1.5rem;
+  flex: 1;
+}
+
+/* ==========================================================================
+   UI Components & Cards (KKC Tile Style with Pay4Coins Blue)
+   ========================================================================== */
+.card-kkc {
+  background-color: var(--kkc-surface);
+  border: 1px solid var(--kkc-border);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+  margin-bottom: 1.25rem;
+}
+
+.card-kkc:hover {
+  border-color: var(--kkc-border-strong);
+}
+
+.card-kkc-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--kkc-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-kkc-header .card-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--kkc-text);
+}
+
+.card-kkc-body {
+  padding: 1.25rem;
+}
+
+/* KPI Widgets */
+.kpi-card {
+  padding: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1.15rem;
+}
+
+.kpi-card:hover {
+  border-color: var(--kkc-primary);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.08);
+}
+
+.kpi-icon-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  flex-shrink: 0;
+}
+
+.kpi-val {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1.65rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--kkc-text);
+}
+
+.kpi-label {
+  font-size: 0.75rem;
+  color: var(--kkc-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+
+/* Action Tiles on Dashboard */
+.action-tile {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.9rem 1rem;
+  border-radius: 0.65rem;
+  border: 1px solid var(--kkc-border);
+  background-color: var(--kkc-surface);
+  transition: all 0.15s ease;
+  height: 100%;
+}
+
+.action-tile:hover {
+  border-color: var(--kkc-primary);
+  background-color: var(--kkc-surface-hover);
+  transform: translateY(-1px);
+}
+
+.action-tile-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+/* Buttons (Pay4Coins Blue) */
+.btn-primary-kkc {
+  background-color: var(--kkc-primary);
+  border-color: var(--kkc-primary);
+  color: #FFFFFF !important;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.95rem;
+  transition: all 0.15s ease;
+}
+
+.btn-primary-kkc:hover, .btn-primary-kkc:focus {
+  background-color: var(--kkc-primary-hover);
+  border-color: var(--kkc-primary-hover);
+  color: #FFFFFF !important;
+  box-shadow: 0 0 10px rgba(2, 132, 199, 0.35);
+}
+
+.btn-outline-kkc {
+  background-color: var(--kkc-surface);
+  border: 1px solid var(--kkc-border-strong);
+  color: var(--kkc-text);
+  font-weight: 500;
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.85rem;
+  transition: all 0.15s ease;
+}
+
+.btn-outline-kkc:hover {
+  background-color: var(--kkc-surface-hover);
+  border-color: var(--kkc-primary);
+  color: var(--kkc-primary);
+}
+
+/* Custom Table */
+.kkc-table {
+  width: 100%;
+  margin-bottom: 0;
+  color: var(--kkc-text);
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.kkc-table th {
+  background-color: var(--kkc-table-th-bg);
+  color: var(--kkc-table-th-color);
+  font-size: 0.725rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 2px solid var(--kkc-table-border);
+  white-space: nowrap;
+}
+
+.kkc-table td {
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--kkc-table-border);
+  vertical-align: middle;
+  font-size: 0.865rem;
+}
+
+.kkc-table tbody tr:hover {
+  background-color: var(--kkc-table-hover);
+}
+
+/* Status Badges */
+.badge-kkc {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 9999px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+[data-bs-theme="light"] .badge-kkc-warning {
+  background-color: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FCD34D;
+}
+[data-bs-theme="dark"] .badge-kkc-warning {
+  background-color: rgba(245, 158, 11, 0.18);
+  color: #FBBF24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+[data-bs-theme="light"] .badge-kkc-success {
+  background-color: #D1FAE5;
+  color: #065F46;
+  border: 1px solid #A7F3D0;
+}
+[data-bs-theme="dark"] .badge-kkc-success {
+  background-color: rgba(16, 185, 129, 0.18);
+  color: #34D399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+[data-bs-theme="light"] .badge-kkc-danger {
+  background-color: #FFE4E6;
+  color: #9F1239;
+  border: 1px solid #FECDD3;
+}
+[data-bs-theme="dark"] .badge-kkc-danger {
+  background-color: rgba(244, 63, 94, 0.18);
+  color: #FB7185;
+  border: 1px solid rgba(244, 63, 94, 0.35);
+}
+
+[data-bs-theme="light"] .badge-kkc-info {
+  background-color: #E0F2FE;
+  color: #075985;
+  border: 1px solid #BAE6FD;
+}
+[data-bs-theme="dark"] .badge-kkc-info {
+  background-color: rgba(56, 189, 248, 0.18);
+  color: #38BDF8;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+
+[data-bs-theme="light"] .badge-kkc-neutral {
+  background-color: #F1F5F9;
+  color: #475569;
+  border: 1px solid #CBD5E1;
+}
+[data-bs-theme="dark"] .badge-kkc-neutral {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #94A3B8;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Pay4Coins Partner Box in Sidebar */
+.sidebar-p4c-box {
+  background-color: var(--kkc-surface-hover);
+  border: 1px solid var(--kkc-border);
+  border-radius: 0.6rem;
+  padding: 0.65rem 0.75rem;
+  margin: 0.5rem 0.25rem;
+  transition: border-color 0.15s ease;
+}
+
+.sidebar-p4c-box:hover {
+  border-color: var(--kkc-primary);
+}
