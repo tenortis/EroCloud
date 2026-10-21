@@ -1338,6 +1338,8 @@ class MoviesController
         if ($text === '') {
             return '';
         }
-        return html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $decoded = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $decoded = html_entity_decode($decoded, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        return str_replace(["\r\n", "\r"], "\n", $decoded);
     }
 }

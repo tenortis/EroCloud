@@ -175,6 +175,13 @@ const App = {
 
       const html = await res.text();
       contentArea.innerHTML = html;
+
+      // Seitenbreite steuern: Standardmäßig begrenzt (1440px), optional volle Breite via data-page-width="full"
+      const widthHook = contentArea.querySelector('[data-page-width]');
+      const pageWidth = widthHook ? widthHook.getAttribute('data-page-width') : 'boxed';
+      contentArea.classList.toggle('is-fullwidth', pageWidth === 'full');
+      contentArea.classList.toggle('is-narrow', pageWidth === 'narrow');
+
       window.scrollTo({ top: 0, behavior: 'smooth' });
       this.initDynamicEvents();
     } catch (err) {

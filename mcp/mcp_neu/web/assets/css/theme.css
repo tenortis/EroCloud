@@ -369,10 +369,30 @@ code, kbd, samp, pre, .font-monospace {
   color: var(--kkc-text-muted);
 }
 
-/* Content Container */
+/* Content Container: Standardmäßig auf großen Monitoren begrenzt (1440px),
+   kann aber pro Seite per .is-fullwidth oder data-page-width="full" auf 100% geöffnet werden */
 .app-content {
-  padding: 1.5rem;
+  padding: 1.5rem 2rem;
   flex: 1;
+  width: 100%;
+  max-width: 1440px;
+  margin-right: auto;
+}
+
+.app-content.is-fullwidth,
+.app-content:has([data-page-width="full"]) {
+  max-width: 100%;
+}
+
+.app-content.is-narrow,
+.app-content:has([data-page-width="narrow"]) {
+  max-width: 1140px;
+}
+
+@media (max-width: 767.98px) {
+  .app-content {
+    padding: 1rem;
+  }
 }
 
 /* ==========================================================================
@@ -397,7 +417,8 @@ code, kbd, samp, pre, .font-monospace {
   cursor: pointer;
 }
 
-.card-kkc-header {
+.card-kkc-header,
+.kkc-card-header {
   padding: 1rem 1.25rem;
   border-bottom: 1px solid var(--kkc-border);
   display: flex;
@@ -405,7 +426,8 @@ code, kbd, samp, pre, .font-monospace {
   justify-content: space-between;
 }
 
-.card-kkc-header .card-title {
+.card-kkc-header .card-title,
+.kkc-card-header .card-title {
   margin: 0;
   font-size: 0.95rem;
   font-family: 'Montserrat', sans-serif;
@@ -416,24 +438,34 @@ code, kbd, samp, pre, .font-monospace {
   color: var(--kkc-text);
 }
 
-.card-kkc-body {
+.card-kkc-body,
+.kkc-card-body {
   padding: 1.25rem;
 }
 
 /* KPI Widgets */
-.kpi-card {
+.kpi-card,
+.kkc-stat-card {
+  background-color: var(--kkc-surface);
+  border: 1px solid var(--kkc-border);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
   padding: 1.25rem;
   display: flex;
   align-items: center;
   gap: 1.15rem;
+  height: 100%;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.kpi-card:hover {
+.kpi-card:hover,
+.kkc-stat-card:hover {
   border-color: var(--kkc-primary);
   box-shadow: 0 4px 12px rgba(2, 132, 199, 0.08);
 }
 
-.kpi-icon-box {
+.kpi-icon-box,
+.kkc-stat-icon {
   width: 48px;
   height: 48px;
   border-radius: 0.75rem;
@@ -444,21 +476,23 @@ code, kbd, samp, pre, .font-monospace {
   flex-shrink: 0;
 }
 
-.kpi-val {
+.kpi-val,
+.kkc-stat-value {
   font-family: 'Montserrat', sans-serif;
-  font-size: 1.65rem;
+  font-size: 1.55rem;
   font-weight: 800;
   line-height: 1.1;
   color: var(--kkc-text);
 }
 
-.kpi-label {
+.kpi-label,
+.kkc-stat-label {
   font-size: 0.75rem;
   color: var(--kkc-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-weight: 600;
-  margin-top: 0.25rem;
+  margin-bottom: 0.2rem;
 }
 
 /* Action Tiles on Dashboard */
@@ -492,7 +526,8 @@ code, kbd, samp, pre, .font-monospace {
 }
 
 /* Buttons (Pay4Coins Blue) */
-.btn-primary-kkc {
+.btn-primary-kkc,
+.btn-kkc-primary {
   background-color: var(--kkc-primary);
   border-color: var(--kkc-primary);
   color: #FFFFFF !important;
@@ -502,7 +537,8 @@ code, kbd, samp, pre, .font-monospace {
   transition: all 0.15s ease;
 }
 
-.btn-primary-kkc:hover, .btn-primary-kkc:focus {
+.btn-primary-kkc:hover, .btn-primary-kkc:focus,
+.btn-kkc-primary:hover, .btn-kkc-primary:focus {
   background-color: var(--kkc-primary-hover);
   border-color: var(--kkc-primary-hover);
   color: #FFFFFF !important;

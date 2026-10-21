@@ -119,11 +119,18 @@ if(isset($_GET['actor']) AND $_GET['actor'] == 'me') {
             }
         
             // Temporäre Datei erstellen
-            file_put_contents($temp_file,json_encode($api));
+            $encoded_json = json_encode($api, defined('JSON_INVALID_UTF8_SUBSTITUTE') ? JSON_INVALID_UTF8_SUBSTITUTE : 0);
+            if ($encoded_json !== false) {
+                $temp_dir = dirname($temp_file);
+                if (!is_dir($temp_dir)) {
+                    @mkdir($temp_dir, 0777, true);
+                }
+                @file_put_contents($temp_file, $encoded_json, LOCK_EX);
+            }
         }    
-    // Wenn temporäre Datei existiert
+    // Wenn gültige temporäre Datei existiert
     } else {
-        $api = json_decode(file_get_contents($temp_file), true);    
+        $api = $cached_api;    
     }
 
         

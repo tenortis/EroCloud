@@ -238,7 +238,6 @@ final class PhotoAlbumsController
             FROM `photo_albums_photos`
             WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "'
               AND `merchant_id` = '" . $merchantId . "'
-              AND `status` != 'deleted'
             ORDER BY `id` ASC;", __FILE__, __LINE__);
 
         if ($rsPhotos) {
@@ -248,6 +247,7 @@ final class PhotoAlbumsController
                     'id'        => abs((int)$p->id),
                     'file_id'   => $pFileId,
                     'filename'  => (string)$p->filename,
+                    'rejected'  => abs((int)($p->rejected ?? 0)),
                     'thumb_url' => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=200',
                     'zoom_url'  => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=900',
                 ];
@@ -371,7 +371,6 @@ final class PhotoAlbumsController
                     FROM `photo_albums_photos`
                     WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "'
                       AND `merchant_id` = '" . $merchantId . "'
-                      AND `status` != 'deleted'
                     ORDER BY `id` ASC;", __FILE__, __LINE__);
 
                 if ($rsPhotos) {
@@ -381,6 +380,7 @@ final class PhotoAlbumsController
                             'id'        => abs((int)$p->id),
                             'file_id'   => $pFileId,
                             'filename'  => (string)$p->filename,
+                            'rejected'  => abs((int)($p->rejected ?? 0)),
                             'thumb_url' => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=200',
                             'zoom_url'  => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=900',
                         ];
@@ -442,6 +442,21 @@ final class PhotoAlbumsController
         $onlineAtSql = date('Y-m-d H:i:s', strtotime($onlineAtRaw));
         $storageDir  = defined('PHOTO_ALBUMS_DEFAULT_DIR') ? PHOTO_ALBUMS_DEFAULT_DIR : 'photo_albums';
 
+        if ($metaTitle === '') {
+            $metaTitle = function_exists('mb_substr') ? mb_substr($title, 0, 65, 'UTF-8') : substr($title, 0, 65);
+        } else {
+            $metaTitle = function_exists('mb_substr') ? mb_substr($metaTitle, 0, 65, 'UTF-8') : substr($metaTitle, 0, 65);
+        }
+        if ($metaDescription === '') {
+            $cleanDesc = trim(strip_tags($description));
+            $metaDescription = function_exists('mb_substr') ? mb_substr($cleanDesc, 0, 156, 'UTF-8') : substr($cleanDesc, 0, 156);
+        } else {
+            $metaDescription = function_exists('mb_substr') ? mb_substr($metaDescription, 0, 156, 'UTF-8') : substr($metaDescription, 0, 156);
+        }
+        if ($seoUrl === '' && function_exists('seo_url')) {
+            $seoUrl = (string)seo_url($title);
+        }
+
         if ($existingId > 0) {
             $rsCheck = p4c_query("SELECT `id` FROM `photo_albums` WHERE `id` = '" . $existingId . "' AND `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted' LIMIT 1;", __FILE__, __LINE__);
             if (!$rsCheck || p4c_num_rows($rsCheck) === 0) {
@@ -450,9 +465,12 @@ final class PhotoAlbumsController
         }
 
         if ($existingId === 0) {
+            $albumIdHash = strtolower(md5($merchantId . '_' . microtime(true)));
             p4c_query("INSERT INTO `photo_albums` SET
                 `merchant_id`         = '" . $merchantId . "',
                 `actor_id`            = '" . $actorId . "',
+                `album_id`            = '" . p4c_escape_string($albumIdHash) . "',
+                `create_datetime`     = '" . date('Y-m-d H:i:s') . "',
                 `storage_location`    = '" . p4c_escape_string($storageDir) . "',
                 `number_of_photos`    = '0',
                 `preview_image_fsk16` = '',
@@ -466,12 +484,10 @@ final class PhotoAlbumsController
                 `amount_webmaster`    = '10',
                 `amount_download`     = '" . $amountDownload . "',
                 `album_checked`       = '0000-00-00 00:00:00',
-                `released`            = '0';", __FILE__, __LINE__);
+                `released`            = '0',
+                `admin_infos`         = '';", __FILE__, __LINE__);
 
-            $existingId  = abs((int)p4c_insert_id());
-            $albumIdHash = strtolower(md5($existingId . '_' . time() . '_' . $merchantId));
-
-            p4c_query("UPDATE `photo_albums` SET `album_id` = '" . p4c_escape_string($albumIdHash) . "' WHERE `id` = '" . $existingId . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
+            $existingId = abs((int)p4c_insert_id());
         } else {
             p4c_query("UPDATE `photo_albums` SET
                 `actor_id`         = '" . $actorId . "',
@@ -558,10 +574,20 @@ final class PhotoAlbumsController
             ? date('Y-m-d H:i:s', strtotime($onlineAtRaw))
             : (string)$aObj->online_at;
 
-        // Falls das Album zur Korrektur markiert war (released == 2), wieder auf released = 0 setzen
-        $newReleased = ((string)$aObj->album_checked === '0000-00-00 00:00:00' && (int)$aObj->released === 2)
-            ? 0
-            : (int)$aObj->released;
+        if ($metaTitle === '') {
+            $metaTitle = function_exists('mb_substr') ? mb_substr($title, 0, 65, 'UTF-8') : substr($title, 0, 65);
+        } else {
+            $metaTitle = function_exists('mb_substr') ? mb_substr($metaTitle, 0, 65, 'UTF-8') : substr($metaTitle, 0, 65);
+        }
+        if ($metaDescription === '') {
+            $cleanDesc = trim(strip_tags($description));
+            $metaDescription = function_exists('mb_substr') ? mb_substr($cleanDesc, 0, 156, 'UTF-8') : substr($cleanDesc, 0, 156);
+        } else {
+            $metaDescription = function_exists('mb_substr') ? mb_substr($metaDescription, 0, 156, 'UTF-8') : substr($metaDescription, 0, 156);
+        }
+        if ($seoUrl === '' && function_exists('seo_url')) {
+            $seoUrl = (string)seo_url($title);
+        }
 
         p4c_query("UPDATE `photo_albums` SET
             `actor_id`         = '" . $actorId . "',
@@ -572,7 +598,8 @@ final class PhotoAlbumsController
             `seo_url`          = '" . p4c_escape_string($seoUrl) . "',
             `online_at`        = '" . p4c_escape_string($onlineAtSql) . "',
             `amount_download`  = '" . $amountDownload . "',
-            `released`         = '" . $newReleased . "'
+            `album_checked`    = '0000-00-00 00:00:00',
+            `released`         = '1'
             WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
 
         if (function_exists('photo_album_checksum') && class_exists('PhotoAlbum')) {
@@ -738,7 +765,7 @@ final class PhotoAlbumsController
                 continue;
             }
 
-            $newFileName = 'IMG_' . date('Ymd_His') . '_' . $i . '_' . random_int(100, 999) . '.' . $ext;
+            $newFileName = 'IMG_' . date('Ymd_His') . '_' . ($i + 1) . '.' . $ext;
             $destPath    = $imagesDir . '/' . $newFileName;
 
             if (@move_uploaded_file($tmpName, $destPath)) {
@@ -750,8 +777,7 @@ final class PhotoAlbumsController
                     `album_id`        = '" . p4c_escape_string($albumIdHash) . "',
                     `merchant_id`     = '" . $merchantId . "',
                     `filename`        = '" . p4c_escape_string($newFileName) . "',
-                    `upload_datetime` = '" . date('Y-m-d H:i:s') . "',
-                    `status`          = '';", __FILE__, __LINE__);
+                    `upload_datetime` = '" . date('Y-m-d H:i:s') . "';", __FILE__, __LINE__);
 
                 $uploadedPhotos[] = [
                     'file_id'   => $photoFileId,
@@ -807,7 +833,7 @@ final class PhotoAlbumsController
         $pObj = p4c_fetch_object($rsPhoto);
 
         // Wenn das Album bereits geprüft oder online ist, müssen mindestens 4 Fotos im Album verbleiben
-        $rsCount    = p4c_query("SELECT COUNT(*) AS `cnt` FROM `photo_albums_photos` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "' AND `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted';", __FILE__, __LINE__);
+        $rsCount    = p4c_query("SELECT COUNT(*) AS `cnt` FROM `photo_albums_photos` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
         $cntRow     = $rsCount ? p4c_fetch_object($rsCount) : null;
         $currentCnt = $cntRow ? abs((int)$cntRow->cnt) : 0;
 
@@ -840,6 +866,8 @@ final class PhotoAlbumsController
      */
     public function publish(): void
     {
+        global $mysql;
+
         $this->requireValidCsrf();
         $merchantId = $this->requireMerchantId();
 
@@ -852,7 +880,9 @@ final class PhotoAlbumsController
         if (!$rsAlbum || p4c_num_rows($rsAlbum) === 0) {
             Response::error('Das angeforderte Foto-Album wurde nicht gefunden.', 404);
         }
-        $aObj = p4c_fetch_object($rsAlbum);
+        $aObj        = p4c_fetch_object($rsAlbum);
+        $albumIdHash = (string)$aObj->album_id;
+        $totalPhotos = $this->recalculatePhotoCount($albumDbId, $albumIdHash, $merchantId, $mysql);
 
         if (trim((string)$aObj->preview_image_fsk16) === '') {
             Response::error('Bitte laden Sie ein jugendfreies FSK16-Coverbild für Ihr Foto-Album hoch.', 400);
@@ -860,9 +890,16 @@ final class PhotoAlbumsController
         if (trim((string)$aObj->preview_image_fsk18) === '') {
             Response::error('Bitte laden Sie ein FSK18-Coverbild für Ihr Foto-Album hoch.', 400);
         }
-        if (abs((int)$aObj->number_of_photos) < 4) {
+        if ($totalPhotos < 4) {
             Response::error('Ein Foto-Album muss mindestens 4 Fotos enthalten. Bitte laden Sie noch weitere Fotos hoch.', 400);
         }
+
+        p4c_query("UPDATE `photo_albums` SET
+            `number_of_photos` = '" . $totalPhotos . "',
+            `album_checked`    = '0000-00-00 00:00:00',
+            `released`         = '1'
+            WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "'
+            LIMIT 1;", __FILE__, __LINE__);
 
         unset($_SESSION['upload_photo_album']);
 
@@ -905,8 +942,8 @@ final class PhotoAlbumsController
             Response::error('Bereits geprüfte oder veröffentlichte Foto-Alben können aus Sicherheitsgründen nicht direkt gelöscht werden. Bitte wenden Sie sich bei Bedarf an den Support.', 400);
         }
 
-        p4c_query("UPDATE `photo_albums` SET `status` = 'deleted' WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
-        p4c_query("UPDATE `photo_albums_photos` SET `status` = 'deleted' WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
+        p4c_query("UPDATE `photo_albums` SET `status` = 'deleted', `deleted_datetime` = '0000-00-00 00:00:00' WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
+        p4c_query("DELETE FROM `photo_albums_photos` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
 
         if (function_exists('log_action')) {
             log_action('Foto-Album #' . $albumDbId . ' gelöscht');
@@ -927,8 +964,7 @@ final class PhotoAlbumsController
         $rsCnt = p4c_query("SELECT COUNT(*) AS `cnt`
             FROM `photo_albums_photos`
             WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "'
-              AND `merchant_id` = '" . $merchantId . "'
-              AND `status` != 'deleted';", __FILE__, __LINE__);
+              AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
 
         $row   = $rsCnt ? p4c_fetch_object($rsCnt) : null;
         $total = $row ? abs((int)$row->cnt) : 0;
@@ -1031,7 +1067,7 @@ final class PhotoAlbumsController
             WHERE `merchant_id` = '" . $merchantId . "'
               AND `status` != 'deleted'
               AND (
-                  (`profile_checked` != '0000-00-00 00:00:00' AND `released` = '1')
+                  `status` = 'active'
                   OR `id` = '" . abs((int)$includeActorId) . "'
               )
             ORDER BY `username` ASC;", __FILE__, __LINE__);
@@ -1054,6 +1090,9 @@ final class PhotoAlbumsController
         if ($token === '') {
             $token = (string)$this->request->post('_csrf', '');
         }
+        if ($token === '') {
+            $token = (string)$this->request->post('csrf_token', '');
+        }
         if (!Csrf::validate($token)) {
             Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte laden Sie die Seite neu.', 403);
         }
@@ -1073,6 +1112,8 @@ final class PhotoAlbumsController
         if ($value === '') {
             return '';
         }
-        return html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $decoded = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $decoded = html_entity_decode($decoded, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        return str_replace(["\r\n", "\r"], "\n", $decoded);
     }
 }
