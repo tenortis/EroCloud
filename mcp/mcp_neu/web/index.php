@@ -210,12 +210,9 @@ $basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'
     </nav>
 
     <!-- Sidebar Footer -->
-    <div class="sidebar-footer d-flex align-items-center justify-content-between">
-      <div>
-        <div class="fw-bold" style="color: var(--kkc-text);"><?= htmlspecialchars($projectName, ENT_QUOTES, 'UTF-8') ?> v2.0</div>
-        <div style="font-size: 0.68rem; color: var(--kkc-text-muted);"><?= htmlspecialchars($companyName, ENT_QUOTES, 'UTF-8') ?></div>
-      </div>
-      <span class="badge-kkc badge-kkc-info">PHP 8.4 Ready</span>
+    <div class="sidebar-footer text-center">
+      <div class="fw-semibold" style="color: var(--kkc-text);"><?= htmlspecialchars($projectName, ENT_QUOTES, 'UTF-8') ?> ist ein Service der</div>
+      <div style="font-size: 0.72rem; color: var(--kkc-text-muted);"><?= htmlspecialchars($companyName, ENT_QUOTES, 'UTF-8') ?></div>
     </div>
   </aside>
 

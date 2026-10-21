@@ -111,4 +111,19 @@ mcp_neu/ (später: mcp/)
    * Verifiziert den Login via cURL bei `https://api.pay4coins.com/remote/merchant_login.php`.
    * Ruft bei `'ok'` die Stammdaten von `https://api.pay4coins.com/remote/erocloud_merchant_data.php` ab, legt den Partner in `merchants` an bzw. aktualisiert ihn (AES-verschlüsselt mit `AES_KEY`), setzt die MCP-Session (`$_SESSION['logged_id'] = 'mcp'`, `$_SESSION['logged_in_as'] = 'merchant'`, `$_SESSION['merchant_id']`) und leitet auf `Startseite` weiter.
 3. **Eingeloggter Zustand (`/Startseite` $\rightarrow$ `web/index.php` + `#/startseite`):**
-   * Rendert die App-Shell (Topbar + linke Sidebar mit Darsteller-Profilen, Upload-/Cloud-Menü, API-Key-Modal, FAQ/Support/Impressum) und lädt per JS das Partner-Dashboard (`api.php?route=home/view`).
+   * Rendert die App-Shell (Topbar + linke Sidebar mit Darsteller-Profilen, Upload-/Cloud-Menü, API-Key-Modal, FAQ/Support/Impressum) und lädt per JS das Partner-Dashboard (`api.php?route=startseite`).
+
+---
+
+## 4. 🎨 Verbindliche UI-/UX-Vorgaben (Abgenommener Layout-Stand)
+
+1. **Sidebar-Verhalten (Einklappbare Untermenüs):**
+   * Alle aufklappbaren Menügruppen (`Content hochladen`, `Content in der Cloud`, `Profile`, `Partnerprogramm`) sind beim initialen Laden der Startseite **geschlossen** (`aria-expanded="false"`, ohne `.show`).
+   * Nur wenn gezielt eine Unterseite aufgerufen wird (z. B. `#/movie-upload` oder `#/movies`), öffnet der JS-Router automatisch genau das zugehörige Untermenü und schließt alle übrigen Untermenüs.
+   * Alle Hauptmenüpunkte sind mit `white-space: nowrap` formatiert, sodass Einträge mit Zähler-Badge (`Content in der Cloud`) niemals mehrzeilig umbrechen.
+   * Im Sidebar-Footer steht zentriert der rechtliche Hinweis (*„EroCloud ist ein Service der CIPA MEDIA S.L.“*), ohne technische Versions- oder PHP-Badges.
+2. **Startseite (`#/startseite` Dashboard):**
+   * **Obere KPI-Reihe (4 einheitliche Kennzahlen-Kacheln):** *Filme in der Cloud*, *Fotoalben online*, *Darsteller-Profile* und *Inhalte in Prüfung*.
+   * **Linke Hauptspalte:** *Schnellzugriff-Kachel* (4 Direktwahl-Kacheln) sowie Tabelle *Zuletzt hochgeladene Inhalte*.
+   * **Rechte Spalte:** *Ihre Darsteller-Profile* (Kompaktübersicht mit Status & Direktbearbeitung, **ohne** Amoredea-Werbekachel) sowie *Account-Status & Content-Richtlinien*.
+
