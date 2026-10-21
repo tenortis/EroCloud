@@ -131,7 +131,11 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
   <div class="d-flex align-items-center gap-2">
     <i class="bi bi-exclamation-triangle-fill fs-5"></i>
     <span>
-      Mindestens eines deiner <a href="#/actors" class="fw-bold text-reset">Darsteller-Profile</a> ist aktuell noch nicht aktiviert. Solltest du Fragen zur Freischaltung haben, wende dich bitte an unseren Support.
+      <?php if ($actorsTotal === 1 && !empty($actors)): ?>
+        Dein Darsteller-Profil <a href="#/actor?id=<?= (int)$actors[0]['id'] ?>" class="fw-bold text-reset"><?= View::e($actors[0]['username']) ?></a> ist aktuell noch nicht aktiviert. Solltest du Fragen zur Freischaltung haben, wende dich bitte an unseren Support.
+      <?php else: ?>
+        Mindestens eines deiner <a href="#/actors" class="fw-bold text-reset">Darsteller-Profile</a> ist aktuell noch nicht aktiviert. Solltest du Fragen zur Freischaltung haben, wende dich bitte an unseren Support.
+      <?php endif; ?>
     </span>
   </div>
   <button type="button" class="btn btn-sm btn-outline-kkc" data-bs-toggle="modal" data-bs-target="#modal-support">
@@ -175,14 +179,22 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
   </div>
 
   <div class="col-xl-3 col-md-6">
-    <a href="#/actors" class="text-decoration-none d-block h-100">
+    <?php
+      $actorKpiHref = '#/actors';
+      if ($actorsTotal === 1 && !empty($actors)) {
+          $actorKpiHref = '#/actor?id=' . (int)$actors[0]['id'];
+      } elseif ($actorsTotal === 0) {
+          $actorKpiHref = '#/new-actor';
+      }
+    ?>
+    <a href="<?= View::e($actorKpiHref) ?>" class="text-decoration-none d-block h-100">
       <div class="card-kkc kpi-card h-100 mb-0">
         <div class="kpi-icon-box bg-success bg-opacity-10 text-success">
           <i class="bi bi-people-fill"></i>
         </div>
         <div>
           <div class="kpi-val"><?= (int)$actorsTotal ?></div>
-          <div class="kpi-label">Darsteller-Profile</div>
+          <div class="kpi-label"><?= $actorsTotal === 1 ? 'Darsteller-Profil' : 'Darsteller-Profile' ?></div>
           <small class="<?= $activeActorsCount === $actorsTotal && $actorsTotal > 0 ? 'text-success' : 'text-warning' ?> fw-semibold">
             <i class="bi bi-shield-check me-1"></i><?= (int)$activeActorsCount ?> von <?= (int)$actorsTotal ?> aktiv
           </small>
@@ -217,7 +229,7 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
       <div class="card-kkc-header">
         <div class="card-title">
           <i class="bi bi-lightning-charge-fill ec-text-primary"></i>
-          <span>Schnellzugriff: Content &amp; Profile verwalten</span>
+          <span>Schnellzugriff</span>
         </div>
         <span class="badge-kkc badge-kkc-neutral">Direktwahl</span>
       </div>
@@ -260,31 +272,7 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
               </div>
             </a>
           </div>
-          <?php else: ?>
-          <div class="col-sm-6">
-            <a href="#/actors" class="action-tile text-decoration-none">
-              <div class="action-tile-icon bg-success bg-opacity-10 text-success">
-                <i class="bi bi-people-fill"></i>
-              </div>
-              <div>
-                <div class="fw-bold text-body">Meine Profile verwalten</div>
-                <small class="text-muted">Steckbriefe &amp; Profilbilder bearbeiten</small>
-              </div>
-            </a>
-          </div>
           <?php endif; ?>
-
-          <div class="col-sm-6">
-            <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#modal-api-key" class="action-tile text-decoration-none">
-              <div class="action-tile-icon bg-warning bg-opacity-10 text-warning">
-                <i class="bi bi-key-fill"></i>
-              </div>
-              <div>
-                <div class="fw-bold text-body">Mein API-Key</div>
-                <small class="text-muted">Schlüssel für den Import auf eigene Webseiten</small>
-              </div>
-            </a>
-          </div>
         </div>
       </div>
     </div>
@@ -362,10 +350,187 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
 
   </div>
 
-  <!-- Rechte Spalte: Echte Darsteller-Profile & Richtlinien-Box -->
+  <!-- Rechte Spalte: Darsteller-Profil(e) & Richtlinien-Box -->
   <div class="col-lg-5">
 
-    <!-- Echte Darsteller-Profile im Überblick -->
+    <?php if (empty($actors)): ?>
+    <!-- Leerzustand: Noch kein Darsteller-Profil vorhanden -->
+    <div class="card-kkc">
+      <div class="card-kkc-header">
+        <div class="card-title">
+          <i class="bi bi-person-plus-fill ec-text-primary"></i>
+          <span>Dein Darsteller-Profil</span>
+        </div>
+      </div>
+      <div class="card-kkc-body p-4 text-center text-muted">
+        <i class="bi bi-person-plus fs-2 d-block mb-2 ec-text-primary"></i>
+        Du hast noch kein Darsteller-Profil angelegt. Bitte erstelle zunächst ein Profil, um Filme und Fotoalben hochladen zu können.
+        <div class="mt-3">
+          <a href="#/new-actor" class="btn btn-sm btn-primary-kkc">
+            <i class="bi bi-person-plus-fill me-1"></i> Jetzt Profil anlegen
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <?php elseif ($actorsTotal === 1): ?>
+    <!-- Einzelnes Darsteller-Profil: Direkte Profil-Card (keine Liste/Tabelle) -->
+    <?php
+      $singleActor    = $actors[0];
+      $singleActorId  = (int)$singleActor['id'];
+      $singleEditHref = '#/actor?id=' . $singleActorId;
+      $singleAvatar   = $singleActor['avatar_fsk16'] !== ''
+          ? $mcpUrl . '/ProfilePicture/' . rawurlencode($singleActor['avatar_fsk16'])
+          : '';
+      $singleInitials = mb_strtoupper(mb_substr($singleActor['username'], 0, 2));
+
+      if ($singleActor['status'] === 'active') {
+          $sBadge = 'badge-kkc-success';
+          $sLabel = 'Aktiv';
+          $sIcon  = 'bi-check-circle-fill';
+      } elseif ($singleActor['status'] === 'locked' || $singleActor['status'] === 'blocked') {
+          $sBadge = 'badge-kkc-danger';
+          $sLabel = 'Gesperrt';
+          $sIcon  = 'bi-exclamation-octagon-fill';
+      } else {
+          $sBadge = 'badge-kkc-warning';
+          $sLabel = 'Wird geprüft';
+          $sIcon  = 'bi-hourglass-split';
+      }
+    ?>
+    <div class="card-kkc">
+      <div class="card-kkc-header">
+        <div class="card-title">
+          <i class="bi bi-person-badge-fill ec-text-primary"></i>
+          <span>Dein Darsteller-Profil</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge-kkc <?= $sBadge ?>">
+            <i class="bi <?= $sIcon ?>"></i> <?= $sLabel ?>
+          </span>
+          <?php if ($canCreateActor): ?>
+          <a href="#/new-actor" class="btn btn-sm btn-outline-kkc py-1" style="font-size: 0.78rem;" title="Weiteres Profil anlegen">
+            <i class="bi bi-plus-lg"></i>
+          </a>
+          <?php endif; ?>
+        </div>
+      </div>
+      <div class="card-kkc-body">
+        <?php if (($singleActor['status'] === 'locked' || $singleActor['status'] === 'blocked') && ($singleActor['locked_reason'] ?? '') !== ''): ?>
+        <div class="alert alert-danger py-2 px-3 small mb-3">
+          <div class="fw-bold"><i class="bi bi-exclamation-triangle-fill me-1"></i>Grund der Sperrung:</div>
+          <div><?= View::e($singleActor['locked_reason']) ?></div>
+        </div>
+        <?php endif; ?>
+
+        <!-- Profilbild & Haupt-Infos -->
+        <div class="d-flex align-items-center gap-3 mb-3 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
+          <a href="<?= View::e($singleEditHref) ?>" class="text-decoration-none flex-shrink-0">
+            <?php if ($singleAvatar !== ''): ?>
+            <img src="<?= View::e($singleAvatar) ?>"
+                 alt="<?= View::e($singleActor['username']) ?>"
+                 class="rounded-3 object-fit-cover border shadow-sm"
+                 style="width: 84px; height: 84px;">
+            <?php else: ?>
+            <div class="rounded-3 ec-bg-primary-subtle ec-text-primary fw-bold d-flex align-items-center justify-content-center border"
+                 style="width: 84px; height: 84px; font-size: 1.5rem;">
+              <?= View::e($singleInitials) ?>
+            </div>
+            <?php endif; ?>
+          </a>
+
+          <div class="flex-grow-1 min-w-0">
+            <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+              <a href="<?= View::e($singleEditHref) ?>" class="h5 fw-bold text-body text-decoration-none mb-0 text-truncate">
+                <?= View::e($singleActor['username']) ?>
+              </a>
+              <span class="font-monospace text-muted small">#<?= $singleActorId ?></span>
+            </div>
+
+            <div class="text-muted small mb-2">
+              <i class="bi bi-film ec-text-primary me-1"></i><strong><?= (int)$singleActor['movies_count'] ?></strong> Filme
+              <span class="mx-1">·</span>
+              <i class="bi bi-images ec-text-primary me-1"></i><strong><?= (int)$singleActor['albums_count'] ?></strong> Fotoalben
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 small">
+              <?php if ($singleActor['avatar_fsk16'] !== ''): ?>
+              <span class="badge bg-success bg-opacity-10 text-success border border-success-subtle fw-normal">
+                <i class="bi bi-check-circle-fill me-1"></i>FSK16-Bild
+              </span>
+              <?php else: ?>
+              <span class="badge bg-warning bg-opacity-10 text-warning border border-warning-subtle fw-normal">
+                <i class="bi bi-exclamation-circle-fill me-1"></i>FSK16-Bild fehlt
+              </span>
+              <?php endif; ?>
+
+              <?php if (($singleActor['avatar_fsk18'] ?? '') !== ''): ?>
+              <span class="badge bg-success bg-opacity-10 text-success border border-success-subtle fw-normal">
+                <i class="bi bi-check-circle-fill me-1"></i>FSK18-Bild
+              </span>
+              <?php else: ?>
+              <span class="badge bg-warning bg-opacity-10 text-warning border border-warning-subtle fw-normal">
+                <i class="bi bi-exclamation-circle-fill me-1"></i>FSK18-Bild fehlt
+              </span>
+              <?php endif; ?>
+            </div>
+          </div>
+        </div>
+
+        <!-- Steckbrief-Merkmale -->
+        <div class="d-flex flex-wrap gap-1 mb-3">
+          <?php if (!empty($singleActor['gender_label'])): ?>
+          <span class="badge bg-secondary bg-opacity-10 text-body border fw-normal">
+            <?= View::e($singleActor['gender_label']) ?>
+          </span>
+          <?php endif; ?>
+          <?php if (!empty($singleActor['age'])): ?>
+          <span class="badge bg-secondary bg-opacity-10 text-body border fw-normal">
+            <?= (int)$singleActor['age'] ?> Jahre
+          </span>
+          <?php endif; ?>
+          <?php if (!empty($singleActor['body_height'])): ?>
+          <span class="badge bg-secondary bg-opacity-10 text-body border fw-normal">
+            <?= (int)$singleActor['body_height'] ?> cm
+          </span>
+          <?php endif; ?>
+          <?php if (!empty($singleActor['body_weight'])): ?>
+          <span class="badge bg-secondary bg-opacity-10 text-body border fw-normal">
+            <?= (int)$singleActor['body_weight'] ?> kg
+          </span>
+          <?php endif; ?>
+          <?php if (!empty($singleActor['hair_color'])): ?>
+          <span class="badge bg-secondary bg-opacity-10 text-body border fw-normal">
+            Haare: <?= View::e($singleActor['hair_color']) ?>
+          </span>
+          <?php endif; ?>
+          <?php if (!empty($singleActor['eye_color'])): ?>
+          <span class="badge bg-secondary bg-opacity-10 text-body border fw-normal">
+            Augen: <?= View::e($singleActor['eye_color']) ?>
+          </span>
+          <?php endif; ?>
+          <?php if (!empty($singleActor['cup_size'])): ?>
+          <span class="badge bg-secondary bg-opacity-10 text-body border fw-normal">
+            BH: <?= View::e($singleActor['cup_size']) ?>
+          </span>
+          <?php endif; ?>
+          <?php if (!empty($singleActor['star_sign'])): ?>
+          <span class="badge bg-secondary bg-opacity-10 text-body border fw-normal">
+            <?= View::e($singleActor['star_sign']) ?>
+          </span>
+          <?php endif; ?>
+        </div>
+
+        <!-- Direkt-Button zum Profil bearbeiten -->
+        <a href="<?= View::e($singleEditHref) ?>" class="btn btn-sm btn-primary-kkc w-100 d-flex align-items-center justify-content-center gap-2">
+          <i class="bi bi-pencil-square"></i>
+          <span>Profil &amp; Steckbrief bearbeiten</span>
+        </a>
+      </div>
+    </div>
+
+    <?php else: ?>
+    <!-- Mehrere Darsteller-Profile im Überblick -->
     <div class="card-kkc">
       <div class="card-kkc-header">
         <div class="card-title">
@@ -379,17 +544,6 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
         <?php endif; ?>
       </div>
       <div class="card-kkc-body p-0">
-        <?php if (empty($actors)): ?>
-        <div class="p-4 text-center text-muted">
-          <i class="bi bi-person-plus fs-2 d-block mb-2 ec-text-primary"></i>
-          Du hast noch kein Darsteller-Profil angelegt. Bitte erstelle zunächst ein Profil, um Filme und Fotoalben hochladen zu können.
-          <div class="mt-3">
-            <a href="#/new-actor" class="btn btn-sm btn-primary-kkc">
-              <i class="bi bi-person-plus-fill me-1"></i> Jetzt Profil anlegen
-            </a>
-          </div>
-        </div>
-        <?php else: ?>
         <div class="table-responsive">
           <table class="kkc-table">
             <thead>
@@ -443,9 +597,9 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
             </tbody>
           </table>
         </div>
-        <?php endif; ?>
       </div>
     </div>
+    <?php endif; ?>
 
     <!-- Account-Status & Content-Richtlinien Kachel -->
     <div class="card-kkc mb-0">

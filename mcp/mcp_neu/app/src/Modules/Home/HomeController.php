@@ -60,7 +60,7 @@ class HomeController
             't' => 'Transgender',
         ];
 
-        $rsActors = p4c_query("SELECT `id`, `username`, `status`, `locked_reason`, `profile_image_fsk16`, `profile_image_fsk18`,
+        $rsActors = p4c_query("SELECT `id`, `username`, `status`, `profile_image_fsk16`, `profile_image_fsk18`,
                 `gender`, `age`, `star_sign`, `body_height`, `body_weight`, `hair_color`, `eye_color`, `cup_size`, `sexual_orientation`, `marital_status`
             FROM `actors`
             WHERE `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted'
