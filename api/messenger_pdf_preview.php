@@ -7,8 +7,8 @@ $session_write_close = true;
 include_once("../config.inc.php");
 include_once(API_DIR."/common.inc.php");
 
-$actor_id = abs($_GET['actor_id']);
-$merchant_id = abs($_GET['merchant_id']);
+$actor_id = abs((int)$_GET['actor_id']);
+$merchant_id = abs((int)$_GET['merchant_id']);
 $file_name = preg_replace( '/[^a-z0-9.]/i', '', $_GET['filename']);
 
 $file_path = PROFILE_IMAGE_PATH.'/'.MERCHANT_DEFAULT_DIR.'/'.$merchant_id.'/messenger/'.$actor_id.'/'.$file_name;

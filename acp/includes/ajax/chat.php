@@ -51,7 +51,7 @@ if (p4c_num_rows($rs_chats) > 0) {
             $actor_id = $chat_obj->von_id;
             $user_id =  $chat_obj->an_id;
             
-            $rs_actor = p4c_query("SELECT * FROM `actors` WHERE `id`='".abs($actor_id)."' LIMIT 1;",__FILE__,__LINE__);
+            $rs_actor = p4c_query("SELECT * FROM `actors` WHERE `id`='".abs((int)$actor_id)."' LIMIT 1;",__FILE__,__LINE__);
             $user_obj = p4c_fetch_object($rs_actor);
             
             $username = '<span style="color:#cd0a0a">'.$user_obj->username.'</span>';
@@ -60,7 +60,7 @@ if (p4c_num_rows($rs_chats) > 0) {
             $actor_id = $chat_obj->an_id;
             $user_id =  $chat_obj->von_id;
             
-            $rs_users = p4c_query("SELECT * FROM `members` WHERE `id`='".abs($user_id)."' LIMIT 1;",__FILE__,__LINE__);
+            $rs_users = p4c_query("SELECT * FROM `members` WHERE `id`='".abs((int)$user_id)."' LIMIT 1;",__FILE__,__LINE__);
             $user_obj = p4c_fetch_object($rs_users);
             
             $username = '<span style="color:#3399ff">'.$user_obj->username.'</span>';

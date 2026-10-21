@@ -53,12 +53,12 @@ function data_mapping($id=0) {
         exit;
     }
     
-    $rs_check_actor_reassign = p4c_query("SELECT * FROM `actor_reassign` WHERE `data_mapping_completed`!='0000-00-00 00:00:00' AND `files_mapping_completed`='0000-00-00 00:00:00' AND `id`='".abs($id)."' ORDER BY `id` ASC LIMIT 1;",__FILE__,__LINE__);
+    $rs_check_actor_reassign = p4c_query("SELECT * FROM `actor_reassign` WHERE `data_mapping_completed`!='0000-00-00 00:00:00' AND `files_mapping_completed`='0000-00-00 00:00:00' AND `id`='".abs((int)$id)."' ORDER BY `id` ASC LIMIT 1;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_check_actor_reassign) == 1) {
         $actor_reassign_obj = p4c_fetch_object($rs_check_actor_reassign);
         
         if ($actor_reassign_obj->files_mapping_started == '0000-00-00 00:00:00') {
-            p4c_query("UPDATE `actor_reassign` SET `files_mapping_started`='".date("Y-m-d H:i:s")."' WHERE  `id`='".abs($actor_reassign_obj->id)."' LIMIT 1;",__FILE__,__LINE__);
+            p4c_query("UPDATE `actor_reassign` SET `files_mapping_started`='".date("Y-m-d H:i:s")."' WHERE  `id`='".abs((int)$actor_reassign_obj->id)."' LIMIT 1;",__FILE__,__LINE__);
         }
 
         $new_merchant_id = $actor_reassign_obj->new_merchant_id;
@@ -80,7 +80,7 @@ function data_mapping($id=0) {
         } 
 
         // Dateien kopieren / verschieben
-        $rs_get_actor_reassign_files = p4c_query("SELECT * FROM `actor_reassign_files` WHERE `actor_id`='".abs($actor_id)."' AND `old_merchant_id`='".abs($old_merchant_id)."';",__FILE__,__LINE__);
+        $rs_get_actor_reassign_files = p4c_query("SELECT * FROM `actor_reassign_files` WHERE `actor_id`='".abs((int)$actor_id)."' AND `old_merchant_id`='".abs((int)$old_merchant_id)."';",__FILE__,__LINE__);
         if (p4c_num_rows($rs_get_actor_reassign_files) > 0) {
             while($reassing_file_obj = p4c_fetch_object($rs_get_actor_reassign_files)) {
                 if ($reassing_file_obj->type == 'movie') {
@@ -97,8 +97,8 @@ function data_mapping($id=0) {
                         if (delete_directory($old_path) === true) {
 
                             // Dateien in DB neuem Merchant zuordnen
-                            p4c_query("UPDATE `movies`          SET `merchant_id`='".abs($new_merchant_id)."' WHERE `merchant_id`='".abs($old_merchant_id)."' AND `actor_id`='".abs($actor_id)."' AND `filename`='". p4c_escape_string($reassing_file_obj->filename)."' LIMIT 1;",__FILE__,__LINE__);
-                            p4c_query("UPDATE `movies_online`   SET `merchant_id`='".abs($new_merchant_id)."' WHERE `merchant_id`='".abs($old_merchant_id)."' AND `actor_id`='".abs($actor_id)."' AND `filename`='". p4c_escape_string($reassing_file_obj->filename)."' LIMIT 1;",__FILE__,__LINE__);
+                            p4c_query("UPDATE `movies`          SET `merchant_id`='".abs((int)$new_merchant_id)."' WHERE `merchant_id`='".abs((int)$old_merchant_id)."' AND `actor_id`='".abs((int)$actor_id)."' AND `filename`='". p4c_escape_string($reassing_file_obj->filename)."' LIMIT 1;",__FILE__,__LINE__);
+                            p4c_query("UPDATE `movies_online`   SET `merchant_id`='".abs((int)$new_merchant_id)."' WHERE `merchant_id`='".abs((int)$old_merchant_id)."' AND `actor_id`='".abs((int)$actor_id)."' AND `filename`='". p4c_escape_string($reassing_file_obj->filename)."' LIMIT 1;",__FILE__,__LINE__);
                         }
                     }
 
@@ -114,13 +114,13 @@ function data_mapping($id=0) {
                     if (delete_directory($old_path) === true) {
 
                         // Dateien in DB neuem Merchant zuordnen
-                        p4c_query("UPDATE `photo_albums`        SET `merchant_id`='".abs($new_merchant_id)."' WHERE `merchant_id`='".abs($old_merchant_id)."' AND `actor_id`='".abs($actor_id)."' AND `album_id`='". p4c_escape_string($reassing_file_obj->filename)."' LIMIT 1;",__FILE__,__LINE__);
-                        p4c_query("UPDATE `photo_albums_online` SET `merchant_id`='".abs($new_merchant_id)."' WHERE `merchant_id`='".abs($old_merchant_id)."' AND `actor_id`='".abs($actor_id)."' AND `album_id`='". p4c_escape_string($reassing_file_obj->filename)."' LIMIT 1;",__FILE__,__LINE__);
-                        p4c_query("UPDATE `photo_albums_photos` SET `merchant_id`='".abs($new_merchant_id)."' WHERE `merchant_id`='".abs($old_merchant_id)."' AND `album_id`='". p4c_escape_string($reassing_file_obj->filename)."';",__FILE__,__LINE__);
+                        p4c_query("UPDATE `photo_albums`        SET `merchant_id`='".abs((int)$new_merchant_id)."' WHERE `merchant_id`='".abs((int)$old_merchant_id)."' AND `actor_id`='".abs((int)$actor_id)."' AND `album_id`='". p4c_escape_string($reassing_file_obj->filename)."' LIMIT 1;",__FILE__,__LINE__);
+                        p4c_query("UPDATE `photo_albums_online` SET `merchant_id`='".abs((int)$new_merchant_id)."' WHERE `merchant_id`='".abs((int)$old_merchant_id)."' AND `actor_id`='".abs((int)$actor_id)."' AND `album_id`='". p4c_escape_string($reassing_file_obj->filename)."' LIMIT 1;",__FILE__,__LINE__);
+                        p4c_query("UPDATE `photo_albums_photos` SET `merchant_id`='".abs((int)$new_merchant_id)."' WHERE `merchant_id`='".abs((int)$old_merchant_id)."' AND `album_id`='". p4c_escape_string($reassing_file_obj->filename)."';",__FILE__,__LINE__);
                     }
                 }
                 
-                p4c_query("DELETE FROM `actor_reassign_files` WHERE `id`='".abs($reassing_file_obj->id)."' LIMIT 1;",__FILE__,__LINE__);                
+                p4c_query("DELETE FROM `actor_reassign_files` WHERE `id`='".abs((int)$reassing_file_obj->id)."' LIMIT 1;",__FILE__,__LINE__);                
 
             }            
         }
@@ -137,7 +137,7 @@ function data_mapping($id=0) {
         delete_directory($old_img_path);
 
         
-        p4c_query("UPDATE `actor_reassign` SET `files_mapping_completed`='".date("Y-m-d H:i:s")."' WHERE `id`='".abs($actor_reassign_obj->id)."' LIMIT 1;",__FILE__,__LINE__);
+        p4c_query("UPDATE `actor_reassign` SET `files_mapping_completed`='".date("Y-m-d H:i:s")."' WHERE `id`='".abs((int)$actor_reassign_obj->id)."' LIMIT 1;",__FILE__,__LINE__);
     }
 }
 
@@ -152,63 +152,63 @@ if (p4c_num_rows($rs_check_actor_reassign) == 1) {
     $old_merchant_id = $actor_reassign_obj->old_merchant_id;
     $actor_id = $actor_reassign_obj->actor_id;
     
-    p4c_query("UPDATE `actor_reassign` SET `data_mapping_started`='".date("Y-m-d H:i:s")."' WHERE `id`='".abs($actor_reassign_obj->id)."' LIMIT 1;",__FILE__,__LINE__);    
+    p4c_query("UPDATE `actor_reassign` SET `data_mapping_started`='".date("Y-m-d H:i:s")."' WHERE `id`='".abs((int)$actor_reassign_obj->id)."' LIMIT 1;",__FILE__,__LINE__);    
     
     // Darsteller in DB neuem Merchant zuordnen
-    p4c_query("UPDATE `actors`                  SET `merchant_id`='".abs($new_merchant_id)."' WHERE `merchant_id`='".abs($old_merchant_id)."' AND `id`='".abs($actor_id)."';",__FILE__,__LINE__);
-    p4c_query("UPDATE `actor_cams`              SET `merchant_id`='".abs($new_merchant_id)."' WHERE `merchant_id`='".abs($old_merchant_id)."' AND `actor_id`='".abs($actor_id)."';",__FILE__,__LINE__);
-    p4c_query("UPDATE `actor_member_info`       SET `merchant_id`='".abs($new_merchant_id)."' WHERE `merchant_id`='".abs($old_merchant_id)."' AND `actor_id`='".abs($actor_id)."';",__FILE__,__LINE__);
-    p4c_query("UPDATE `chat_messages`           SET `merchant_id`='".abs($new_merchant_id)."' WHERE (`von`='actor' AND `von_id`='".abs($actor_id)."') AND `merchant_id`='".abs($old_merchant_id)."';",__FILE__,__LINE__);
-    p4c_query("UPDATE `chat_messages`           SET `merchant_id`='".abs($new_merchant_id)."' WHERE (`von`='member' AND `an_id`='".abs($actor_id)."') AND `merchant_id`='".abs($old_merchant_id)."';",__FILE__,__LINE__);
-    p4c_query("UPDATE `chat_messages_history`   SET `merchant_id`='".abs($new_merchant_id)."' WHERE (`von`='actor' AND `von_id`='".abs($actor_id)."') AND `merchant_id`='".abs($old_merchant_id)."';",__FILE__,__LINE__);
-    p4c_query("UPDATE `chat_messages_history`   SET `merchant_id`='".abs($new_merchant_id)."' WHERE (`von`='member' AND `an_id`='".abs($actor_id)."') AND `merchant_id`='".abs($old_merchant_id)."';",__FILE__,__LINE__);
-    p4c_query("UPDATE `group_actors`            SET `merchant_id`='".abs($new_merchant_id)."' WHERE `merchant_id`='".abs($old_merchant_id)."' AND `actor_id`='".abs($actor_id)."';",__FILE__,__LINE__);
-    p4c_query("UPDATE `messenger_sync`          SET `merchant_id`='".abs($new_merchant_id)."' WHERE `merchant_id`='".abs($old_merchant_id)."' AND `actor_id`='".abs($actor_id)."';",__FILE__,__LINE__);
-    p4c_query("UPDATE `revenue_webcam`          SET `merchant_id`='".abs($new_merchant_id)."' WHERE `merchant_id`='".abs($old_merchant_id)."' AND `actor_id`='".abs($actor_id)."';",__FILE__,__LINE__);
+    p4c_query("UPDATE `actors`                  SET `merchant_id`='".abs((int)$new_merchant_id)."' WHERE `merchant_id`='".abs((int)$old_merchant_id)."' AND `id`='".abs((int)$actor_id)."';",__FILE__,__LINE__);
+    p4c_query("UPDATE `actor_cams`              SET `merchant_id`='".abs((int)$new_merchant_id)."' WHERE `merchant_id`='".abs((int)$old_merchant_id)."' AND `actor_id`='".abs((int)$actor_id)."';",__FILE__,__LINE__);
+    p4c_query("UPDATE `actor_member_info`       SET `merchant_id`='".abs((int)$new_merchant_id)."' WHERE `merchant_id`='".abs((int)$old_merchant_id)."' AND `actor_id`='".abs((int)$actor_id)."';",__FILE__,__LINE__);
+    p4c_query("UPDATE `chat_messages`           SET `merchant_id`='".abs((int)$new_merchant_id)."' WHERE (`von`='actor' AND `von_id`='".abs((int)$actor_id)."') AND `merchant_id`='".abs((int)$old_merchant_id)."';",__FILE__,__LINE__);
+    p4c_query("UPDATE `chat_messages`           SET `merchant_id`='".abs((int)$new_merchant_id)."' WHERE (`von`='member' AND `an_id`='".abs((int)$actor_id)."') AND `merchant_id`='".abs((int)$old_merchant_id)."';",__FILE__,__LINE__);
+    p4c_query("UPDATE `chat_messages_history`   SET `merchant_id`='".abs((int)$new_merchant_id)."' WHERE (`von`='actor' AND `von_id`='".abs((int)$actor_id)."') AND `merchant_id`='".abs((int)$old_merchant_id)."';",__FILE__,__LINE__);
+    p4c_query("UPDATE `chat_messages_history`   SET `merchant_id`='".abs((int)$new_merchant_id)."' WHERE (`von`='member' AND `an_id`='".abs((int)$actor_id)."') AND `merchant_id`='".abs((int)$old_merchant_id)."';",__FILE__,__LINE__);
+    p4c_query("UPDATE `group_actors`            SET `merchant_id`='".abs((int)$new_merchant_id)."' WHERE `merchant_id`='".abs((int)$old_merchant_id)."' AND `actor_id`='".abs((int)$actor_id)."';",__FILE__,__LINE__);
+    p4c_query("UPDATE `messenger_sync`          SET `merchant_id`='".abs((int)$new_merchant_id)."' WHERE `merchant_id`='".abs((int)$old_merchant_id)."' AND `actor_id`='".abs((int)$actor_id)."';",__FILE__,__LINE__);
+    p4c_query("UPDATE `revenue_webcam`          SET `merchant_id`='".abs((int)$new_merchant_id)."' WHERE `merchant_id`='".abs((int)$old_merchant_id)."' AND `actor_id`='".abs((int)$actor_id)."';",__FILE__,__LINE__);
    
     $rs_group = p4c_query("SELECT `id` FROM `groups` ORDER BY `groups`.`id` ASC LIMIT 1;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_group) == 1) {
         $group_id = p4c_result($rs_group,0);
-        p4c_query("UPDATE `group_actors` SET `group_id`='".abs($group_id)."' WHERE `merchant_id`='".abs($old_merchant_id)."' AND `actor_id`='".abs($actor_id)."';",__FILE__,__LINE__);
+        p4c_query("UPDATE `group_actors` SET `group_id`='".abs((int)$group_id)."' WHERE `merchant_id`='".abs((int)$old_merchant_id)."' AND `actor_id`='".abs((int)$actor_id)."';",__FILE__,__LINE__);
     }    
     
     // zu kopierende Filme tämporär in DB speichern speichern
-    $rs_movies = p4c_query("SELECT * FROM `movies` WHERE `merchant_id`='".abs($old_merchant_id)."' AND `actor_id`='".abs($actor_id)."';",__FILE__,__LINE__);
+    $rs_movies = p4c_query("SELECT * FROM `movies` WHERE `merchant_id`='".abs((int)$old_merchant_id)."' AND `actor_id`='".abs((int)$actor_id)."';",__FILE__,__LINE__);
     if (p4c_num_rows($rs_movies) > 0) {
         while($movie_obj = p4c_fetch_object($rs_movies)) {
-            $rs_actor_reassign_files = p4c_query("SELECT * FROM `actor_reassign_files` WHERE `file_id`='".abs($movie_obj->id)."' AND `type`='movie' LIMIT 1;",__FILE__,__LINE__);
+            $rs_actor_reassign_files = p4c_query("SELECT * FROM `actor_reassign_files` WHERE `file_id`='".abs((int)$movie_obj->id)."' AND `type`='movie' LIMIT 1;",__FILE__,__LINE__);
             if (p4c_num_rows($rs_actor_reassign_files) == 0) {
                 p4c_query("INSERT INTO `actor_reassign_files` SET
-                    `file_id`='".abs($movie_obj->id)."',
+                    `file_id`='".abs((int)$movie_obj->id)."',
                     `filename`='".p4c_escape_string($movie_obj->filename)."',
                     `type`='movie',
-                    `actor_id`='".abs($movie_obj->actor_id)."',
-                    `old_merchant_id`='".abs($movie_obj->merchant_id)."',
-                    `new_merchant_id`='".abs($new_merchant_id)."'
+                    `actor_id`='".abs((int)$movie_obj->actor_id)."',
+                    `old_merchant_id`='".abs((int)$movie_obj->merchant_id)."',
+                    `new_merchant_id`='".abs((int)$new_merchant_id)."'
                 ",__FILE__,__LINE__);
             }
         }
     }
     
     // zu kopierende Fotoalben tämporär in DB speichern speichern
-    $rs_photo_albums = p4c_query("SELECT * FROM `photo_albums` WHERE `merchant_id`='".abs($old_merchant_id)."' AND `actor_id`='".abs($actor_id)."';",__FILE__,__LINE__);
+    $rs_photo_albums = p4c_query("SELECT * FROM `photo_albums` WHERE `merchant_id`='".abs((int)$old_merchant_id)."' AND `actor_id`='".abs((int)$actor_id)."';",__FILE__,__LINE__);
     if (p4c_num_rows($rs_photo_albums) > 0) {
         while($album_obj = p4c_fetch_object($rs_photo_albums)) {
-            $rs_actor_reassign_files = p4c_query("SELECT * FROM `actor_reassign_files` WHERE `file_id`='".abs($album_obj->id)."' AND `type`='photo_album' LIMIT 1;",__FILE__,__LINE__);
+            $rs_actor_reassign_files = p4c_query("SELECT * FROM `actor_reassign_files` WHERE `file_id`='".abs((int)$album_obj->id)."' AND `type`='photo_album' LIMIT 1;",__FILE__,__LINE__);
             if (p4c_num_rows($rs_actor_reassign_files) == 0) {
                 p4c_query("INSERT INTO `actor_reassign_files` SET
-                    `file_id`='".abs($album_obj->id)."',
+                    `file_id`='".abs((int)$album_obj->id)."',
                     `filename`='". p4c_escape_string($album_obj->album_id)."',
                     `type`='photo_album',
-                    `actor_id`='".abs($album_obj->actor_id)."',
-                    `old_merchant_id`='".abs($album_obj->merchant_id)."',
-                    `new_merchant_id`='".abs($new_merchant_id)."'
+                    `actor_id`='".abs((int)$album_obj->actor_id)."',
+                    `old_merchant_id`='".abs((int)$album_obj->merchant_id)."',
+                    `new_merchant_id`='".abs((int)$new_merchant_id)."'
                 ",__FILE__,__LINE__);
             }
         }
     }
 
-    p4c_query("UPDATE `actor_reassign` SET `data_mapping_completed`='".date("Y-m-d H:i:s")."' WHERE `id`='".abs($actor_reassign_obj->id)."' LIMIT 1;",__FILE__,__LINE__);
+    p4c_query("UPDATE `actor_reassign` SET `data_mapping_completed`='".date("Y-m-d H:i:s")."' WHERE `id`='".abs((int)$actor_reassign_obj->id)."' LIMIT 1;",__FILE__,__LINE__);
 
     data_mapping($actor_reassign_obj->id);
 }

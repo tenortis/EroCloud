@@ -16,7 +16,7 @@ if (is_logged_in('mcp') === false) {
     exit;
 }
 
-$merchant_id = abs($_SESSION['merchant_id']);
+$merchant_id = abs((int)$_SESSION['merchant_id']);
 
 $site = '';
 
@@ -36,10 +36,10 @@ if (isset($_POST['chat_id']) AND isset($_POST['send_reply'])) {
         exit;
     }
     
-    $actor_id = abs($explode[0]);
-    $member_id = abs($explode[1]);
+    $actor_id = abs((int)$explode[0]);
+    $member_id = abs((int)$explode[1]);
     
-    $rs_actor = p4c_query("SELECT * FROM `actors` WHERE `id`='".abs($actor_id)."' AND `merchant_id`='".abs($merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_actor = p4c_query("SELECT * FROM `actors` WHERE `id`='".abs((int)$actor_id)."' AND `merchant_id`='".abs((int)$merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
 
     if (!empty($message) AND p4c_num_rows($rs_actor) === 1) {
         $actor_obj = p4c_fetch_object($rs_actor);
@@ -113,7 +113,7 @@ if (isset($_POST['chat_id']) AND isset($_POST['member_id'])) {
     // Prüfen ob actor_id zum Merchant gehört.
     // Wenn nicht wurde die Übertragung der chat_id manipuliert.
     // Dann hier abbrechen.
-    $rs_actor = p4c_query("SELECT * FROM `actors` WHERE `id`='".abs($actor_id)."' AND `merchant_id`='".abs($merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_actor = p4c_query("SELECT * FROM `actors` WHERE `id`='".abs((int)$actor_id)."' AND `merchant_id`='".abs((int)$merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_actor) == 0) {
         exit;
     }
@@ -121,7 +121,7 @@ if (isset($_POST['chat_id']) AND isset($_POST['member_id'])) {
     $actor_obj = p4c_fetch_object($rs_actor);
     
     $rs_chats = p4c_query("SELECT * FROM `amoredea_messages` WHERE
-        `chat_id` = '".p4c_escape_string($chat_id)."' AND `merchant_id`='".abs($actor_obj->merchant_id)."' ORDER BY `datetime` ASC LIMIT 40;",__FILE__,__LINE__);
+        `chat_id` = '".p4c_escape_string($chat_id)."' AND `merchant_id`='".abs((int)$actor_obj->merchant_id)."' ORDER BY `datetime` ASC LIMIT 40;",__FILE__,__LINE__);
 
     $chat = '';
     $send_jason = array();
@@ -189,7 +189,7 @@ if (isset($_POST['chat_id']) AND isset($_POST['member_id'])) {
                     $mess_from   = $chat_obj->von;
                     $mess_time   = date("H:i", strtotime($chat_obj->datetime));
                     $mess_timestamp = $chat_obj->datetime;
-                    $status      = abs($chat_obj->gelesen);
+                    $status      = abs((int)$chat_obj->gelesen);
 
                     if ($mess_from === 'member') {
                         $from_class = 'history_member';
@@ -237,7 +237,7 @@ if (isset($_POST['chat_id']) AND isset($_POST['member_id'])) {
     
     $username = '<i>unbekannt</i>';
     
-    $rs_member = p4c_query("SELECT *, AES_DECRYPT(`username`, '".AMOREDEA_AES_KEY."') AS `username` FROM `members` WHERE `id`='".abs($member_id)."' AND `actor_id`='".$actor_id."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_member = p4c_query("SELECT *, AES_DECRYPT(`username`, '".AMOREDEA_AES_KEY."') AS `username` FROM `members` WHERE `id`='".abs((int)$member_id)."' AND `actor_id`='".$actor_id."' LIMIT 1;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_member) == 1) {
         $member_obj = p4c_fetch_object($rs_member);
         

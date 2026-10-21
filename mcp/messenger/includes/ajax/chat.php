@@ -22,11 +22,11 @@ if(isset($_POST['remote_member_id'])) {
         $datetime = date("Y-m-d H:i:s", strtotime($_POST['mess_timestamp']));
         
         $rs_chats = p4c_query("SELECT * FROM `chat_messages_history` WHERE
-            `chat_id` = '".p4c_escape_string($chat_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `datetime`<'".$datetime."' ORDER BY `datetime` DESC LIMIT 40;",__FILE__,__LINE__);
+            `chat_id` = '".p4c_escape_string($chat_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND `datetime`<'".$datetime."' ORDER BY `datetime` DESC LIMIT 40;",__FILE__,__LINE__);
         
     } else {        
         $rs_chats = p4c_query("SELECT * FROM `chat_messages` WHERE
-            `chat_id` = '".p4c_escape_string($chat_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' ORDER BY `datetime` ASC LIMIT 40;",__FILE__,__LINE__);
+            `chat_id` = '".p4c_escape_string($chat_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' ORDER BY `datetime` ASC LIMIT 40;",__FILE__,__LINE__);
     }
     
     // Wenn noch keine Nachricht geschrieben wurde
@@ -46,10 +46,10 @@ if(isset($_POST['remote_member_id'])) {
         // Lösche ältere nachrichten aus Chat (im Verlauf `chat_messages_history` bleiben Sie erhalten)
         p4c_query("DELETE FROM `chat_messages` WHERE
             `chat_id` = '".p4c_escape_string($chat_id)."' AND 
-            `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
+            `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
             `id` < (SELECT min(id) FROM (SELECT * FROM `chat_messages` WHERE
                 `chat_id` = '".p4c_escape_string($chat_id)."' AND 
-                `merchant_id`='".abs($_SESSION['merchant_id'])."'
+                `merchant_id`='".abs((int)$_SESSION['merchant_id'])."'
                 ORDER BY `id` DESC LIMIT 40) AS `last_ids`
             ) ORDER BY `id` DESC;",__FILE__,__LINE__);
         

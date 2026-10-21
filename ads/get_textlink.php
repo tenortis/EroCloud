@@ -11,7 +11,7 @@ include_once(API_DIR."/common.inc.php");
 if (isset($_GET['site_id']) AND isset($_GET['wmid'])) {
         
     $pid        = trim(preg_replace ( '/[^a-z0-9.-]/i', '', $_GET['wmid']));
-    $site_id    = abs($_GET['site_id']);
+    $site_id    = abs((int)$_GET['site_id']);
     
     $rs_site = p4c_query("SELECT * FROM `sites` WHERE `id`='".p4c_escape_string($site_id)."' LIMIT 1;",__FILE__,__LINE__);
     
@@ -91,14 +91,14 @@ if (isset($_GET['site_id']) AND isset($_GET['wmid'])) {
     ) ENGINE=MyISAM AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;",__FILE__,__LINE__);
 
     // Wenn Klick noch nicht existiert, logge ihn  
-    $rs_check = p4c_query("SELECT `timestamp` FROM `ads_clicks_".date('Ym')."` WHERE `p4c_partner_id`='".p4c_escape_string($pid)."' AND `site_id`='".abs($site_id)."' AND `referer`='". p4c_escape_string($ref)."' AND `session`='".p4c_escape_string(session_id())."' LIMIT 1",__FILE__,__LINE__);
+    $rs_check = p4c_query("SELECT `timestamp` FROM `ads_clicks_".date('Ym')."` WHERE `p4c_partner_id`='".p4c_escape_string($pid)."' AND `site_id`='".abs((int)$site_id)."' AND `referer`='". p4c_escape_string($ref)."' AND `session`='".p4c_escape_string(session_id())."' LIMIT 1",__FILE__,__LINE__);
     if (p4c_num_rows($rs_check) == 0) {
         p4c_query("INSERT INTO `ads_clicks_".(int)date('Ym')."` SET
             `p4c_partner_id`    = '".p4c_escape_string($pid)."',
             `campaign_id`       = '".p4c_escape_string($cid)."',
             `session`           = '".p4c_escape_string(session_id())."',
             `timestamp`         = '".date("Y-m-d H:i:s")."',
-            `site_id`           = '".abs($site_id)."',
+            `site_id`           = '".abs((int)$site_id)."',
             `url`               = '".p4c_escape_string($host)."',
             `referer`           = '".p4c_escape_string($ref)."'
         ",__FILE__,__LINE__);
@@ -114,7 +114,7 @@ if (isset($_GET['site_id']) AND isset($_GET['wmid'])) {
                 `campaign_id`       = '".p4c_escape_string($cid)."',
                 `session`           = '".p4c_escape_string(session_id())."',
                 `timestamp`         = '".date("Y-m-d H:i:s")."',
-                `site_id`           = '".abs($site_id)."',
+                `site_id`           = '".abs((int)$site_id)."',
                 `url`               = '".p4c_escape_string($host)."',
                 `referer`           = '".p4c_escape_string($ref)."'
             ",__FILE__,__LINE__);

@@ -10,7 +10,7 @@ if (!in_array('all', $_SESSION['employee_access_area']) AND !in_array('user', $_
 }
 
 
-$member_id = abs($_GET['id']);
+$member_id = abs((int)$_GET['id']);
 
 include(SOURCEDIR.'/includes/klassen/member.inc.php');
 $member = new Member($member_id, false);
@@ -29,10 +29,10 @@ $m['online_device'] = $member->online_device();
 $m['p4c_shop_id']   = $member->p4c_shop_id();
 $m['amount_coins']   = $member->amount_coins();
 
-$rs_count_messages = p4c_query("SELECT COUNT(*) FROM `chat_messages_history` WHERE `von`='member' AND `von_id`='".abs($member_id)."'", __FILE__,__LINE__);
+$rs_count_messages = p4c_query("SELECT COUNT(*) FROM `chat_messages_history` WHERE `von`='member' AND `von_id`='".abs((int)$member_id)."'", __FILE__,__LINE__);
 $count_messanges = p4c_num_rows($rs_count_messages);
 
-$rs_count_chats = p4c_query("SELECT COUNT(*) FROM `chat_messages_history` WHERE (`von`='member' AND `von_id`='".abs($member_id)."') OR (`von`='actor' AND `an_id`='".abs($member_id)."') GROUP BY `chat_id`", __FILE__,__LINE__);
+$rs_count_chats = p4c_query("SELECT COUNT(*) FROM `chat_messages_history` WHERE (`von`='member' AND `von_id`='".abs((int)$member_id)."') OR (`von`='actor' AND `an_id`='".abs((int)$member_id)."') GROUP BY `chat_id`", __FILE__,__LINE__);
 $count_chats = p4c_num_rows($rs_count_chats);
 
 // Site-Klasse einbinden 
@@ -149,7 +149,7 @@ $site .= '
                     
                     "bProcessing": true,
                     //"bServerSide": true,
-                    "sAjaxSource": "'.ACP_URL.'/includes/ajax/user_chats.php?member_id='.abs($member_id).'",
+                    "sAjaxSource": "'.ACP_URL.'/includes/ajax/user_chats.php?member_id='.abs((int)$member_id).'",
                     "aoColumns": [
                         {"sClass": "center"},
                         {"sClass": "center"},

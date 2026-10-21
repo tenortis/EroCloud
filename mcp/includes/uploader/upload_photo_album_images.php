@@ -81,7 +81,7 @@ function upload_file($album) {
                     p4c_query("INSERT INTO `photo_albums_photos` SET
                         `file_id` = '". p4c_escape_string($file_id)."',
                         `album_id` = '". p4c_escape_string($album->field('album_id'))."',
-                        `merchant_id` = '". abs($_SESSION['merchant_id'])."',
+                        `merchant_id` = '". abs((int)$_SESSION['merchant_id'])."',
                         `filename` = '". p4c_escape_string($file_name)."',
                         `upload_datetime` = '". date("Y-m-d H:i:s")."'
                     ",__FILE__,__LINE__);
@@ -105,15 +105,15 @@ $fileTypes = array('jpg','jpeg','png'); // File extensions
 if(isset($_FILES["album_images"]) AND isset($_GET['album_id']) AND isset($_GET['fsk'])) {
     $ret = array();
     
-    $album_id = abs($_GET['album_id']); 
-    $fsk = abs($_GET['fsk']); 
+    $album_id = abs((int)$_GET['album_id']); 
+    $fsk = abs((int)$_GET['fsk']); 
     
     // Fotoalbum-Klasse einbinden 
     include_once(SOURCEDIR.'/includes/klassen/PhotoAlbum.inc.php');
     $album = new PhotoAlbum($mysql,$album_id);
 
     if ($album->field("id") == '') {
-        file_error('Dieses Album ('.abs($album_id).') existiert nicht.');
+        file_error('Dieses Album ('.abs((int)$album_id).') existiert nicht.');
     }    
     
     $error = $_FILES["album_images"]["error"];

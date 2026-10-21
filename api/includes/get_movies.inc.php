@@ -36,7 +36,7 @@ if(isset($_GET['actor']) AND $_GET['actor'] == 'me') {
     */
 } else if(isset($_GET['actor_id'])) {
         
-    $actor_id = abs($_GET['actor_id']);        
+    $actor_id = abs((int)$_GET['actor_id']);        
 
     
     /*
@@ -69,7 +69,7 @@ if(isset($_GET['actor']) AND $_GET['actor'] == 'me') {
         ",__FILE__,__LINE__);
         */
         $rs_movies_online = p4c_query("SELECT `checksum`, `file_id`, `actor_id`, `online_at`, `status`, `visible_for_website` FROM `movies_online` WHERE
-            `actor_id`='".abs($actor_id)."' ",__FILE__,__LINE__);
+            `actor_id`='".abs((int)$actor_id)."' ",__FILE__,__LINE__);
 
         $number_of_movies = p4c_num_rows($rs_movies_online);
         if($number_of_movies == 0) {

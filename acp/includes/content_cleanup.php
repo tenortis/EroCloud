@@ -128,7 +128,7 @@ while ($row = p4c_fetch_object($rs_deleted_movies)) {
     // Resolve Actor/Profile name
     $actor_name = '-';
     if ($row->actor_id > 0) {
-        $rs_actor = p4c_query("SELECT `username` FROM `actors` WHERE `id` = '".abs($row->actor_id)."' LIMIT 1;", __FILE__, __LINE__);
+        $rs_actor = p4c_query("SELECT `username` FROM `actors` WHERE `id` = '".abs((int)$row->actor_id)."' LIMIT 1;", __FILE__, __LINE__);
         if (p4c_num_rows($rs_actor) > 0) {
             $actor_name = '<a href="'.ACP_URL.'/Actor/'.$row->actor_id.'" target="_blank">'.htmlspecialchars(p4c_result($rs_actor, 0), ENT_QUOTES, 'UTF-8').'</a>';
         } else {

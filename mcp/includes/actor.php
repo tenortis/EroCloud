@@ -4,7 +4,7 @@ if (!defined('SAFE_INC')) {
     die ("Access denied!");
 }
 
-$actor_id = abs(filter_input(INPUT_GET, 'id', FILTER_SANITIZE_NUMBER_INT));
+$actor_id = abs((int)filter_input(INPUT_GET, 'id', FILTER_SANITIZE_NUMBER_INT));
 
 include_once(SOURCEDIR.'/includes/klassen/actor.inc.php');
 $actor = new Actor($actor_id);
@@ -14,7 +14,7 @@ if ($actor->get("id") == '') {
     exit;    
 }
 
-if ($actor->get("merchant_id") != abs($_SESSION['merchant_id'])) {
+if ($actor->get("merchant_id") != abs((int)$_SESSION['merchant_id'])) {
     header('Location: '.MCP_URL.'/Actors');
     exit;            
 }
@@ -26,18 +26,18 @@ if ($actor->get("status") == 'deleted') {
 
 // Nachrichtenpreis für neue User ändern
 if (isset($_POST['save_newuser_pn_amount'])) {
-    $post_newuser_pn_amount = abs(filter_input(INPUT_POST, 'newuser_pn_amount', FILTER_SANITIZE_NUMBER_INT));
+    $post_newuser_pn_amount = abs((int)filter_input(INPUT_POST, 'newuser_pn_amount', FILTER_SANITIZE_NUMBER_INT));
     
     p4c_query("UPDATE `actors` SET `pn_amount` ='".$post_newuser_pn_amount."' WHERE
-        `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
-        `id`='".abs($actor_id)."' LIMIT 1;
+        `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
+        `id`='".abs((int)$actor_id)."' LIMIT 1;
     ",__FILE__,__LINE__);
     
     $m5d_checksum = actor_checksum($actor_id);
         
     p4c_query("UPDATE `actors` SET `md5_checksum`='".p4c_escape_string($m5d_checksum)."' WHERE
-        `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
-        `id`='".abs($actor_id)."' LIMIT 1;
+        `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
+        `id`='".abs((int)$actor_id)."' LIMIT 1;
     ",__FILE__,__LINE__);
 
     header('Location: '.MCP_URL.'/Actor/'.$actor_id.'?ok=edit_actor');
@@ -46,18 +46,18 @@ if (isset($_POST['save_newuser_pn_amount'])) {
 
 // Nachrichten nicht-/kostenlos wenn die Webcam gesendet wird
 if (isset($_POST['save_pn_free_if_webcam'])) {    
-    $post_pn_free_if_webcam = abs(filter_input(INPUT_POST, 'pn_free_if_webcam', FILTER_SANITIZE_NUMBER_INT));
+    $post_pn_free_if_webcam = abs((int)filter_input(INPUT_POST, 'pn_free_if_webcam', FILTER_SANITIZE_NUMBER_INT));
     
     p4c_query("UPDATE `actors` SET `pn_free_if_webcam` ='".$post_pn_free_if_webcam."' WHERE
-        `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
-        `id`='".abs($actor_id)."' LIMIT 1;
+        `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
+        `id`='".abs((int)$actor_id)."' LIMIT 1;
     ",__FILE__,__LINE__);
     
     $m5d_checksum = actor_checksum($actor_id);
         
     p4c_query("UPDATE `actors` SET `md5_checksum`='".p4c_escape_string($m5d_checksum)."' WHERE
-        `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
-        `id`='".abs($actor_id)."' LIMIT 1;
+        `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
+        `id`='".abs((int)$actor_id)."' LIMIT 1;
     ",__FILE__,__LINE__);
 
     header('Location: '.MCP_URL.'/Actor/'.$actor_id.'?ok=edit_actor');
@@ -67,18 +67,18 @@ if (isset($_POST['save_pn_free_if_webcam'])) {
 
 // Webcam-Preis für neue User ändern
 if (isset($_POST['save_newuser_cam_amount'])) {
-    $post_newuser_cam_amount = abs(filter_input(INPUT_POST, 'newuser_cam_amount', FILTER_SANITIZE_NUMBER_INT));
+    $post_newuser_cam_amount = abs((int)filter_input(INPUT_POST, 'newuser_cam_amount', FILTER_SANITIZE_NUMBER_INT));
     
     p4c_query("UPDATE `actors` SET `cam_amount` ='".$post_newuser_cam_amount."' WHERE
-        `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
-        `id`='".abs($actor_id)."' LIMIT 1;
+        `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
+        `id`='".abs((int)$actor_id)."' LIMIT 1;
     ",__FILE__,__LINE__);
     
     $m5d_checksum = actor_checksum($actor_id);
         
     p4c_query("UPDATE `actors` SET `md5_checksum`='".p4c_escape_string($m5d_checksum)."' WHERE
-        `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
-        `id`='".abs($actor_id)."' LIMIT 1;
+        `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
+        `id`='".abs((int)$actor_id)."' LIMIT 1;
     ",__FILE__,__LINE__);
 
     header('Location: '.MCP_URL.'/Actor/'.$actor_id.'?ok=edit_actor');
@@ -87,18 +87,18 @@ if (isset($_POST['save_newuser_cam_amount'])) {
 
 //Wann darf der User sein Webcam senden?  
 if (isset($_POST['save_usercam_if_amacam'])) {
-    $post_usercam_if_amacam = abs(filter_input(INPUT_POST, 'usercam_if_amacam', FILTER_SANITIZE_NUMBER_INT));
+    $post_usercam_if_amacam = abs((int)filter_input(INPUT_POST, 'usercam_if_amacam', FILTER_SANITIZE_NUMBER_INT));
     
     p4c_query("UPDATE `actors` SET `usercam_if_amacam` ='".$post_usercam_if_amacam."' WHERE
-        `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
-        `id`='".abs($actor_id)."' LIMIT 1;
+        `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
+        `id`='".abs((int)$actor_id)."' LIMIT 1;
     ",__FILE__,__LINE__);
     
     $m5d_checksum = actor_checksum($actor_id);
         
     p4c_query("UPDATE `actors` SET `md5_checksum`='".p4c_escape_string($m5d_checksum)."' WHERE
-        `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
-        `id`='".abs($actor_id)."' LIMIT 1;
+        `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
+        `id`='".abs((int)$actor_id)."' LIMIT 1;
     ",__FILE__,__LINE__);
 
     header('Location: '.MCP_URL.'/Actor/'.$actor_id.'?ok=edit_actor');
@@ -110,8 +110,8 @@ if (isset($_POST['save_webcam_user_sound'])) {
     $post_sound = filter_input(INPUT_POST, 'cam_sound', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW);
     
     p4c_query("UPDATE `actors` SET `cam_new_user_sound` ='".$post_sound."' WHERE
-        `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
-        `id`='".abs($actor_id)."' LIMIT 1;
+        `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
+        `id`='".abs((int)$actor_id)."' LIMIT 1;
     ",__FILE__,__LINE__);
 
     header('Location: '.MCP_URL.'/Actor/'.$actor_id.'?ok=edit_actor');
@@ -180,55 +180,55 @@ if (isset($_POST['edit_actor'])) {
     if ($actor->get("status") == 'inactive') {
         p4c_query("UPDATE `actors` SET `created_datetime`='0000-00-00 00:00:00'
         WHERE
-            `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
-            `id`='".abs($actor_id)."' LIMIT 1;
+            `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
+            `id`='".abs((int)$actor_id)."' LIMIT 1;
         ",__FILE__,__LINE__);
     }
     
     p4c_query("UPDATE `actors` SET
         `obolus_type`           ='".p4c_escape_string(filter_input(INPUT_POST, 'obolus_type', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW))."',
-        `check_gender`          ='".abs(filter_input(INPUT_POST, 'check_gender', FILTER_SANITIZE_NUMBER_INT))."',
+        `check_gender`          ='".abs((int)filter_input(INPUT_POST, 'check_gender', FILTER_SANITIZE_NUMBER_INT))."',
         `gender`                ='".p4c_escape_string(utf8_decode(filter_input(INPUT_POST, 'gender', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW)))."',
-        `check_age`             ='".abs(filter_input(INPUT_POST, 'check_age', FILTER_SANITIZE_NUMBER_INT))."',
-        `age`                   ='".abs(filter_input(INPUT_POST, 'age', FILTER_SANITIZE_NUMBER_INT))."',
-        `check_star_sign`       ='".abs(filter_input(INPUT_POST, 'check_star_sign', FILTER_SANITIZE_NUMBER_INT))."',
+        `check_age`             ='".abs((int)filter_input(INPUT_POST, 'check_age', FILTER_SANITIZE_NUMBER_INT))."',
+        `age`                   ='".abs((int)filter_input(INPUT_POST, 'age', FILTER_SANITIZE_NUMBER_INT))."',
+        `check_star_sign`       ='".abs((int)filter_input(INPUT_POST, 'check_star_sign', FILTER_SANITIZE_NUMBER_INT))."',
         `star_sign`             ='".p4c_escape_string(utf8_decode(filter_input(INPUT_POST, 'star_sign', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW)))."',
-        `check_body_height`     ='".abs(filter_input(INPUT_POST, 'check_body_height', FILTER_SANITIZE_NUMBER_INT))."',
-        `body_height`           ='".abs(filter_input(INPUT_POST, 'body_height', FILTER_SANITIZE_NUMBER_INT))."',
-        `check_eye_color`       ='".abs(filter_input(INPUT_POST, 'check_eye_color', FILTER_SANITIZE_NUMBER_INT))."',
+        `check_body_height`     ='".abs((int)filter_input(INPUT_POST, 'check_body_height', FILTER_SANITIZE_NUMBER_INT))."',
+        `body_height`           ='".abs((int)filter_input(INPUT_POST, 'body_height', FILTER_SANITIZE_NUMBER_INT))."',
+        `check_eye_color`       ='".abs((int)filter_input(INPUT_POST, 'check_eye_color', FILTER_SANITIZE_NUMBER_INT))."',
         `eye_color`             ='".p4c_escape_string(filter_input(INPUT_POST, 'eye_color', FILTER_SANITIZE_STRING, FILTER_FLAG_ENCODE_LOW))."',
-        `check_hair_color`      ='".abs(filter_input(INPUT_POST, 'check_hair_color', FILTER_SANITIZE_NUMBER_INT))."',
+        `check_hair_color`      ='".abs((int)filter_input(INPUT_POST, 'check_hair_color', FILTER_SANITIZE_NUMBER_INT))."',
         `hair_color`            ='".p4c_escape_string(filter_input(INPUT_POST, 'hair_color', FILTER_SANITIZE_STRING, FILTER_FLAG_ENCODE_LOW))."',
-        `check_body_weight`     ='".abs(filter_input(INPUT_POST, 'check_body_weight', FILTER_SANITIZE_NUMBER_INT))."',
-        `body_weight`           ='".abs(filter_input(INPUT_POST, 'body_weight', FILTER_SANITIZE_NUMBER_INT))."',
-        `check_cup_size`        ='".abs(filter_input(INPUT_POST, 'check_cup_size', FILTER_SANITIZE_NUMBER_INT))."',
+        `check_body_weight`     ='".abs((int)filter_input(INPUT_POST, 'check_body_weight', FILTER_SANITIZE_NUMBER_INT))."',
+        `body_weight`           ='".abs((int)filter_input(INPUT_POST, 'body_weight', FILTER_SANITIZE_NUMBER_INT))."',
+        `check_cup_size`        ='".abs((int)filter_input(INPUT_POST, 'check_cup_size', FILTER_SANITIZE_NUMBER_INT))."',
         `cup_size`              ='".p4c_escape_string($cup_sice)."',
-        `check_shaven`          ='".abs(filter_input(INPUT_POST, 'check_shaven', FILTER_SANITIZE_NUMBER_INT))."',
-        `shaven`                ='".abs(filter_input(INPUT_POST, 'shaven', FILTER_SANITIZE_NUMBER_INT))."',
-        `check_look`            ='".abs(filter_input(INPUT_POST, 'check_look', FILTER_SANITIZE_NUMBER_INT))."',
+        `check_shaven`          ='".abs((int)filter_input(INPUT_POST, 'check_shaven', FILTER_SANITIZE_NUMBER_INT))."',
+        `shaven`                ='".abs((int)filter_input(INPUT_POST, 'shaven', FILTER_SANITIZE_NUMBER_INT))."',
+        `check_look`            ='".abs((int)filter_input(INPUT_POST, 'check_look', FILTER_SANITIZE_NUMBER_INT))."',
         `look`                  ='".p4c_escape_string(filter_input(INPUT_POST, 'look', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW))."',
-        `check_marital_status`  ='".abs(filter_input(INPUT_POST, 'check_marital_status', FILTER_SANITIZE_NUMBER_INT))."',
+        `check_marital_status`  ='".abs((int)filter_input(INPUT_POST, 'check_marital_status', FILTER_SANITIZE_NUMBER_INT))."',
         `marital_status`        ='".p4c_escape_string(filter_input(INPUT_POST, 'marital_status', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW))."',
-        `check_sexual_orientation`='".abs(filter_input(INPUT_POST, 'check_sexual_orientation', FILTER_SANITIZE_NUMBER_INT))."',
+        `check_sexual_orientation`='".abs((int)filter_input(INPUT_POST, 'check_sexual_orientation', FILTER_SANITIZE_NUMBER_INT))."',
         `sexual_orientation`    ='".p4c_escape_string(filter_input(INPUT_POST, 'sexual_orientation', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW))."',
-        `check_looking_for`     ='".abs(filter_input(INPUT_POST, 'check_looking_for', FILTER_SANITIZE_NUMBER_INT))."',
+        `check_looking_for`     ='".abs((int)filter_input(INPUT_POST, 'check_looking_for', FILTER_SANITIZE_NUMBER_INT))."',
         `looking_for`           ='".p4c_escape_string($looking_for)."',
-        `check_interests`       ='".abs(filter_input(INPUT_POST, 'check_interests', FILTER_SANITIZE_NUMBER_INT))."',
+        `check_interests`       ='".abs((int)filter_input(INPUT_POST, 'check_interests', FILTER_SANITIZE_NUMBER_INT))."',
         `interests`             ='".p4c_escape_string($interests)."',
-        `check_sexual_preferences`='".abs(filter_input(INPUT_POST, 'check_sexual_preferences', FILTER_SANITIZE_NUMBER_INT))."',
+        `check_sexual_preferences`='".abs((int)filter_input(INPUT_POST, 'check_sexual_preferences', FILTER_SANITIZE_NUMBER_INT))."',
         `sexual_preferences`    ='".p4c_escape_string($sexual_preferences)."',
-        `check_about_me`        ='".abs(filter_input(INPUT_POST, 'check_about_me', FILTER_SANITIZE_NUMBER_INT))."',
+        `check_about_me`        ='".abs((int)filter_input(INPUT_POST, 'check_about_me', FILTER_SANITIZE_NUMBER_INT))."',
         `about_me`              ='".p4c_escape_string(filter_input(INPUT_POST, 'about_me', FILTER_SANITIZE_STRING, FILTER_FLAG_ENCODE_LOW))."'
     WHERE
-        `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
-        `id`='".abs($actor_id)."' LIMIT 1;
+        `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
+        `id`='".abs((int)$actor_id)."' LIMIT 1;
     ",__FILE__,__LINE__);
     
     $m5d_checksum = actor_checksum($actor_id);
         
     p4c_query("UPDATE `actors` SET `md5_checksum`='".p4c_escape_string($m5d_checksum)."' WHERE
-        `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
-        `id`='".abs($actor_id)."' LIMIT 1;
+        `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
+        `id`='".abs((int)$actor_id)."' LIMIT 1;
     ",__FILE__,__LINE__);
 
     header('Location: '.MCP_URL.'/Actor/'.$actor_id.'?ok=edit_actor');

@@ -7,6 +7,10 @@ if (!defined('SAFE_INC')) {
 // $member = new Member($member_id);
 class Member {
     
+    public $class_errorlog;
+    public $member_id;
+    public $is_remote_member_id;
+
     function __construct($member_id, $is_remote_member_id=true) {
         global $mysql, $class_errorlog;
         $this->class_errorlog = $class_errorlog;
@@ -26,7 +30,7 @@ class Member {
         if ($this->is_remote_member_id === true) {
             $sql_id = "`remote_member_id`='".p4c_escape_string($this->member_id)."'";
         } else {
-            $sql_id = "`id`='".abs($this->member_id)."'";
+            $sql_id = "`id`='".abs((int)$this->member_id)."'";
         }
 
         $rs_member = p4c_query("SELECT ".$select." FROM `members` WHERE ".$sql_id." LIMIT 1;", __FILE__, __LINE__);

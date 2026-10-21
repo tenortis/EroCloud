@@ -9,15 +9,17 @@ if (!defined('SAFE_INC'))
 class p4c_mysqli {
     
     private $connect;
+    public $error_log;
     
     public function __construct($dbhost, $dbuser, $dbpass, $dbname) {
         $this->error_log = new p4c_errorlog();
        
+        if (function_exists('mysqli_report')) { @mysqli_report(MYSQLI_REPORT_OFF); }
         $this->connect = @new mysqli($dbhost, $dbuser, $dbpass, $dbname);
         
         // $connect_error was broken until PHP 5.2.9 and 5.3.0.
         if ($this->connect->connect_error) {
-            $this->error_log->log('Kann keine Verbindung zur Datenbank herstellen! ('.$this->connect->connect_errno.') '.$this->connect->connect_error);
+            $this->error_log->log('Kann keine Verbindung zur Datenbank herstellen! ('.$this->connect->connect_errno.') '.$this->connect->connect_error, __FILE__, __LINE__);
             die('Wartungsarbeiten.');
             #die('Kann keine Verbindung zur Datenbank herstellen! ('.$this->connect->connect_errno.') '.$this->connect->connect_error);
         }
@@ -25,7 +27,7 @@ class p4c_mysqli {
         // Use this instead of $connect_error if you need to ensure
         // compatibility with PHP versions prior to 5.2.9 and 5.3.0.
         if (mysqli_connect_error()) {
-            $this->error_log->log('Kann keine Verbindung zur Datenbank herstellen! (('.mysqli_connect_errno().') '.mysqli_connect_error());
+            $this->error_log->log('Kann keine Verbindung zur Datenbank herstellen! (('.mysqli_connect_errno().') '.mysqli_connect_error(), __FILE__, __LINE__);
             #die('Kann keine Verbindung zur Datenbank herstellen!');
             die('Wartungsarbeiten.');
         }
@@ -39,7 +41,7 @@ class p4c_mysqli {
         }
     }
     
-    public function error($result) {
+    public function error($result = null) {
         if ($this->connect->connect_error) {
             return '('.$this->connect->connect_errno.') '.$this->connect->connect_error;
         } else {
@@ -75,13 +77,14 @@ class p4c_mysqli {
     }
     
     public function result($result, $row, $field=0) { 
+        if (!$result || !isset($result->num_rows) || $result->num_rows <= $row) { return false; }
         $result->data_seek($row); 
         $datarow = $result->fetch_array(); 
-        return $datarow[$field]; 
+        return (is_array($datarow) && array_key_exists($field, $datarow)) ? $datarow[$field] : false; 
     }
     
     public function real_escape_string($result) {
-        return $this->connect->real_escape_string($result);
+        return $this->connect->real_escape_string((string)$result);
     }
     
     public function affected_rows() {

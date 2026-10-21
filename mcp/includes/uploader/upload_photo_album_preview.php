@@ -83,10 +83,10 @@ function upload_file($album, $fsk) {
             }       
             
             p4c_query("UPDATE `photo_albums` SET
-                `preview_image_fsk".abs($fsk)."`='".p4c_escape_string($file_name)."'
+                `preview_image_fsk".abs((int)$fsk)."`='".p4c_escape_string($file_name)."'
             WHERE 
-                `id` = '".abs($album_id)."' AND
-                `merchant_id` = '".abs($_SESSION['merchant_id'])."'
+                `id` = '".abs((int)$album_id)."' AND
+                `merchant_id` = '".abs((int)$_SESSION['merchant_id'])."'
             LIMIT 1;",__FILE__,__LINE__);
 
 
@@ -106,8 +106,8 @@ function upload_file($album, $fsk) {
             $m5d_checksum = photo_album_checksum($a);
             
             p4c_query("UPDATE `photo_albums` SET `checksum`='".p4c_escape_string($m5d_checksum)."' WHERE
-                `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
-                `id`='".abs($album_id)."' LIMIT 1;
+                `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
+                `id`='".abs((int)$album_id)."' LIMIT 1;
             ",__FILE__,__LINE__);
             
             $ret[]= '';
@@ -123,15 +123,15 @@ $fileTypes = array('jpg','jpeg'); // File extensions
 if(isset($_FILES["album_image"]) AND isset($_GET['album_id']) AND isset($_GET['fsk'])) {
     $ret = array();
     
-    $album_id = abs($_GET['album_id']); 
-    $fsk = abs($_GET['fsk']); 
+    $album_id = abs((int)$_GET['album_id']); 
+    $fsk = abs((int)$_GET['fsk']); 
     
     // Fotoalbum-Klasse einbinden 
     include_once(SOURCEDIR.'/includes/klassen/PhotoAlbum.inc.php');
     $album = new PhotoAlbum($mysql,$album_id);
 
     if ($album->field("id") == '') {
-        file_error('Dieses Album ('.abs($album_id).') existiert nicht.');
+        file_error('Dieses Album ('.abs((int)$album_id).') existiert nicht.');
     }
     
     $error = $_FILES["album_image"]["error"];

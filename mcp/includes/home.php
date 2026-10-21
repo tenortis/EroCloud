@@ -6,10 +6,10 @@ if (!defined('SAFE_INC'))
 $merchant = new Merchant($mysql,$_SESSION['merchant_id']);
 
 //Prüfen ob schon eine Gruppe für die Profile erstellt wurde. Wenn nicht, dann jetzt anlegen.
-$rs_groups = p4c_query("SELECT * FROM `groups` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' ORDER BY `id` DESC;",__FILE__,__LINE__);
+$rs_groups = p4c_query("SELECT * FROM `groups` WHERE `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' ORDER BY `id` DESC;",__FILE__,__LINE__);
 if (p4c_num_rows($rs_groups) === 0) {
     p4c_query("INSERT INTO `groups` SET
-        `merchant_id`   = '".abs($_SESSION['merchant_id'])."',
+        `merchant_id`   = '".abs((int)$_SESSION['merchant_id'])."',
         `group_id`      = '".p4c_escape_string("G-". strtoupper(randomString(8)))."',
         `group_name`    = 'Standartgruppe',
         `group_password`= '".p4c_escape_string(randomString(12))."';
@@ -17,15 +17,15 @@ if (p4c_num_rows($rs_groups) === 0) {
     
     $group_id = p4c_insert_id();
     
-    $rs_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' ORDER BY `username` ASC;",__FILE__,__LINE__);
+    $rs_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' ORDER BY `username` ASC;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_actors) > 0) {
         while($actor_obj = p4c_fetch_object($rs_actors)) {
-            $rs_check_group = p4c_query("SELECT * FROM `group_actors` WHERE `actor_id`='".abs($actor_obj->id)."' LIMIT 1;",__FILE__,__LINE__);
+            $rs_check_group = p4c_query("SELECT * FROM `group_actors` WHERE `actor_id`='".abs((int)$actor_obj->id)."' LIMIT 1;",__FILE__,__LINE__);
             if (p4c_num_rows($rs_check_group) === 0) {
                 p4c_query("INSERT INTO `group_actors` SET
-                    `merchant_id`   = '".abs($_SESSION['merchant_id'])."',
-                    `group_id`      = '".abs($group_id)."',
-                    `actor_id`      = '".abs($actor_obj->id)."';",__FILE__,__LINE__);
+                    `merchant_id`   = '".abs((int)$_SESSION['merchant_id'])."',
+                    `group_id`      = '".abs((int)$group_id)."',
+                    `actor_id`      = '".abs((int)$actor_obj->id)."';",__FILE__,__LINE__);
             }
         }
     }
@@ -96,7 +96,7 @@ $site .= '
             if (isset($_POST['accept_content_rules']) AND isset($_POST['upload_content'])) {
 
                 p4c_query("UPDATE `merchants` SET `accept_content_rules`='".date("Y-m-d H:i:s")."' WHERE
-                    `id`='".abs($_SESSION['merchant_id'])."' AND `accept_content_rules`='0000-00-00 00:00:00' LIMIT 1;",__FILE__,__LINE__);
+                    `id`='".abs((int)$_SESSION['merchant_id'])."' AND `accept_content_rules`='0000-00-00 00:00:00' LIMIT 1;",__FILE__,__LINE__);
                 
                 header('Location: '.MCP_URL.'/Startseite');
                 exit;
@@ -143,7 +143,7 @@ $site .= '
             ';
         }
         
-        $rs_actors = p4c_query("SELECT * FROM `actors`WHERE (`status`='blocked' OR `status`='inactive') AND `merchant_id`='".abs($_SESSION['merchant_id'])."'LIMIT 1;",__FILE__,__LINE__);
+        $rs_actors = p4c_query("SELECT * FROM `actors`WHERE (`status`='blocked' OR `status`='inactive') AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."'LIMIT 1;",__FILE__,__LINE__);
         if (p4c_num_rows($rs_actors) > 0) {
             $site .= '
             <div class="alert alert-warning">
@@ -158,7 +158,7 @@ $site .= '
         }
 
     } else {
-        $rs_group = p4c_query("SELECT * FROM `groups` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `id`='".abs($_SESSION['my_chatgroup'])."' LIMIT 1;",__FILE__,__LINE__);
+        $rs_group = p4c_query("SELECT * FROM `groups` WHERE `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND `id`='".abs((int)$_SESSION['my_chatgroup'])."' LIMIT 1;",__FILE__,__LINE__);
         // Wenn die Gruppe nicht mehr existiert
         if (p4c_num_rows($rs_group) == 0) {
             header('Location: '.MCP_URL.'/index.php?logout');
@@ -250,7 +250,7 @@ $site .= '
         </div>
         ';
         
-        $rs_actors = p4c_query("SELECT * FROM `actors`WHERE (`status`='blocked' OR `status`='inactive') AND `merchant_id`='".abs($_SESSION['merchant_id'])."'LIMIT 1;",__FILE__,__LINE__);
+        $rs_actors = p4c_query("SELECT * FROM `actors`WHERE (`status`='blocked' OR `status`='inactive') AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."'LIMIT 1;",__FILE__,__LINE__);
         if (p4c_num_rows($rs_actors) > 0) {
             $site .= '
             <div class="column_actor_error ui-state-error" style="padding:10px;">
@@ -300,7 +300,7 @@ $site .= '
         <div class="column_amoredea">
             ';
             if ($_SESSION['logged_in_as'] == 'merchant' AND $count_actors > 0) {
-                $rs_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `status`!='deleted' ORDER BY `username` ASC;",__FILE__,__LINE__);
+                $rs_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND `status`!='deleted' ORDER BY `username` ASC;",__FILE__,__LINE__);
                 $actor_obj = p4c_fetch_object($rs_actors);
                 
                 $site .= '
@@ -338,7 +338,7 @@ $site .= '
         </div>';
         
     } else {
-        $rs_group = p4c_query("SELECT * FROM `groups` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `id`='".abs($_SESSION['my_chatgroup'])."' LIMIT 1;",__FILE__,__LINE__);
+        $rs_group = p4c_query("SELECT * FROM `groups` WHERE `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND `id`='".abs((int)$_SESSION['my_chatgroup'])."' LIMIT 1;",__FILE__,__LINE__);
         // Wenn die Gruppe nicht mehr existiert
         if (p4c_num_rows($rs_group) == 0) {
             header('Location: '.MCP_URL.'/index.php?logout');

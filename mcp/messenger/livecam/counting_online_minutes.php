@@ -16,7 +16,7 @@ if (!isset($_POST['actor_id'])) {
     exit;
 }
 
-$post_actor_id = abs(filter_input(INPUT_POST, 'actor_id', FILTER_SANITIZE_NUMBER_INT));
+$post_actor_id = abs((int)filter_input(INPUT_POST, 'actor_id', FILTER_SANITIZE_NUMBER_INT));
 
 /**
  * Punktesystem - Für Upload von kostenpflichtigen Album

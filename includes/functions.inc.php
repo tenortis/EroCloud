@@ -93,7 +93,7 @@ function hash_password($new_password) {
 
 /** Prüfen ob Merchant existiert **/
 function check_merchant_exists($merchant_id,$file,$line) {
-    $rs_merchant = p4c_query("SELECT * FROM `merchants` WHERE `id`='".abs($merchant_id)."' LIMIT 1;",$file,$line);
+    $rs_merchant = p4c_query("SELECT * FROM `merchants` WHERE `id`='".abs((int)$merchant_id)."' LIMIT 1;",$file,$line);
     if (p4c_num_rows($rs_merchant) == 0) {die("Merchant nicht bekannt.");}
     return p4c_fetch_object($rs_merchant);
 }
@@ -141,9 +141,9 @@ function p4c_insert_id() {
 	return $mysql->insert_id();
 }
     
-function p4c_close($string) {
+function p4c_close($string = null) {
     global $mysql;
-	return $mysql->close($string);       
+	return $mysql->close();       
 }
 
 function p4c_result($string, $row, $field=0) {
@@ -173,14 +173,25 @@ function randomString($len) {
 function p4c_errorlog($error) {
     global $class_errorlog;
 
-	if (is_string($error)) { 
-		$error=trim($error);
-	}
-    
-	if(!empty($error) AND !empty($error['file'])) {
-		$class_errorlog->log($error['message'],$error['file'],$error['line']);
-	}
-    
+    if (!is_object($class_errorlog)) {
+        return;
+    }
+
+    if (is_string($error)) {
+        $error = trim($error);
+        if ($error !== '') {
+            $class_errorlog->log($error, __FILE__, __LINE__);
+        }
+        return;
+    }
+
+    if (ini_get('log_errors')) {
+        return;
+    }
+
+    if (is_array($error) && !empty($error['file']) && !empty($error['message'])) {
+        $class_errorlog->log($error['message'], $error['file'], isset($error['line']) ? $error['line'] : 0);
+    }
 }
 
 function getUserIP() {
@@ -216,7 +227,7 @@ function getBrowserFingerprint() {
 
 function getBrowserName() {
 
-    $ExactBrowserNameUA=$_SERVER['HTTP_USER_AGENT'];
+    $ExactBrowserNameUA = isset($_SERVER['HTTP_USER_AGENT']) ? (string)$_SERVER['HTTP_USER_AGENT'] : '';
 
     if (strpos(strtolower($ExactBrowserNameUA), "safari/") and strpos(strtolower($ExactBrowserNameUA), "opr/")) {
         // OPERA
@@ -250,7 +261,7 @@ function utf8decodeArray($array) {
     foreach($array as $key =>  $value){
         if(is_array($value)){
             $array[$key] = utf8decodeArray($value);
-        } elseif(mb_detect_encoding($value, 'UTF-8', true)) {
+        } elseif(is_string($value) && mb_detect_encoding($value, 'UTF-8', true)) {
             $array[$key] = utf8_decode($value);
         }
     }
@@ -463,6 +474,7 @@ function check_ip_whitelist($ip) {
 }
 
 function convertBytes($size, $sourceUnit = 'B', $targetUnit = 'MB') { 
+    $size = (float)$size;
     $units = array(
         'bit' => 0,
           'B' => 1,
@@ -516,8 +528,8 @@ function p4c_curl($url) {
 function validate_url($url) {
     $url = trim($url);
    
-    $urlregex = "^(https?|ftp)\:\/\/([a-z0-9+!*(),;?&=\$_.-]+(\:[a-z0-9+!*(),;?&=\$_.-]+)?@)?[a-z0-9+\$_-]+(\.[a-z0-9+\$_-]+)*(\:[0-9]{2,5})?(\/([a-z0-9+\$_-]\.?)+)*\/?(\?[a-z+&\$_.-][a-z0-9;:@/&%=+\$_.-]*)?(#[a-z_.-][a-z0-9+\$_.-]*)?\$";
-    if (eregi($urlregex, $url)) {
+    $urlregex = "/^(https?|ftp)\:\/\/([a-z0-9+!*(),;?&=\$_.-]+(\:[a-z0-9+!*(),;?&=\$_.-]+)?@)?[a-z0-9+\$_-]+(\.[a-z0-9+\$_-]+)*(\:[0-9]{2,5})?(\/([a-z0-9+\$_-]\.?)+)*\/?(\?[a-z+&\$_.-][a-z0-9;:@\/&%=+\$_.-]*)?(#[a-z_.-][a-z0-9+\$_.-]*)?\$/i";
+    if (preg_match($urlregex, (string)$url)) {
         return true;
     } else {
         return false;
@@ -549,7 +561,7 @@ function utf8_to_latin1swedishci($string = '') {
     // https://www.utf8-chartable.de/unicode-utf8-table.pl?start=8192&number=128&utf8=string-literal
     // https://www.toptal.com/designers/htmlarrows/punctuation/
     
-    if (trim($string) != '') {
+    if (trim((string)$string) != '') {
         # \xE2\x80\x8B
         $string = mb_ereg_replace("\xe2\x80\x80", "", $string);
         $string = mb_ereg_replace("\xe2\x80\x82", "", $string);

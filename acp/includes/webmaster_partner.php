@@ -11,7 +11,8 @@ if (isset($_POST['import_conversions'])) {
 
     $import_conversion_date = date("Y-m-d", strtotime($_POST['import_conversions']));
     
-    exec('/usr/bin/php '.SOURCEDIR.'/cronjobs/import_conversions.php --date='.escapeshellarg($import_conversion_date), $output, $retval);
+    $php_cli = is_executable('/opt/php-8.0/bin/php') ? '/opt/php-8.0/bin/php' : '/usr/bin/php';
+    exec($php_cli.' '.SOURCEDIR.'/cronjobs/import_conversions.php --date='.escapeshellarg($import_conversion_date), $output, $retval);
     print_r($output);
     print_r($retval);
 

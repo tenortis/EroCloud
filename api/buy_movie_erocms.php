@@ -54,12 +54,12 @@ if (!isset($_GET['buy_as']) OR ($_GET['buy_as'] != 'streaming' AND $_GET['buy_as
 
 $input['user_streaming_key']= $_GET['user_streaming_key'];
 $input['movie_id']          = $_GET['movie_id'];
-$input['user_id']           = abs($_GET['user_id']);
-$input['shop_id']           = abs($_GET['shop_id']);
+$input['user_id']           = abs((int)$_GET['user_id']);
+$input['shop_id']           = abs((int)$_GET['shop_id']);
 $input['buy_as']            = $_GET['buy_as'];
-$input['movie_price']       = abs($_GET['movie_price']);
-$input['actor_commision']   = abs($_GET['actor_commision']);
-$input['actor_commision_percent'] = abs($_GET['actor_commision_percent']);
+$input['movie_price']       = abs((float)$_GET['movie_price']);
+$input['actor_commision']   = abs((float)$_GET['actor_commision']);
+$input['actor_commision_percent'] = abs((float)$_GET['actor_commision_percent']);
 
 // Der Streaming-Key erstellt sich wie folgt:
 $user_streaming_key = generate_user_streaming_key($input);

@@ -895,7 +895,7 @@ function aic_analyze_texts($movie_data, $segments, $spoken_transcript, $env) {
  * Laedt alle relevanten Daten eines Films aus movies + movies_ai_analysis
  */
 function aic_get_movie_details($movie_id) {
-    $movie_id = abs($movie_id);
+    $movie_id = abs((int)$movie_id);
     if ($movie_id <= 0) {
         return null;
     }
@@ -998,7 +998,7 @@ function aic_get_movie_details($movie_id) {
 function aic_process_single_movie_pipeline($movie_id, $env, $options = array()) {
     $details = aic_get_movie_details($movie_id);
     if (!$details) {
-        return array('status' => 'error', 'message' => 'Film #' . abs($movie_id) . ' nicht gefunden.');
+        return array('status' => 'error', 'message' => 'Film #' . abs((int)$movie_id) . ' nicht gefunden.');
     }
 
     $batch_cfg       = aic_load_batch_config();
@@ -1020,7 +1020,7 @@ function aic_process_single_movie_pipeline($movie_id, $env, $options = array()) 
     // Markiere als "In Arbeit" (subtitle_status = 1)
     p4c_query("INSERT INTO `movies_ai_analysis`
         (`movie_id`, `merchant_id`, `subtitle_status`, `subtitle_filename`, `created_at`, `updated_at`)
-        VALUES ('" . abs($details['id']) . "', '" . abs($details['merchant_id']) . "', '1', '" . p4c_escape_string($sub_file) . "', '" . $now . "', '" . $now . "')
+        VALUES ('" . abs((int)$details['id']) . "', '" . abs((int)$details['merchant_id']) . "', '1', '" . p4c_escape_string($sub_file) . "', '" . $now . "', '" . $now . "')
         ON DUPLICATE KEY UPDATE `subtitle_status` = '1', `updated_at` = '" . $now . "';", __FILE__, __LINE__);
 
     if (!$details['mp4_exists']) {
@@ -1149,7 +1149,7 @@ function aic_process_single_movie_pipeline($movie_id, $env, $options = array()) 
             // Optional: Falls movies.movie_language leer ist und Option aktiv, erkannte Sprache eintragen
             $allowed_langs = array_keys($allowed_langs_map);
             if (!empty($batch_cfg['sync_empty_movie_lang']) && empty($details['movie_language']) && in_array($detected_lang, $allowed_langs)) {
-                p4c_query("UPDATE `movies` SET `movie_language` = '" . p4c_escape_string($detected_lang) . "' WHERE `id` = '" . abs($details['id']) . "' AND (`movie_language` = '' OR `movie_language` IS NULL) LIMIT 1;", __FILE__, __LINE__);
+                p4c_query("UPDATE `movies` SET `movie_language` = '" . p4c_escape_string($detected_lang) . "' WHERE `id` = '" . abs((int)$details['id']) . "' AND (`movie_language` = '' OR `movie_language` IS NULL) LIMIT 1;", __FILE__, __LINE__);
             }
         } else {
             @unlink($wav_tmp);
@@ -1173,7 +1173,7 @@ function aic_process_single_movie_pipeline($movie_id, $env, $options = array()) 
     $seg_json   = json_encode($segments, JSON_UNESCAPED_UNICODE);
 
     p4c_query("UPDATE `movies_ai_analysis` SET
-            `subtitle_status`      = '" . abs($sub_status) . "',
+            `subtitle_status`      = '" . abs((int)$sub_status) . "',
             `detected_language`    = '" . p4c_escape_string($detected_lang) . "',
             `language_confidence`  = '" . p4c_escape_string($lang_conf) . "',
             `subtitle_filename`    = '" . p4c_escape_string($sub_file) . "',
@@ -1182,7 +1182,7 @@ function aic_process_single_movie_pipeline($movie_id, $env, $options = array()) 
             `whisper_duration_sec` = '" . p4c_escape_string($w_duration) . "',
             `last_error`           = '" . p4c_escape_string($last_error) . "',
             `updated_at`           = '" . $now . "'
-        WHERE `movie_id` = '" . abs($details['id']) . "'
+        WHERE `movie_id` = '" . abs((int)$details['id']) . "'
         LIMIT 1;", __FILE__, __LINE__);
 
     $report = null;
@@ -1200,13 +1200,13 @@ function aic_process_single_movie_pipeline($movie_id, $env, $options = array()) 
         p4c_query("UPDATE `movies_ai_analysis` SET
                 `text_check_status`    = '2',
                 `text_compliance`      = '" . p4c_escape_string($report['compliance_status']) . "',
-                `text_risk_score`      = '" . abs($report['risk_score']) . "',
+                `text_risk_score`      = '" . abs((int)$report['risk_score']) . "',
                 `text_engine_used`     = '" . p4c_escape_string($report['engine_used']) . "',
                 `text_summary`         = '" . p4c_escape_string($report['summary_de']) . "',
                 `text_violations_json` = '" . p4c_escape_string($viol_json) . "',
                 `text_duration_sec`    = '" . p4c_escape_string($report['duration_sec']) . "',
                 `updated_at`           = '" . $now2 . "'
-            WHERE `movie_id` = '" . abs($details['id']) . "'
+            WHERE `movie_id` = '" . abs((int)$details['id']) . "'
             LIMIT 1;", __FILE__, __LINE__);
     }
 
@@ -1385,7 +1385,7 @@ function aic_render_movie_detail_bram_box($real_movie_id, $movie_data = array(),
                 '" . p4c_escape_string($sub_file) . "',
                 '2',
                 '" . p4c_escape_string($rep['compliance_status']) . "',
-                '" . abs($rep['risk_score']) . "',
+                '" . abs((int)$rep['risk_score']) . "',
                 '" . p4c_escape_string($rep['engine_used']) . "',
                 '" . p4c_escape_string($rep['summary_de']) . "',
                 '" . p4c_escape_string($viol_json) . "',
@@ -1396,7 +1396,7 @@ function aic_render_movie_detail_bram_box($real_movie_id, $movie_data = array(),
             ON DUPLICATE KEY UPDATE
                 `text_check_status`    = '2',
                 `text_compliance`      = '" . p4c_escape_string($rep['compliance_status']) . "',
-                `text_risk_score`      = '" . abs($rep['risk_score']) . "',
+                `text_risk_score`      = '" . abs((int)$rep['risk_score']) . "',
                 `text_engine_used`     = '" . p4c_escape_string($rep['engine_used']) . "',
                 `text_summary`         = '" . p4c_escape_string($rep['summary_de']) . "',
                 `text_violations_json` = '" . p4c_escape_string($viol_json) . "',

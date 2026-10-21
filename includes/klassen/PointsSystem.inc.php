@@ -63,20 +63,20 @@ class PointsSystem {
                 $date = $this->date;
             }
             
-            $rs_points_system = p4c_query("SELECT * FROM `points_scoring` WHERE `actor_id`='".abs($this->actor_id)."' AND `date`='".$date."' LIMIT 1;",__FILE__,__LINE__);
+            $rs_points_system = p4c_query("SELECT * FROM `points_scoring` WHERE `actor_id`='".abs((int)$this->actor_id)."' AND `date`='".$date."' LIMIT 1;",__FILE__,__LINE__);
             if (p4c_num_rows($rs_points_system) == 0) {
                 
                 p4c_query("INSERT INTO `points_scoring` SET
-                    `actor_id`='".abs($this->actor_id)."',
-                    `". p4c_escape_string($this->group)."` = '".abs($points)."',
+                    `actor_id`='".abs((int)$this->actor_id)."',
+                    `". p4c_escape_string($this->group)."` = '".abs((int)$points)."',
                     `date` = '".$date."'
                 ",__FILE__,__LINE__);
                 
             } else {
                 p4c_query("UPDATE `points_scoring` SET
-                    `".p4c_escape_string($this->group)."` = `".p4c_escape_string($this->group)."` + ".abs($points)."
+                    `".p4c_escape_string($this->group)."` = `".p4c_escape_string($this->group)."` + ".abs((int)$points)."
                 WHERE 
-                    `actor_id` = '".abs($this->actor_id)."' AND
+                    `actor_id` = '".abs((int)$this->actor_id)."' AND
                     `date` = '".$date."'
                 LIMIT 1;",__FILE__,__LINE__);
             }

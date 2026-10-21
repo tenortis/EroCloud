@@ -10,6 +10,7 @@ class Merchant {
     
     public $mysql;
     public $merchant_id;
+    public $partner_id;
     
     public function __construct($mysql, $merchant_id='') {
         $this->mysql = $mysql;
@@ -39,7 +40,7 @@ class Merchant {
         } else if ($this->partner_id != '' AND strlen($this->partner_id) < 10) {
             $rs_member = $this->mysql->query("SELECT ".$select." FROM `merchants` WHERE `id`='".p4c_escape_string($this->partner_id)."' LIMIT 1;", __FILE__, __LINE__);
         } else {
-                $rs_member = $this->mysql->query("SELECT ".$select." FROM `merchants` WHERE `id`='".abs($this->merchant_id)."' LIMIT 1;", __FILE__, __LINE__);
+                $rs_member = $this->mysql->query("SELECT ".$select." FROM `merchants` WHERE `id`='".abs((int)$this->merchant_id)."' LIMIT 1;", __FILE__, __LINE__);
         }
 
         if ($this->mysql->num_rows($rs_member) > 0) {

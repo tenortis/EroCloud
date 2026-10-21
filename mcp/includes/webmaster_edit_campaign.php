@@ -44,7 +44,7 @@ if ($campaign->get_var("campaign_id") == '') {
 }
 
 if (isset($_POST['delete_campaign'])) {
-    if (p4c_query("DELETE FROM `ads_campaigns` WHERE `campaign_id`='". p4c_escape_string($campaign->get_var("campaign_id"))."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;")) {
+    if (p4c_query("DELETE FROM `ads_campaigns` WHERE `campaign_id`='". p4c_escape_string($campaign->get_var("campaign_id"))."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;")) {
         header('Location: '.MCP_URL.'/Webmaster/Ads');
         exit;
     }
@@ -140,7 +140,7 @@ if (isset($_POST['edit_campaign'])) {
         `reserve_value` = '".p4c_escape_string($reserve_value)."'
     WHERE
         `campaign_id`='".p4c_escape_string($cid)."' AND
-        `merchant_id`='".abs($_SESSION['merchant_id'])."'
+        `merchant_id`='".abs((int)$_SESSION['merchant_id'])."'
     LIMIT 1;",__FILE__,__LINE__)) {
         header('Location: '.MCP_URL.'/Webmaster/Edit-Campaign?cid='.$cid);
         exit;

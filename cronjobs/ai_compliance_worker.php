@@ -173,11 +173,11 @@ for ($i = 0; $i < $max_runs; $i++) {
         p4c_query("INSERT INTO `movies_ai_analysis`
             (`movie_id`, `merchant_id`, `text_check_status`, `text_compliance`, `text_risk_score`, `text_engine_used`, `text_summary`, `text_violations_json`, `text_duration_sec`, `created_at`, `updated_at`)
             VALUES (
-                '" . abs($details['id']) . "',
-                '" . abs($details['merchant_id']) . "',
+                '" . abs((int)$details['id']) . "',
+                '" . abs((int)$details['merchant_id']) . "',
                 '2',
                 '" . p4c_escape_string($report['compliance_status']) . "',
-                '" . abs($report['risk_score']) . "',
+                '" . abs((int)$report['risk_score']) . "',
                 '" . p4c_escape_string($report['engine_used']) . "',
                 '" . p4c_escape_string($report['summary_de']) . "',
                 '" . p4c_escape_string($viol_json) . "',
@@ -188,7 +188,7 @@ for ($i = 0; $i < $max_runs; $i++) {
             ON DUPLICATE KEY UPDATE
                 `text_check_status`    = '2',
                 `text_compliance`      = '" . p4c_escape_string($report['compliance_status']) . "',
-                `text_risk_score`      = '" . abs($report['risk_score']) . "',
+                `text_risk_score`      = '" . abs((int)$report['risk_score']) . "',
                 `text_engine_used`     = '" . p4c_escape_string($report['engine_used']) . "',
                 `text_summary`         = '" . p4c_escape_string($report['summary_de']) . "',
                 `text_violations_json` = '" . p4c_escape_string($viol_json) . "',

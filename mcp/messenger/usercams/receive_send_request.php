@@ -26,8 +26,8 @@ if (isset($_POST['localDescription'])) {
     if (!empty($_POST['localDescription'])) {
 
         $rs_sdp = p4c_query("SELECT * FROM `member_cams` WHERE 
-            `member_id` = '".abs($member_id)."' AND
-            `merchant_id` = '".abs($actor_id)."'
+            `member_id` = '".abs((int)$member_id)."' AND
+            `merchant_id` = '".abs((int)$actor_id)."'
         LIMIT 1;",__FILE__,__LINE__);
 
         $content = base64_decode($_POST['localDescription']);
@@ -38,8 +38,8 @@ if (isset($_POST['localDescription'])) {
                 `sdp_description_receiver` = '".p4c_escape_string($content)."',
                 `sdp_receiver_checksum` = '".p4c_escape_string($content_checksum)."'
             WHERE 
-                `member_id` = '".abs($member_id)."' AND
-                `merchant_id` = '".abs($actor_id)."'
+                `member_id` = '".abs((int)$member_id)."' AND
+                `merchant_id` = '".abs((int)$actor_id)."'
             LIMIT 1;",__FILE__,__LINE__);
         }
 
@@ -56,8 +56,8 @@ if (isset($_POST['localDescription'])) {
     $member_id = $_POST['sender_id'];
     
     $rs_sdp = p4c_query("SELECT `sdp_description_transmitter` FROM `member_cams` WHERE 
-        `member_id` = '".abs($member_id)."' AND
-        `merchant_id` = '".abs($actor_id)."' AND 
+        `member_id` = '".abs((int)$member_id)."' AND
+        `merchant_id` = '".abs((int)$actor_id)."' AND 
         `sdp_description_transmitter` != ''
     LIMIT 1;",__FILE__,__LINE__);
 
@@ -79,8 +79,8 @@ if (isset($_POST['localDescription'])) {
     // Wenn keine ICE-Kandidaten übertragen wurden, dann datei leeren
     if (!empty($_POST['iceCandidate'])) {
         $rs_ice_candidates = p4c_query("SELECT * FROM `member_cams` WHERE 
-            `member_id` = '".abs($member_id)."' AND
-            `merchant_id` = '".abs($actor_id)."';",__FILE__,__LINE__);
+            `member_id` = '".abs((int)$member_id)."' AND
+            `merchant_id` = '".abs((int)$actor_id)."';",__FILE__,__LINE__);
         
         if (p4c_num_rows($rs_ice_candidates) > 0) {
             
@@ -91,8 +91,8 @@ if (isset($_POST['localDescription'])) {
                 `ice_candidates_receiver` = '".p4c_escape_string($content)."',
                 `ice_receiver_checksum` = '".p4c_escape_string($content_checksum)."'
             WHERE 
-                `member_id` = '".abs($member_id)."' AND
-                `merchant_id` = '".abs($actor_id)."';",__FILE__,__LINE__);
+                `member_id` = '".abs((int)$member_id)."' AND
+                `merchant_id` = '".abs((int)$actor_id)."';",__FILE__,__LINE__);
         }
     } else {
         
@@ -100,8 +100,8 @@ if (isset($_POST['localDescription'])) {
             `ice_candidates_receiver` = '',
             `sdp_description_receiver` = ''
         WHERE 
-            `member_id` = '".abs($member_id)."' AND
-            `merchant_id` = '".abs($actor_id)."';",__FILE__,__LINE__);
+            `member_id` = '".abs((int)$member_id)."' AND
+            `merchant_id` = '".abs((int)$actor_id)."';",__FILE__,__LINE__);
         
     }
     
@@ -120,8 +120,8 @@ if (isset($_POST['localDescription'])) {
     $member_id = $_POST['actor_id'];
     
     $rs_ice_candidates = p4c_query("SELECT `ice_candidates_transmitter` FROM `member_cams` WHERE 
-        `member_id` = '".abs($member_id)."' AND
-        `merchant_id` = '".abs($actor_id)."' AND
+        `member_id` = '".abs((int)$member_id)."' AND
+        `merchant_id` = '".abs((int)$actor_id)."' AND
         `ice_candidates_transmitter` != ''
     LIMIT 1;",__FILE__,__LINE__);
     
@@ -149,8 +149,8 @@ if (isset($_POST['localDescription'])) {
     
     // prüfen ob ICE-Kandidaten vom User (transmitter) existieren
     $rs_transmitter = p4c_query("SELECT * FROM `member_cams` WHERE 
-        `member_id` = '".abs($member_id)."' AND
-        `merchant_id` = '".abs($actor_id)."' AND
+        `member_id` = '".abs((int)$member_id)."' AND
+        `merchant_id` = '".abs((int)$actor_id)."' AND
         `ice_candidates_transmitter` != ''
     LIMIT 1;",__FILE__,__LINE__);
  
@@ -162,8 +162,8 @@ if (isset($_POST['localDescription'])) {
     
     // prüfen ob ICE-Kandidaten vom User (receiver) existieren
     $rs_receiver = p4c_query("SELECT * FROM `member_cams` WHERE 
-        `member_id` = '".abs($member_id)."' AND
-        `merchant_id` = '".abs($actor_id)."' AND
+        `member_id` = '".abs((int)$member_id)."' AND
+        `merchant_id` = '".abs((int)$actor_id)."' AND
         `ice_candidates_receiver` != ''
     LIMIT 1;",__FILE__,__LINE__);
     
@@ -187,7 +187,7 @@ if (isset($_POST['localDescription'])) {
     }
     
     p4c_query("DELETE FROM `cam_stun_turn` WHERE 
-        `member_id` = '".abs($member_id)."' AND
+        `member_id` = '".abs((int)$member_id)."' AND
         `transmitter_type` = 'member';",__FILE__,__LINE__);
     
 }

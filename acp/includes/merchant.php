@@ -10,7 +10,7 @@ if (!in_array('all', $_SESSION['employee_access_area']) AND !in_array('merchant'
 }
 
 if (is_numeric($_GET['id'])) {
-    $partner_id = abs($_GET['id']);
+    $partner_id = abs((int)$_GET['id']);
 } else {
     $partner_id = p4c_escape_string($_GET['id']);
 }
@@ -34,20 +34,20 @@ $m['last_ip']        = $merchant->last_ip('aes_decrypt');
 $m['last_ip_datetime'] = $merchant->last_ip_datetime();
 $m['api_key']        = $merchant->api_key('aes_decrypt');
 
-$rs_count_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id`='".abs($merchant_id)."';", __FILE__,__LINE__);
+$rs_count_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id`='".abs((int)$merchant_id)."';", __FILE__,__LINE__);
 $count_actors = p4c_num_rows($rs_count_actors);
 
 if (isset($_POST['save_settings'])) {
     
     $minimum_number_actor_profiles = $count_actors;
     
-    if (isset($_POST['minimum_number_actor_profiles']) AND abs($_POST['minimum_number_actor_profiles']) > $minimum_number_actor_profiles) {
-        $minimum_number_actor_profiles = abs($_POST['minimum_number_actor_profiles']);  
+    if (isset($_POST['minimum_number_actor_profiles']) AND abs((int)$_POST['minimum_number_actor_profiles']) > $minimum_number_actor_profiles) {
+        $minimum_number_actor_profiles = abs((int)$_POST['minimum_number_actor_profiles']);  
     }
     
     if(p4c_query("UPDATE `merchants` SET 
-        `minimum_number_actor_profiles` = '".abs($minimum_number_actor_profiles)."'
-        WHERE `id`='".abs($merchant_id)."' LIMIT 1;",__FILE__,__LINE__)
+        `minimum_number_actor_profiles` = '".abs((int)$minimum_number_actor_profiles)."'
+        WHERE `id`='".abs((int)$merchant_id)."' LIMIT 1;",__FILE__,__LINE__)
     ) {
         log_action('H&auml;ndler (PID:'.$m['partner_id'].') bearbeitet.');
         header('Location: '.ACP_URL.'/Haendler/'.$m['partner_id'].'?saved=2');

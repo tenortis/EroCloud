@@ -14,9 +14,11 @@ include_once(SOURCEDIR."/includes/functions.inc.php");
 
 // SESSION starten
 ##############################################
-session_save_path(TEMP_DIR.'/');
-ini_set('session.gc_probability', 1);
-if(!isset($_SESSION)) {p4c_session_start();}
+if (session_status() !== PHP_SESSION_ACTIVE && !headers_sent()) {
+    session_save_path(TEMP_DIR.'/');
+    ini_set('session.gc_probability', 1);
+}
+if(!isset($_SESSION) && session_status() !== PHP_SESSION_ACTIVE && !headers_sent()) {p4c_session_start();}
 
 // Error-Handler einbinden
 include(SOURCEDIR.'/includes/klassen/errorlog.inc.php');
@@ -68,7 +70,7 @@ function log_action($string) {
         $employee_id = 0;
     }
     p4c_query("INSERT INTO `employee_history` SET 
-    `employee_id` = '".abs($employee_id)."',
+    `employee_id` = '".abs((int)$employee_id)."',
     `description` = '".p4c_escape_string($string)."',
     `datetime`    = '".date("Y-m-d H:i:s")."',
     `ip`          = '".p4c_escape_string(GetUserIP())."';",__FILE__,__LINE__);

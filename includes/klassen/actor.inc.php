@@ -8,6 +8,9 @@ if (!defined('SAFE_INC')) {
 
 class Actor {
     
+    public $class_errorlog;
+    public $actor_id;
+
     function __construct($actor_id) {
         global $mysql, $class_errorlog;
         $this->class_errorlog = $class_errorlog;
@@ -23,7 +26,7 @@ class Actor {
             $select = "`".p4c_escape_string($var)."`";
         }
 
-        $rs_actor = p4c_query("SELECT ".$select." FROM `actors` WHERE `id`='".abs($this->actor_id)."' LIMIT 1;", __FILE__, __LINE__);
+        $rs_actor = p4c_query("SELECT ".$select." FROM `actors` WHERE `id`='".abs((int)$this->actor_id)."' LIMIT 1;", __FILE__, __LINE__);
         if (p4c_num_rows($rs_actor) > 0) {
             $actor_ary = p4c_fetch_object($rs_actor);
             return $actor_ary->$var;

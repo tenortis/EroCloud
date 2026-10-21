@@ -9,12 +9,22 @@ if (!defined('SAFE_INC'))
  * **/
 
 class p4c_errorlog {
+    public $date;
     public function __construct() {
         $this->date = date("d-M-Y H:i:s");
     }
    
-    function log($error,$file,$line) {
-        error_log("[".$this->date."] ".$error." in ".$file." on line ".$line."\n", 3,  SOURCEDIR.'/log/.errorlog');
+    function log($error, $file=__FILE__, $line=__LINE__) {
+        $this->date = date("d-M-Y H:i:s T");
+        $context = '';
+        if (PHP_SAPI === 'cli') {
+            $script = isset($_SERVER['argv'][0]) ? basename((string)$_SERVER['argv'][0]) : basename((string)$file);
+            $context = '[CLI: ' . $script . '] ';
+        } elseif (!empty($_SERVER['HTTP_HOST'])) {
+            $uri = isset($_SERVER['REQUEST_URI']) ? ' ' . $_SERVER['REQUEST_URI'] : '';
+            $context = '[' . $_SERVER['HTTP_HOST'] . $uri . '] ';
+        }
+        error_log("[" . $this->date . "] " . $context . $error . " in " . $file . " on line " . $line . "\n", 3, SOURCEDIR . '/log/.errorlog');
         return "Sorry! Es ist ein Fehler aufgetreten.";
     }   
 }

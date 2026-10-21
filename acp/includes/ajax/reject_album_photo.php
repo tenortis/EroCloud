@@ -37,7 +37,7 @@ if (p4c_num_rows($rs_photo) == 0) {
     file_error("Das Foto existiert nicht.");
 }
 
-p4c_query("UPDATE `photo_albums_photos` SET `rejected` = '".abs($rejected)."' WHERE `file_id`='". p4c_escape_string($file_id)."' LIMIT 1;",__FILE__,__LINE__);
+p4c_query("UPDATE `photo_albums_photos` SET `rejected` = '".abs((int)$rejected)."' WHERE `file_id`='". p4c_escape_string($file_id)."' LIMIT 1;",__FILE__,__LINE__);
 
 echo json_encode($send_jason);
 

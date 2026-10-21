@@ -11,12 +11,12 @@ if (!isset($_SESSION['merchant_id'])) {
     die('Access not allowed!');
 }
 
-$post_actor_id = abs(filter_input(INPUT_POST, 'actor_id', FILTER_SANITIZE_NUMBER_INT));
+$post_actor_id = abs((int)filter_input(INPUT_POST, 'actor_id', FILTER_SANITIZE_NUMBER_INT));
 
 p4c_query("DELETE FROM `members_seeing_actor_cam` WHERE `cam_time`<='".time()."';", __FILE__, __LINE__);
-p4c_query("UPDATE `actor_cams` SET `datetime`='".date("Y-m-d H:i:s")."' WHERE `actor_id`='".abs($post_actor_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
+p4c_query("UPDATE `actor_cams` SET `datetime`='".date("Y-m-d H:i:s")."' WHERE `actor_id`='".abs((int)$post_actor_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
 
-$rs_members_seeing_actor_cam = p4c_query("SELECT * FROM `members_seeing_actor_cam` WHERE `actor_id`='".abs($post_actor_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
+$rs_members_seeing_actor_cam = p4c_query("SELECT * FROM `members_seeing_actor_cam` WHERE `actor_id`='".abs((int)$post_actor_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
 
 $site = '<div class="ui-widget-header">Folgende User wollen deine LiveCam sehen</div>';
 
@@ -25,7 +25,7 @@ if (p4c_num_rows($rs_members_seeing_actor_cam) == 0) {
     
 } else {
     
-    $rs_cam_settings = p4c_query("SELECT `cam_user_auto_on`, `cam_new_user_sound` FROM `actors` WHERE `id`='".abs($post_actor_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
+    $rs_cam_settings = p4c_query("SELECT `cam_user_auto_on`, `cam_new_user_sound` FROM `actors` WHERE `id`='".abs((int)$post_actor_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
     $cam_settings_obj = p4c_fetch_object($rs_cam_settings);
 
     while($cam_member_obj = p4c_fetch_object($rs_members_seeing_actor_cam)) {
@@ -50,8 +50,8 @@ if (p4c_num_rows($rs_members_seeing_actor_cam) == 0) {
                         `cam_watching`='1'
                     WHERE 
                         `chat_id`='". p4c_escape_string($cam_member_obj->chat_id)."' AND
-                        `actor_id`='".abs($post_actor_id)."' AND
-                        `merchant_id`='".abs($_SESSION['merchant_id'])."'
+                        `actor_id`='".abs((int)$post_actor_id)."' AND
+                        `merchant_id`='".abs((int)$_SESSION['merchant_id'])."'
                     LIMIT 1;", __FILE__, __LINE__);
                 }
 
@@ -65,8 +65,8 @@ if (p4c_num_rows($rs_members_seeing_actor_cam) == 0) {
                     `cam_sound`='0'
                 WHERE
                     `chat_id`='".p4c_escape_string($cam_member_obj->chat_id)."' AND
-                    `actor_id`='".abs($post_actor_id)."' AND
-                    `merchant_id`='".abs($_SESSION['merchant_id'])."'
+                    `actor_id`='".abs((int)$post_actor_id)."' AND
+                    `merchant_id`='".abs((int)$_SESSION['merchant_id'])."'
                 LIMIT 1;", __FILE__, __LINE__);
             }
 

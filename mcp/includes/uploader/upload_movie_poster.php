@@ -92,7 +92,7 @@ function upload_file($rs_movie, $movie_id, $fsk) {
                 `checksum`='".movie_checksum($movie)."',
                 `movie_checked` = '0000-00-00 00:00:00',
                 `released`='1'
-                WHERE `id`='".abs($movie_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__);
+                WHERE `id`='".abs((int)$movie_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__);
             
             
         } else {
@@ -106,10 +106,10 @@ $fileTypes = array('jpg','jpeg','png'); // File extensions
 if(isset($_FILES["movie_poster"]) AND isset($_GET['movie_id']) AND isset($_GET['fsk'])) {
     $ret = array();
     
-    $movie_id = abs($_GET['movie_id']); 
-    $fsk = abs($_GET['fsk']); 
+    $movie_id = abs((int)$_GET['movie_id']); 
+    $fsk = abs((int)$_GET['fsk']); 
     
-    $rs_movie = p4c_query("SELECT * FROM `movies` WHERE `id`='".abs($movie_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_movie = p4c_query("SELECT * FROM `movies` WHERE `id`='".abs((int)$movie_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__);
     
     // Nur Updaten wenn Datei noch nicht hochgeladen wurde
     if (p4c_num_rows($rs_movie) == 1) {

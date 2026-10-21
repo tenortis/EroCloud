@@ -42,7 +42,7 @@ if (p4c_num_rows($rs_points_scoring) > 0) {
 
     while($scoring_obj = p4c_fetch_object($rs_points_scoring)) {
 
-        $rs_actor = p4c_query("SELECT `username` FROM `actors`WHERE `id`='".abs($scoring_obj->actor_id)."' LIMIT 1;",__FILE__,__LINE__);
+        $rs_actor = p4c_query("SELECT `username` FROM `actors`WHERE `id`='".abs((int)$scoring_obj->actor_id)."' LIMIT 1;",__FILE__,__LINE__);
         
         if (p4c_num_rows($rs_actor) == 0) {
             $actor_name = '';

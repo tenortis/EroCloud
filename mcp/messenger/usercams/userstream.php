@@ -16,10 +16,10 @@ if (!isset($_GET['member_id'])) {
     exit;
 }
 
-$sender_id = abs($_GET['member_id']);
-$member_id = abs($_SESSION['merchant_id']);
+$sender_id = abs((int)$_GET['member_id']);
+$member_id = abs((int)$_SESSION['merchant_id']);
 
-$rs_member = p4c_query("SELECT * FROM `members` WHERE `id`='".abs($sender_id)."' LIMIT 1;",__FILE__,__LINE__);
+$rs_member = p4c_query("SELECT * FROM `members` WHERE `id`='".abs((int)$sender_id)."' LIMIT 1;",__FILE__,__LINE__);
 if (p4c_num_rows($rs_member) == 0) {
     exit;
 }

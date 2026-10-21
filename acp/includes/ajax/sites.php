@@ -36,7 +36,7 @@ if (p4c_num_rows($rs_sites) > 0) {
 
     while($site_obj = p4c_fetch_object($rs_sites)) {
         
-        $rs_ads = p4c_query("SELECT COUNT(*) FROM `ads_media` WHERE `site_id`='".abs($site_obj->id)."';",__FILE__,__LINE__);
+        $rs_ads = p4c_query("SELECT COUNT(*) FROM `ads_media` WHERE `site_id`='".abs((int)$site_obj->id)."';",__FILE__,__LINE__);
         
         if ($site_obj->status == '1') {
             $status = '<img src="'.ACP_URL.'/images/icons/on.png" alt="" title="aktiv" />';

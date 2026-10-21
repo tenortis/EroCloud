@@ -8,7 +8,7 @@ header('Content-Type: text/html; charset=utf-8');
 $rs_sync = p4c_query("SELECT * FROM `messenger_sync` WHERE
     (`sync_time`='0000-00-00 00:00:00' OR `chats_synct`<`chats_total` OR `chats_total`='0') AND 
     `domain`    ='".p4c_escape_string($domain)."' AND 
-    `actor_id`  = '".abs($actor_id)."' AND
+    `actor_id`  = '".abs((int)$actor_id)."' AND
     AES_DECRYPT(`apikey`, '".AES_KEY."') = '".p4c_escape_string($api_key)."'
 LIMIT 1;",__FILE__,__LINE__);
 
@@ -62,7 +62,7 @@ if (p4c_num_rows($rs_sync) > 0) {
                         `remote_member_id`  = '".p4c_escape_string($remote_member_id)."',
                         `p4c_shop_id`       = '".p4c_escape_string($member_ary->p4c_shop_id)."',
                         `username`          = '".p4c_escape_string($member_ary->username)."',
-                        `amount_coins`      = '".abs($member_ary->amount_coins)."',
+                        `amount_coins`      = '".abs((int)$member_ary->amount_coins)."',
                         `birthday`          = '".p4c_escape_string(date("Y-m-d", strtotime($member_ary->birthday)))."',
                         `email`             = '".p4c_escape_string($member_ary->email)."',
                         `lastonline`        = '".p4c_escape_string(date("Y-m-d H:i:s",strtotime($member_ary->lastonline)))."',
@@ -81,20 +81,20 @@ if (p4c_num_rows($rs_sync) > 0) {
             if ($site_ary->chats_synct >= $count_chats) {
                 p4c_query("UPDATE `messenger_sync` SET
                     `sync_time`='".date("Y-m-d H:i:s")."',
-                    `chats_synct`='".abs($count_chats)."'
-                WHERE `merchant_id`='".abs($merchant_id)."' AND `actor_id`='".abs($actor_id)."' AND `domain`='".p4c_escape_string($domain)."' LIMIT 1;",__FILE__,__LINE__);
+                    `chats_synct`='".abs((int)$count_chats)."'
+                WHERE `merchant_id`='".abs((int)$merchant_id)."' AND `actor_id`='".abs((int)$actor_id)."' AND `domain`='".p4c_escape_string($domain)."' LIMIT 1;",__FILE__,__LINE__);
             }
             // Ansonsten mache weiter und setze Zeitstempel auf 0 zurück
             else {
                 p4c_query("UPDATE `messenger_sync` SET
                     `sync_time`='0000-00-00 00:00:00',
-                    `chats_total`='".abs($count_chats)."'
-                WHERE `merchant_id`='".abs($merchant_id)."' AND `actor_id`='".abs($actor_id)."' AND `domain`='".p4c_escape_string($domain)."' LIMIT 1;",__FILE__,__LINE__);
+                    `chats_total`='".abs((int)$count_chats)."'
+                WHERE `merchant_id`='".abs((int)$merchant_id)."' AND `actor_id`='".abs((int)$actor_id)."' AND `domain`='".p4c_escape_string($domain)."' LIMIT 1;",__FILE__,__LINE__);
 
                 include_once(SOURCEDIR.'/includes/klassen/member.inc.php');
                 
                 foreach ($chat_obj as $erocms_chat_id => $chat_ary) {
-                    $rs_actor_member_info = p4c_query("SELECT * FROM `actor_member_info` WHERE `erocms_chat_id`='". p4c_escape_string($erocms_chat_id)."' AND `p4c_shop_id`='".abs($chat_ary->p4c_shop_id)."' LIMIT 1;",__FILE__,__LINE__);
+                    $rs_actor_member_info = p4c_query("SELECT * FROM `actor_member_info` WHERE `erocms_chat_id`='". p4c_escape_string($erocms_chat_id)."' AND `p4c_shop_id`='".abs((int)$chat_ary->p4c_shop_id)."' LIMIT 1;",__FILE__,__LINE__);
 
                     if (p4c_num_rows($rs_actor_member_info) == 0) {
 
@@ -105,22 +105,22 @@ if (p4c_num_rows($rs_sync) > 0) {
                         
                         if(p4c_query("INSERT INTO `actor_member_info` SET 
                             `chat_id`           = '".p4c_escape_string($chat_id)."',
-                            `erocms_amateur_id` = '".abs($chat_ary->amateur_id)."',
-                            `erocms_member_id`  = '".abs($chat_ary->member_id)."',
+                            `erocms_amateur_id` = '".abs((int)$chat_ary->amateur_id)."',
+                            `erocms_member_id`  = '".abs((int)$chat_ary->member_id)."',
                             `erocms_chat_id`    = '".p4c_escape_string($erocms_chat_id)."',
-                            `p4c_shop_id`       = '".abs($chat_ary->p4c_shop_id)."',
-                            `remote_member_id`  = '".abs($chat_ary->p4c_shop_id)."_".abs($chat_ary->member_id)."',
+                            `p4c_shop_id`       = '".abs((int)$chat_ary->p4c_shop_id)."',
+                            `remote_member_id`  = '".abs((int)$chat_ary->p4c_shop_id)."_".abs((int)$chat_ary->member_id)."',
                             `domain`            = '".p4c_escape_string($chat_ary->domain)."',
-                            `merchant_id`       = '".abs($merchant_id)."',
-                            `actor_id`          = '".abs($actor_id)."',
-                            `member_id`         = '".abs($member->id())."',
-                            `pn_amount`         = '".abs($chat_ary->pn_preis)."',
-                            `pn_free_when_webcam` = '".abs($chat_ary->pn_kostenlos_bei_webcam)."',
-                            `cam2cam_amount`    = '".abs($chat_ary->cam2cam_preis)."',
-                            `cam_amount`        = '".abs($chat_ary->cam_preis)."',
-                            `is_cam_free`       = '".abs($chat_ary->cam_kostenlos)."',
-                            `member_is_typing`  = '".abs($chat_ary->member_tippt)."',
-                            `actor_is_typing`   = '".abs($chat_ary->ama_tippt)."',
+                            `merchant_id`       = '".abs((int)$merchant_id)."',
+                            `actor_id`          = '".abs((int)$actor_id)."',
+                            `member_id`         = '".abs((int)$member->id())."',
+                            `pn_amount`         = '".abs((int)$chat_ary->pn_preis)."',
+                            `pn_free_when_webcam` = '".abs((int)$chat_ary->pn_kostenlos_bei_webcam)."',
+                            `cam2cam_amount`    = '".abs((int)$chat_ary->cam2cam_preis)."',
+                            `cam_amount`        = '".abs((int)$chat_ary->cam_preis)."',
+                            `is_cam_free`       = '".abs((int)$chat_ary->cam_kostenlos)."',
+                            `member_is_typing`  = '".abs((int)$chat_ary->member_tippt)."',
+                            `actor_is_typing`   = '".abs((int)$chat_ary->ama_tippt)."',
                             `user_notes`        = '".p4c_escape_string($chat_ary->userinfo)."'
                         ",__FILE__,__LINE__));
                     }

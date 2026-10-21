@@ -275,12 +275,12 @@ if (isset($_GET['guuid'])) {
             }
 
             // Loggen, wann der User die URL aufgerufen hat
-            $check_website_access = p4c_query("SELECT * FROM `user_tracking_website_access` WHERE `url_id`='".p4c_escape_string($url_id)."' AND `user_id`='".abs($user_id)."' LIMIT 1;",__FILE__,__LINE__);
+            $check_website_access = p4c_query("SELECT * FROM `user_tracking_website_access` WHERE `url_id`='".p4c_escape_string($url_id)."' AND `user_id`='".abs((int)$user_id)."' LIMIT 1;",__FILE__,__LINE__);
             if (p4c_num_rows($check_website_access) == 0) {
                 p4c_query("INSERT INTO `user_tracking_website_access` SET
                     `gtag`='". p4c_escape_string($site_id)."',
                     `url_id`= '". p4c_escape_string($url_id)."',
-                    `user_id` = '". abs($user_id)."',
+                    `user_id` = '". abs((int)$user_id)."',
                     `log_datetime` = '".date("Y-m-d H:i:s")."';", __FILE__,__LINE__);            
             }
         }

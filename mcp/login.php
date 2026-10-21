@@ -56,7 +56,7 @@ if ($data == 'ok') {
             if (p4c_num_rows($rs_user) > 0) {
                 $user_ary = p4c_fetch_object($rs_user);
 
-                $merchant_id = abs($user_ary->id);
+                $merchant_id = abs((int)$user_ary->id);
 
                 // If api_key not exist
                 if (trim($user_ary->api_key) == '') {
@@ -117,7 +117,7 @@ if ($data == 'ok') {
                     `username`      = AES_ENCRYPT('".p4c_escape_string($merchant_xml_obj->username)."','".AES_KEY."'),
                     `email`         = AES_ENCRYPT('".p4c_escape_string($merchant_xml_obj->email)."','".AES_KEY."'),
                     `last_ip`=AES_ENCRYPT('".p4c_escape_string(getUserIP())."','".AES_KEY."'),
-                    `last_ip_datetime`='".date("Y-m-d H:i:s")."' WHERE `id`='".abs($merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
+                    `last_ip_datetime`='".date("Y-m-d H:i:s")."' WHERE `id`='".abs((int)$merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
                 
                 header('Location: '.MCP_URL.'/Startseite');
                 exit;

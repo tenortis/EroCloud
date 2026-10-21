@@ -11,25 +11,25 @@ if (is_logged_in('mcp') === false) {
     exit;
 }
 
-$merchant_id = abs($_SESSION['merchant_id']);
+$merchant_id = abs((int)$_SESSION['merchant_id']);
 
 if (isset($_POST['checked']) AND isset($_POST['comment_id']) AND isset($_POST['month'])) {
 
-    $comment_id = abs($_POST['comment_id']);
-    $checked = abs($_POST['checked']);
-    $month = abs($_POST['month']);
+    $comment_id = abs((int)$_POST['comment_id']);
+    $checked = abs((int)$_POST['checked']);
+    $month = abs((int)$_POST['month']);
     
     // DB von amoredea auswählen
     $mysql -> change_connect("amoredea");
 
-    $rs_comments = p4c_query("SELECT * FROM `timeline_comments_".abs($month)."` WHERE `id`='".abs($comment_id)."' AND `merchant_id`='".abs($merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_comments = p4c_query("SELECT * FROM `timeline_comments_".abs((int)$month)."` WHERE `id`='".abs((int)$comment_id)."' AND `merchant_id`='".abs((int)$merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
     
     if (p4c_num_rows($rs_comments) > 0) {
-        p4c_query("UPDATE `timeline_comments_".abs($month)."` SET
-            `checked` = '".abs($checked)."'
+        p4c_query("UPDATE `timeline_comments_".abs((int)$month)."` SET
+            `checked` = '".abs((int)$checked)."'
         WHERE
-            `id` = '".abs($comment_id)."' AND
-            `merchant_id`='".abs($merchant_id)."'
+            `id` = '".abs((int)$comment_id)."' AND
+            `merchant_id`='".abs((int)$merchant_id)."'
         LIMIT 1;",__FILE__,__LINE__);  
     }
     
@@ -43,27 +43,27 @@ if (isset($_POST['checked']) AND isset($_POST['comment_id']) AND isset($_POST['m
 
 if (isset($_POST['delete_id'])) {
     
-    $comment_id = abs($_POST['delete_id']);
-    $month = abs($_POST['month']);
+    $comment_id = abs((int)$_POST['delete_id']);
+    $month = abs((int)$_POST['month']);
     
     // DB von amoredea auswählen
     $mysql -> change_connect("amoredea");
     
-    $rs_comments = p4c_query("SELECT * FROM `timeline_comments_".abs($month)."` WHERE `id`='".abs($comment_id)."' AND `merchant_id`='".abs($merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_comments = p4c_query("SELECT * FROM `timeline_comments_".abs((int)$month)."` WHERE `id`='".abs((int)$comment_id)."' AND `merchant_id`='".abs((int)$merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
     
     if (p4c_num_rows($rs_comments) > 0) {
         $comment_obj = p4c_fetch_object($rs_comments);
         
-        p4c_query("DELETE FROM `timeline_comments_".abs($month)."` WHERE `id`='".abs($comment_id)."' AND `merchant_id`='".abs($merchant_id)."' LIMIT 1;",__FILE__,__LINE__);  
+        p4c_query("DELETE FROM `timeline_comments_".abs((int)$month)."` WHERE `id`='".abs((int)$comment_id)."' AND `merchant_id`='".abs((int)$merchant_id)."' LIMIT 1;",__FILE__,__LINE__);  
     
-        $rs_content = p4c_query("SELECT * FROM `timeline_".abs($month)."` WHERE `id`='".abs($comment_obj->content_id)."' LIMIT 1;",__FILE__,__LINE__);
+        $rs_content = p4c_query("SELECT * FROM `timeline_".abs((int)$month)."` WHERE `id`='".abs((int)$comment_obj->content_id)."' LIMIT 1;",__FILE__,__LINE__);
         if (p4c_num_rows($rs_content)) {
             $content_obj = p4c_fetch_object($rs_content);
             
             $number_of_comments = $content_obj->number_of_comments - 1;
             if ($number_of_comments < 0) {$number_of_comments = 0;}        
 
-            p4c_query("UPDATE `timeline_".abs($month)."` SET `number_of_comments`='".$number_of_comments."' WHERE `id`='".abs($comment_obj->content_id)."' LIMIT 1;",__FILE__,__LINE__);
+            p4c_query("UPDATE `timeline_".abs((int)$month)."` SET `number_of_comments`='".$number_of_comments."' WHERE `id`='".abs((int)$comment_obj->content_id)."' LIMIT 1;",__FILE__,__LINE__);
         }
     }
 
@@ -96,7 +96,7 @@ for($i=0;$i<=$month_total;$i++) {
 
     $check_tbl_exists = p4c_query("SHOW TABLES LIKE 'timeline_comments_".$month."';",__FILE__,__LINE__);
     if (p4c_num_rows($check_tbl_exists) > 0) {
-        $rs_comments = p4c_query("SELECT * FROM `timeline_comments_".$month."` WHERE `merchant_id`='".abs($merchant_id)."' ORDER BY `id` DESC", __FILE__, __LINE__);
+        $rs_comments = p4c_query("SELECT * FROM `timeline_comments_".$month."` WHERE `merchant_id`='".abs((int)$merchant_id)."' ORDER BY `id` DESC", __FILE__, __LINE__);
         if (p4c_num_rows($rs_comments) > 0) {
             while($comment_obj = p4c_fetch_object($rs_comments)) {
                 

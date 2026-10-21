@@ -76,8 +76,9 @@ if (!function_exists('sa_get_disk_metrics')) {
     function sa_get_disk_metrics($disk_check_path, $fallback_used_bytes = 0.0) {
         $disk_total = 0.0;
         $disk_free  = 0.0;
+        $disabled   = array_map('trim', explode(',', strtolower((string)@ini_get('disable_functions'))));
 
-        if (function_exists('disk_total_space')) {
+        if (function_exists('disk_total_space') && !in_array('disk_total_space', $disabled)) {
             $t = @disk_total_space($disk_check_path);
             if ($t === false || $t <= 0) {
                 $rp = @realpath($disk_check_path);
@@ -90,7 +91,7 @@ if (!function_exists('sa_get_disk_metrics')) {
             }
         }
 
-        if (function_exists('disk_free_space')) {
+        if (function_exists('disk_free_space') && !in_array('disk_free_space', $disabled)) {
             $f = @disk_free_space($disk_check_path);
             if ($f === false || $f <= 0) {
                 $rp = @realpath($disk_check_path);
@@ -105,7 +106,6 @@ if (!function_exists('sa_get_disk_metrics')) {
 
         // Fallback 1: Linux 'df -P -k' falls disk_total_space in php.ini (disable_functions) gesperrt ist
         if ($disk_total <= 0 && function_exists('exec')) {
-            $disabled = array_map('trim', explode(',', strtolower((string)@ini_get('disable_functions'))));
             if (!in_array('exec', $disabled)) {
                 $df_out = array();
                 $df_ret = 1;

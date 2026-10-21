@@ -9,7 +9,7 @@ include_once(MCP_DIR."/common.inc.php");
 
 header('Content-Type: text/html; charset=utf-8');
 
-$args = str_replace('--', "&", $_SERVER['argv'][1]);
+$args = isset($_SERVER['argv'][1]) ? str_replace('--', "&", $_SERVER['argv'][1]) : '';
 
 parse_str($args, $_GET);
 
@@ -19,9 +19,9 @@ if ((isset($_GET['actor_id']) OR isset($_GET['merchant_id']) OR isset($_GET['all
     $type = 'webcam';
     
     if (isset($_GET['actor_id'])) {
-        $sql = "`actor_id` = '".abs($_GET['actor_id'])."' AND ";
+        $sql = "`actor_id` = '".abs((int)$_GET['actor_id'])."' AND ";
     } else if (isset($_GET['merchant_id'])) {
-        $sql = "`merchant_id` = '".abs($_GET['merchant_id'])."' AND ";
+        $sql = "`merchant_id` = '".abs((int)$_GET['merchant_id'])."' AND ";
     } else {
         $sql = "";
     }
@@ -81,7 +81,7 @@ if ((isset($_GET['actor_id']) OR isset($_GET['merchant_id']) OR isset($_GET['all
                 
                     foreach($revenue_obj->date as $date => $amount) {
                         
-                        $amount = abs($amount);
+                        $amount = abs((float)$amount);
                         
                         $date = date("Y-m-d", strtotime($date));
 
@@ -90,26 +90,26 @@ if ((isset($_GET['actor_id']) OR isset($_GET['merchant_id']) OR isset($_GET['all
                             if ($amount > 0) {
 
                                 $rs_revenue_webcam = p4c_query("SELECT * FROM `revenue_webcam` WHERE 
-                                    `merchant_id` = '".abs($site_obj->merchant_id)."' AND
-                                    `actor_id` = '".abs($actor_id)."' AND
+                                    `merchant_id` = '".abs((int)$site_obj->merchant_id)."' AND
+                                    `actor_id` = '".abs((int)$actor_id)."' AND
                                     `date` = '".p4c_escape_string($date)."' AND
                                     `domain` = '".p4c_escape_string($domain)."' LIMIT 1;
                                 ",__FILE__,__LINE__);
 
                                 if (p4c_num_rows($rs_revenue_webcam) == 0) {
                                     p4c_query("INSERT INTO `revenue_webcam` SET 
-                                        `merchant_id` = '".abs($site_obj->merchant_id)."',
-                                        `actor_id` = '".abs($actor_id)."',
+                                        `merchant_id` = '".abs((int)$site_obj->merchant_id)."',
+                                        `actor_id` = '".abs((int)$actor_id)."',
                                         `date` = '".p4c_escape_string($date)."',
                                         `domain` = '".p4c_escape_string($domain)."',
-                                        `commision` = '".abs($amount)."'
+                                        `commision` = '".abs((float)$amount)."'
                                     ",__FILE__,__LINE__);
                                 } else {
                                     p4c_query("UPDATE `revenue_webcam` SET 
-                                        `commision` = '".abs($amount)."'
+                                        `commision` = '".abs((float)$amount)."'
                                     WHERE 
-                                        `merchant_id` = '".abs($site_obj->merchant_id)."' AND
-                                        `actor_id` = '".abs($actor_id)."' AND
+                                        `merchant_id` = '".abs((int)$site_obj->merchant_id)."' AND
+                                        `actor_id` = '".abs((int)$actor_id)."' AND
                                         `date` = '".p4c_escape_string($date)."' AND
                                         `domain` = '".p4c_escape_string($domain)."'
                                     LIMIT 1;",__FILE__,__LINE__);

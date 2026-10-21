@@ -44,6 +44,9 @@ class ChatMessage {
     var $geloescht      = 0;
     var $domain         = '';
     var $send_to        = '';
+    var $mysql;
+    var $class_errorlog;
+    var $preis          = 0;
     
     function __construct() {
         global $mysql, $class_errorlog;
@@ -118,45 +121,45 @@ class ChatMessage {
         
         if (p4c_query('INSERT INTO `chat_messages` SET 
             `chat_id`       = "'.p4c_escape_string($this->chat_id).'",
-            `p4c_shop_id`   = "'.abs($this->p4c_shop_id).'",
-            `merchant_id`   = "'.abs($this->merchant_id).'",
-            `erocms_von_id` = "'.abs($this->erocms_von_id).'",
-            `erocms_an_id`  = "'.abs($this->erocms_an_id).'",
+            `p4c_shop_id`   = "'.abs((int)$this->p4c_shop_id).'",
+            `merchant_id`   = "'.abs((int)$this->merchant_id).'",
+            `erocms_von_id` = "'.abs((int)$this->erocms_von_id).'",
+            `erocms_an_id`  = "'.abs((int)$this->erocms_an_id).'",
             `von`           = "'.p4c_escape_string($this->von).'",
-            `von_id`        = "'.abs($this->von_id).'",
-            `an_id`         = "'.abs($this->an_id).'",
-            `message_price` = "'.abs($this->message_price).'",
-            `actor_commision`           = "'.abs($this->actor_commision).'",
-            `actor_commision_percent`   = "'.abs($this->actor_commision_percent).'",
+            `von_id`        = "'.abs((int)$this->von_id).'",
+            `an_id`         = "'.abs((int)$this->an_id).'",
+            `message_price` = "'.abs((float)$this->message_price).'",
+            `actor_commision`           = "'.abs((float)$this->actor_commision).'",
+            `actor_commision_percent`   = "'.abs((float)$this->actor_commision_percent).'",
             `message`       = "'.p4c_escape_string($message).'",
             `datetime`      = "'.date("Y-m-d H:i:s", strtotime($this->datetime)).'",
-            `is_mobile`     = "'.abs($this->is_mobile).'",
-            `systemnachricht` = "'.abs($this->systemnachricht).'",
-            `gelesen`       = "'.abs($this->gelesen).'",
-            `beantwortet`   = "'.abs($this->beantwortet).'",
-            `geloescht`     = "'.abs($this->geloescht).'";',__FILE__,__LINE__)) {
+            `is_mobile`     = "'.abs((int)$this->is_mobile).'",
+            `systemnachricht` = "'.abs((int)$this->systemnachricht).'",
+            `gelesen`       = "'.abs((int)$this->gelesen).'",
+            `beantwortet`   = "'.abs((int)$this->beantwortet).'",
+            `geloescht`     = "'.abs((int)$this->geloescht).'";',__FILE__,__LINE__)) {
             
             $insert_id_chat_messages = p4c_insert_id();
             
             p4c_query('INSERT INTO `chat_messages_history` SET 
                 `chat_id`       = "'.p4c_escape_string($this->chat_id).'",
-                `p4c_shop_id`   = "'.abs($this->p4c_shop_id).'",
-                `merchant_id`   = "'.abs($this->merchant_id).'",
-                `erocms_von_id` = "'.abs($this->erocms_von_id).'",
-                `erocms_an_id`  = "'.abs($this->erocms_an_id).'",
+                `p4c_shop_id`   = "'.abs((int)$this->p4c_shop_id).'",
+                `merchant_id`   = "'.abs((int)$this->merchant_id).'",
+                `erocms_von_id` = "'.abs((int)$this->erocms_von_id).'",
+                `erocms_an_id`  = "'.abs((int)$this->erocms_an_id).'",
                 `von`           = "'.p4c_escape_string($this->von).'",
-                `von_id`        = "'.abs($this->von_id).'",
-                `an_id`         = "'.abs($this->an_id).'",
-                `message_price` = "'.abs($this->message_price).'",
-                `actor_commision`           = "'.abs($this->actor_commision).'",
-                `actor_commision_percent`   = "'.abs($this->actor_commision_percent).'",
+                `von_id`        = "'.abs((int)$this->von_id).'",
+                `an_id`         = "'.abs((int)$this->an_id).'",
+                `message_price` = "'.abs((float)$this->message_price).'",
+                `actor_commision`           = "'.abs((float)$this->actor_commision).'",
+                `actor_commision_percent`   = "'.abs((float)$this->actor_commision_percent).'",
                 `message`       = "'.p4c_escape_string($message).'",
                 `datetime`      = "'.date("Y-m-d H:i:s", strtotime($this->datetime)).'",
-                `is_mobile`     = "'.abs($this->is_mobile).'",
-                `systemnachricht` = "'.abs($this->systemnachricht).'",
-                `gelesen`       = "'.abs($this->gelesen).'",
-                `beantwortet`   = "'.abs($this->beantwortet).'",
-                `geloescht`     = "'.abs($this->geloescht).'";',__FILE__,__LINE__);
+                `is_mobile`     = "'.abs((int)$this->is_mobile).'",
+                `systemnachricht` = "'.abs((int)$this->systemnachricht).'",
+                `gelesen`       = "'.abs((int)$this->gelesen).'",
+                `beantwortet`   = "'.abs((int)$this->beantwortet).'",
+                `geloescht`     = "'.abs((int)$this->geloescht).'";',__FILE__,__LINE__);
             
             $insert_id_chat_messages_history = p4c_insert_id();
             
@@ -164,8 +167,8 @@ class ChatMessage {
                 return $this->send_to_erocms($insert_id_chat_messages, $insert_id_chat_messages_history, $this->chat_id, $this->p4c_shop_id, $this->von_id);
             } else {
                 
-                p4c_query("UPDATE `chat_messages` SET `gelesen` = '0' WHERE `id`='".abs($insert_id_chat_messages)."' LIMIT 1;",__FILE__,__LINE__);
-                p4c_query("UPDATE `chat_messages_history` SET `gelesen` = '0' WHERE `id`='".abs($insert_id_chat_messages_history)."' LIMIT 1;",__FILE__,__LINE__);
+                p4c_query("UPDATE `chat_messages` SET `gelesen` = '0' WHERE `id`='".abs((int)$insert_id_chat_messages)."' LIMIT 1;",__FILE__,__LINE__);
+                p4c_query("UPDATE `chat_messages_history` SET `gelesen` = '0' WHERE `id`='".abs((int)$insert_id_chat_messages_history)."' LIMIT 1;",__FILE__,__LINE__);
                 
                 return 'ok';
             }
@@ -180,7 +183,7 @@ class ChatMessage {
         $search = array('http://', 'https://', 'www.');
         $domain = str_replace($search, '', $this->domain);
         
-        $rs_messenger_sync = p4c_query("SELECT AES_DECRYPT(`apikey`, '".AES_KEY."') FROM `messenger_sync` WHERE `actor_id`='".abs($p4c_actor_id)."' AND `p4c_shop_id`='".abs($p4c_shop_id)."' LIMIT 1;",__FILE__,__LINE__);
+        $rs_messenger_sync = p4c_query("SELECT AES_DECRYPT(`apikey`, '".AES_KEY."') FROM `messenger_sync` WHERE `actor_id`='".abs((int)$p4c_actor_id)."' AND `p4c_shop_id`='".abs((int)$p4c_shop_id)."' LIMIT 1;",__FILE__,__LINE__);
 
         $param = array(
             "api_key"   => p4c_result($rs_messenger_sync, 0),
@@ -205,8 +208,8 @@ class ChatMessage {
         if($data != false) {
             if ($data === 'ok') {
                 p4c_query("UPDATE `actor_member_info` SET `marked_as_unanswered`='0' WHERE `chat_id` = '".p4c_escape_string($chat_id)."' LIMIT 1;",__FILE__,__LINE__);
-                p4c_query("UPDATE `chat_messages` SET `gelesen`='0' WHERE `id`='".abs($insert_id_chat_messages)."' LIMIT 1;",__FILE__,__LINE__);
-                p4c_query("UPDATE `chat_messages_history` SET `gelesen`='0' WHERE `id`='".abs($insert_id_chat_messages_history)."' LIMIT 1;",__FILE__,__LINE__);
+                p4c_query("UPDATE `chat_messages` SET `gelesen`='0' WHERE `id`='".abs((int)$insert_id_chat_messages)."' LIMIT 1;",__FILE__,__LINE__);
+                p4c_query("UPDATE `chat_messages_history` SET `gelesen`='0' WHERE `id`='".abs((int)$insert_id_chat_messages_history)."' LIMIT 1;",__FILE__,__LINE__);
             } else {
                 $class_errorlog->log($data."\n".'https://'.$domain.'/erocloud_api/get_new_message.php?'.$query,__FILE__,__LINE__);
             }

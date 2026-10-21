@@ -7,7 +7,7 @@ $sourcedir = dirname(dirname(__FILE__));
 include_once($sourcedir."/config.inc.php");
 include_once(MCP_DIR."/common.inc.php");
 
-$args = str_replace('--', "&", $_SERVER['argv'][1]);
+$args = isset($_SERVER['argv'][1]) ? str_replace('--', "&", $_SERVER['argv'][1]) : '';
 parse_str($args, $_GET);
 
 function getConversionsData($url, $site_obj) {
@@ -93,11 +93,14 @@ Curl errno: ".$errno."
         
         // Prüfen ob Logs als XML gesendet werden    
         preg_match_all('/<log>(.*)<\/log>/smU',$file_get_contents, $xml_logs);
-        if (isset($xml_logs[1]) AND !empty($xml_logs[1])) {
-                   
-            $xml = simplexml_load_string($file_get_contents);
+        if (isset($xml_logs[0]) AND !empty($xml_logs[0])) {
+            $clean_xml = '<?xml version="1.0" encoding="UTF-8"?><eroads>' . implode("\n", $xml_logs[0]) . '</eroads>';
+            $prev_libxml = libxml_use_internal_errors(true);
+            $xml = @simplexml_load_string($clean_xml);
+            libxml_clear_errors();
+            libxml_use_internal_errors($prev_libxml);
 
-            foreach($xml->log as $array) {
+            foreach(($xml !== false && isset($xml->log)) ? $xml->log : array() as $array) {
                 
                 /** $array 
                     [id] => 23
@@ -146,11 +149,11 @@ Zeile: ".__LINE__, 'From: EroADS-Bot <no-replay@erocloud.net>');
                     if (!empty($member_id) OR $member_id != '0') {
                         p4c_query("UPDATE `ads_conversions` SET
                             `username`  = '".p4c_escape_string($username)."',
-                            `member_id` = '".abs($member_id)."'
+                            `member_id` = '".abs((int)$member_id)."'
                         WHERE
                             `user_hash` = '".p4c_escape_string($user_hash)."' AND
                             `member_id` = '0' AND
-                            `site_id`   = '".abs($site_obj->id)."' AND
+                            `site_id`   = '".abs((int)$site_obj->id)."' AND
                             `wmid`      = '".p4c_escape_string($wm_id)."'
                         LIMIT 1;",__FILE__,__LINE__);
                     }
@@ -171,15 +174,15 @@ Zeile: ".__LINE__, 'From: EroADS-Bot <no-replay@erocloud.net>');
                         p4c_query("INSERT INTO `ads_conversions` SET
                             `cheksum`       = '".p4c_escape_string($checksum)."',
                             `date_time`     = '".$timestamp."',
-                            `site_id`       = '".abs($site_obj->id)."', 
+                            `site_id`       = '".abs((int)$site_obj->id)."', 
                             `p4c_partner_id`= '".p4c_escape_string($site_obj->partner_id)."', 
                             `user_hash`     = '".p4c_escape_string($user_hash)."', 
-                            `member_id`     = '".abs($member_id)."',
+                            `member_id`     = '".abs((int)$member_id)."',
                             `username`      = '".p4c_escape_string($username)."',
                             `wmid`          = '".p4c_escape_string($wm_id)."',
                             `campaign_id`   = '".p4c_escape_string($campaign_id)."',
-                            `join`          = '".abs($sign_form)."',
-                            `reg`           = '".abs($is_registered)."',
+                            `join`          = '".abs((int)$sign_form)."',
+                            `reg`           = '".abs((int)$is_registered)."',
                             `first_payment` = '".p4c_escape_string($first_payment)."',
                             `follow_payment`= '".p4c_escape_string($follow_payment) ."',
                             `again_credited_payment`= '".p4c_escape_string($gutschrift_payment) ."',
@@ -190,7 +193,7 @@ Zeile: ".__LINE__, 'From: EroADS-Bot <no-replay@erocloud.net>');
                 }
             }
             
-            p4c_query("UPDATE `sites` SET `import_conversions_updatetime`='".date("Y-m-d H:i:s")."' WHERE `id`='".abs($site_obj->id)."' LIMIT 1;",__FILE__,__LINE__);
+            p4c_query("UPDATE `sites` SET `import_conversions_updatetime`='".date("Y-m-d H:i:s")."' WHERE `id`='".abs((int)$site_obj->id)."' LIMIT 1;",__FILE__,__LINE__);
             
         } else {
             if (!empty($file_get_contents)) {
@@ -213,7 +216,7 @@ Zeile: ".__LINE__, 'From: EroADS-Bot <no-replay@erocloud.net>');
                     return false;
                 }
                 
-                p4c_query("UPDATE `sites` SET `import_conversions_updatetime`='".date("Y-m-d H:i:s")."' WHERE `id`='".abs($site_obj->id)."' LIMIT 1;",__FILE__,__LINE__);
+                p4c_query("UPDATE `sites` SET `import_conversions_updatetime`='".date("Y-m-d H:i:s")."' WHERE `id`='".abs((int)$site_obj->id)."' LIMIT 1;",__FILE__,__LINE__);
                 
             }
         }

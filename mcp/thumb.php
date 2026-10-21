@@ -30,7 +30,7 @@ if (!isset($_GET['movie_id']) || empty($_GET['movie_id'])) {
 }
 
 $movie_id_param = p4c_escape_string($_GET['movie_id']);
-$thumb_num = isset($_GET['thumb_number']) ? abs($_GET['thumb_number']) : 1;
+$thumb_num = isset($_GET['thumb_number']) ? abs((int)$_GET['thumb_number']) : 1;
 
 $rs_movie = p4c_query("SELECT `id`, `file_id`, `merchant_id`, `filename`, `storage_location` FROM `movies` WHERE `file_id`='".$movie_id_param."' LIMIT 1;",__FILE__,__LINE__);
 
@@ -187,7 +187,7 @@ if (!$target_file || !is_file($target_file) || filesize($target_file) == 0) {
    
     $width = 0;
     if (isset($_GET['w']) AND !empty($_GET['w'])) {
-        $width = abs($_GET['w']);
+        $width = abs((int)$_GET['w']);
     }
     
     if ($width > 1024) {$width = 1024;}

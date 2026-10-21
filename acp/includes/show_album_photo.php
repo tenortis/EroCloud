@@ -131,7 +131,7 @@ if (!is_file($filename)) {
    
     $width = 0;
     if (isset($_GET['w']) AND !empty($_GET['w'])) {
-        $width = abs($_GET['w']);
+        $width = abs((int)$_GET['w']);
     }
     
     if ($width > 900) {$width = 900;}

@@ -65,7 +65,7 @@ if (isset($_POST['admin_notes_abbort']) AND $settings->get_var("admin_notes_edit
     header('Location: '.ACP_URL.'/Startseite');
     exit;
 } else if (isset($_POST['admin_notes_edit']) AND $settings->get_var("admin_notes_edit") == 0) {
-    p4c_query("UPDATE `settings` SET `value`='".abs($_SESSION['employee_id'])."' WHERE `variable`='admin_notes_edit' LIMIT 1;");
+    p4c_query("UPDATE `settings` SET `value`='".abs((int)$_SESSION['employee_id'])."' WHERE `variable`='admin_notes_edit' LIMIT 1;");
     header('Location: '.ACP_URL.'/Startseite');
     exit;
 } else if (isset($_POST['admin_notes']) AND isset($_POST['admin_notes_save']) AND $settings->get_var("admin_notes_edit") == $_SESSION['employee_id']) {
@@ -76,7 +76,7 @@ if (isset($_POST['admin_notes_abbort']) AND $settings->get_var("admin_notes_edit
 }
 
 if (isset($_POST['employee_notes'])) {
-    p4c_query("UPDATE `employee` SET `notes`='".p4c_escape_string(utf8_encode($_POST['employee_notes']))."' WHERE `id`='".abs($_SESSION['employee_id'])."' LIMIT 1;");
+    p4c_query("UPDATE `employee` SET `notes`='".p4c_escape_string(utf8_encode($_POST['employee_notes']))."' WHERE `id`='".abs((int)$_SESSION['employee_id'])."' LIMIT 1;");
     header('Location: '.ACP_URL.'/Startseite');
     exit;
 }

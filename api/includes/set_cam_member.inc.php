@@ -10,12 +10,12 @@ if(!isset($_GET['actor_id'])) {
     print_xml($api);
 }
 
-$get_actor_id = abs(filter_input(INPUT_GET, 'actor_id', FILTER_SANITIZE_NUMBER_INT));
-$get_erocms_member_id = abs(filter_input(INPUT_GET, 'erocms_member_id', FILTER_SANITIZE_NUMBER_INT));
-$get_erocms_actor_id = abs(filter_input(INPUT_GET, 'erocms_actor_id', FILTER_SANITIZE_NUMBER_INT));
+$get_actor_id = abs((int)filter_input(INPUT_GET, 'actor_id', FILTER_SANITIZE_NUMBER_INT));
+$get_erocms_member_id = abs((int)filter_input(INPUT_GET, 'erocms_member_id', FILTER_SANITIZE_NUMBER_INT));
+$get_erocms_actor_id = abs((int)filter_input(INPUT_GET, 'erocms_actor_id', FILTER_SANITIZE_NUMBER_INT));
 
 // Profil abfragen
-$rs_actor_cams = p4c_query("SELECT * FROM `actor_cams` WHERE `actor_id`='".abs($get_actor_id)."' LIMIT 1;",__FILE__,__LINE__);
+$rs_actor_cams = p4c_query("SELECT * FROM `actor_cams` WHERE `actor_id`='".abs((int)$get_actor_id)."' LIMIT 1;",__FILE__,__LINE__);
 if(p4c_num_rows($rs_actor_cams) == '0') {
     $api['error'] = 'actor-cam not exists';
     print_xml($api);
@@ -23,7 +23,7 @@ if(p4c_num_rows($rs_actor_cams) == '0') {
 
 
 // Wenn Actor nicht existiert
-$rs_actor = p4c_query("SELECT * FROM `actors` WHERE `id`='".abs($get_actor_id)."' LIMIT 1;",__FILE__,__LINE__);        
+$rs_actor = p4c_query("SELECT * FROM `actors` WHERE `id`='".abs((int)$get_actor_id)."' LIMIT 1;",__FILE__,__LINE__);        
 if (p4c_num_rows($rs_actor) == 0) {
     $api['error'] = 'actor not exists';
     print_xml($api);
@@ -39,10 +39,10 @@ $cam_user_auto_on = $actor_obj->cam_user_auto_on;
 $chat_id = $get_actor_id.'_'.$p4c_shop_id.'_'.$get_erocms_member_id;
 
 $rs_actor_member_info = p4c_query("SELECT * FROM `actor_member_info` WHERE
-    `erocms_amateur_id`='".abs($get_erocms_actor_id)."' AND 
-    `erocms_member_id`='".abs($get_erocms_member_id)."' AND 
+    `erocms_amateur_id`='".abs((int)$get_erocms_actor_id)."' AND 
+    `erocms_member_id`='".abs((int)$get_erocms_member_id)."' AND 
     `domain`='".p4c_escape_string($domain)."' AND 
-    `p4c_shop_id`='".abs($p4c_shop_id)."'
+    `p4c_shop_id`='".abs((int)$p4c_shop_id)."'
 LIMIT 1;",__FILE__,__LINE__);
 
 if (p4c_num_rows($rs_actor_member_info) == 0) {
@@ -58,19 +58,19 @@ if (p4c_num_rows($rs_actor_member_info) == 0) {
     
     p4c_query("INSERT INTO `actor_member_info` SET 
         `chat_id`           = '".p4c_escape_string($chat_id)."',
-        `erocms_amateur_id` = '".abs($get_erocms_actor_id)."', 
-        `erocms_member_id`  = '".abs($get_erocms_member_id)."',
+        `erocms_amateur_id` = '".abs((int)$get_erocms_actor_id)."', 
+        `erocms_member_id`  = '".abs((int)$get_erocms_member_id)."',
         `erocms_chat_id`    = '".p4c_escape_string($erocms_chat_id)."',
-        `p4c_shop_id`       = '".abs($p4c_shop_id)."',
+        `p4c_shop_id`       = '".abs((int)$p4c_shop_id)."',
         `remote_member_id`  = '".p4c_escape_string($remote_member_id)."',
         `domain`            = '".p4c_escape_string($domain)."',
-        `merchant_id`       = '".abs($merchant_id)."',
-        `actor_id`          = '".abs($actor_id)."',
-        `member_id`         = '".abs($member->id())."',
-        `pn_amount`         = '".abs($actor->get('pn_amount'))."',
-        `pn_free_when_webcam` = '".abs($actor->get('pn_free_if_webcam'))."',
-        `cam2cam_amount`    = '".abs($actor->get('cam2cam_amount'))."',
-        `cam_amount`        = '".abs($actor->get('cam_amount'))."',
+        `merchant_id`       = '".abs((int)$merchant_id)."',
+        `actor_id`          = '".abs((int)$actor_id)."',
+        `member_id`         = '".abs((int)$member->id())."',
+        `pn_amount`         = '".abs((int)$actor->get('pn_amount'))."',
+        `pn_free_when_webcam` = '".abs((int)$actor->get('pn_free_if_webcam'))."',
+        `cam2cam_amount`    = '".abs((int)$actor->get('cam2cam_amount'))."',
+        `cam_amount`        = '".abs((int)$actor->get('cam_amount'))."',
         `is_cam_free`       = '0',
         `member_is_typing`  = '0',
         `actor_is_typing`   = '0',
@@ -106,12 +106,12 @@ if (p4c_num_rows($rs_actor_cam_members) == 0) {
     
     p4c_query("INSERT INTO `members_seeing_actor_cam` SET
         `chat_id`       = '".p4c_escape_string($chat_id)."', 
-        `merchant_id`   = '".abs($merchant_id)."',
-        `actor_id`      = '".abs($actor_id)."',
-        `remote_member_id` = '".abs($get_erocms_member_id)."',
+        `merchant_id`   = '".abs((int)$merchant_id)."',
+        `actor_id`      = '".abs((int)$actor_id)."',
+        `remote_member_id` = '".abs((int)$get_erocms_member_id)."',
         `cam_time`      = '".(time()+10)."',
         `cam_watching`  = '".$cam_watching."',
-        `cam_amount`    = '".abs($cam_amount)."',
+        `cam_amount`    = '".abs((int)$cam_amount)."',
         `cam_sound`     = '1'
     ;",__FILE__,__LINE__);
 
@@ -123,9 +123,9 @@ if (p4c_num_rows($rs_actor_cam_members) == 0) {
         `cam_time`      = '".(time()+10)."'
     WHERE 
         `chat_id`       = '".p4c_escape_string($chat_id)."' AND
-        `merchant_id`   = '".abs($merchant_id)."' AND
-        `actor_id`      = '".abs($actor_id)."' AND
-        `remote_member_id` = '".abs($get_erocms_member_id)."'
+        `merchant_id`   = '".abs((int)$merchant_id)."' AND
+        `actor_id`      = '".abs((int)$actor_id)."' AND
+        `remote_member_id` = '".abs((int)$get_erocms_member_id)."'
     LIMIT 1;",__FILE__,__LINE__);
 
     $actor_cam_members_obj = p4c_fetch_object($rs_actor_cam_members);

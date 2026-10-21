@@ -56,8 +56,8 @@ if (isset($_GET['type']) AND $_GET['type'] === 'erocms') {
 // Bild aus EroCloud gesendt
 } else {
     
-    $actor_id = abs($_GET['actor_id']);
-    $merchant_id = abs($_GET['merchant_id']);
+    $actor_id = abs((int)$_GET['actor_id']);
+    $merchant_id = abs((int)$_GET['merchant_id']);
     $file_name = preg_replace( '/[^a-z0-9.]/i', '', $_GET['filename']);
 
     $no_pic = MCP_DIR.'/images/movie_poster_nopic.jpg';

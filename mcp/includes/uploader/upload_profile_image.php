@@ -83,18 +83,18 @@ function upload_file($actor, $fsk) {
             }            
             
             p4c_query("UPDATE `actors` SET
-                `profile_image_fsk".abs($fsk)."`='".p4c_escape_string($file_name)."'
+                `profile_image_fsk".abs((int)$fsk)."`='".p4c_escape_string($file_name)."'
             WHERE 
-                `id` = '".abs($actor_id)."' AND
-                `merchant_id` = '".abs($_SESSION['merchant_id'])."'
+                `id` = '".abs((int)$actor_id)."' AND
+                `merchant_id` = '".abs((int)$_SESSION['merchant_id'])."'
             LIMIT 1;",__FILE__,__LINE__);
 
             
             $m5d_checksum = actor_checksum($actor_id);
 
             p4c_query("UPDATE `actors` SET `md5_checksum`='".p4c_escape_string($m5d_checksum)."' WHERE
-                `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
-                `id`='".abs($actor_id)."' LIMIT 1;
+                `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
+                `id`='".abs((int)$actor_id)."' LIMIT 1;
             ",__FILE__,__LINE__);
             
         } else {
@@ -108,14 +108,14 @@ $fileTypes = array('jpg','jpeg','png'); // File extensions
 if(isset($_FILES["profile_image"]) AND isset($_GET['actor_id']) AND isset($_GET['fsk'])) {
     $ret = array();
     
-    $actor_id = abs($_GET['actor_id']); 
-    $fsk = abs($_GET['fsk']); 
+    $actor_id = abs((int)$_GET['actor_id']); 
+    $fsk = abs((int)$_GET['fsk']); 
     
     include_once(SOURCEDIR.'/includes/klassen/actor.inc.php');
     $actor = new Actor($actor_id);
 
     if ($actor->get("id") == '') {
-        file_error('Das Profil ('.abs($actor_id).') existiert nicht.');
+        file_error('Das Profil ('.abs((int)$actor_id).') existiert nicht.');
     }
     
     $error = $_FILES["profile_image"]["error"];

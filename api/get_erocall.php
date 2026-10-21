@@ -28,7 +28,7 @@ if (isset($_GET['hash'])) {
         exit;
     }
   
-    $actor_id = abs($_GET['erocloud_actor_id']);
+    $actor_id = abs((int)$_GET['erocloud_actor_id']);
     $rufnummer = $_GET['rufnummer'];
     $ddi = $_GET['ddi'];
     $caller = $_GET['caller'];
@@ -36,25 +36,25 @@ if (isset($_GET['hash'])) {
     $event = $_GET['event'];
     $event_info = $_GET['event_info'];
     $date_time = date("Y-m-d H:i:s", $_GET['date_time']);
-    $timestamp = abs($_GET['timestamp']);
+    $timestamp = abs((int)$_GET['timestamp']);
     $tarif = floatval($_GET['tarif']);
-    $duration_out = abs($_GET['duration']);
+    $duration_out = abs((int)$_GET['duration']);
     $payout = floatval($_GET['payout']);
-    $provision_mobil = abs($_GET['provision_mobil']);
-    $provision_festnetz = abs($_GET['provision_festnetz']);
+    $provision_mobil = abs((float)$_GET['provision_mobil']);
+    $provision_festnetz = abs((float)$_GET['provision_festnetz']);
     
     $erocall_number_de = substr($rufnummer,5);
     $erocall_number_de = substr($erocall_number_de,0,-strlen($ddi));
     
     $rs_check_actor_exists = p4c_query("SELECT * FROM `actors` WHERE
-        `id`='".abs($actor_id)."' AND
+        `id`='".abs((int)$actor_id)."' AND
         `erocall_number_de`='". p4c_escape_string($erocall_number_de)."' AND
         `erocall_number_de_ddi`='". p4c_escape_string($ddi)."'
     LIMIT 1;",__FILE__,__LINE__);
 
     if (p4c_num_rows($rs_check_actor_exists) == 0) {
         $class_errorlog->log("EroCall Error - Darsteller nicht gefunden:\n".print_r($_GET,true)."\n"."SELECT * FROM `actors` WHERE
-        `id`='".abs($actor_id)."' AND
+        `id`='".abs((int)$actor_id)."' AND
         `erocall_number_de`='". p4c_escape_string($erocall_number_de)."' AND
         `erocall_number_de_ddi`='". p4c_escape_string($ddi)."'
     LIMIT 1;",__FILE__,__LINE__);
@@ -80,23 +80,23 @@ if (isset($_GET['hash'])) {
    
     // Prüfen ob Rufnummer aus Ziffern besteht // Rufnummer kann auch sein: 0049123456789XXX
     if (($event == 'connect' OR $event == 'hangup') AND ctype_digit(str_replace('x','', strtolower($caller)))) {
-        $rs_anrufe = p4c_query("SELECT * FROM `erocall` WHERE `rufnummer`='".p4c_escape_string($rufnummer)."' AND `date_time`='".p4c_escape_string($date_time)."' AND `timestamp`='".abs($timestamp)."' AND `event`='".p4c_escape_string($event)."' LIMIT 1;",__FILE__,__LINE__);
+        $rs_anrufe = p4c_query("SELECT * FROM `erocall` WHERE `rufnummer`='".p4c_escape_string($rufnummer)."' AND `date_time`='".p4c_escape_string($date_time)."' AND `timestamp`='".abs((int)$timestamp)."' AND `event`='".p4c_escape_string($event)."' LIMIT 1;",__FILE__,__LINE__);
         if (p4c_num_rows($rs_anrufe) == 0) {
             if(p4c_query("INSERT INTO `erocall` SET 
-                `actor_id`='".abs($actor->get('id'))."',
-                `merchant_id`='".abs($actor->get('merchant_id'))."',
+                `actor_id`='".abs((int)$actor->get('id'))."',
+                `merchant_id`='".abs((int)$actor->get('merchant_id'))."',
                 `rufnummer`='".p4c_escape_string($rufnummer)."',
                 `caller`='".p4c_escape_string($caller)."',
                 `caller_netz`='".p4c_escape_string($netz)."',
                 `destination_number`='".p4c_escape_string($destination_number)."',
                 `destination_netz`='".p4c_escape_string($destination_netz)."',
                 `tarif`='".floatval($tarif)."',
-                `duration_out`='".abs($duration_out)."',
-                `provision_mobil`='".abs($provision_mobil)."',
-                `provision_festnetz`='".abs($provision_festnetz)."',
+                `duration_out`='".abs((int)$duration_out)."',
+                `provision_mobil`='".abs((float)$provision_mobil)."',
+                `provision_festnetz`='".abs((float)$provision_festnetz)."',
                 `merchant_payout`='".floatval($payout)."',
                 `date_time`='".p4c_escape_string($date_time)."',
-                `timestamp`='".abs($timestamp)."',
+                `timestamp`='".abs((int)$timestamp)."',
                 `event`='".p4c_escape_string($event)."',
                 `event_info`='".p4c_escape_string($event_info)."';
             ",__FILE__,__LINE__)) {

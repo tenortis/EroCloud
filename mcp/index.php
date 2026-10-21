@@ -112,7 +112,7 @@ $site = '<!DOCTYPE html>
         
         $merchant = new Merchant($mysql,$_SESSION['merchant_id']);
         
-        $rs_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `status`!='deleted' ORDER BY `username` ASC;",__FILE__,__LINE__);
+        $rs_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND `status`!='deleted' ORDER BY `username` ASC;",__FILE__,__LINE__);
         $count_actors = p4c_num_rows($rs_actors);
         
         $site .= '
@@ -295,7 +295,7 @@ $site = '<!DOCTYPE html>
                                 $rs_count_chats = p4c_query("SELECT * FROM `group_actors`, `chat_messages`, `actors` WHERE
                                     `group_actors`.`actor_id`=`chat_messages`.`an_id` AND
                                     `actors`.`id`=`chat_messages`.`an_id` AND
-                                    `group_actors`.`merchant_id`='".abs($_SESSION['merchant_id'])."' AND
+                                    `group_actors`.`merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
                                     `chat_messages`.`von`='member' AND
                                     `chat_messages`.`gelesen` != '1' AND
                                     (`actors`.`status`='active' OR `actors`.`status`='inactive')
@@ -304,8 +304,8 @@ $site = '<!DOCTYPE html>
                                 $rs_count_chats = p4c_query("SELECT * FROM `group_actors`, `chat_messages`, `actors` WHERE
                                     `group_actors`.`actor_id`=`chat_messages`.`an_id` AND
                                     `actors`.`id`=`chat_messages`.`an_id` AND
-                                    `group_actors`.`group_id` = '".abs($_SESSION['my_chatgroup'])."' AND
-                                    `group_actors`.`merchant_id`='".abs($_SESSION['merchant_id'])."' AND
+                                    `group_actors`.`group_id` = '".abs((int)$_SESSION['my_chatgroup'])."' AND
+                                    `group_actors`.`merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
                                     `chat_messages`.`von`='member' AND
                                     `chat_messages`.`gelesen` != '1' AND
                                     (`actors`.`status`='active' OR `actors`.`status`='inactive')
@@ -358,10 +358,10 @@ $site = '<!DOCTYPE html>
                                 
                                 }
                                 
-                                $rs_movies = p4c_query("SELECT `id`, `convert_status`, `filename`, `title`, `movie_checked`, `released` FROM `movies` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' ORDER BY `id` DESC", __FILE__, __LINE__);
+                                $rs_movies = p4c_query("SELECT `id`, `convert_status`, `filename`, `title`, `movie_checked`, `released` FROM `movies` WHERE `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' ORDER BY `id` DESC", __FILE__, __LINE__);
                                 $count_movies = p4c_num_rows($rs_movies);
                                 
-                                $rs_albums = p4c_query("SELECT * FROM `photo_albums` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' ORDER BY `id` DESC", __FILE__, __LINE__);
+                                $rs_albums = p4c_query("SELECT * FROM `photo_albums` WHERE `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' ORDER BY `id` DESC", __FILE__, __LINE__);
                                 $count_albums = p4c_num_rows($rs_albums);
                                 
                                 $site .= '
@@ -798,16 +798,16 @@ $site = '<!DOCTYPE html>
                         jQuery(".tabs ul li").removeClass("current");
                         jQuery(".tabs .tab-content").removeClass("current");
 
-                        jQuery(".tabs ul li[data-tab=tab-'.abs($_POST['activeTabId']).']").addClass("current");
-                        jQuery(".tabs #tab-'.abs($_POST['activeTabId']).'").addClass("current");
+                        jQuery(".tabs ul li[data-tab=tab-'.abs((int)$_POST['activeTabId']).']").addClass("current");
+                        jQuery(".tabs #tab-'.abs((int)$_POST['activeTabId']).'").addClass("current");
                         ';   
                     } else if (isset($_GET['activeTabId'])) {
                         $site .= ' 
                         jQuery(".tabs ul li").removeClass("current");
                         jQuery(".tabs .tab-content").removeClass("current");
 
-                        jQuery(".tabs ul li[data-tab=tab-'.abs($_GET['activeTabId']).']").addClass("current");
-                        jQuery(".tabs #tab-'.abs($_GET['activeTabId']).'").addClass("current");
+                        jQuery(".tabs ul li[data-tab=tab-'.abs((int)$_GET['activeTabId']).']").addClass("current");
+                        jQuery(".tabs #tab-'.abs((int)$_GET['activeTabId']).'").addClass("current");
                         ';              
                     }
                 }

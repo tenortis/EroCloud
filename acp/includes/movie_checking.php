@@ -11,7 +11,7 @@ if (!defined('SAFE_INC'))
 
 if (!isset($_GET['id'])) {exit;}
 
-$movie_id = abs($_GET['id']);
+$movie_id = abs((int)$_GET['id']);
 
 $m = new Movie($mysql,$movie_id);
 
@@ -101,7 +101,7 @@ if (isset($_POST['btn']['submit_rejection_reason_movie'])) {
     }
 }
 
-$streaming_preis = round($movie['playtime_seconds'] * $movie['amount_second']);
+$streaming_preis = round((float)$movie['playtime_seconds'] * (float)$movie['amount_second']);
 
 $amount_webmaster_ary = array(0, 5, 10, 15, 20, 25);
 $replace_title_ary = array('°','^','²','§','§','$','%','{','[',']','}','´','`','~',"'",'_',';','<','>');
@@ -111,7 +111,7 @@ if (isset($_POST['btn']['save_movie'])) {
     if (isset($_POST['actor_id']) AND $_POST['actor_id'] == 0) {
         $error = 'Bitte w&auml;hlen Sie den Hauptdartseller aus.';
     } else {
-        $movie['actor_id'] = abs($_POST['actor_id']);
+        $movie['actor_id'] = abs((int)$_POST['actor_id']);
     }
     
     $movie['category_master'] = trim(strip_tags($_POST['category_master']));
@@ -162,30 +162,30 @@ if (isset($_POST['btn']['save_movie'])) {
     if(!isset($_POST['amount_second'])) {
         $error = 'Bitte geben Sie an, wieviel der Film auf Ihrer eigenen Webseite kosten soll.';
     } else {
-        $movie['amount_second'] = number_format($_POST['amount_second'], 1, '.', '');
+        $movie['amount_second'] = number_format((float)$_POST['amount_second'], 1, '.', '');
     }
     
     if (!isset($_POST['fsk18']) OR empty($_POST['fsk18'])) {
         $error = 'Bitte w&auml;hlen Sie ein FSK18 Vorschaubild aus.';
     } else {
-        $movie['fsk18'] = abs($_POST['fsk18']);
+        $movie['fsk18'] = abs((int)$_POST['fsk18']);
     }
     
     if (!isset($_POST['fsk16']) OR empty($_POST['fsk16'])) {
         $error = 'Bitte w&auml;hlen Sie ein FSK16 Vorschaubild aus.';
     } else {
-        $movie['fsk16'] = abs($_POST['fsk16']);
+        $movie['fsk16'] = abs((int)$_POST['fsk16']);
     }
     
     if(isset($_POST['amount_webmaster'])) {
-        $amount_webmaster = abs($_POST['amount_webmaster']);
+        $amount_webmaster = abs((int)$_POST['amount_webmaster']);
         if (in_array($amount_webmaster, $amount_webmaster_ary)) {
             $movie['amount_webmaster'] = $amount_webmaster;
         }
     }
     
     if(isset($_POST['as_download'])) {
-        $movie['as_download'] = abs($_POST['as_download']);
+        $movie['as_download'] = abs((int)$_POST['as_download']);
         if ($movie['as_download'] == 0) {
             $movie['as_download'] = 0;
         } else {
@@ -194,7 +194,7 @@ if (isset($_POST['btn']['save_movie'])) {
     }
     
     if(isset($_POST['amount_download'])) {
-        $amount_download = abs($_POST['amount_download']);
+        $amount_download = abs((int)$_POST['amount_download']);
         if ($amount_download <= 150 AND $amount_download >= 0) {
             $movie['amount_download'] = $amount_download;
         }
@@ -232,7 +232,7 @@ if (isset($_POST['btn']['save_movie'])) {
         $movie['quality'] = 'hd';
     }
 
-    $movie['preview'] = abs($_POST['preview']);
+    $movie['preview'] = abs((int)$_POST['preview']);
 
     if(!isset($_POST['visible_for_website'])) {
         $movie['visible_for_website'] = 'public';
@@ -270,8 +270,8 @@ if (isset($_POST['btn']['save_movie'])) {
             `actor_id`='".p4c_escape_string($movie['actor_id'])."',
             `checksum`='".movie_checksum($movie)."',
             `quality`='".p4c_escape_string($movie['quality'])."',
-            `preview_image_fsk16`='".abs($movie['fsk16'])."',
-            `preview_image_fsk18`='".abs($movie['fsk18'])."',
+            `preview_image_fsk16`='".abs((int)$movie['fsk16'])."',
+            `preview_image_fsk18`='".abs((int)$movie['fsk18'])."',
             `title` = '".p4c_escape_string($movie['title'])."',
             `description` = '".p4c_escape_string($movie['description'])."',
             `meta_title` = '".p4c_escape_string($movie['meta_title'])."',
@@ -281,18 +281,18 @@ if (isset($_POST['btn']['save_movie'])) {
             `category_slave` = '".p4c_escape_string($movie['category_slave'])."',
             `seo_url` = '".p4c_escape_string($movie['seo_url'])."',
             `online_at` = '".p4c_escape_string($movie['online_at'])."',
-            `amount_second` = '".abs($movie['amount_second'])."',
-            `amount_webmaster` = '".abs($movie['amount_webmaster'])."',
-            `as_download` = '".abs($movie['as_download'])."',
-            `amount_download` = '".abs($movie['amount_download'])."',
+            `amount_second` = '".abs((float)$movie['amount_second'])."',
+            `amount_webmaster` = '".abs((int)$movie['amount_webmaster'])."',
+            `as_download` = '".abs((int)$movie['as_download'])."',
+            `amount_download` = '".abs((int)$movie['amount_download'])."',
             `movie_checked` = '".date("Y-m-d H:i:s")."',
-            `preview`='".abs($movie['preview'])."',
+            `preview`='".abs((int)$movie['preview'])."',
             `status`='".p4c_escape_string($status)."',
             `visible_for_website`= '".p4c_escape_string($movie['visible_for_website'])."',
             `admin_infos` ='".$admin_infos."',
-            `released_from` = '".abs($_SESSION['employee_id'])."',
+            `released_from` = '".abs((int)$_SESSION['employee_id'])."',
             `released_datetime` = '".date("Y-m-d H:i:s")."'
-            WHERE `id`='".abs($movie_id)."' LIMIT 1;",__FILE__,__LINE__)) {
+            WHERE `id`='".abs((int)$movie_id)."' LIMIT 1;",__FILE__,__LINE__)) {
             
             // Prüfe ob Film schon online in der Cloud existiert
             $rs_movie_online = p4c_query("SELECT * FROM `movies_online` WHERE `file_id`='".p4c_escape_string($m->field('file_id'))."' LIMIT 1;",__FILE__,__LINE__);
@@ -302,8 +302,8 @@ if (isset($_POST['btn']['save_movie'])) {
                     `actor_id`='".p4c_escape_string($movie['actor_id'])."',
                     `checksum`='".movie_checksum($movie)."',
                     `quality`='".p4c_escape_string($movie['quality'])."',
-                    `preview_image_fsk16`='".abs($movie['fsk16'])."',
-                    `preview_image_fsk18`='".abs($movie['fsk18'])."',
+                    `preview_image_fsk16`='".abs((int)$movie['fsk16'])."',
+                    `preview_image_fsk18`='".abs((int)$movie['fsk18'])."',
                     `title` = '".p4c_escape_string($movie['title'])."',
                     `description` = '".p4c_escape_string($movie['description'])."',
                     `meta_title` = '".p4c_escape_string($movie['meta_title'])."',
@@ -313,16 +313,16 @@ if (isset($_POST['btn']['save_movie'])) {
                     `category_slave` = '".p4c_escape_string($movie['category_slave'])."',
                     `seo_url` = '".p4c_escape_string($movie['seo_url'])."',
                     `online_at` = '".p4c_escape_string($movie['online_at'])."',
-                    `amount_second` = '".abs($movie['amount_second'])."',
-                    `amount_webmaster` = '".abs($movie['amount_webmaster'])."',
-                    `as_download` = '".abs($movie['as_download'])."',
-                    `amount_download` = '".abs($movie['amount_download'])."',
+                    `amount_second` = '".abs((float)$movie['amount_second'])."',
+                    `amount_webmaster` = '".abs((int)$movie['amount_webmaster'])."',
+                    `as_download` = '".abs((int)$movie['as_download'])."',
+                    `amount_download` = '".abs((int)$movie['amount_download'])."',
                     `movie_checked` = '".date("Y-m-d H:i:s")."',
-                    `preview`='".abs($movie['preview'])."',
+                    `preview`='".abs((int)$movie['preview'])."',
                     `status`='".p4c_escape_string($status)."',
                     `visible_for_website`= '".p4c_escape_string($movie['visible_for_website'])."',
                     `admin_infos` ='".$admin_infos."',
-                    `released_from` = '".abs($_SESSION['employee_id'])."',
+                    `released_from` = '".abs((int)$_SESSION['employee_id'])."',
                     `released_datetime` = '".date("Y-m-d H:i:s")."'
                     WHERE `file_id` = '".p4c_escape_string($m->field('file_id'))."' LIMIT 1;",__FILE__,__LINE__);
             }
@@ -337,7 +337,7 @@ if (isset($_POST['btn']['save_movie'])) {
 
                     p4c_query("INSERT INTO `movies_online` SET
                         `actor_id`='".p4c_escape_string($movie['actor_id'])."',
-                        `merchant_id` = '".abs($m->field('merchant_id'))."',
+                        `merchant_id` = '".abs((int)$m->field('merchant_id'))."',
                         `storage_location` = '".p4c_escape_string($movie['storage_location'])."',
                         `checksum`='".movie_checksum($movie)."',
                         `quality`='".p4c_escape_string($movie['quality'])."',
@@ -358,17 +358,17 @@ if (isset($_POST['btn']['save_movie'])) {
                         `category_slave` = '".p4c_escape_string($movie['category_slave'])."',
                         `seo_url` = '".p4c_escape_string($movie['seo_url'])."',
                         `online_at` = '".p4c_escape_string($movie['online_at'])."',
-                        `amount_second` = '".abs($movie['amount_second'])."',
-                        `amount_own` = '".abs($m->field('amount_second'))."',
-                        `amount_webmaster` = '".abs($movie['amount_webmaster'])."',
-                        `as_download` = '".abs($movie['as_download'])."',
-                        `amount_download` = '".abs($movie['amount_download'])."',
+                        `amount_second` = '".abs((float)$movie['amount_second'])."',
+                        `amount_own` = '".abs((float)$m->field('amount_second'))."',
+                        `amount_webmaster` = '".abs((int)$movie['amount_webmaster'])."',
+                        `as_download` = '".abs((int)$movie['as_download'])."',
+                        `amount_download` = '".abs((int)$movie['amount_download'])."',
                         `movie_checked` = '".date("Y-m-d H:i:s")."',
-                        `preview`='".abs($movie['preview'])."',
+                        `preview`='".abs((int)$movie['preview'])."',
                         `status`='".p4c_escape_string($status)."',
                         `visible_for_website`= '".p4c_escape_string($movie['visible_for_website'])."',
                         `admin_infos` ='".$admin_infos."',
-                        `released_from` = '".abs($_SESSION['employee_id'])."',
+                        `released_from` = '".abs((int)$_SESSION['employee_id'])."',
                         `released_datetime` = '".date("Y-m-d H:i:s")."'
                     ;",__FILE__,__LINE__);
 
@@ -546,7 +546,7 @@ $site .= $ai_tabs_data['css_html'] . '
                 jQuery(".group1").colorbox({photo:true, rel:"group1", maxWidth:"100%", width:"auto", maxHeight:"80%"});
                             
                 jQuery.fn.preis_je_sekunde = function() {
-                    dauer = parseInt('.round($movie['playtime_seconds']).');
+                    dauer = parseInt('.round((float)$movie['playtime_seconds']).');
                     preis = jQuery(this).val();
                     gesamt = Math.round(dauer * preis);
                     jQuery("#streamingpreis").html(gesamt);
@@ -1086,7 +1086,7 @@ $site .= $ai_tabs_data['css_html'] . '
                 <select name="actor_id" style="font-size:25px;">
                     <option value="0">Bitte w&auml;hlen</option> 
                     ';
-                    $rs_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id` = '".abs($merchant->id())."' ORDER BY `username` ASC;",__FILE__,__LINE__);
+                    $rs_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id` = '".abs((int)$merchant->id())."' ORDER BY `username` ASC;",__FILE__,__LINE__);
                     if (p4c_num_rows($rs_actors) > 0) {
                         while($actor_obj = p4c_fetch_object($rs_actors)) {
                             if ($actor_obj->id == $movie['actor_id']) {
@@ -1184,7 +1184,7 @@ $site .= $ai_tabs_data['css_html'] . '
             <div class="ui-widget-content edit_content" style="margin-bottom:8px; border-bottom:none; border-top:none;">';
                 while($reson_history_obj = p4c_fetch_object($rs_rejection_reason_movie_history)) {
                     $rs_rejection_reason_movie = p4c_query("SELECT `de_short` FROM `rejection_reason_movie` WHERE `id_name`='".$reson_history_obj->id_name."' ORDER BY `de_short` ASC LIMIT 1;",__FILE__,__LINE__);
-                    $employee_name = p4c_query("SELECT `username` FROM `employee` WHERE `id`='".abs($reson_history_obj->employee_id)."' LIMIT 1;",__FILE__,__LINE__);
+                    $employee_name = p4c_query("SELECT `username` FROM `employee` WHERE `id`='".abs((int)$reson_history_obj->employee_id)."' LIMIT 1;",__FILE__,__LINE__);
                     $rejection_reason_username = p4c_result($employee_name, 0);
                     if (empty($rejection_reason_username)) {
                         $rejection_reason_username = '-unbekannt-';

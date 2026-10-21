@@ -19,10 +19,10 @@ if (p4c_num_rows($rs_members) > 0) {
     
     while($member_obj = p4c_fetch_object($rs_members)) {
 
-        $rs_count_messages = p4c_query("SELECT COUNT(*) FROM `chat_messages_history` WHERE `von`='member' AND `von_id`='".abs($member_obj->id)."';", __FILE__,__LINE__);
+        $rs_count_messages = p4c_query("SELECT COUNT(*) FROM `chat_messages_history` WHERE `von`='member' AND `von_id`='".abs((int)$member_obj->id)."';", __FILE__,__LINE__);
         $count_messages = p4c_result($rs_count_messages,0);
         
-        $rs_count_chats = p4c_query("SELECT COUNT(*) FROM `chat_messages_history` WHERE (`von`='member' AND `von_id`='".abs($member_obj->id)."') OR (`von`='actor' AND `an_id`='".abs($member_obj->id)."') GROUP BY `chat_id`", __FILE__, __LINE__);
+        $rs_count_chats = p4c_query("SELECT COUNT(*) FROM `chat_messages_history` WHERE (`von`='member' AND `von_id`='".abs((int)$member_obj->id)."') OR (`von`='actor' AND `an_id`='".abs((int)$member_obj->id)."') GROUP BY `chat_id`", __FILE__, __LINE__);
         $count_chats = p4c_num_rows($rs_count_chats);
         
         p4c_query("UPDATE `members` SET 
@@ -31,7 +31,7 @@ if (p4c_num_rows($rs_members) > 0) {
             `count_chats`       = '".$count_chats."',
             `count_messages`    = '".$count_messages."'
         WHERE
-            `id` = '".abs($member_obj->id)."' LIMIT 1;",__FILE__,__LINE__);
+            `id` = '".abs((int)$member_obj->id)."' LIMIT 1;",__FILE__,__LINE__);
     }
 
 }

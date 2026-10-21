@@ -16,21 +16,21 @@ if (is_logged_in('mcp') === false) {
     exit;
 }
 
-$merchant_id = abs($_SESSION['merchant_id']);
+$merchant_id = abs((int)$_SESSION['merchant_id']);
 
 $site = '';
 
 // Antwort speíchern
 if (isset($_POST['comment_id']) AND isset($_POST['month']) AND isset($_POST['send_reply'])) {
 
-    $comment_id = abs($_POST['comment_id']);
-    $month = abs($_POST['month']);
+    $comment_id = abs((int)$_POST['comment_id']);
+    $month = abs((int)$_POST['month']);
     $reply_text = trim(strip_tags($_POST['send_reply']));
     
     // DB von amoredea auswählen
     $mysql -> change_connect("amoredea");
 
-    $rs_comments = p4c_query("SELECT * FROM `timeline_comments_".abs($month)."` WHERE `id`='".abs($comment_id)."' AND `merchant_id`='".abs($merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_comments = p4c_query("SELECT * FROM `timeline_comments_".abs((int)$month)."` WHERE `id`='".abs((int)$comment_id)."' AND `merchant_id`='".abs((int)$merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
 
     if (p4c_num_rows($rs_comments) == 0) {
         $site .= '
@@ -44,7 +44,7 @@ if (isset($_POST['comment_id']) AND isset($_POST['month']) AND isset($_POST['sen
     // DB von EroCloud auswählen
     $mysql -> change_connect("");    
     
-    $rs_actor = p4c_query("SELECT * FROM `actors` WHERE `id`='".abs($comment_obj->actor_id)."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_actor = p4c_query("SELECT * FROM `actors` WHERE `id`='".abs((int)$comment_obj->actor_id)."' LIMIT 1;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_actor) > 0) {
         $actor_obj = p4c_fetch_object($rs_actor);
         $actor_username = $actor_obj->username;
@@ -67,10 +67,10 @@ if (isset($_POST['comment_id']) AND isset($_POST['month']) AND isset($_POST['sen
         `comment` = '". p4c_escape_string($reply_text)."'
     ",__FILE__,__LINE__);
 
-    $rs_content_exists = p4c_query("SELECT * FROM `timeline_".$month."` WHERE `id`='".abs($comment_obj->content_id)."' AND `actor_id`='".abs($comment_obj->actor_id)."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_content_exists = p4c_query("SELECT * FROM `timeline_".$month."` WHERE `id`='".abs((int)$comment_obj->content_id)."' AND `actor_id`='".abs((int)$comment_obj->actor_id)."' LIMIT 1;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_content_exists) > 0) {
         $content_obj = p4c_fetch_object($rs_content_exists);
-        p4c_query("UPDATE `timeline_".$month."` SET `number_of_comments`=number_of_comments+1 WHERE `id`='".abs($comment_obj->content_id)."' LIMIT 1;",__FILE__,__LINE__);
+        p4c_query("UPDATE `timeline_".$month."` SET `number_of_comments`=number_of_comments+1 WHERE `id`='".abs((int)$comment_obj->content_id)."' LIMIT 1;",__FILE__,__LINE__);
     }
 
     // DB von EroCloud auswählen
@@ -102,13 +102,13 @@ if (isset($_POST['comment_id']) AND isset($_POST['month']) AND isset($_POST['sen
 // Antworten-Maske
 if (isset($_POST['comment_id']) AND isset($_POST['month'])) {
 
-    $comment_id = abs($_POST['comment_id']);
-    $month = abs($_POST['month']);
+    $comment_id = abs((int)$_POST['comment_id']);
+    $month = abs((int)$_POST['month']);
 
     // DB von amoredea auswählen
     $mysql -> change_connect("amoredea");
 
-    $rs_comments = p4c_query("SELECT * FROM `timeline_comments_".abs($month)."` WHERE `id`='".abs($comment_id)."' AND `merchant_id`='".abs($merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_comments = p4c_query("SELECT * FROM `timeline_comments_".abs((int)$month)."` WHERE `id`='".abs((int)$comment_id)."' AND `merchant_id`='".abs((int)$merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
 
     if (p4c_num_rows($rs_comments) == 0) {
         $site .= '

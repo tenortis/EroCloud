@@ -72,50 +72,50 @@ class ChatMessage {
     	
         if (p4c_query('INSERT INTO `amoredea_messages` SET 
             `chat_id`       = "'.p4c_escape_string($this->chat_id).'",
-            `p4c_shop_id`   = "'.abs($this->p4c_shop_id).'",
-            `merchant_id`   = "'.abs($this->merchant_id).'",
-            `amoredea_von_id` = "'.abs($this->amoredea_von_id).'",
-            `amoredea_an_id`  = "'.abs($this->amoredea_an_id).'",
+            `p4c_shop_id`   = "'.abs((int)$this->p4c_shop_id).'",
+            `merchant_id`   = "'.abs((int)$this->merchant_id).'",
+            `amoredea_von_id` = "'.abs((int)$this->amoredea_von_id).'",
+            `amoredea_an_id`  = "'.abs((int)$this->amoredea_an_id).'",
             `von`           = "'.p4c_escape_string($this->von).'",
-            `von_id`        = "'.abs($this->von_id).'",
-            `an_id`         = "'.abs($this->an_id).'",
-            `message_price` = "'.abs($this->message_price).'",
-            `actor_commision`           = "'.abs($this->actor_commision).'",
-            `actor_commision_percent`   = "'.abs($this->actor_commision_percent).'",
+            `von_id`        = "'.abs((int)$this->von_id).'",
+            `an_id`         = "'.abs((int)$this->an_id).'",
+            `message_price` = "'.abs((float)$this->message_price).'",
+            `actor_commision`           = "'.abs((float)$this->actor_commision).'",
+            `actor_commision_percent`   = "'.abs((float)$this->actor_commision_percent).'",
             `message`       = "'.p4c_escape_string($message).'",
             `datetime`      = "'.date("Y-m-d H:i:s", strtotime($this->datetime)).'",
-            `is_mobile`     = "'.abs($this->is_mobile).'",
-            `systemnachricht` = "'.abs($this->systemnachricht).'",
-            `gelesen`       = "'.abs($this->gelesen).'",
-            `beantwortet`   = "'.abs($this->beantwortet).'",
-            `geloescht`     = "'.abs($this->geloescht).'";',__FILE__,__LINE__)) {
+            `is_mobile`     = "'.abs((int)$this->is_mobile).'",
+            `systemnachricht` = "'.abs((int)$this->systemnachricht).'",
+            `gelesen`       = "'.abs((int)$this->gelesen).'",
+            `beantwortet`   = "'.abs((int)$this->beantwortet).'",
+            `geloescht`     = "'.abs((int)$this->geloescht).'";',__FILE__,__LINE__)) {
             
             $insert_id_chat_messages = p4c_insert_id();
             
             p4c_query('INSERT INTO `amoredea_messages_history` SET 
                 `chat_id`       = "'.p4c_escape_string($this->chat_id).'",
-                `p4c_shop_id`   = "'.abs($this->p4c_shop_id).'",
-                `merchant_id`   = "'.abs($this->merchant_id).'",
-                `amoredea_von_id` = "'.abs($this->amoredea_von_id).'",
-                `amoredea_an_id`  = "'.abs($this->amoredea_an_id).'",
+                `p4c_shop_id`   = "'.abs((int)$this->p4c_shop_id).'",
+                `merchant_id`   = "'.abs((int)$this->merchant_id).'",
+                `amoredea_von_id` = "'.abs((int)$this->amoredea_von_id).'",
+                `amoredea_an_id`  = "'.abs((int)$this->amoredea_an_id).'",
                 `von`           = "'.p4c_escape_string($this->von).'",
-                `von_id`        = "'.abs($this->von_id).'",
-                `an_id`         = "'.abs($this->an_id).'",
-                `message_price` = "'.abs($this->message_price).'",
-                `actor_commision`           = "'.abs($this->actor_commision).'",
-                `actor_commision_percent`   = "'.abs($this->actor_commision_percent).'",
+                `von_id`        = "'.abs((int)$this->von_id).'",
+                `an_id`         = "'.abs((int)$this->an_id).'",
+                `message_price` = "'.abs((float)$this->message_price).'",
+                `actor_commision`           = "'.abs((float)$this->actor_commision).'",
+                `actor_commision_percent`   = "'.abs((float)$this->actor_commision_percent).'",
                 `message`       = "'.p4c_escape_string($message).'",
                 `datetime`      = "'.date("Y-m-d H:i:s", strtotime($this->datetime)).'",
-                `is_mobile`     = "'.abs($this->is_mobile).'",
-                `systemnachricht` = "'.abs($this->systemnachricht).'",
-                `gelesen`       = "'.abs($this->gelesen).'",
-                `beantwortet`   = "'.abs($this->beantwortet).'",
-                `geloescht`     = "'.abs($this->geloescht).'";',__FILE__,__LINE__);
+                `is_mobile`     = "'.abs((int)$this->is_mobile).'",
+                `systemnachricht` = "'.abs((int)$this->systemnachricht).'",
+                `gelesen`       = "'.abs((int)$this->gelesen).'",
+                `beantwortet`   = "'.abs((int)$this->beantwortet).'",
+                `geloescht`     = "'.abs((int)$this->geloescht).'";',__FILE__,__LINE__);
             
             $insert_id_chat_messages_history = p4c_insert_id();
             
-            p4c_query("UPDATE `amoredea_messages` SET `gelesen` = '0' WHERE `id`='".abs($insert_id_chat_messages)."' LIMIT 1;",__FILE__,__LINE__);
-            p4c_query("UPDATE `amoredea_messages_history` SET `gelesen` = '0' WHERE `id`='".abs($insert_id_chat_messages_history)."' LIMIT 1;",__FILE__,__LINE__);
+            p4c_query("UPDATE `amoredea_messages` SET `gelesen` = '0' WHERE `id`='".abs((int)$insert_id_chat_messages)."' LIMIT 1;",__FILE__,__LINE__);
+            p4c_query("UPDATE `amoredea_messages_history` SET `gelesen` = '0' WHERE `id`='".abs((int)$insert_id_chat_messages_history)."' LIMIT 1;",__FILE__,__LINE__);
                 
             return 'ok';
         }

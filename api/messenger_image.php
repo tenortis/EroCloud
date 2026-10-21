@@ -14,8 +14,8 @@ p4c_close(DB_HOST);
 p4c_errorlog(error_get_last());
 
 
-$actor_id = abs($_GET['actor_id']);
-$merchant_id = abs($_GET['merchant_id']);
+$actor_id = abs((int)$_GET['actor_id']);
+$merchant_id = abs((int)$_GET['merchant_id']);
 $file_name = preg_replace( '/[^a-z0-9.]/i', '', $_GET['filename']);
 
 $no_pic = MCP_DIR.'/images/movie_poster_nopic.jpg';
@@ -111,7 +111,7 @@ if(filesize($file_path) == 0) {
    
     $width = 150;
     if (isset($_GET['w']) AND !empty($_GET['w'])) {
-        $width = abs($_GET['w']);
+        $width = abs((int)$_GET['w']);
     }
     
     if ($width > 900) {$width = 900;}

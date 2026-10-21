@@ -31,7 +31,7 @@ $rs_actors = p4c_query("SELECT
     `profile_image_fsk16`,
     `profile_image_fsk18`,
     `lastonline`
-    FROM `actors` WHERE `actors`.`merchant_id`='".abs($_GET['merchant_id'])."' ORDER BY `actors`.`id` DESC", __FILE__, __LINE__);
+    FROM `actors` WHERE `actors`.`merchant_id`='".abs((int)$_GET['merchant_id'])."' ORDER BY `actors`.`id` DESC", __FILE__, __LINE__);
 
 if (p4c_num_rows($rs_actors) > 0) {
     $output = array(

@@ -10,10 +10,10 @@ if(!isset($_GET['actor_id'])) {
     print_xml($api);
 }
 
-$get_actor_id = abs(filter_input(INPUT_GET, 'actor_id', FILTER_SANITIZE_NUMBER_INT));
+$get_actor_id = abs((int)filter_input(INPUT_GET, 'actor_id', FILTER_SANITIZE_NUMBER_INT));
 
 // Profil abfragen
-$rs_actor = p4c_query("SELECT  `actors`.*, `merchants`.`partner_id` FROM `actors` INNER JOIN `merchants` ON `merchants`.`id`=`actors`.`merchant_id` WHERE `actors`.`id`='".abs($get_actor_id)."' LIMIT 1;",__FILE__,__LINE__);
+$rs_actor = p4c_query("SELECT  `actors`.*, `merchants`.`partner_id` FROM `actors` INNER JOIN `merchants` ON `merchants`.`id`=`actors`.`merchant_id` WHERE `actors`.`id`='".abs((int)$get_actor_id)."' LIMIT 1;",__FILE__,__LINE__);
 
 if(p4c_num_rows($rs_actor) == '0') {
     $api['error'] = 'actor not exists';

@@ -32,7 +32,7 @@ if (!in_array($merchant_obj->partner_id(), ['ABPP2HNMDG', 'KJDJEEESAX', 'CCRVWMV
 
 
 if (is_numeric($_GET['sid'])) {
-    $site_id = abs($_GET['sid']);
+    $site_id = abs((int)$_GET['sid']);
 } else {
     $site_id = p4c_escape_string($_GET['sid']);
 }

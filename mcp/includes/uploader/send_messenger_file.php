@@ -61,7 +61,7 @@ function upload_file($actor, $chat_id) {
         }
         
         $actor_id   = $actor->get('id');
-        $merchant_id= abs($_SESSION['merchant_id']);
+        $merchant_id= abs((int)$_SESSION['merchant_id']);
         
         $file_id = strtolower(md5($actor_id.time()));
         
@@ -80,7 +80,7 @@ function upload_file($actor, $chat_id) {
             
             $message = 'erocloud_'.$datei_typ.':::'.$merchant_id.':::'.$actor_id.':::'.$file_name;
 
-            $rs_actor_member_info = p4c_query("SELECT * FROM `actor_member_info` WHERE `chat_id`='". p4c_escape_string($chat_id)."' AND `merchant_id`='".abs($merchant_id)."' AND `actor_id`='".abs($actor_id)."' LIMIT 1;",__FILE__,__LINE__);
+            $rs_actor_member_info = p4c_query("SELECT * FROM `actor_member_info` WHERE `chat_id`='". p4c_escape_string($chat_id)."' AND `merchant_id`='".abs((int)$merchant_id)."' AND `actor_id`='".abs((int)$actor_id)."' LIMIT 1;",__FILE__,__LINE__);
 
             if (p4c_num_rows($rs_actor_member_info) === 1) {
                 $member_info_obj = p4c_fetch_object($rs_actor_member_info);

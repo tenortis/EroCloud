@@ -53,7 +53,7 @@ if(isset($_POST['userlist']) AND $_POST['userlist'] == 'unread') {
     
     $send_jason = array();
     
-    $rs_actor_member_infos = p4c_query("SELECT * FROM `actor_member_info` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `marked_as_unanswered`='1' ORDER BY `id` DESC;",__FILE__,__LINE__);
+    $rs_actor_member_infos = p4c_query("SELECT * FROM `actor_member_info` WHERE `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND `marked_as_unanswered`='1' ORDER BY `id` DESC;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_actor_member_infos) > 0) {
         $marked_as_unanswered_ary = array();
         while($marked_as_unanswered_obj = p4c_fetch_object($rs_actor_member_infos)) {
@@ -63,7 +63,7 @@ if(isset($_POST['userlist']) AND $_POST['userlist'] == 'unread') {
     
     $rs_members = p4c_query("SELECT *, `members`.`id` AS `member_id` FROM `group_actors`, `members` LEFT JOIN `messenger_sync` ON `messenger_sync`.`p4c_shop_id`=`members`.`p4c_shop_id` WHERE
         `messenger_sync`.`actor_id`=`group_actors`.`actor_id` AND
-        `group_actors`.`group_id`='".abs($_SESSION['my_chatgroup'])."' AND
+        `group_actors`.`group_id`='".abs((int)$_SESSION['my_chatgroup'])."' AND
         (`group_actors`.`is_displayed_as`='only_chat_actor' OR `group_actors`.`is_displayed_as`='chat_upload_actor') AND
         `members`.`lastonline`>'".date("Y-m-d H:i:s",strtotime("-3 month"))."' AND
         `messenger_sync`.`sync_time`!='0000-00-00 00:00:00'
@@ -73,8 +73,8 @@ if(isset($_POST['userlist']) AND $_POST['userlist'] == 'unread') {
     $rs_count_unread_chat_messages = p4c_query("SELECT COUNT(*) AS `count`, `group_actors`.`actor_id`, `chat_messages`.`von_id`  FROM `group_actors`, `chat_messages`, `actors` WHERE
         `group_actors`.`actor_id`=`chat_messages`.`an_id` AND
         `actors`.`id`=`chat_messages`.`an_id` AND
-        `group_actors`.`group_id` = '".abs($_SESSION['my_chatgroup'])."' AND
-        `group_actors`.`merchant_id`='".abs($_SESSION['merchant_id'])."' AND
+        `group_actors`.`group_id` = '".abs((int)$_SESSION['my_chatgroup'])."' AND
+        `group_actors`.`merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
         `chat_messages`.`von`='member' AND
         `chat_messages`.`gelesen` != '1' AND
         (`actors`.`status`='active' OR `actors`.`status`='inactive')

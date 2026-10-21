@@ -11,7 +11,7 @@ if (is_logged_in('mcp') === false) {
     exit;
 }
 
-$site_id = abs($_POST['site_id']);
+$site_id = abs((int)$_POST['site_id']);
 
 $merchant = new Merchant($mysql,$_SESSION['merchant_id']);
 

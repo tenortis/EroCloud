@@ -23,7 +23,7 @@ if(isset($_POST['remote_member_id'])) {
     
     $rs_members_infos = p4c_query("SELECT * FROM `members`, `actor_member_info` WHERE
         `members`.`remote_member_id`=`actor_member_info`.`remote_member_id` AND
-        `actor_member_info`.`merchant_id`='".abs($_SESSION['merchant_id'])."' AND
+        `actor_member_info`.`merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
         `actor_member_info`.`chat_id`='". p4c_escape_string($chat_id)."' LIMIT 1;",__FILE__,__LINE__);
 
     // Wenn noch kein Chat 
@@ -32,8 +32,8 @@ if(isset($_POST['remote_member_id'])) {
         $member_info_obj = p4c_fetch_object($rs_members_infos);
         
         $explode_chat_id = explode('_',$chat_id);
-        $actor_id           = abs($explode_chat_id[0]);
-        $erocms_member_id   = abs($explode_chat_id[2]);
+        $actor_id           = abs((int)$explode_chat_id[0]);
+        $erocms_member_id   = abs((int)$explode_chat_id[2]);
         $remote_member_id   = $explode_chat_id['1'].'_'.$explode_chat_id['2'];
         
         $rs_member = p4c_query("SELECT * FROM `members` WHERE `remote_member_id` = '".p4c_escape_string($remote_member_id)."' LIMIT 1;",__FILE__,__LINE__);
@@ -41,9 +41,9 @@ if(isset($_POST['remote_member_id'])) {
             $member_obj = p4c_fetch_object($rs_member);
 
             $rs_messenger_sync = p4c_query("SELECT * FROM `messenger_sync` WHERE
-                `p4c_shop_id`= '".abs($member_obj->p4c_shop_id)."' AND
-                `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
-                `actor_id`= '".abs($actor_id)."'
+                `p4c_shop_id`= '".abs((int)$member_obj->p4c_shop_id)."' AND
+                `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
+                `actor_id`= '".abs((int)$actor_id)."'
             LIMIT 1;",__FILE__,__LINE__);
             if (p4c_num_rows($rs_messenger_sync) == 0) {
                 $send_jason['error'] = 'reload';
@@ -51,7 +51,7 @@ if(isset($_POST['remote_member_id'])) {
                 exit;
             }
 
-            $rs_actor = p4c_query("SELECT * FROM `actors` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `id`= '".abs($actor_id)."' LIMIT 1;",__FILE__,__LINE__);
+            $rs_actor = p4c_query("SELECT * FROM `actors` WHERE `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND `id`= '".abs((int)$actor_id)."' LIMIT 1;",__FILE__,__LINE__);
             if (p4c_num_rows($rs_actor) == 0) {
                 $send_jason['error'] = 'reload2';
                 echo json_encode($send_jason);
@@ -65,19 +65,19 @@ if(isset($_POST['remote_member_id'])) {
             
             p4c_query("INSERT INTO `actor_member_info` SET 
                 `chat_id`           = '".p4c_escape_string($chat_id)."',
-                `erocms_amateur_id` = '".abs($sync_obj->remote_actor_id)."',
-                `erocms_member_id`  = '".abs($erocms_member_id)."',
+                `erocms_amateur_id` = '".abs((int)$sync_obj->remote_actor_id)."',
+                `erocms_member_id`  = '".abs((int)$erocms_member_id)."',
                 `erocms_chat_id`    = '".p4c_escape_string($erocms_chat_id)."',
-                `p4c_shop_id`       = '".abs($member_obj->p4c_shop_id)."',
+                `p4c_shop_id`       = '".abs((int)$member_obj->p4c_shop_id)."',
                 `remote_member_id`  = '".p4c_escape_string($member_obj->remote_member_id)."',
                 `domain`            = '".p4c_escape_string($sync_obj->domain)."',
-                `merchant_id`       = '".abs($_SESSION['merchant_id'])."',
-                `actor_id`          = '".abs($sync_obj->actor_id)."',
-                `member_id`         = '".abs($member_obj->id)."',
-                `pn_amount`         = '".abs($actor_obj->pn_amount)."',
-                `pn_free_when_webcam` = '".abs($actor_obj->pn_free_if_webcam)."',
-                `cam2cam_amount`    = '".abs($actor_obj->cam2cam_amount)."',
-                `cam_amount`        = '".abs($actor_obj->cam_amount)."',
+                `merchant_id`       = '".abs((int)$_SESSION['merchant_id'])."',
+                `actor_id`          = '".abs((int)$sync_obj->actor_id)."',
+                `member_id`         = '".abs((int)$member_obj->id)."',
+                `pn_amount`         = '".abs((int)$actor_obj->pn_amount)."',
+                `pn_free_when_webcam` = '".abs((int)$actor_obj->pn_free_if_webcam)."',
+                `cam2cam_amount`    = '".abs((int)$actor_obj->cam2cam_amount)."',
+                `cam_amount`        = '".abs((int)$actor_obj->cam_amount)."',
                 `is_cam_free`       = '0',
                 `member_is_typing`  = '0',
                 `actor_is_typing`   = '0',
@@ -87,7 +87,7 @@ if(isset($_POST['remote_member_id'])) {
 
             $rs_members_infos = p4c_query("SELECT * FROM `members`, `actor_member_info` WHERE
                 `members`.`remote_member_id`=`actor_member_info`.`remote_member_id` AND
-                `actor_member_info`.`merchant_id`='".abs($_SESSION['merchant_id'])."' AND
+                `actor_member_info`.`merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
                 `actor_member_info`.`chat_id`='". p4c_escape_string($chat_id)."' LIMIT 1;",__FILE__,__LINE__);
         }
     }

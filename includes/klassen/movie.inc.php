@@ -24,11 +24,11 @@ class Movie {
             if (strlen($this->movie_id) == 32) {
                 $from = "`file_id`='". p4c_escape_string($this->movie_id)."'";
             } else {
-                $from = "`id`='".abs($this->movie_id)."'";
+                $from = "`id`='".abs((int)$this->movie_id)."'";
             }
             
             if (is_logged_in('mcp') === true) {
-                $rs_movies = $this->mysql->query("SELECT `".p4c_escape_string($var)."` FROM `movies` WHERE ".$from." AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
+                $rs_movies = $this->mysql->query("SELECT `".p4c_escape_string($var)."` FROM `movies` WHERE ".$from." AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
             } else if (is_logged_in('acp') === true) {
                 $rs_movies = $this->mysql->query("SELECT `".p4c_escape_string($var)."` FROM `movies` WHERE ".$from." LIMIT 1;", __FILE__, __LINE__);
             }
@@ -63,7 +63,7 @@ class MovieOnline {
         if (strlen($this->movie_id) == 32) {
             $from = "`file_id`='".p4c_escape_string($this->movie_id)."'";
         } else {
-            $from = "`id`='".abs($this->movie_id)."'";
+            $from = "`id`='".abs((int)$this->movie_id)."'";
         }
         
         $rs_movies = $this->mysql->query("SELECT `".p4c_escape_string($var)."` FROM `movies_online` WHERE ".$from." LIMIT 1;", __FILE__, __LINE__);

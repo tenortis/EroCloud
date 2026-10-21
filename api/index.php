@@ -30,8 +30,8 @@ if(!isset($_GET['domain'])) {
 }
 
 $domain          = strip_tags($_GET['domain']);
-$p4c_shop_id     = abs(filter_input(INPUT_GET, 'p4c_shop_id', FILTER_SANITIZE_NUMBER_INT));
-$remote_actor_id = abs(filter_input(INPUT_GET, 'sender_id', FILTER_SANITIZE_NUMBER_INT));
+$p4c_shop_id     = abs((int)filter_input(INPUT_GET, 'p4c_shop_id', FILTER_SANITIZE_NUMBER_INT));
+$remote_actor_id = abs((int)filter_input(INPUT_GET, 'sender_id', FILTER_SANITIZE_NUMBER_INT));
 
 // Domainname säubern
 $domain = str_replace(array("http://", "https://"), "", $domain);

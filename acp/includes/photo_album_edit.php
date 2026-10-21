@@ -5,7 +5,7 @@ if (!defined('SAFE_INC'))
 
 if (!isset($_GET['id'])) {exit;}
 
-$album_id = abs($_GET['id']);
+$album_id = abs((int)$_GET['id']);
 
 $a = new PhotoAlbumOnline($mysql,$album_id);
 
@@ -38,7 +38,7 @@ if (isset($_POST['btn']['save_album'])) {
     if (isset($_POST['actor_id']) AND $_POST['actor_id'] == 0) {
         $error = 'Bitte w&auml;hlen Sie den Hauptdartseller aus.';
     } else {
-        $album['actor_id'] = abs($_POST['actor_id']);
+        $album['actor_id'] = abs((int)$_POST['actor_id']);
     }
     
     $album['category_master'] = trim(strip_tags($_POST['category_master']));
@@ -75,7 +75,7 @@ if (isset($_POST['btn']['save_album'])) {
     }
     
     if(isset($_POST['actor_id'])) {
-        $album['actor_id'] = abs($_POST['actor_id']);
+        $album['actor_id'] = abs((int)$_POST['actor_id']);
     }
     
     if(isset($_POST['online_at'])) {
@@ -83,7 +83,7 @@ if (isset($_POST['btn']['save_album'])) {
     }
 
     if(isset($_POST['amount_download'])) {
-        $amount_download = abs($_POST['amount_download']);
+        $amount_download = abs((int)$_POST['amount_download']);
         if ($amount_download <= 5000 AND $amount_download >= 0) {
             $album['amount_download'] = $amount_download;
         }
@@ -113,7 +113,7 @@ if (isset($_POST['btn']['save_album'])) {
     }
     
     // Prüfe ob bei diesem Kunden bereichts ein Fotoalbum mit diesem Title existiert
-    $rs_check_album_exists = p4c_query("SELECT `id`  FROM `photo_albums_online` WHERE `title`='".p4c_escape_string($album['title'])."' AND `id`!='".abs($album_id)."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_check_album_exists = p4c_query("SELECT `id`  FROM `photo_albums_online` WHERE `title`='".p4c_escape_string($album['title'])."' AND `id`!='".abs((int)$album_id)."' LIMIT 1;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_check_album_exists) == 1) {
         $error = 'Es existiert bereits eine Fotoalbum mit diesem Titel.';
         $duplicate_title = p4c_result($rs_check_album_exists, 0);
@@ -126,8 +126,8 @@ if (isset($_POST['btn']['save_album'])) {
     if (!isset($error) OR empty($error)) {
         
         if (p4c_query("UPDATE `photo_albums_online` SET
-            `actor_id` = '".abs($album['actor_id'])."',
-            `number_of_photos`='".abs($album['number_of_photos'])."',
+            `actor_id` = '".abs((int)$album['actor_id'])."',
+            `number_of_photos`='".abs((int)$album['number_of_photos'])."',
             `title` = '".p4c_escape_string($album['title'])."',
             `description` = '".p4c_escape_string($album['description'])."',
             `meta_title` = '".p4c_escape_string($album['meta_title'])."',
@@ -140,14 +140,14 @@ if (isset($_POST['btn']['save_album'])) {
             `album_checked` = '".date("Y-m-d H:i:s")."',
             `status`='".$status."',
             `admin_infos` ='".$admin_infos."',
-            `last_updated_by` = '".abs($_SESSION['employee_id'])."',
+            `last_updated_by` = '".abs((int)$_SESSION['employee_id'])."',
             `last_updated_datetime` = '".date("Y-m-d H:i:s")."'
-            WHERE `id`='".abs($album_id)."' LIMIT 1;",__FILE__,__LINE__)
+            WHERE `id`='".abs((int)$album_id)."' LIMIT 1;",__FILE__,__LINE__)
         ) {
 
             if (p4c_query("UPDATE `photo_albums` SET
-                `actor_id` = '".abs($album['actor_id'])."',
-                `number_of_photos`='".abs($album['number_of_photos'])."',
+                `actor_id` = '".abs((int)$album['actor_id'])."',
+                `number_of_photos`='".abs((int)$album['number_of_photos'])."',
                 `title` = '".p4c_escape_string($album['title'])."',
                 `description` = '".p4c_escape_string($album['description'])."',
                 `meta_title` = '".p4c_escape_string($album['meta_title'])."',
@@ -160,7 +160,7 @@ if (isset($_POST['btn']['save_album'])) {
                 `album_checked` = '".date("Y-m-d H:i:s")."',
                 `status`='".$status."',
                 `admin_infos` ='".$admin_infos."',
-                `last_updated_by` = '".abs($_SESSION['employee_id'])."',
+                `last_updated_by` = '".abs((int)$_SESSION['employee_id'])."',
                 `last_updated_datetime` = '".date("Y-m-d H:i:s")."'
                 WHERE `album_id`='".p4c_escape_string($a->field('album_id'))."' LIMIT 1;",__FILE__,__LINE__)
             ) {
@@ -200,14 +200,14 @@ $album['released_from'] = $a->field('released_from');
 $album['last_updated_date'] = $a->field('last_updated_datetime');
 
 if ($a->field('last_updated_by') != 0) {
-    $rs_employee = p4c_query("SELECT `username` FROM `employee` WHERE `id`='".abs($a->field('last_updated_by'))."' LIMIT 1;", __FILE__, __LINE__);
+    $rs_employee = p4c_query("SELECT `username` FROM `employee` WHERE `id`='".abs((int)$a->field('last_updated_by'))."' LIMIT 1;", __FILE__, __LINE__);
     $album['last_updated_by'] = p4c_result($rs_employee, 0);
 } else {
     $album['last_updated_by'] = '-';
 }
 
 if ($a->field('released_from') != 0) {
-    $rs_employee = p4c_query("SELECT `username` FROM `employee` WHERE `id`='".abs($a->field('released_from'))."' LIMIT 1;", __FILE__, __LINE__);
+    $rs_employee = p4c_query("SELECT `username` FROM `employee` WHERE `id`='".abs((int)$a->field('released_from'))."' LIMIT 1;", __FILE__, __LINE__);
     $album['released_from'] = p4c_result($rs_employee, 0);
 } else {
     $album['released_from'] = '-';
@@ -336,7 +336,7 @@ $site .= '
             $site .= '<div class="ui-state-error" style="padding:10px; margin-top:10px;">'.$error.'</div>';
 
             if (isset($duplicate_title)) {
-                $rs_dublicate_album = p4c_query("SELECT * FROM `photo_albums` WHERE `id`='".abs($duplicate_title)."' LIMIT 1;",__FILE__,__LINE__);
+                $rs_dublicate_album = p4c_query("SELECT * FROM `photo_albums` WHERE `id`='".abs((int)$duplicate_title)."' LIMIT 1;",__FILE__,__LINE__);
                 if (p4c_num_rows($rs_dublicate_album) == 1) {
                     $dublicat_ary = p4c_fetch_object($rs_dublicate_album);
                     $site .= '
@@ -371,7 +371,7 @@ $site .= '
                 <select name="actor_id" style="font-size:25px;">
                     <option value="0">Bitte w&auml;hlen</option> 
                     ';
-                    $rs_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id` = '".abs($merchant->id())."' ORDER BY `username` ASC;",__FILE__,__LINE__);
+                    $rs_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id` = '".abs((int)$merchant->id())."' ORDER BY `username` ASC;",__FILE__,__LINE__);
                     if (p4c_num_rows($rs_actors) > 0) {
                         while($actor_obj = p4c_fetch_object($rs_actors)) {
                             if ($actor_obj->id == $album['actor_id']) {
@@ -513,7 +513,7 @@ $site .= '
                 while($reson_history_obj = p4c_fetch_object($rs_rejection_reason_photo_album_history)) {
                     $rs_rejection_reason_photo_album = p4c_query("SELECT `de_short` FROM `rejection_reason_photo_album` WHERE `id_name`='".$reson_history_obj->id_name."' ORDER BY `de_short` ASC LIMIT 1;",__FILE__,__LINE__);
                     
-                    $employee_name = p4c_query("SELECT `username` FROM `employee` WHERE `id`='".abs($reson_history_obj->employee_id)."' LIMIT 1;",__FILE__,__LINE__);
+                    $employee_name = p4c_query("SELECT `username` FROM `employee` WHERE `id`='".abs((int)$reson_history_obj->employee_id)."' LIMIT 1;",__FILE__,__LINE__);
                     $rejection_reason_username = p4c_result($employee_name, 0);
                     if (empty($rejection_reason_username)) {
                         $rejection_reason_username = '-unbekannt-';

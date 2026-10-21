@@ -21,7 +21,7 @@ if ($partners_obj->von == 'actor') {
     $actor_id = $partners_obj->von_id;
     $member_id =  $partners_obj->an_id;
 
-    $rs_actor = p4c_query("SELECT * FROM `actors` WHERE `id`='".abs($actor_id)."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_actor = p4c_query("SELECT * FROM `actors` WHERE `id`='".abs((int)$actor_id)."' LIMIT 1;",__FILE__,__LINE__);
     $user_obj = p4c_fetch_object($rs_actor);
 
     $username = '<span style="color:#cd0a0a">'.$user_obj->username.'</span>';
@@ -30,7 +30,7 @@ if ($partners_obj->von == 'actor') {
     $actor_id = $partners_obj->an_id;
     $member_id =  $partners_obj->von_id;
 
-    $rs_users = p4c_query("SELECT * FROM `members` WHERE `id`='".abs($user_id)."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_users = p4c_query("SELECT * FROM `members` WHERE `id`='".abs((int)$user_id)."' LIMIT 1;",__FILE__,__LINE__);
     $user_obj = p4c_fetch_object($rs_users);
 
     $username = '<span style="color:#3399ff">'.$user_obj->username.'</span>';

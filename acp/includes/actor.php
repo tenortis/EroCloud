@@ -9,7 +9,7 @@ if (!in_array('all', $_SESSION['employee_access_area']) AND !in_array('actors', 
     exit;        
 }
 
-$actor_id = abs(filter_input(INPUT_GET, 'id', FILTER_SANITIZE_NUMBER_INT));
+$actor_id = abs((int)filter_input(INPUT_GET, 'id', FILTER_SANITIZE_NUMBER_INT));
 
 include_once(SOURCEDIR.'/includes/klassen/actor.inc.php');
 $actor = new Actor($actor_id);
@@ -40,12 +40,12 @@ if (isset($_GET['del'])) {
 
         if(@unlink($filename)) {
 
-            p4c_query("UPDATE `actors` SET `profile_image_".strtolower($_GET['del'])."`='' WHERE `id`='".abs($actor_id)."' LIMIT 1;",__FILE__,__LINE__);
+            p4c_query("UPDATE `actors` SET `profile_image_".strtolower($_GET['del'])."`='' WHERE `id`='".abs((int)$actor_id)."' LIMIT 1;",__FILE__,__LINE__);
             
             $m5d_checksum = actor_checksum($actor_id);
 
             p4c_query("UPDATE `actors` SET `md5_checksum`='".p4c_escape_string($m5d_checksum)."' WHERE
-                `id`='".abs($actor_id)."' LIMIT 1;
+                `id`='".abs((int)$actor_id)."' LIMIT 1;
             ",__FILE__,__LINE__);
             
             header('Location: '.ACP_URL.'/Actor/'.$actor_id.'?ok=edit_actor');
@@ -54,19 +54,19 @@ if (isset($_GET['del'])) {
 }
 
 if (isset($_POST['new_merchant'])) {
-    $new_mechant_id = abs($_POST['new_merchant_id']);
+    $new_mechant_id = abs((int)$_POST['new_merchant_id']);
     
     if ($new_mechant_id > 0) {
     
         $old_merchant_id = $merchant->id();
         
         // Ein Cronjob übernimmt all 5 Minuten die Arbeit. (cronjob/actor_reassign.php)
-        $rs_check_actor_reassign = p4c_query("SELECT * FROM `actor_reassign` WHERE `actor_id`='".abs($actor_id)."' LIMIT 1;",__FILE__,__LINE__);
+        $rs_check_actor_reassign = p4c_query("SELECT * FROM `actor_reassign` WHERE `actor_id`='".abs((int)$actor_id)."' LIMIT 1;",__FILE__,__LINE__);
         if (p4c_num_rows($rs_check_actor_reassign) == 0) {
             p4c_query("INSERT INTO `actor_reassign` SET
-                `actor_id` = '".abs($actor_id)."',
-                `old_merchant_id` = '".abs($old_merchant_id)."',
-                `new_merchant_id` = '".abs($new_mechant_id)."',
+                `actor_id` = '".abs((int)$actor_id)."',
+                `old_merchant_id` = '".abs((int)$old_merchant_id)."',
+                `new_merchant_id` = '".abs((int)$new_mechant_id)."',
                 `order_from` = '".date("Y-m-d H:i:s")."'                    
             ",__FILE__,__LINE__);
         }
@@ -86,14 +86,14 @@ if (isset($_POST['new_merchant'])) {
     $amoredea_provision_obolus_default = '70';
     $amoredea_provision_obolus = $amoredea_provision_obolus_default;
     if (isset($_POST['amoredea_provision_obolus'])) {
-        $amoredea_provision_obolus = abs($_POST['amoredea_provision_obolus']);
+        $amoredea_provision_obolus = abs((float)$_POST['amoredea_provision_obolus']);
         if ($amoredea_provision_obolus == 0) {$amoredea_provision_obolus = $amoredea_provision_obolus_default;}            
     }
 
     $amoredea_provision_content_default = '50';
     $amoredea_provision_content = $amoredea_provision_content_default;
     if (isset($_POST['amoredea_provision_content'])) {
-        $amoredea_provision_content = abs($_POST['amoredea_provision_content']);
+        $amoredea_provision_content = abs((float)$_POST['amoredea_provision_content']);
         if ($amoredea_provision_content == 0) {$amoredea_provision_content = $amoredea_provision_content_default;}            
     }
     
@@ -143,7 +143,7 @@ if (isset($_POST['new_merchant'])) {
     $post_username = str_replace($search,$replace,trim($_POST['username']));
     $post_username = trim(preg_replace ( '/[^a-zA-Z0-9-_.]/i', '', $post_username));
    
-    $rs_check_username_exists = p4c_query("SELECT `username` FROM `actors` WHERE `username`='".p4c_escape_string($post_username)."' AND `id`!='".abs($actor_id)."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_check_username_exists = p4c_query("SELECT `username` FROM `actors` WHERE `username`='".p4c_escape_string($post_username)."' AND `id`!='".abs((int)$actor_id)."' LIMIT 1;",__FILE__,__LINE__);
     // Speichern wenn Username nicht existiert
     if (p4c_num_rows($rs_check_username_exists) > 0) {
         $error = 'Der Username <b>'.$post_username.'</b> ist leider schon vergeben.';
@@ -156,69 +156,69 @@ if (isset($_POST['new_merchant'])) {
         p4c_query("UPDATE `actors` SET
             `status`                ='".$status."',
             `admin_infos`           ='".p4c_escape_string(filter_input(INPUT_POST, 'admin_infos', FILTER_SANITIZE_STRING, FILTER_FLAG_ENCODE_LOW))."',
-            `amoredea_provision_content`='".abs($amoredea_provision_content)."',
-            `amoredea_provision_obolus`='".abs($amoredea_provision_obolus)."',
-            `erocall_number_de`     ='".abs($erocall_number_de)."',
+            `amoredea_provision_content`='".abs((float)$amoredea_provision_content)."',
+            `amoredea_provision_obolus`='".abs((float)$amoredea_provision_obolus)."',
+            `erocall_number_de`     ='".abs((int)$erocall_number_de)."',
             `erocall_number_de_ddi` ='".p4c_escape_string($erocall_number_de_ddi)."',
-            `erocall_number_de_dest_landline` ='".abs($erocall_number_de_dest_landline)."',
-            `erocall_number_de_dest_mobile` ='".abs($erocall_number_de_dest_mobile)."',
+            `erocall_number_de_dest_landline` ='".abs((int)$erocall_number_de_dest_landline)."',
+            `erocall_number_de_dest_mobile` ='".abs((int)$erocall_number_de_dest_mobile)."',
             `erocall_number_de_rate`='".p4c_escape_string($erocall_number_de_rate)."',
-            `erocall_number_de_status` ='".abs($erocall_number_de_status)."',
+            `erocall_number_de_status` ='".abs((int)$erocall_number_de_status)."',
             `username`              ='".p4c_escape_string($post_username)."',
             `is_displayed_as`       ='". p4c_escape_string($is_displayed_as)."',
             `actor_categories`      ='".p4c_escape_string($categorys)."',
             `obolus_type`            ='".p4c_escape_string(filter_input(INPUT_POST, 'obolus_type', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW))."',
-            `check_gender`          ='".abs(filter_input(INPUT_POST, 'check_gender', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_gender`          ='".abs((int)filter_input(INPUT_POST, 'check_gender', FILTER_SANITIZE_NUMBER_INT))."',
             `gender`                ='".p4c_escape_string(filter_input(INPUT_POST, 'gender', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW))."',
-            `check_age`             ='".abs(filter_input(INPUT_POST, 'check_age', FILTER_SANITIZE_NUMBER_INT))."',
-            `age`                   ='".abs(filter_input(INPUT_POST, 'age', FILTER_SANITIZE_NUMBER_INT))."',
-            `check_star_sign`       ='".abs(filter_input(INPUT_POST, 'check_star_sign', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_age`             ='".abs((int)filter_input(INPUT_POST, 'check_age', FILTER_SANITIZE_NUMBER_INT))."',
+            `age`                   ='".abs((int)filter_input(INPUT_POST, 'age', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_star_sign`       ='".abs((int)filter_input(INPUT_POST, 'check_star_sign', FILTER_SANITIZE_NUMBER_INT))."',
             `star_sign`             ='".p4c_escape_string(filter_input(INPUT_POST, 'star_sign', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW))."',
-            `check_body_height`     ='".abs(filter_input(INPUT_POST, 'check_body_height', FILTER_SANITIZE_NUMBER_INT))."',
-            `body_height`           ='".abs(filter_input(INPUT_POST, 'body_height', FILTER_SANITIZE_NUMBER_INT))."',
-            `check_eye_color`       ='".abs(filter_input(INPUT_POST, 'check_eye_color', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_body_height`     ='".abs((int)filter_input(INPUT_POST, 'check_body_height', FILTER_SANITIZE_NUMBER_INT))."',
+            `body_height`           ='".abs((int)filter_input(INPUT_POST, 'body_height', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_eye_color`       ='".abs((int)filter_input(INPUT_POST, 'check_eye_color', FILTER_SANITIZE_NUMBER_INT))."',
             `eye_color`             ='".p4c_escape_string(filter_input(INPUT_POST, 'eye_color', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW))."',
-            `check_hair_color`      ='".abs(filter_input(INPUT_POST, 'check_hair_color', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_hair_color`      ='".abs((int)filter_input(INPUT_POST, 'check_hair_color', FILTER_SANITIZE_NUMBER_INT))."',
             `hair_color`            ='".p4c_escape_string(filter_input(INPUT_POST, 'hair_color', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW))."',
-            `check_body_weight`     ='".abs(filter_input(INPUT_POST, 'check_body_weight', FILTER_SANITIZE_NUMBER_INT))."',
-            `body_weight`           ='".abs(filter_input(INPUT_POST, 'body_weight', FILTER_SANITIZE_NUMBER_INT))."',
-            `check_cup_size`        ='".abs(filter_input(INPUT_POST, 'check_cup_size', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_body_weight`     ='".abs((int)filter_input(INPUT_POST, 'check_body_weight', FILTER_SANITIZE_NUMBER_INT))."',
+            `body_weight`           ='".abs((int)filter_input(INPUT_POST, 'body_weight', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_cup_size`        ='".abs((int)filter_input(INPUT_POST, 'check_cup_size', FILTER_SANITIZE_NUMBER_INT))."',
             `cup_size`              ='".p4c_escape_string($cup_sice)."',
-            `check_shaven`          ='".abs(filter_input(INPUT_POST, 'check_shaven', FILTER_SANITIZE_NUMBER_INT))."',
-            `shaven`                ='".abs(filter_input(INPUT_POST, 'shaven', FILTER_SANITIZE_NUMBER_INT))."',
-            `check_look`            ='".abs(filter_input(INPUT_POST, 'check_look', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_shaven`          ='".abs((int)filter_input(INPUT_POST, 'check_shaven', FILTER_SANITIZE_NUMBER_INT))."',
+            `shaven`                ='".abs((int)filter_input(INPUT_POST, 'shaven', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_look`            ='".abs((int)filter_input(INPUT_POST, 'check_look', FILTER_SANITIZE_NUMBER_INT))."',
             `look`                  ='".p4c_escape_string(filter_input(INPUT_POST, 'look', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW))."',
-            `check_marital_status`  ='".abs(filter_input(INPUT_POST, 'check_marital_status', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_marital_status`  ='".abs((int)filter_input(INPUT_POST, 'check_marital_status', FILTER_SANITIZE_NUMBER_INT))."',
             `marital_status`        ='".p4c_escape_string(filter_input(INPUT_POST, 'marital_status', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW))."',
-            `check_sexual_orientation`='".abs(filter_input(INPUT_POST, 'check_sexual_orientation', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_sexual_orientation`='".abs((int)filter_input(INPUT_POST, 'check_sexual_orientation', FILTER_SANITIZE_NUMBER_INT))."',
             `sexual_orientation`    ='".p4c_escape_string(filter_input(INPUT_POST, 'sexual_orientation', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW))."',
-            `check_looking_for`     ='".abs(filter_input(INPUT_POST, 'check_looking_for', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_looking_for`     ='".abs((int)filter_input(INPUT_POST, 'check_looking_for', FILTER_SANITIZE_NUMBER_INT))."',
             `looking_for`           ='".p4c_escape_string($looking_for)."',
-            `check_interests`       ='".abs(filter_input(INPUT_POST, 'check_interests', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_interests`       ='".abs((int)filter_input(INPUT_POST, 'check_interests', FILTER_SANITIZE_NUMBER_INT))."',
             `interests`             ='".p4c_escape_string($interests)."',
-            `check_sexual_preferences`='".abs(filter_input(INPUT_POST, 'check_sexual_preferences', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_sexual_preferences`='".abs((int)filter_input(INPUT_POST, 'check_sexual_preferences', FILTER_SANITIZE_NUMBER_INT))."',
             `sexual_preferences`    ='".p4c_escape_string($sexual_preferences)."',
-            `check_about_me`        ='".abs(filter_input(INPUT_POST, 'check_about_me', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_about_me`        ='".abs((int)filter_input(INPUT_POST, 'check_about_me', FILTER_SANITIZE_NUMBER_INT))."',
             `about_me`              ='".p4c_escape_string(filter_input(INPUT_POST, 'about_me', FILTER_SANITIZE_STRING, FILTER_FLAG_ENCODE_LOW))."'
         WHERE
-            `id`='".abs($actor_id)."' LIMIT 1;
+            `id`='".abs((int)$actor_id)."' LIMIT 1;
         ",__FILE__,__LINE__);
 
         $m5d_checksum = actor_checksum($actor_id);
 
         p4c_query("UPDATE `actors` SET `md5_checksum`='".p4c_escape_string($m5d_checksum)."' WHERE
-            `id`='".abs($actor_id)."' LIMIT 1;
+            `id`='".abs((int)$actor_id)."' LIMIT 1;
         ",__FILE__,__LINE__);
 
-        p4c_query("UPDATE `group_actors` SET `is_displayed_as`='".p4c_escape_string($is_displayed_as)."' WHERE `actor_id`='".abs($actor_id)."'",__FILE__,__LINE__);
+        p4c_query("UPDATE `group_actors` SET `is_displayed_as`='".p4c_escape_string($is_displayed_as)."' WHERE `actor_id`='".abs((int)$actor_id)."'",__FILE__,__LINE__);
         
         // Wenn das Profil gelöscht werden soll, auch die Filme und Fotoalben löschen
         if ($status == 'deleted') {
-            p4c_query("UPDATE `movies` SET `status`='deleted', `deleted_datetime`='".date("Y-m-d H:i:s")."' WHERE `actor_id`='".abs($actor_id)."';",__FILE__,__LINE__);
-            p4c_query("UPDATE `movies_online` SET `status`='deleted', `deleted_datetime`='".date("Y-m-d H:i:s")."' WHERE `actor_id`='".abs($actor_id)."';",__FILE__,__LINE__);
+            p4c_query("UPDATE `movies` SET `status`='deleted', `deleted_datetime`='".date("Y-m-d H:i:s")."' WHERE `actor_id`='".abs((int)$actor_id)."';",__FILE__,__LINE__);
+            p4c_query("UPDATE `movies_online` SET `status`='deleted', `deleted_datetime`='".date("Y-m-d H:i:s")."' WHERE `actor_id`='".abs((int)$actor_id)."';",__FILE__,__LINE__);
             
-            p4c_query("UPDATE `photo_albums` SET `status`='deleted', `deleted_datetime`='".date("Y-m-d H:i:s")."' WHERE `actor_id`='".abs($actor_id)."';",__FILE__,__LINE__);
-            p4c_query("UPDATE `photo_albums_online` SET `status`='deleted', `deleted_datetime`='".date("Y-m-d H:i:s")."' WHERE `actor_id`='".abs($actor_id)."';",__FILE__,__LINE__);
+            p4c_query("UPDATE `photo_albums` SET `status`='deleted', `deleted_datetime`='".date("Y-m-d H:i:s")."' WHERE `actor_id`='".abs((int)$actor_id)."';",__FILE__,__LINE__);
+            p4c_query("UPDATE `photo_albums_online` SET `status`='deleted', `deleted_datetime`='".date("Y-m-d H:i:s")."' WHERE `actor_id`='".abs((int)$actor_id)."';",__FILE__,__LINE__);
         }
         
         header('Location: '.ACP_URL.'/Actor/'.$actor_id.'?ok=edit_actor');
@@ -1043,7 +1043,7 @@ $site .= '
     <div class="ui-widget-header" style="padding:5px 10px; margin-top:10px;">Darsteller einem neuen Partner zuordnen</div>
     <div class="ui-widget-content edit_content" style="margin-bottom:8px; border-top:none; padding:10px;">
         ';
-        $rs_check_actor_reassign = p4c_query("SELECT * FROM `actor_reassign` WHERE `actor_id`='".abs($actor_id)."' AND `files_mapping_completed`='0000-00-00 00:00:00' LIMIT 1;",__FILE__,__LINE__);
+        $rs_check_actor_reassign = p4c_query("SELECT * FROM `actor_reassign` WHERE `actor_id`='".abs((int)$actor_id)."' AND `files_mapping_completed`='0000-00-00 00:00:00' LIMIT 1;",__FILE__,__LINE__);
         if (p4c_num_rows($rs_check_actor_reassign) == 1) {
             $actor_reassign_obj = p4c_fetch_object($rs_check_actor_reassign);
             $site .= '<div class="ui-state-error" style="padding:5px; margin-bottom:10px;">Dieser Darsteller wird aktuell einem neuen Besitzer zugeordnet (an MID: '.$actor_reassign_obj->new_merchant_id.') .</div>';
@@ -1064,7 +1064,7 @@ $site .= '
             ';
         }
         
-        $rs_check_actors_reassign = p4c_query("SELECT * FROM `actor_reassign` WHERE `actor_id`='".abs($actor_id)."' AND `files_mapping_completed`!='0000-00-00 00:00:00';",__FILE__,__LINE__);
+        $rs_check_actors_reassign = p4c_query("SELECT * FROM `actor_reassign` WHERE `actor_id`='".abs((int)$actor_id)."' AND `files_mapping_completed`!='0000-00-00 00:00:00';",__FILE__,__LINE__);
         if (p4c_num_rows($rs_check_actors_reassign) > 0) {
             $site.= '<div style="margin-top:15px;">';
                 while($actor_reassign_obj = p4c_fetch_object($rs_check_actors_reassign)) {
@@ -1081,7 +1081,7 @@ $site .= '
 <!-- Videos Tab -->
 ';
 
-$rs_actor_movies = p4c_query("SELECT * FROM `movies` WHERE `actor_id`='".abs($actor_id)."' ORDER BY `id` DESC;", __FILE__, __LINE__);
+$rs_actor_movies = p4c_query("SELECT * FROM `movies` WHERE `actor_id`='".abs((int)$actor_id)."' ORDER BY `id` DESC;", __FILE__, __LINE__);
 $site .= '
 <div id="tab-videos">
     <div class="ui-widget-header" style="padding:10px; font-size:20px;">Filme von '.htmlspecialchars($actor->get("username"), ENT_QUOTES, 'UTF-8').'</div>
@@ -1170,7 +1170,7 @@ $site .= '
 ';
 
 // Fotoalben Tab
-$rs_actor_albums = p4c_query("SELECT * FROM `photo_albums` WHERE `actor_id`='".abs($actor_id)."' ORDER BY `id` DESC;", __FILE__, __LINE__);
+$rs_actor_albums = p4c_query("SELECT * FROM `photo_albums` WHERE `actor_id`='".abs((int)$actor_id)."' ORDER BY `id` DESC;", __FILE__, __LINE__);
 $site .= '
 <div id="tab-albums">
     <div class="ui-widget-header" style="padding:10px; font-size:20px;">Fotoalben von '.htmlspecialchars($actor->get("username"), ENT_QUOTES, 'UTF-8').'</div>

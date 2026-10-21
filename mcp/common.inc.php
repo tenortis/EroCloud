@@ -68,7 +68,7 @@ function log_action($string) {
         $merchant_id = 0;
     }
     p4c_query("INSERT INTO `merchant_history` SET 
-    `merchant_id` = '".abs($merchant_id)."',
+    `merchant_id` = '".abs((int)$merchant_id)."',
     `description` = '".p4c_escape_string($string)."',
     `datetime`    = '".date("Y-m-d H:i:s")."',
     `ip`          = '".p4c_escape_string(GetUserIP())."';",__FILE__,__LINE__);

@@ -54,12 +54,12 @@ if (!isset($_GET['buy_as']) OR ($_GET['buy_as'] != 'online' AND $_GET['buy_as'] 
 
 $input['user_key']          = $_GET['user_key'];
 $input['album_id']          = $_GET['album_id'];
-$input['user_id']           = abs($_GET['user_id']);
-$input['shop_id']           = abs($_GET['shop_id']);
+$input['user_id']           = abs((int)$_GET['user_id']);
+$input['shop_id']           = abs((int)$_GET['shop_id']);
 $input['buy_as']            = $_GET['buy_as'];
-$input['album_price']       = abs($_GET['album_price']);
-$input['actor_commision']   = abs($_GET['actor_commision']);
-$input['actor_commision_percent'] = abs($_GET['actor_commision_percent']);
+$input['album_price']       = abs((float)$_GET['album_price']);
+$input['actor_commision']   = abs((float)$_GET['actor_commision']);
+$input['actor_commision_percent'] = abs((float)$_GET['actor_commision_percent']);
 
 // Der Streaming-Key erstellt sich wie folgt:
 $user_key = generate_user_album_key($input);

@@ -13,7 +13,7 @@ if (is_logged_in('mcp') === false) {
 
 $file_id = $_GET['id'];
 
-$rs_movie = p4c_query("SELECT * FROM `movies` WHERE `file_id`='".p4c_escape_string($file_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__);
+$rs_movie = p4c_query("SELECT * FROM `movies` WHERE `file_id`='".p4c_escape_string($file_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__);
 if (p4c_num_rows($rs_movie) == 0) {
     $filename = MCP_DIR.'/images/movie_poster_nopic.jpg';
     header('Content-type: image/jpeg');
@@ -199,7 +199,7 @@ if (!file_exists($filename)) {
    
     $width = 0;
     if (isset($_GET['w']) AND !empty($_GET['w'])) {
-        $width = abs($_GET['w']);
+        $width = abs((int)$_GET['w']);
     }
     
     if ($width > 900) {$width = 900;}

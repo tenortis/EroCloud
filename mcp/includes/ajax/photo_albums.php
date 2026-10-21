@@ -11,10 +11,10 @@ if (is_logged_in('mcp') === false) {
     exit;
 }
 
-$merchant_id = abs($_SESSION['merchant_id']);
+$merchant_id = abs((int)$_SESSION['merchant_id']);
 
 $rs_albums = p4c_query("SELECT `photo_albums`.`id`, `album_id`, `checksum`, `number_of_photos`, `title`, `album_checked`, `released`, `username`, `actor_id`
-    FROM `photo_albums` LEFT JOIN `actors` ON `photo_albums`.`actor_id`=`actors`.`id` WHERE `photo_albums`.`merchant_id`='".abs($merchant_id)."' AND `photo_albums`.`status`!='deleted' ORDER BY `id` DESC;", __FILE__, __LINE__);
+    FROM `photo_albums` LEFT JOIN `actors` ON `photo_albums`.`actor_id`=`actors`.`id` WHERE `photo_albums`.`merchant_id`='".abs((int)$merchant_id)."' AND `photo_albums`.`status`!='deleted' ORDER BY `id` DESC;", __FILE__, __LINE__);
 
 
 if (p4c_num_rows($rs_albums) > 0) {

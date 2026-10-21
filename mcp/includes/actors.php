@@ -4,7 +4,7 @@ if (!defined('SAFE_INC')) {
     die ("Access denied!");
 }
 
-$rs_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `status`!='deleted' ORDER BY `username` ASC;",__FILE__,__LINE__);
+$rs_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND `status`!='deleted' ORDER BY `username` ASC;",__FILE__,__LINE__);
 $count_actors = p4c_num_rows($rs_actors);
 
 $site .= '

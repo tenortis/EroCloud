@@ -137,7 +137,7 @@ if (isset($_GET['wmid'])) {
     if (p4c_num_rows($rs_check) == 0) {
         p4c_query("INSERT INTO `ads_impressions_".date('Ym')."` SET
             `p4c_partner_id`= '".p4c_escape_string($pid)."',
-            `media_id`  = '".abs($ads_obj->id)."',
+            `media_id`  = '".abs((int)$ads_obj->id)."',
             `campaign_id` = '".p4c_escape_string($cid)."',
             `number_of_impressions`=number_of_impressions+1,
             `timestamp` = '".date("Y-m-d")."',

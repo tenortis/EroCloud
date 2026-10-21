@@ -32,7 +32,7 @@ if (isset($_POST['login']) AND isset($_POST['pid']) AND isset($_POST['pass'])) {
                 if (p4c_num_rows($rs_group) > 0) {
                     $user_ary = p4c_fetch_object($rs_group);
                     
-                    $merchant_id = abs($user_ary->merchant_id);
+                    $merchant_id = abs((int)$user_ary->merchant_id);
                     if (isset($merchant_id) AND trim($merchant_id) != '') {
                          $merchant = new Merchant($mysql,$merchant_id);
 

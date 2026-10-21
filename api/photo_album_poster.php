@@ -44,16 +44,17 @@ if (empty($album_param)) {
 }
 
 $fsk = 'preview_image_fsk16';
-if (isset($_GET['fsk']) && abs($_GET['fsk']) == 18) {
+if (isset($_GET['fsk']) && abs((int)$_GET['fsk']) == 18) {
     $fsk = 'preview_image_fsk18';
 }
 
 $escaped_id = p4c_escape_string($album_param);
+$numeric_id = ctype_digit((string)$album_param) ? abs((int)$album_param) : 0;
 
 // Query photo_albums FIRST by valid columns (album_id or numeric id)
-$rs_album = p4c_query("SELECT * FROM `photo_albums` WHERE `album_id`='".$escaped_id."' OR `id`='".abs($album_param)."' LIMIT 1;",__FILE__,__LINE__);
+$rs_album = p4c_query("SELECT * FROM `photo_albums` WHERE `album_id`='".$escaped_id."'" . ($numeric_id > 0 ? " OR `id`='".$numeric_id."'" : "") . " LIMIT 1;",__FILE__,__LINE__);
 if (p4c_num_rows($rs_album) == 0) {
-    $rs_album = p4c_query("SELECT * FROM `photo_albums_online` WHERE `album_id`='".$escaped_id."' OR `id`='".abs($album_param)."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_album = p4c_query("SELECT * FROM `photo_albums_online` WHERE `album_id`='".$escaped_id."'" . ($numeric_id > 0 ? " OR `id`='".$numeric_id."'" : "") . " LIMIT 1;",__FILE__,__LINE__);
 }
 
 if (p4c_num_rows($rs_album) == 0) {
@@ -229,7 +230,7 @@ if (!is_file($filename) || filesize($filename) == 0) {
    
     $width = 0;
     if (isset($_GET['w']) AND !empty($_GET['w'])) {
-        $width = abs($_GET['w']);
+        $width = abs((int)$_GET['w']);
     }
     
     if ($width > 900) {$width = 900;}

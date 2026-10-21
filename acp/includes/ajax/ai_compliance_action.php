@@ -68,7 +68,7 @@ function aic_fetch_history_rows($compliance_filter = 'all', $subtitle_filter = '
     $q = trim((string)$search_query);
     if ($q !== '') {
         if (ctype_digit($q)) {
-            $id_num = abs($q);
+            $id_num = abs((int)$q);
             $where[] = "(`ai`.`movie_id` = '" . $id_num . "' OR `ai`.`merchant_id` = '" . $id_num . "')";
         } else {
             $esc_q = p4c_escape_string($q);
@@ -163,7 +163,7 @@ if ($action === 'poll_worker_status') {
     $ws = aic_get_worker_status();
     $cur_movie_info = null;
     if (!empty($ws['current_movie_id'])) {
-        $rs_cm = p4c_query("SELECT `id`, `title`, `playtime_seconds` FROM `movies` WHERE `id` = '" . abs($ws['current_movie_id']) . "' LIMIT 1;", __FILE__, __LINE__);
+        $rs_cm = p4c_query("SELECT `id`, `title`, `playtime_seconds` FROM `movies` WHERE `id` = '" . abs((int)$ws['current_movie_id']) . "' LIMIT 1;", __FILE__, __LINE__);
         if (p4c_num_rows($rs_cm) > 0) {
             $cm = p4c_fetch_object($rs_cm);
             $cur_movie_info = array(
@@ -555,7 +555,7 @@ if ($action === 'clean_all_vtt_transcripts') {
                     `spoken_segments_json` = '" . p4c_escape_string($new_segs_json) . "',
                     " . ($err_note !== '' ? "`last_error` = '" . p4c_escape_string($err_note) . "'," : "") . "
                     `updated_at`           = '" . $now . "'
-                WHERE `movie_id` = '" . abs($mid) . "'
+                WHERE `movie_id` = '" . abs((int)$mid) . "'
                 LIMIT 1;", __FILE__, __LINE__);
         }
 
@@ -746,7 +746,7 @@ if ($action === 'run_bulk_text_precheck') {
     @set_time_limit(120);
     $chunk_size   = isset($_POST['chunk_size']) ? max(10, min(500, (int)$_POST['chunk_size'])) : 250;
     $force_recheck = !empty($_POST['force_recheck']);
-    $last_id      = isset($_POST['last_id']) ? abs($_POST['last_id']) : 0;
+    $last_id      = isset($_POST['last_id']) ? abs((int)$_POST['last_id']) : 0;
 
     if ($force_recheck) {
         // Bei Komplett-Neubewertung (z.B. nach Regelwerks-Änderung) per Cursor (m.id < last_id) durch alle Videos laufen
@@ -804,12 +804,12 @@ if ($action === 'run_bulk_text_precheck') {
         p4c_query("INSERT INTO `movies_ai_analysis`
             (`movie_id`, `merchant_id`, `subtitle_filename`, `text_check_status`, `text_compliance`, `text_risk_score`, `text_engine_used`, `text_summary`, `text_violations_json`, `text_duration_sec`, `created_at`, `updated_at`)
             VALUES (
-                '" . abs($mid) . "',
-                '" . abs($row->merchant_id) . "',
+                '" . abs((int)$mid) . "',
+                '" . abs((int)$row->merchant_id) . "',
                 '" . p4c_escape_string($sub_file) . "',
                 '2',
                 '" . p4c_escape_string($rep['compliance_status']) . "',
-                '" . abs($rep['risk_score']) . "',
+                '" . abs((int)$rep['risk_score']) . "',
                 '" . p4c_escape_string($rep['engine_used']) . "',
                 '" . p4c_escape_string($rep['summary_de']) . "',
                 '" . p4c_escape_string($viol_json) . "',
@@ -820,7 +820,7 @@ if ($action === 'run_bulk_text_precheck') {
             ON DUPLICATE KEY UPDATE
                 `text_check_status`    = '2',
                 `text_compliance`      = '" . p4c_escape_string($rep['compliance_status']) . "',
-                `text_risk_score`      = '" . abs($rep['risk_score']) . "',
+                `text_risk_score`      = '" . abs((int)$rep['risk_score']) . "',
                 `text_engine_used`     = '" . p4c_escape_string($rep['engine_used']) . "',
                 `text_summary`         = '" . p4c_escape_string($rep['summary_de']) . "',
                 `text_violations_json` = '" . p4c_escape_string($viol_json) . "',
@@ -843,8 +843,8 @@ if ($action === 'run_bulk_text_precheck') {
 }
 
 if ($action === 'load_movie') {
-    $movie_id    = isset($_REQUEST['movie_id']) ? abs($_REQUEST['movie_id']) : 0;
-    $merchant_id = isset($_REQUEST['merchant_id']) ? abs($_REQUEST['merchant_id']) : 0;
+    $movie_id    = isset($_REQUEST['movie_id']) ? abs((int)$_REQUEST['movie_id']) : 0;
+    $merchant_id = isset($_REQUEST['merchant_id']) ? abs((int)$_REQUEST['merchant_id']) : 0;
     $mode        = isset($_REQUEST['mode']) ? trim($_REQUEST['mode']) : '';
 
     if ($mode === 'next_untested') {
@@ -906,9 +906,9 @@ if ($action === 'load_movie') {
 }
 
 if ($action === 'run_whisper') {
-    $movie_id        = isset($_POST['movie_id']) ? abs($_POST['movie_id']) : 0;
+    $movie_id        = isset($_POST['movie_id']) ? abs((int)$_POST['movie_id']) : 0;
     $sim_scenario    = isset($_POST['sim_scenario']) ? trim($_POST['sim_scenario']) : 'clean';
-    $audio_limit_sec = isset($_POST['audio_limit_sec']) ? abs($_POST['audio_limit_sec']) : 120;
+    $audio_limit_sec = isset($_POST['audio_limit_sec']) ? abs((int)$_POST['audio_limit_sec']) : 120;
     $details         = aic_get_movie_details($movie_id);
 
     if (!$details) {
@@ -992,9 +992,9 @@ if ($action === 'run_whisper') {
     p4c_query("INSERT INTO `movies_ai_analysis`
         (`movie_id`, `merchant_id`, `subtitle_status`, `detected_language`, `language_confidence`, `subtitle_filename`, `spoken_transcript`, `spoken_segments_json`, `whisper_duration_sec`, `created_at`, `updated_at`)
         VALUES (
-            '" . abs($details['id']) . "',
-            '" . abs($details['merchant_id']) . "',
-            '" . abs($sub_status) . "',
+            '" . abs((int)$details['id']) . "',
+            '" . abs((int)$details['merchant_id']) . "',
+            '" . abs((int)$sub_status) . "',
             '" . p4c_escape_string($detected_lang) . "',
             '" . p4c_escape_string($lang_conf) . "',
             '" . p4c_escape_string($sub_file) . "',
@@ -1005,7 +1005,7 @@ if ($action === 'run_whisper') {
             '" . $now . "'
         )
         ON DUPLICATE KEY UPDATE
-            `subtitle_status`      = '" . abs($sub_status) . "',
+            `subtitle_status`      = '" . abs((int)$sub_status) . "',
             `detected_language`    = '" . p4c_escape_string($detected_lang) . "',
             `language_confidence`  = '" . p4c_escape_string($lang_conf) . "',
             `subtitle_filename`    = '" . p4c_escape_string($sub_file) . "',
@@ -1022,7 +1022,7 @@ if ($action === 'run_whisper') {
 }
 
 if ($action === 'run_text_check') {
-    $movie_id          = isset($_POST['movie_id']) ? abs($_POST['movie_id']) : 0;
+    $movie_id          = isset($_POST['movie_id']) ? abs((int)$_POST['movie_id']) : 0;
     $custom_transcript = isset($_POST['custom_transcript']) ? trim($_POST['custom_transcript']) : null;
     $custom_title      = isset($_POST['custom_title']) ? trim($_POST['custom_title']) : null;
     $custom_desc       = isset($_POST['custom_desc']) ? trim($_POST['custom_desc']) : null;
@@ -1070,13 +1070,13 @@ if ($action === 'run_text_check') {
     p4c_query("INSERT INTO `movies_ai_analysis`
         (`movie_id`, `merchant_id`, `spoken_transcript`, `spoken_segments_json`, `text_check_status`, `text_compliance`, `text_risk_score`, `text_engine_used`, `text_summary`, `text_violations_json`, `text_duration_sec`, `created_at`, `updated_at`)
         VALUES (
-            '" . abs($details['id']) . "',
-            '" . abs($details['merchant_id']) . "',
+            '" . abs((int)$details['id']) . "',
+            '" . abs((int)$details['merchant_id']) . "',
             '" . p4c_escape_string($transcript_to_check) . "',
             '" . p4c_escape_string($seg_json) . "',
             '2',
             '" . p4c_escape_string($report['compliance_status']) . "',
-            '" . abs($report['risk_score']) . "',
+            '" . abs((int)$report['risk_score']) . "',
             '" . p4c_escape_string($report['engine_used']) . "',
             '" . p4c_escape_string($report['summary_de']) . "',
             '" . p4c_escape_string($viol_json) . "',
@@ -1089,7 +1089,7 @@ if ($action === 'run_text_check') {
             `spoken_segments_json` = '" . p4c_escape_string($seg_json) . "',
             `text_check_status`    = '2',
             `text_compliance`      = '" . p4c_escape_string($report['compliance_status']) . "',
-            `text_risk_score`      = '" . abs($report['risk_score']) . "',
+            `text_risk_score`      = '" . abs((int)$report['risk_score']) . "',
             `text_engine_used`     = '" . p4c_escape_string($report['engine_used']) . "',
             `text_summary`         = '" . p4c_escape_string($report['summary_de']) . "',
             `text_violations_json` = '" . p4c_escape_string($viol_json) . "',

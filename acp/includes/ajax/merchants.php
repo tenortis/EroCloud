@@ -46,7 +46,7 @@ if (p4c_num_rows($rs_merchants) > 0) {
         $rs_movies = p4c_query("SELECT * FROM `movies` WHERE `merchant_id`='". p4c_escape_string($merchant_ary->id)."' AND `movie_checked`='000-00-00 00:00:00' AND `released`='1';", __FILE__, __LINE__);
         $rs_movies_online = p4c_query("SELECT * FROM `movies_online` WHERE `merchant_id`='". p4c_escape_string($merchant_ary->id)."';",__FILE__,__LINE__);
 
-        $rs_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id`='".abs($merchant_ary->id)."';", __FILE__,__LINE__);
+        $rs_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id`='".abs((int)$merchant_ary->id)."';", __FILE__,__LINE__);
         
         $accept_content_rules = '0000-00-00 00:00:00';
         if ($merchant_ary->accept_content_rules != '0000-00-00 00:00:00') {
@@ -57,8 +57,8 @@ if (p4c_num_rows($rs_merchants) > 0) {
         $row[] = $merchant_ary->id;
         $row[] = '<a href="'.ACP_URL.'/Haendler/'.$merchant_ary->partner_id.'">'.$merchant_ary->partner_id.'</a>';
         $row[] = '<a href="'.ACP_URL.'/Haendler/'.$merchant_ary->partner_id.'">'.$merchant_ary->username.'</a>';
-        $row[] = abs(p4c_num_rows($rs_actors));
-        $row[] = abs(p4c_num_rows($rs_movies_online));
+        $row[] = abs((int)p4c_num_rows($rs_actors));
+        $row[] = abs((int)p4c_num_rows($rs_movies_online));
         $row[] = p4c_num_rows($rs_movies);
         $row[] = '<a href="mailto:'.$merchant_ary->email.'">'.$merchant_ary->email.'</a>';
         $row[] = $merchant_ary->last_ip;

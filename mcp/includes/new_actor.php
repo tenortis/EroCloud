@@ -59,54 +59,54 @@ if (isset($_POST['new_actor'])) {
             `username`              ='".p4c_escape_string($post_username)."',
             `status`                ='inactive',
             `created_datetime`      ='".date("Y-m-d H:i:s")."',
-            `check_gender`          ='".abs(filter_input(INPUT_POST, 'check_gender', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_gender`          ='".abs((int)filter_input(INPUT_POST, 'check_gender', FILTER_SANITIZE_NUMBER_INT))."',
             `gender`                ='".p4c_escape_string(filter_input(INPUT_POST, 'gender', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW))."',
-            `check_age`             ='".abs(filter_input(INPUT_POST, 'check_age', FILTER_SANITIZE_NUMBER_INT))."',
-            `age`                   ='".abs(filter_input(INPUT_POST, 'age', FILTER_SANITIZE_NUMBER_INT))."',
-            `check_star_sign`       ='".abs(filter_input(INPUT_POST, 'check_star_sign', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_age`             ='".abs((int)filter_input(INPUT_POST, 'check_age', FILTER_SANITIZE_NUMBER_INT))."',
+            `age`                   ='".abs((int)filter_input(INPUT_POST, 'age', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_star_sign`       ='".abs((int)filter_input(INPUT_POST, 'check_star_sign', FILTER_SANITIZE_NUMBER_INT))."',
             `star_sign`             ='".p4c_escape_string(filter_input(INPUT_POST, 'star_sign', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW))."',
-            `check_body_height`     ='".abs(filter_input(INPUT_POST, 'check_body_height', FILTER_SANITIZE_NUMBER_INT))."',
-            `body_height`           ='".abs(filter_input(INPUT_POST, 'body_height', FILTER_SANITIZE_NUMBER_INT))."',
-            `check_eye_color`       ='".abs(filter_input(INPUT_POST, 'check_eye_color', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_body_height`     ='".abs((int)filter_input(INPUT_POST, 'check_body_height', FILTER_SANITIZE_NUMBER_INT))."',
+            `body_height`           ='".abs((int)filter_input(INPUT_POST, 'body_height', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_eye_color`       ='".abs((int)filter_input(INPUT_POST, 'check_eye_color', FILTER_SANITIZE_NUMBER_INT))."',
             `eye_color`             ='".p4c_escape_string(filter_input(INPUT_POST, 'eye_color', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW))."',
-            `check_hair_color`      ='".abs(filter_input(INPUT_POST, 'check_hair_color', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_hair_color`      ='".abs((int)filter_input(INPUT_POST, 'check_hair_color', FILTER_SANITIZE_NUMBER_INT))."',
             `hair_color`            ='".p4c_escape_string(filter_input(INPUT_POST, 'hair_color', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW))."',
-            `check_body_weight`     ='".abs(filter_input(INPUT_POST, 'check_body_weight', FILTER_SANITIZE_NUMBER_INT))."',
-            `body_weight`           ='".abs(filter_input(INPUT_POST, 'body_weight', FILTER_SANITIZE_NUMBER_INT))."',
-            `check_cup_size`        ='".abs(filter_input(INPUT_POST, 'check_cup_size', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_body_weight`     ='".abs((int)filter_input(INPUT_POST, 'check_body_weight', FILTER_SANITIZE_NUMBER_INT))."',
+            `body_weight`           ='".abs((int)filter_input(INPUT_POST, 'body_weight', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_cup_size`        ='".abs((int)filter_input(INPUT_POST, 'check_cup_size', FILTER_SANITIZE_NUMBER_INT))."',
             `cup_size`              ='".p4c_escape_string($cup_sice)."',
-            `check_shaven`          ='".abs(filter_input(INPUT_POST, 'check_shaven', FILTER_SANITIZE_NUMBER_INT))."',
-            `shaven`                ='".abs(filter_input(INPUT_POST, 'shaven', FILTER_SANITIZE_NUMBER_INT))."',
-            `check_look`            ='".abs(filter_input(INPUT_POST, 'check_look', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_shaven`          ='".abs((int)filter_input(INPUT_POST, 'check_shaven', FILTER_SANITIZE_NUMBER_INT))."',
+            `shaven`                ='".abs((int)filter_input(INPUT_POST, 'shaven', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_look`            ='".abs((int)filter_input(INPUT_POST, 'check_look', FILTER_SANITIZE_NUMBER_INT))."',
             `look`                  ='".p4c_escape_string(filter_input(INPUT_POST, 'look', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW))."',
-            `check_marital_status`  ='".abs(filter_input(INPUT_POST, 'check_marital_status', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_marital_status`  ='".abs((int)filter_input(INPUT_POST, 'check_marital_status', FILTER_SANITIZE_NUMBER_INT))."',
             `marital_status`        ='".p4c_escape_string(filter_input(INPUT_POST, 'marital_status', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW))."',
-            `check_sexual_orientation`='".abs(filter_input(INPUT_POST, 'check_sexual_orientation', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_sexual_orientation`='".abs((int)filter_input(INPUT_POST, 'check_sexual_orientation', FILTER_SANITIZE_NUMBER_INT))."',
             `sexual_orientation`    ='".p4c_escape_string(filter_input(INPUT_POST, 'sexual_orientation', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW))."',
-            `check_looking_for`     ='".abs(filter_input(INPUT_POST, 'check_looking_for', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_looking_for`     ='".abs((int)filter_input(INPUT_POST, 'check_looking_for', FILTER_SANITIZE_NUMBER_INT))."',
             `looking_for`           ='".p4c_escape_string($looking_for)."',
-            `check_interests`       ='".abs(filter_input(INPUT_POST, 'check_interests', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_interests`       ='".abs((int)filter_input(INPUT_POST, 'check_interests', FILTER_SANITIZE_NUMBER_INT))."',
             `interests`             ='".p4c_escape_string($interests)."',
-            `check_sexual_preferences`='".abs(filter_input(INPUT_POST, 'check_sexual_preferences', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_sexual_preferences`='".abs((int)filter_input(INPUT_POST, 'check_sexual_preferences', FILTER_SANITIZE_NUMBER_INT))."',
             `sexual_preferences`    ='".p4c_escape_string($sexual_preferences)."',
-            `check_about_me`        ='".abs(filter_input(INPUT_POST, 'check_about_me', FILTER_SANITIZE_NUMBER_INT))."',
+            `check_about_me`        ='".abs((int)filter_input(INPUT_POST, 'check_about_me', FILTER_SANITIZE_NUMBER_INT))."',
             `about_me`              ='".p4c_escape_string(filter_input(INPUT_POST, 'about_me', FILTER_SANITIZE_STRING, FILTER_FLAG_ENCODE_LOW))."',
-            `merchant_id`='".abs($_SESSION['merchant_id'])."'
+            `merchant_id`='".abs((int)$_SESSION['merchant_id'])."'
         ",__FILE__,__LINE__);
 
         $actor_id = p4c_insert_id();
 
         //Prüfen ob schon eine Gruppe für die Profile erstellt wurde. Wenn nicht, dann jetzt anlegen.
-        $rs_groups = p4c_query("SELECT * FROM `groups` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' ORDER BY `id` DESC;",__FILE__,__LINE__);
+        $rs_groups = p4c_query("SELECT * FROM `groups` WHERE `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' ORDER BY `id` DESC;",__FILE__,__LINE__);
         if (p4c_num_rows($rs_groups) > 0) {
             $group_obj = p4c_fetch_object($rs_groups);
 
-            $rs_check_group = p4c_query("SELECT * FROM `group_actors` WHERE `actor_id`='".abs($actor_id)."' LIMIT 1;",__FILE__,__LINE__);
+            $rs_check_group = p4c_query("SELECT * FROM `group_actors` WHERE `actor_id`='".abs((int)$actor_id)."' LIMIT 1;",__FILE__,__LINE__);
             if (p4c_num_rows($rs_check_group) === 0) {
                 p4c_query("INSERT INTO `group_actors` SET
-                    `merchant_id`   = '".abs($_SESSION['merchant_id'])."',
-                    `group_id`      = '".abs($group_obj->id)."',
-                    `actor_id`      = '".abs($actor_id)."';",__FILE__,__LINE__);
+                    `merchant_id`   = '".abs((int)$_SESSION['merchant_id'])."',
+                    `group_id`      = '".abs((int)$group_obj->id)."',
+                    `actor_id`      = '".abs((int)$actor_id)."';",__FILE__,__LINE__);
             }                
         }
 

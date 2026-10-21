@@ -137,7 +137,16 @@ if (!isset($_GET['photo_id']) || empty($_GET['photo_id'])) {
     exit;
 }
 
-$photo_id = $_GET['photo_id'];
+$raw_photo_id = trim((string)$_GET['photo_id']);
+$fsk_mode = null;
+if (preg_match('#^FSK(16|18)/(.+)$#i', $raw_photo_id, $m)) {
+    $fsk_mode = (int)$m[1];
+    $photo_id = trim($m[2]);
+} elseif (strpos($raw_photo_id, '/') !== false) {
+    $photo_id = basename($raw_photo_id);
+} else {
+    $photo_id = $raw_photo_id;
+}
 
 $rs_photo = p4c_query("SELECT `photo_albums`.`id` AS `album_id`, `photo_albums`.`storage_location`, `photo_albums_photos`.`merchant_id`, `photo_albums_photos`.`filename`
     FROM `photo_albums_photos` INNER JOIN `photo_albums` ON `photo_albums_photos`.`album_id`=`photo_albums`.`album_id` WHERE
@@ -145,7 +154,18 @@ $rs_photo = p4c_query("SELECT `photo_albums`.`id` AS `album_id`, `photo_albums`.
     LIMIT 1;",__FILE__,__LINE__);
 
 if (p4c_num_rows($rs_photo) == 0) {
-    error_log("[EroCloud Photo Error] Foto-Eintrag nicht in Datenbank gefunden! File-ID: ".$photo_id);
+    // Fallback: Falls eine Album-ID statt einer Photo-File-ID (z.B. via /AlbumPhoto/FSK16/<album_id>) übergeben wurde
+    $rs_album_check = p4c_query("SELECT `id` FROM `photo_albums` WHERE `album_id`='".p4c_escape_string($photo_id)."' LIMIT 1;",__FILE__,__LINE__);
+    if (p4c_num_rows($rs_album_check) > 0) {
+        $_GET['album_id'] = $photo_id;
+        if ($fsk_mode !== null && !isset($_GET['fsk'])) {
+            $_GET['fsk'] = $fsk_mode;
+        }
+        include(API_DIR . '/photo_album_poster.php');
+        exit;
+    }
+
+    error_log("[EroCloud Photo Error] Foto-Eintrag nicht in Datenbank gefunden! File-ID: ".$raw_photo_id);
     no_image();
     exit;
 }
@@ -202,7 +222,7 @@ if (!is_file($file_path)) {
    
     $width = 200;
     if (isset($_GET['w']) AND !empty($_GET['w'])) {
-        $width = abs($_GET['w']);
+        $width = abs((int)$_GET['w']);
     }
 
     if ($width > 200) {$width = 200;}

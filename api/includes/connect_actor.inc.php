@@ -21,11 +21,11 @@ if (!isset($p4c_shop_id) OR empty($p4c_shop_id)) {
     print_xml($api);    
 }
 
-$get_erocloud_actor_id = abs(filter_input(INPUT_GET, 'erocloud_actor_id', FILTER_SANITIZE_NUMBER_INT));
-$get_remote_actor_id = abs(filter_input(INPUT_GET, 'remote_actor_id', FILTER_SANITIZE_NUMBER_INT));
+$get_erocloud_actor_id = abs((int)filter_input(INPUT_GET, 'erocloud_actor_id', FILTER_SANITIZE_NUMBER_INT));
+$get_remote_actor_id = abs((int)filter_input(INPUT_GET, 'remote_actor_id', FILTER_SANITIZE_NUMBER_INT));
 
 // Profil abfragen
-$rs_actor = p4c_query("SELECT * FROM `actors` WHERE `id`='".abs($get_erocloud_actor_id)."' LIMIT 1;",__FILE__,__LINE__);
+$rs_actor = p4c_query("SELECT * FROM `actors` WHERE `id`='".abs((int)$get_erocloud_actor_id)."' LIMIT 1;",__FILE__,__LINE__);
 
 if(p4c_num_rows($rs_actor) == '0') {
     $api['error'] = 'actor not exists';
@@ -36,31 +36,31 @@ if(p4c_num_rows($rs_actor) == '0') {
                    
     // Prüfen ob Darsteller schon syncronisiert wurde / mit Cloud verbunden ist
     $rs_check_sync = p4c_query("SELECT * FROM `messenger_sync` WHERE
-        `merchant_id`   = '".abs($actor_obj->merchant_id)."' AND
-        `actor_id`      = '".abs($get_erocloud_actor_id)."' AND
-        `remote_actor_id`='".abs($get_remote_actor_id)."' AND
-        `p4c_shop_id`   = '".abs($p4c_shop_id)."'
+        `merchant_id`   = '".abs((int)$actor_obj->merchant_id)."' AND
+        `actor_id`      = '".abs((int)$get_erocloud_actor_id)."' AND
+        `remote_actor_id`='".abs((int)$get_remote_actor_id)."' AND
+        `p4c_shop_id`   = '".abs((int)$p4c_shop_id)."'
     LIMIT 1;",__FILE__,__LINE__);
     
     if (p4c_num_rows($rs_check_sync,__FILE__,__LINE__) === 0) {
 
         p4c_query("INSERT INTO `messenger_sync` SET
-            `merchant_id`   = '".abs($actor_obj->merchant_id)."',
-            `actor_id`      = '".abs($get_erocloud_actor_id)."',
-            `remote_actor_id`='".abs($get_remote_actor_id)."',
+            `merchant_id`   = '".abs((int)$actor_obj->merchant_id)."',
+            `actor_id`      = '".abs((int)$get_erocloud_actor_id)."',
+            `remote_actor_id`='".abs((int)$get_remote_actor_id)."',
             `apikey`        = AES_ENCRYPT('".p4c_escape_string($api_key)."','".AES_KEY."'),
             `domain`        = '". p4c_escape_string($domain)."',
-            `p4c_shop_id`   = '".abs($p4c_shop_id)."';
+            `p4c_shop_id`   = '".abs((int)$p4c_shop_id)."';
         ",__FILE__,__LINE__);
     } else {
         p4c_query("UPDATE `messenger_sync` SET
             `apikey`        = AES_ENCRYPT('".p4c_escape_string($api_key)."','".AES_KEY."'),
             `domain`        = '". p4c_escape_string($domain)."'
         WHERE 
-            `merchant_id`   = '".abs($actor_obj->merchant_id)."' AND
-            `actor_id`      = '".abs($get_erocloud_actor_id)."' AND
-            `remote_actor_id`='".abs($get_remote_actor_id)."' AND
-            `p4c_shop_id`   = '".abs($p4c_shop_id)."'
+            `merchant_id`   = '".abs((int)$actor_obj->merchant_id)."' AND
+            `actor_id`      = '".abs((int)$get_erocloud_actor_id)."' AND
+            `remote_actor_id`='".abs((int)$get_remote_actor_id)."' AND
+            `p4c_shop_id`   = '".abs((int)$p4c_shop_id)."'
         LIMIT 1;",__FILE__,__LINE__);
         
         /**
@@ -70,10 +70,10 @@ if(p4c_num_rows($rs_actor) == '0') {
          */
         
         $rs_check_actor_member_info = p4c_query("SELECT * FROM `actor_member_info` WHERE
-            `merchant_id`   = '".abs($actor_obj->merchant_id)."' AND
-            `actor_id`      = '".abs($get_erocloud_actor_id)."' AND
-            `p4c_shop_id`   = '".abs($p4c_shop_id)."' AND
-            `erocms_amateur_id`!='".abs($get_remote_actor_id)."';",__FILE__,__LINE__);
+            `merchant_id`   = '".abs((int)$actor_obj->merchant_id)."' AND
+            `actor_id`      = '".abs((int)$get_erocloud_actor_id)."' AND
+            `p4c_shop_id`   = '".abs((int)$p4c_shop_id)."' AND
+            `erocms_amateur_id`!='".abs((int)$get_remote_actor_id)."';",__FILE__,__LINE__);
         
         if (p4c_num_rows($rs_check_actor_member_info) > 0) {
            
@@ -85,13 +85,13 @@ if(p4c_num_rows($rs_actor) == '0') {
                     $erocms_chat_id = $get_remote_actor_id.'_'.$explode[1];
 
                     p4c_query("UPDATE `actor_member_info` SET
-                        `erocms_amateur_id` = '".abs($get_remote_actor_id)."',
-                        `erocms_chat_id`    = '".abs($erocms_chat_id)."'   
+                        `erocms_amateur_id` = '".abs((int)$get_remote_actor_id)."',
+                        `erocms_chat_id`    = '".abs((int)$erocms_chat_id)."'   
                     WHERE
-                        `id`            = '".abs($actor_member_obj->id)."' AND
-                        `merchant_id`   = '".abs($actor_obj->merchant_id)."' AND
-                        `actor_id`      = '".abs($get_erocloud_actor_id)."' AND
-                        `p4c_shop_id`   = '".abs($p4c_shop_id)."'
+                        `id`            = '".abs((int)$actor_member_obj->id)."' AND
+                        `merchant_id`   = '".abs((int)$actor_obj->merchant_id)."' AND
+                        `actor_id`      = '".abs((int)$get_erocloud_actor_id)."' AND
+                        `p4c_shop_id`   = '".abs((int)$p4c_shop_id)."'
                     LIMIT 1;",__FILE__,__LINE__);
                 }                
             }            
@@ -99,11 +99,11 @@ if(p4c_num_rows($rs_actor) == '0') {
         
         
         $rs_check_chat_messages = p4c_query("SELECT * FROM `chat_messages` WHERE
-            `merchant_id`   = '".abs($actor_obj->merchant_id)."' AND
-            `p4c_shop_id`   = '".abs($p4c_shop_id)."' AND
+            `merchant_id`   = '".abs((int)$actor_obj->merchant_id)."' AND
+            `p4c_shop_id`   = '".abs((int)$p4c_shop_id)."' AND
             (
-                (`von`='actor' AND `von_id` = '".abs($get_erocloud_actor_id)."' AND `erocms_von_id` != '".abs($get_remote_actor_id)."') OR 
-                (`von`='member' AND `an_id` = '".abs($get_erocloud_actor_id)."' AND `erocms_an_id` != '".abs($get_remote_actor_id)."')
+                (`von`='actor' AND `von_id` = '".abs((int)$get_erocloud_actor_id)."' AND `erocms_von_id` != '".abs((int)$get_remote_actor_id)."') OR 
+                (`von`='member' AND `an_id` = '".abs((int)$get_erocloud_actor_id)."' AND `erocms_an_id` != '".abs((int)$get_remote_actor_id)."')
             )            
             ;",__FILE__,__LINE__);
         
@@ -121,23 +121,23 @@ if(p4c_num_rows($rs_actor) == '0') {
                 }
                
                 p4c_query("UPDATE `chat_messages` SET
-                    `erocms_von_id` = '".abs($erocms_von_id)."',
-                    `erocms_an_id` = '".abs($erocms_an_id)."'
+                    `erocms_von_id` = '".abs((int)$erocms_von_id)."',
+                    `erocms_an_id` = '".abs((int)$erocms_an_id)."'
                 WHERE 
-                    `id` = '".abs($actor_member_obj->id)."' AND
-                    `merchant_id`   = '".abs($actor_obj->merchant_id)."' AND
-                    `p4c_shop_id`   = '".abs($p4c_shop_id)."'                        
+                    `id` = '".abs((int)$actor_member_obj->id)."' AND
+                    `merchant_id`   = '".abs((int)$actor_obj->merchant_id)."' AND
+                    `p4c_shop_id`   = '".abs((int)$p4c_shop_id)."'                        
                 LIMIT 1;",__FILE__,__LINE__);
                 
             }            
         }    
         
         $rs_check_chat_messages_history = p4c_query("SELECT * FROM `chat_messages_history` WHERE
-            `merchant_id`   = '".abs($actor_obj->merchant_id)."' AND
-            `p4c_shop_id`   = '".abs($p4c_shop_id)."' AND
+            `merchant_id`   = '".abs((int)$actor_obj->merchant_id)."' AND
+            `p4c_shop_id`   = '".abs((int)$p4c_shop_id)."' AND
             (
-                (`von`='actor' AND `von_id` = '".abs($get_erocloud_actor_id)."' AND `erocms_von_id` != '".abs($get_remote_actor_id)."') OR 
-                (`von`='member' AND `an_id` = '".abs($get_erocloud_actor_id)."' AND `erocms_an_id` != '".abs($get_remote_actor_id)."')
+                (`von`='actor' AND `von_id` = '".abs((int)$get_erocloud_actor_id)."' AND `erocms_von_id` != '".abs((int)$get_remote_actor_id)."') OR 
+                (`von`='member' AND `an_id` = '".abs((int)$get_erocloud_actor_id)."' AND `erocms_an_id` != '".abs((int)$get_remote_actor_id)."')
             )
             ;",__FILE__,__LINE__);
         
@@ -155,12 +155,12 @@ if(p4c_num_rows($rs_actor) == '0') {
                 }
                
                 p4c_query("UPDATE `chat_messages_history` SET
-                    `erocms_von_id` = '".abs($erocms_von_id)."',
-                    `erocms_an_id` = '".abs($erocms_an_id)."'
+                    `erocms_von_id` = '".abs((int)$erocms_von_id)."',
+                    `erocms_an_id` = '".abs((int)$erocms_an_id)."'
                 WHERE 
-                    `id` = '".abs($actor_member_obj->id)."' AND
-                    `merchant_id`   = '".abs($actor_obj->merchant_id)."' AND
-                    `p4c_shop_id`   = '".abs($p4c_shop_id)."'                        
+                    `id` = '".abs((int)$actor_member_obj->id)."' AND
+                    `merchant_id`   = '".abs((int)$actor_obj->merchant_id)."' AND
+                    `p4c_shop_id`   = '".abs((int)$p4c_shop_id)."'                        
                 LIMIT 1;",__FILE__,__LINE__);
                 
             }            

@@ -5,7 +5,7 @@ if (!defined('SAFE_INC'))
 
 if (!isset($_GET['id'])) {exit;}
 
-$album_id = abs($_GET['id']);
+$album_id = abs((int)$_GET['id']);
 
 $a = new PhotoAlbum($mysql,$album_id);
 
@@ -36,7 +36,7 @@ if (isset($_POST['edit_album'])) {
     }
     
     // Prüfe ob bei diesem Kunden bereichts ein Fotoalbum mit diesem Title existiert
-    $rs_check_album_exists = p4c_query("SELECT `id`  FROM `photo_albums` WHERE `title`='".p4c_escape_string($album['title'])."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `id`!='".abs($album_id)."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_check_album_exists = p4c_query("SELECT `id`  FROM `photo_albums` WHERE `title`='".p4c_escape_string($album['title'])."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND `id`!='".abs((int)$album_id)."' LIMIT 1;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_check_album_exists) == 1) {
         $error = 'Du hast bereits eine Fotoalbum mit diesem Titel hochgeladen.';
         $duplicate_title = p4c_result($rs_check_album_exists, 0);
@@ -53,9 +53,9 @@ if (isset($_POST['edit_album'])) {
         }
 
         if(isset($_POST['actor_id'])) {
-            $album['actor_id'] = abs($_POST['actor_id']);
+            $album['actor_id'] = abs((int)$_POST['actor_id']);
         } else {
-            $album['actor_id'] = abs($a->field('actor_id'));
+            $album['actor_id'] = abs((int)$a->field('actor_id'));
         }
 
         if(isset($_POST['online_at'])) {
@@ -65,25 +65,25 @@ if (isset($_POST['edit_album'])) {
         }
 
         if(isset($_POST['amount_download'])) {
-            $amount_download = abs($_POST['amount_download']);
+            $amount_download = abs((int)$_POST['amount_download']);
             if ($amount_download <= 5000 AND $amount_download >= 0) {
                 $album['amount_download'] = $amount_download;
             } else {
-                $album['amount_download'] = abs($a->field('amount_download'));
+                $album['amount_download'] = abs((int)$a->field('amount_download'));
             }
         } else {
-            $album['amount_download'] = abs($a->field('amount_download'));
+            $album['amount_download'] = abs((int)$a->field('amount_download'));
         }
         
         if(isset($_POST['amount_webmaster'])) {
-            $amount_webmaster = abs($_POST['amount_webmaster']);
+            $amount_webmaster = abs((int)$_POST['amount_webmaster']);
             if (in_array($amount_webmaster, $amount_webmaster_ary)) {
                 $album['amount_webmaster'] = $amount_webmaster;
             } else {
-                $album['amount_webmaster'] = abs($a->field('amount_webmaster'));
+                $album['amount_webmaster'] = abs((int)$a->field('amount_webmaster'));
             }
         } else {
-            $album['amount_webmaster'] = abs($a->field('amount_webmaster'));
+            $album['amount_webmaster'] = abs((int)$a->field('amount_webmaster'));
         }
 
         $album['meta_title'] = substr($_POST['title'], 0, 65);
@@ -98,23 +98,23 @@ if (isset($_POST['edit_album'])) {
         }
 
         if (!isset($error) OR empty($error)) {
-            $rs_count_photos = p4c_query("SELECT * FROM `photo_albums_photos` WHERE `album_id`='". p4c_escape_string($a->field('album_id'))."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."';",__FILE__,__LINE__);
+            $rs_count_photos = p4c_query("SELECT * FROM `photo_albums_photos` WHERE `album_id`='". p4c_escape_string($a->field('album_id'))."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."';",__FILE__,__LINE__);
             $album['number_of_photos'] = p4c_num_rows($rs_count_photos);
 
             if (p4c_query("UPDATE `photo_albums` SET
-                `actor_id` = '".abs($album['actor_id'])."',
-                `number_of_photos`='".abs($album['number_of_photos'])."',
+                `actor_id` = '".abs((int)$album['actor_id'])."',
+                `number_of_photos`='".abs((int)$album['number_of_photos'])."',
                 `title` = '".p4c_escape_string($album['title'])."',
                 `description` = '".p4c_escape_string($album['description'])."',
                 `meta_title` = '".p4c_escape_string($album['meta_title'])."',
                 `meta_description` = '".p4c_escape_string($album['meta_description'])."',
                 `seo_url` = '".p4c_escape_string($album['seo_url'])."',
                 `online_at` = '".p4c_escape_string($album['online_at'])."',
-                `amount_webmaster` = '".abs($album['amount_webmaster'])."',
-                `amount_download` = '".abs($album['amount_download'])."',
+                `amount_webmaster` = '".abs((int)$album['amount_webmaster'])."',
+                `amount_download` = '".abs((int)$album['amount_download'])."',
                 `album_checked` = '0000-00-00 00:00:00',
                 `released`='1'
-                WHERE `id`='".abs($album_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__)
+                WHERE `id`='".abs((int)$album_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__)
             ) {
                 header('Location: '.MCP_URL.'/Photo-Album-Upload?step=3&album_id='.$album_id);
                 exit;
@@ -143,7 +143,7 @@ $album['category_slave'] = $a->field('category_slave');
 $album['album_checked']  = $a->field('album_checked');
 $album['released'] = $a->field('released');
 
-$rs_photos = p4c_query("SELECT * FROM `photo_albums_photos` WHERE `album_id`='".p4c_escape_string($a->field('album_id'))."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' ORDER BY `id` DESC;",__FILE__,__LINE__);
+$rs_photos = p4c_query("SELECT * FROM `photo_albums_photos` WHERE `album_id`='".p4c_escape_string($a->field('album_id'))."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' ORDER BY `id` DESC;",__FILE__,__LINE__);
 $count_photos = p4c_num_rows($rs_photos);
 
 $site .= '
@@ -211,7 +211,7 @@ $site .= '
         $site .= '<div class="ui-state-error" style="padding:10px; margin-top:10px;">'.$error.'</div>';
 
         if (isset($duplicate_title)) {
-            $rs_dublicate_album = p4c_query("SELECT * FROM `photo_albums` WHERE `id`='".abs($duplicate_title)."' LIMIT 1;",__FILE__,__LINE__);
+            $rs_dublicate_album = p4c_query("SELECT * FROM `photo_albums` WHERE `id`='".abs((int)$duplicate_title)."' LIMIT 1;",__FILE__,__LINE__);
             if (p4c_num_rows($rs_dublicate_album) == 1) {
                 $dublicat_ary = p4c_fetch_object($rs_dublicate_album);
                 $site .= '
@@ -332,7 +332,7 @@ $site .= '
             <div class="edit_title">Welchem Darsteller soll das Album zugeordnet werden?</div>
             <div class="edit_content" style="margin-bottom:8px;">
                 <select name="actor_id">';
-                    $rs_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `status`='active' ORDER BY `username` ASC",__FILE__,__LINE__);
+                    $rs_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND `status`='active' ORDER BY `username` ASC",__FILE__,__LINE__);
                     if (p4c_num_rows($rs_actors) > 0) {
                         while($actor_obj = p4c_fetch_object($rs_actors)) {
 

@@ -11,14 +11,14 @@ if (is_logged_in('mcp') === false) {
     exit;
 }
 
-$merchant_id = abs($_SESSION['merchant_id']);
+$merchant_id = abs((int)$_SESSION['merchant_id']);
 
 if (isset($_POST['mark_as_read']) AND isset($_POST['chat_id'])) {
 
     $chat_id = preg_replace ( '/[^a-z0-9_]/i', '', $_POST['chat_id']);
     
-    p4c_query("UPDATE `amoredea_messages` SET `gelesen` = '1' WHERE `chat_id`='".p4c_escape_string($chat_id)."' AND `von`='member' AND `merchant_id`='".abs($merchant_id)."';",__FILE__,__LINE__);
-    p4c_query("UPDATE `amoredea_messages_history` SET `gelesen` = '1' WHERE `chat_id`='".p4c_escape_string($chat_id)."' AND `von`='member' AND `merchant_id`='".abs($merchant_id)."';",__FILE__,__LINE__);
+    p4c_query("UPDATE `amoredea_messages` SET `gelesen` = '1' WHERE `chat_id`='".p4c_escape_string($chat_id)."' AND `von`='member' AND `merchant_id`='".abs((int)$merchant_id)."';",__FILE__,__LINE__);
+    p4c_query("UPDATE `amoredea_messages_history` SET `gelesen` = '1' WHERE `chat_id`='".p4c_escape_string($chat_id)."' AND `von`='member' AND `merchant_id`='".abs((int)$merchant_id)."';",__FILE__,__LINE__);
     
     echo "1";
 
@@ -63,14 +63,14 @@ if (isset($_POST['delete_id'])) {
 
 $count_total_chats = 0;
 
-$rs_chats = p4c_query("SELECT *, COUNT(*) AS `count_messages` FROM `amoredea_messages` WHERE `merchant_id`='".abs($merchant_id)."' AND `gelesen`='0' AND `von`='member' GROUP BY `chat_id`;",__FILE__,__LINE__);
+$rs_chats = p4c_query("SELECT *, COUNT(*) AS `count_messages` FROM `amoredea_messages` WHERE `merchant_id`='".abs((int)$merchant_id)."' AND `gelesen`='0' AND `von`='member' GROUP BY `chat_id`;",__FILE__,__LINE__);
 #$rs_chats = p4c_query("SELECT * FROM `amoredea_messages` WHERE `chat_id` LIKE '%_11' AND `gelesen`='0' AND `von`='member';",__FILE__,__LINE__);
 while($chat_obj = p4c_fetch_object($rs_chats)) {
     
         // DB von amoredea auswählen
     $mysql -> change_connect("amoredea");
     
-    $rs_member = p4c_query("SELECT `id`, AES_DECRYPT(`username`, '".AMOREDEA_AES_KEY."') AS `username` FROM `members` WHERE `id`='".abs($chat_obj->von_id)."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_member = p4c_query("SELECT `id`, AES_DECRYPT(`username`, '".AMOREDEA_AES_KEY."') AS `username` FROM `members` WHERE `id`='".abs((int)$chat_obj->von_id)."' LIMIT 1;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_member) == 0) {
         continue;
     }

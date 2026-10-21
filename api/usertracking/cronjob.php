@@ -148,9 +148,9 @@ function crawl_url($website_obj, $access_obj) {
             find_keywords($website_obj, $access_obj, $search_text);
             
             p4c_query("UPDATE `user_tracking_sites` SET
-                `status_code`='".abs($httpcode)."',
+                `status_code`='".abs((int)$httpcode)."',
                 `last_check_datetime`='".date("Y-m-d H:i:s")."'
-            WHERE `id`='".abs($id)."' LIMIT 1;",__FILE__,__LINE__);
+            WHERE `id`='".abs((int)$id)."' LIMIT 1;",__FILE__,__LINE__);
             
         #}
     }
@@ -201,12 +201,12 @@ function find_keywords($website_obj, $access_obj, $search_text) {
 }
 
 function keywords_to_user($access_obj, $keywords='') {
-    $rs_user = p4c_query("SELECT * FROM `user_tracking_users` WHERE `id`='".abs($access_obj->user_id)."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_user = p4c_query("SELECT * FROM `user_tracking_users` WHERE `id`='".abs((int)$access_obj->user_id)."' LIMIT 1;",__FILE__,__LINE__);
     
     if (p4c_num_rows($rs_user) > 0) {
         p4c_query("UPDATE `user_tracking_website_access` SET
             `checked_datetime` = '".date("Y-m-d H:i:s")."'
-        WHERE `id`='".abs($access_obj->id)."' LIMIT 1;",__FILE__,__LINE__);
+        WHERE `id`='".abs((int)$access_obj->id)."' LIMIT 1;",__FILE__,__LINE__);
         
         if ($keywords != '') {
             $user_obj = p4c_fetch_object($rs_user);
@@ -236,7 +236,7 @@ function keywords_to_user($access_obj, $keywords='') {
             p4c_query("UPDATE `user_tracking_users` SET
                 `interests`='". p4c_escape_string($interests_json)."',
                 `update_time`='".date("Y-m-d H:i:s")."'
-            WHERE `id`='".abs($user_obj->id)."' LIMIT 1;",__FILE__,__LINE__);
+            WHERE `id`='".abs((int)$user_obj->id)."' LIMIT 1;",__FILE__,__LINE__);
         }
     }
 }

@@ -21,7 +21,7 @@ if (is_logged_in('mcp') === false) {
     exit;
 }
 
-$merchant_id = abs($_SESSION['merchant_id']);
+$merchant_id = abs((int)$_SESSION['merchant_id']);
 
 #$rs_movies = p4c_query("SELECT `id`, `convert_status`, `file_id`, `filename`, `title`, `movie_checked`, `released`
 #     FROM `movies` WHERE `merchant_id`='".abs($merchant_id)."' ORDER BY `id` DESC", __FILE__, __LINE__);
@@ -32,7 +32,7 @@ $send_jason = array();
 
 $rs_photo = p4c_query("SELECT * FROM `photo_albums_photos` INNER JOIN `photo_albums` ON `photo_albums_photos`.`album_id`=`photo_albums`.`album_id` WHERE
     `file_id`='". p4c_escape_string($file_id)."' AND
-    `photo_albums_photos`.`merchant_id`='".abs($merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
+    `photo_albums_photos`.`merchant_id`='".abs((int)$merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
 
 if (p4c_num_rows($rs_photo) == 0) {
     file_error("Das Foto existiert nicht.");
@@ -46,7 +46,7 @@ if (is_file($filename)) {
     if (unlink($filename)) {
         p4c_query("DELETE FROM `photo_albums_photos` WHERE
             `file_id`='". p4c_escape_string($file_id)."' AND
-            `photo_albums_photos`.`merchant_id`='".abs($merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
+            `photo_albums_photos`.`merchant_id`='".abs((int)$merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
     } else {
         file_error("Das Foto konnte nicht gel&ouml;scht werden.");    
     }

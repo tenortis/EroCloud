@@ -31,7 +31,7 @@ if (!isset($_GET['step'])) {
             
 
                     
-            $rs_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' ORDER BY `username` ASC;",__FILE__,__LINE__);
+            $rs_actors = p4c_query("SELECT * FROM `actors` WHERE `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' ORDER BY `username` ASC;",__FILE__,__LINE__);
             if (p4c_num_rows($rs_actors) > 1) {
                 $site .= '
                 <div style="margin-bottom:15px;">

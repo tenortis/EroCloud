@@ -21,7 +21,7 @@ $photo_id = $_GET['photo_id'];
 $rs_photo = p4c_query("SELECT `photo_albums`.`id` AS `album_id`, `photo_albums`.`storage_location`, `photo_albums_photos`.`merchant_id`, `photo_albums_photos`.`filename`
     FROM `photo_albums_photos` INNER JOIN `photo_albums` ON `photo_albums_photos`.`album_id`=`photo_albums`.`album_id` WHERE
         `file_id`='".p4c_escape_string($photo_id)."' AND
-        `photo_albums_photos`.`merchant_id`='".abs($_SESSION['merchant_id'])."'
+        `photo_albums_photos`.`merchant_id`='".abs((int)$_SESSION['merchant_id'])."'
     LIMIT 1;",__FILE__,__LINE__);
 
 if (p4c_num_rows($rs_photo) == 0) {
@@ -173,7 +173,7 @@ if (!is_file($filename) || filesize($filename) == 0) {
    
     $width = 0;
     if (isset($_GET['w']) AND !empty($_GET['w'])) {
-        $width = abs($_GET['w']);
+        $width = abs((int)$_GET['w']);
     }
     
     if ($width > 900) {$width = 900;}

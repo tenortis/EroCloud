@@ -33,7 +33,7 @@ if (filemtime($temp_file) < time()-10) {
             if ($actors_obj->erocall_number_de_status == 1) {
                 $phone_status = 'online';
 
-                $rs_check_call = p4c_query("SELECT * FROM `erocall` WHERE `actor_id`='".abs($actors_obj->id)."' ORDER BY `erocall`.`id` DESC LIMIT 1;",__FILE__,__LINE__);
+                $rs_check_call = p4c_query("SELECT * FROM `erocall` WHERE `actor_id`='".abs((int)$actors_obj->id)."' ORDER BY `erocall`.`id` DESC LIMIT 1;",__FILE__,__LINE__);
                 if (p4c_num_rows($rs_check_call) == 1) {
                     $call_obj = p4c_fetch_object($rs_check_call);
                     if ($call_obj->date_time >= date("Y-m-d H:i:s", strtotime("-60 minutes")) AND $call_obj->event == 'connect') {

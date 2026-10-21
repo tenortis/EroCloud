@@ -98,7 +98,7 @@ while($site_obj = p4c_fetch_object($rs_sites)) {
 }
 
 
-$rs_campaigns = p4c_query("SELECT * FROM `ads_campaigns` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."';",__FILE__,__LINE__);
+$rs_campaigns = p4c_query("SELECT * FROM `ads_campaigns` WHERE `merchant_id`='".abs((int)$_SESSION['merchant_id'])."';",__FILE__,__LINE__);
 
 $tbody_campaigns = '';
 $number_of_campaigns = '';
@@ -153,7 +153,7 @@ if ($count_own_sites > 0) {
     $tbody_own_sites = '';
     while($site_obj = p4c_fetch_object($rs_own_sites)) {
 
-        $rs_ads = p4c_query("SELECT * FROM `ads_media` WHERE `site_id` = '".abs($site_obj->id)."' ORDER BY `upload_datetime` DESC;",__FILE__,__LINE__);
+        $rs_ads = p4c_query("SELECT * FROM `ads_media` WHERE `site_id` = '".abs((int)$site_obj->id)."' ORDER BY `upload_datetime` DESC;",__FILE__,__LINE__);
         
         $tbody_own_sites .= '
         <tr>

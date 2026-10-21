@@ -76,21 +76,21 @@ if (p4c_num_rows($rs_actor_member_info) > 0) {
                     $mess = new ChatMessage;
 
                     $mess->chat_id      = p4c_escape_string($member_info_obj->chat_id);
-                    $mess->p4c_shop_id  = abs($member_info_obj->p4c_shop_id);
-                    $mess->merchant_id  = abs($merchant_id);
-                    $mess->erocms_von_id= abs($chat_ary->von_id);
-                    $mess->erocms_an_id = abs($chat_ary->an_id);
+                    $mess->p4c_shop_id  = abs((int)$member_info_obj->p4c_shop_id);
+                    $mess->merchant_id  = abs((int)$merchant_id);
+                    $mess->erocms_von_id= abs((int)$chat_ary->von_id);
+                    $mess->erocms_an_id = abs((int)$chat_ary->an_id);
                     $mess->von          = p4c_escape_string($von);
-                    $mess->von_id       = abs($von_id);
-                    $mess->an_id        = abs($an_id);
-                    $mess->message_price= abs($chat_ary->preis_coins);
+                    $mess->von_id       = abs((int)$von_id);
+                    $mess->an_id        = abs((int)$an_id);
+                    $mess->message_price= abs((int)$chat_ary->preis_coins);
                     $mess->message      = p4c_escape_string($chat_ary->nachricht);
                     $mess->datetime     = p4c_escape_string($chat_ary->datetime);
-                    $mess->is_mobile    = abs($chat_ary->is_mobile);
-                    $mess->systemnachricht= abs($chat_ary->systemnachricht);
-                    $mess->gelesen      = abs($chat_ary->gelesen);
-                    $mess->beantwortet  = abs($chat_ary->beantwortet);
-                    $mess->geloescht    = abs($chat_ary->geloescht);
+                    $mess->is_mobile    = abs((int)$chat_ary->is_mobile);
+                    $mess->systemnachricht= abs((int)$chat_ary->systemnachricht);
+                    $mess->gelesen      = abs((int)$chat_ary->gelesen);
+                    $mess->beantwortet  = abs((int)$chat_ary->beantwortet);
+                    $mess->geloescht    = abs((int)$chat_ary->geloescht);
 
                     $mess->send();
                 }
@@ -99,7 +99,7 @@ if (p4c_num_rows($rs_actor_member_info) > 0) {
             if (p4c_query("UPDATE `actor_member_info` SET `is_synct`='1' WHERE `chat_id`='".p4c_escape_string($member_info_obj->chat_id)."' LIMIT 1; ",__FILE__,__LINE__)) {
                 p4c_query("UPDATE `messenger_sync` SET
                     `chats_synct`=chats_synct+1
-                WHERE `merchant_id`='".abs($merchant_id)."' AND `actor_id`='".abs($actor_id)."' AND `domain`='".p4c_escape_string($domain)."' LIMIT 1;",__FILE__,__LINE__);
+                WHERE `merchant_id`='".abs((int)$merchant_id)."' AND `actor_id`='".abs((int)$actor_id)."' AND `domain`='".p4c_escape_string($domain)."' LIMIT 1;",__FILE__,__LINE__);
             }
 
         }

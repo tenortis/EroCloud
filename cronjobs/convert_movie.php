@@ -35,7 +35,7 @@ if (isset($db_settings_ary['videothek_ffmpeg_on_off']) AND $db_settings_ary['vid
         while($movie_obj = p4c_fetch_object($rs_check_movies)) {
             // Wenn die Konvertierung länger dauert als 4 Stunden, dann abbrechen
             if ($movie_obj->convert_endtime == '0000-00-00 00:00:00' AND date("Y-m-d H:i:s", strtotime("-4 hours")) > $movie_obj->convert_starttime) {
-                p4c_query("UPDATE `movies` SET `convert_status`='3', `convert_starttime`='0000-00-00 00:00:00' WHERE `id`='".abs($movie_obj->id)."' LIMIT 1;", __FILE__, __LINE__);
+                p4c_query("UPDATE `movies` SET `convert_status`='3', `convert_starttime`='0000-00-00 00:00:00' WHERE `id`='".abs((int)$movie_obj->id)."' LIMIT 1;", __FILE__, __LINE__);
             }
         }
     }
@@ -57,7 +57,7 @@ if (isset($db_settings_ary['videothek_ffmpeg_on_off']) AND $db_settings_ary['vid
                     $base_filename = pathinfo($movie_ary->filename, PATHINFO_FILENAME);
                     $file_name_neu = strtolower($base_filename) . '.mp4';
                 
-                    p4c_query("UPDATE `movies` SET `convert_status`='1', `convert_starttime`='".date("Y-m-d H:i:s")."' WHERE `id`='".abs($movie_ary->id)."' LIMIT 1;", __FILE__, __LINE__);
+                    p4c_query("UPDATE `movies` SET `convert_status`='1', `convert_starttime`='".date("Y-m-d H:i:s")."' WHERE `id`='".abs((int)$movie_ary->id)."' LIMIT 1;", __FILE__, __LINE__);
         
                     // Logge Start der Konvertierung
                     /*
@@ -184,7 +184,7 @@ if (isset($db_settings_ary['videothek_ffmpeg_on_off']) AND $db_settings_ary['vid
                                 $amount_own_sql = '';
                                 if ((int)$movie_ary->playtime_seconds <= 0 && $post_playtime_sec > 0 && (float)$movie_ary->amount_second > 0) {
                                     $recalc_amount_own = round($post_playtime_sec * (float)$movie_ary->amount_second);
-                                    $amount_own_sql = ", `amount_own`='" . abs($recalc_amount_own) . "'";
+                                    $amount_own_sql = ", `amount_own`='" . abs((int)$recalc_amount_own) . "'";
                                 }
 
                                 // Aktualisiere Dateiname, frisch ausgelesene Metadaten und Konvertierungs-Status in Datenbank
@@ -196,7 +196,7 @@ if (isset($db_settings_ary['videothek_ffmpeg_on_off']) AND $db_settings_ary['vid
                                     `convert_status`='2',
                                     `convert_endtime`='" . date("Y-m-d H:i:s") . "'"
                                     . $amount_own_sql . "
-                                    WHERE `id`='" . abs($movie_ary->id) . "' LIMIT 1;", __FILE__, __LINE__);
+                                    WHERE `id`='" . abs((int)$movie_ary->id) . "' LIMIT 1;", __FILE__, __LINE__);
                                 
                                 // 10 Vorschaubilder (Thumbnails) erzeugen – mit Schutz gegen Division durch 0
                                 $thumb_prefix = 'thumb_' . strtolower($base_filename);
@@ -220,7 +220,7 @@ if (isset($db_settings_ary['videothek_ffmpeg_on_off']) AND $db_settings_ary['vid
                                     @unlink($org_file);
                                 }
                             } else {
-                                p4c_query("UPDATE `movies` SET `convert_status`='3' WHERE `id`='".abs($movie_ary->id)."' LIMIT 1;", __FILE__, __LINE__);
+                                p4c_query("UPDATE `movies` SET `convert_status`='3' WHERE `id`='".abs((int)$movie_ary->id)."' LIMIT 1;", __FILE__, __LINE__);
                             }
                         } else {
                             // Kopieren fehlgeschlagen -> Temp-Dateien aufräumen und Fehlerstatus setzen
@@ -230,17 +230,17 @@ if (isset($db_settings_ary['videothek_ffmpeg_on_off']) AND $db_settings_ary['vid
                             if (file_exists($temp_qt_file)) {
                                 @unlink($temp_qt_file);
                             }
-                            p4c_query("UPDATE `movies` SET `convert_status`='3' WHERE `id`='".abs($movie_ary->id)."' LIMIT 1;", __FILE__, __LINE__);
+                            p4c_query("UPDATE `movies` SET `convert_status`='3' WHERE `id`='".abs((int)$movie_ary->id)."' LIMIT 1;", __FILE__, __LINE__);
                         }
                     } else {
                         // FFmpeg fehlgeschlagen oder leere Datei -> Temp-Datei aufräumen und Status auf 3 (fehlerhaft), damit Queue nicht 4h blockiert
                         if (file_exists($temp_encoded_file)) {
                             @unlink($temp_encoded_file);
                         }
-                        p4c_query("UPDATE `movies` SET `convert_status`='3' WHERE `id`='".abs($movie_ary->id)."' LIMIT 1;", __FILE__, __LINE__);
+                        p4c_query("UPDATE `movies` SET `convert_status`='3' WHERE `id`='".abs((int)$movie_ary->id)."' LIMIT 1;", __FILE__, __LINE__);
                     }
                 } else {
-                    p4c_query("UPDATE `movies` SET `convert_status`='3' WHERE `id`='".abs($movie_ary->id)."' LIMIT 1;", __FILE__, __LINE__);
+                    p4c_query("UPDATE `movies` SET `convert_status`='3' WHERE `id`='".abs((int)$movie_ary->id)."' LIMIT 1;", __FILE__, __LINE__);
                 }
             }
         }

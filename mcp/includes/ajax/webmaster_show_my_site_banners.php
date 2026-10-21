@@ -11,8 +11,8 @@ if (is_logged_in('mcp') === false) {
     exit;
 }
 
-$merchant_id = abs($_SESSION['merchant_id']);
-$site_id     = abs($_POST['site_id']);
+$merchant_id = abs((int)$_SESSION['merchant_id']);
+$site_id     = abs((int)$_POST['site_id']);
 
 // Site-Klasse einbinden 
 include(SOURCEDIR.'/includes/klassen/site.inc.php');
@@ -24,7 +24,7 @@ if ($website->get_var("id") == '') {
 }
 
 $rs_ads = p4c_query("SELECT * FROM `ads_media` WHERE 
-    `site_id` = '".abs($site_id)."'
+    `site_id` = '".abs((int)$site_id)."'
 ORDER BY `upload_datetime` DESC;",__FILE__,__LINE__);
 
 $site = '';

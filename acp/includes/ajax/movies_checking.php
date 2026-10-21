@@ -58,8 +58,8 @@ if (p4c_num_rows($rs_movies) > 0) {
         $title = safe_utf8($movie_ary->title);
         
         $rs_actors = p4c_query("SELECT `username` FROM `actors` WHERE
-            `id`='".abs($movie_ary->actor_id)."' AND
-            `merchant_id` = '".abs($movie_ary->merchant_id)."';",__FILE__,__LINE__);
+            `id`='".abs((int)$movie_ary->actor_id)."' AND
+            `merchant_id` = '".abs((int)$movie_ary->merchant_id)."';",__FILE__,__LINE__);
         
         if (p4c_num_rows($rs_actors) > 0) {
             $actor_name = safe_utf8(p4c_result($rs_actors, 0));
@@ -113,17 +113,17 @@ if (p4c_num_rows($rs_movies) > 0) {
 
             $now       = date('Y-m-d H:i:s');
             $viol_json = json_encode($rep['violations'], JSON_UNESCAPED_UNICODE);
-            $sub_file  = 'sub_' . abs($movie_ary->id) . '_' . $movie_ary->file_id . '.vtt';
+            $sub_file  = 'sub_' . abs((int)$movie_ary->id) . '_' . $movie_ary->file_id . '.vtt';
 
             p4c_query("INSERT INTO `movies_ai_analysis`
                 (`movie_id`, `merchant_id`, `subtitle_filename`, `text_check_status`, `text_compliance`, `text_risk_score`, `text_engine_used`, `text_summary`, `text_violations_json`, `text_duration_sec`, `created_at`, `updated_at`)
                 VALUES (
-                    '" . abs($movie_ary->id) . "',
-                    '" . abs($movie_ary->merchant_id) . "',
+                    '" . abs((int)$movie_ary->id) . "',
+                    '" . abs((int)$movie_ary->merchant_id) . "',
                     '" . p4c_escape_string($sub_file) . "',
                     '2',
                     '" . p4c_escape_string($rep['compliance_status']) . "',
-                    '" . abs($rep['risk_score']) . "',
+                    '" . abs((int)$rep['risk_score']) . "',
                     '" . p4c_escape_string($rep['engine_used']) . "',
                     '" . p4c_escape_string($rep['summary_de']) . "',
                     '" . p4c_escape_string($viol_json) . "',
@@ -134,7 +134,7 @@ if (p4c_num_rows($rs_movies) > 0) {
                 ON DUPLICATE KEY UPDATE
                     `text_check_status`    = '2',
                     `text_compliance`      = '" . p4c_escape_string($rep['compliance_status']) . "',
-                    `text_risk_score`      = '" . abs($rep['risk_score']) . "',
+                    `text_risk_score`      = '" . abs((int)$rep['risk_score']) . "',
                     `text_engine_used`     = '" . p4c_escape_string($rep['engine_used']) . "',
                     `text_summary`         = '" . p4c_escape_string($rep['summary_de']) . "',
                     `text_violations_json` = '" . p4c_escape_string($viol_json) . "',

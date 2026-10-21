@@ -16,14 +16,14 @@ if (!isset($_GET['content_id']) OR !isset($_GET['month'])) {
     exit;
 }
 
-$month = abs($_GET['month']);
-$content_id = abs($_GET['content_id']);
-$merchant_id = abs($_SESSION['merchant_id']);
+$month = abs((int)$_GET['month']);
+$content_id = abs((int)$_GET['content_id']);
+$merchant_id = abs((int)$_SESSION['merchant_id']);
 
 // DB von amoredea auswählen
 $mysql -> change_connect("amoredea");
 
-$rs_comments = p4c_query("SELECT * FROM `timeline_comments_".$month."` WHERE `content_id`='".abs($content_id)."' AND `merchant_id`='".abs($merchant_id)."' LIMIT 1;", __FILE__, __LINE__);
+$rs_comments = p4c_query("SELECT * FROM `timeline_comments_".$month."` WHERE `content_id`='".abs((int)$content_id)."' AND `merchant_id`='".abs((int)$merchant_id)."' LIMIT 1;", __FILE__, __LINE__);
 if (p4c_num_rows($rs_comments) == 0) {
     header('Location: '.URL.'/Comments');
     exit;

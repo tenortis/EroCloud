@@ -93,22 +93,22 @@ function upload_file($rs_movie, $movie_id) {
             if (file_exists($file_path)) {
                 $resolution = $width.'x'.$height;
 
-                $amount_own = round($play_time_sec*$movie_ary->amount_second);
+                $amount_own = round((float)$play_time_sec*(float)$movie_ary->amount_second);
                 
                 if (p4c_query("UPDATE `movies` SET
                     `filename`          = '".p4c_escape_string($file_name)."',
                     `playtime_string`   = '".p4c_escape_string($play_time)."',
                     `playtime_seconds`  = '".p4c_escape_string($play_time_sec)."',
                     `resolution`        = '".p4c_escape_string($resolution)."',
-                    `amount_own`        = '".abs($amount_own)."'
-                    WHERE `id` ='".abs($movie_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__)) {
+                    `amount_own`        = '".abs((int)$amount_own)."'
+                    WHERE `id` ='".abs((int)$movie_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__)) {
                         
                         if (isset($_POST['released']) AND $_POST['released'] == 'true') {
                             p4c_query("UPDATE `movies` SET
                                 `create_datetime` = '".date("Y-m-d H:i:s")."',
                                 `movie_checked` = '0000-00-00 00:00:00',
                                 `released`='1'
-                                WHERE `id`='".abs($movie_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__);
+                                WHERE `id`='".abs((int)$movie_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__);
                         }
                         
                         $ret[]= $fileName;
@@ -129,9 +129,9 @@ $fileTypes = array('avi','flv','m4v','mkv','mov','mp4','mpg','wmv'); // File ext
 if(isset($_FILES["movie"]) AND isset($_GET['movie_id'])) {
     $ret = array();
 	
-    $movie_id = abs($_GET['movie_id']); 
+    $movie_id = abs((int)$_GET['movie_id']); 
     
-    $rs_movie = p4c_query("SELECT * FROM `movies` WHERE `id`='".abs($movie_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' AND (`filename`='' OR `convert_status`='0') LIMIT 1;",__FILE__,__LINE__);
+    $rs_movie = p4c_query("SELECT * FROM `movies` WHERE `id`='".abs((int)$movie_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND (`filename`='' OR `convert_status`='0') LIMIT 1;",__FILE__,__LINE__);
     
     // Nur Updaten wenn Datei noch nicht hochgeladen wurde
     if (p4c_num_rows($rs_movie) == 1) {

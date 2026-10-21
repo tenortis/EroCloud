@@ -15,7 +15,7 @@ if (is_logged_in('acp') === false) {
     exit;   
 }
 
-$member_id = abs($_GET['member_id']);
+$member_id = abs((int)$_GET['member_id']);
 
 function private_substr($str, $len=20) {
     if (strlen($str) > $len) {
@@ -26,7 +26,7 @@ function private_substr($str, $len=20) {
     return $str;
 }
 
-$rs_chats = p4c_query("SELECT * FROM `chat_messages_history` WHERE (`von`='member' AND `von_id`='".abs($member_id)."') OR (`von`='actor' AND `an_id`='".abs($member_id)."') GROUP BY `chat_id`", __FILE__, __LINE__);
+$rs_chats = p4c_query("SELECT * FROM `chat_messages_history` WHERE (`von`='member' AND `von_id`='".abs((int)$member_id)."') OR (`von`='actor' AND `an_id`='".abs((int)$member_id)."') GROUP BY `chat_id`", __FILE__, __LINE__);
 
 if (p4c_num_rows($rs_chats) > 0) {
     $output = array(
@@ -49,7 +49,7 @@ if (p4c_num_rows($rs_chats) > 0) {
         $rs_last_message = p4c_query("SELECT * FROM `chat_messages_history` WHERE `chat_id`='". p4c_escape_string($chat_obj->chat_id)."' ORDER BY `chat_id` DESC LIMIT 1;", __FILE__,__LINE__);
         $last_mess_obj = p4c_fetch_object($rs_last_message);
                 
-        $rs_actor = p4c_query("SELECT * FROM `actors` WHERE `id`='".abs($actor_id)."' LIMIT 1;",__FILE__,__LINE__);
+        $rs_actor = p4c_query("SELECT * FROM `actors` WHERE `id`='".abs((int)$actor_id)."' LIMIT 1;",__FILE__,__LINE__);
         $actor_obj = p4c_fetch_object($rs_actor);
         
     	$row = array();

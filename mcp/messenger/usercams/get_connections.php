@@ -15,7 +15,7 @@ if (!isset($_SESSION['merchant_id'])) {
 
 if (isset($_POST['get_userinfos'])) {
         
-    $rs_member = p4c_query("SELECT * FROM `members` WHERE `id`='".abs($_POST['get_userinfos'])."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_member = p4c_query("SELECT * FROM `members` WHERE `id`='".abs((int)$_POST['get_userinfos'])."' LIMIT 1;",__FILE__,__LINE__);
     $member_obj = p4c_fetch_object($rs_member);
     
     $ary = array();
@@ -30,7 +30,7 @@ if (isset($_POST['get_userinfos'])) {
     exit;
 }
 
-$merchant_id = abs($_SESSION['merchant_id']);
+$merchant_id = abs((int)$_SESSION['merchant_id']);
 
 $rs_connections = p4c_query("SELECT *, count(*) AS `count_ice_sdp` FROM `member_cams` WHERE
     `merchant_id`='".$merchant_id."' AND

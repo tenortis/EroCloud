@@ -64,8 +64,8 @@ if (p4c_num_rows($rs_movies) > 0) {
         }
         
         $rs_actors = p4c_query("SELECT `username` FROM `actors` WHERE
-            `id`='".abs($movie_ary->actor_id)."' AND
-            `merchant_id` = '".abs($movie_ary->merchant_id)."';",__FILE__,__LINE__);
+            `id`='".abs((int)$movie_ary->actor_id)."' AND
+            `merchant_id` = '".abs((int)$movie_ary->merchant_id)."';",__FILE__,__LINE__);
         
         if (p4c_num_rows($rs_actors) > 0) {
             $actor = '<a href="'.ACP_URL.'/Actor/'.$movie_ary->actor_id.'" target="_blank">'. utf8_decode(p4c_result($rs_actors,0)).'</a>';

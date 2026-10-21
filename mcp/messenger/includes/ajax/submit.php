@@ -21,7 +21,7 @@ if ($set_my_chatgroup > 0) {
 
 // Set Messenger-Sound
 if (isset($_POST['set_messenger_sound'])) {
-    $status = abs($_POST['set_messenger_sound']);
+    $status = abs((int)$_POST['set_messenger_sound']);
 
     if ($status === 1) {
         $status = 0;
@@ -32,8 +32,8 @@ if (isset($_POST['set_messenger_sound'])) {
     p4c_query("UPDATE `groups` SET
         `messneger_sound`='".$status."'
     WHERE
-        `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
-        `id`='".abs($_SESSION['my_chatgroup'])."'
+        `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
+        `id`='".abs((int)$_SESSION['my_chatgroup'])."'
     LIMIT 1;",__FILE__,__LINE__);
     
     echo $status;
@@ -43,8 +43,8 @@ if (isset($_POST['set_messenger_sound'])) {
 if (isset($_POST['get_messenger_sound']) AND isset($_SESSION['merchant_id'])) {
     if (isset($_SESSION['my_chatgroup'])) {
         $rs_sound = p4c_query("SELECT `messneger_sound` FROM `groups` WHERE
-            `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
-            `id`='".abs($_SESSION['my_chatgroup'])."'
+            `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
+            `id`='".abs((int)$_SESSION['my_chatgroup'])."'
         LIMIT 1;",__FILE__,__LINE__);
     
         echo p4c_result($rs_sound,0);
@@ -61,15 +61,15 @@ if (isset($_POST['actor_is_typing']) AND isset($_SESSION['merchant_id'])) {
     $get_chat_id = filter_input(INPUT_POST, 'chat_id', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_HIGH);
     $get_chat_id = preg_replace( '/[^0-9a-z_]/i', '', $get_chat_id);
 
-    $merchant_id= abs($_SESSION['merchant_id']);
+    $merchant_id= abs((int)$_SESSION['merchant_id']);
     
     p4c_query("UPDATE `actor_member_info` SET
-        `actor_is_typing`='".abs($_POST['actor_is_typing'])."'
+        `actor_is_typing`='".abs((int)$_POST['actor_is_typing'])."'
     WHERE
         `chat_id`    = '". p4c_escape_string($get_chat_id)."' AND
-        `merchant_id`= '".abs($merchant_id)."' LIMIT 1;", __FILE__, __LINE__);
+        `merchant_id`= '".abs((int)$merchant_id)."' LIMIT 1;", __FILE__, __LINE__);
     
-    $rs_actor_member_info = p4c_query("SELECT * FROM `actor_member_info` WHERE `chat_id`='". p4c_escape_string($get_chat_id)."' AND `merchant_id`='".abs($merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_actor_member_info = p4c_query("SELECT * FROM `actor_member_info` WHERE `chat_id`='". p4c_escape_string($get_chat_id)."' AND `merchant_id`='".abs((int)$merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_actor_member_info,__FILE__,__LINE__) === 1) {
        
         $member_info_obj = p4c_fetch_object($rs_actor_member_info);
@@ -80,13 +80,13 @@ if (isset($_POST['actor_is_typing']) AND isset($_SESSION['merchant_id'])) {
         $actor_id   = $member_info_obj->actor_id;
     
         #$rs_messenger_sync = p4c_query("SELECT AES_DECRYPT(`apikey`, '".AES_KEY."') FROM `messenger_sync` WHERE `p4c_shop_id`='".abs($shop_id)."' LIMIT 1;",__FILE__,__LINE__);
-        $rs_messenger_sync = p4c_query("SELECT AES_DECRYPT(`apikey`, '".AES_KEY."') FROM `messenger_sync` WHERE `actor_id`='".abs($actor_id)."' AND `p4c_shop_id`='".abs($shop_id)."' LIMIT 1;",__FILE__,__LINE__);
+        $rs_messenger_sync = p4c_query("SELECT AES_DECRYPT(`apikey`, '".AES_KEY."') FROM `messenger_sync` WHERE `actor_id`='".abs((int)$actor_id)."' AND `p4c_shop_id`='".abs((int)$shop_id)."' LIMIT 1;",__FILE__,__LINE__);
         
         $param = array(
             "api_key"           => p4c_result($rs_messenger_sync, 0),
             "erocms_amateur_id" => $member_info_obj->erocms_amateur_id,
             "erocms_member_id"  => $member_info_obj->erocms_member_id,
-            "actor_is_typing"   => abs($_POST['actor_is_typing'])
+            "actor_is_typing"   => abs((int)$_POST['actor_is_typing'])
         );
 
         $param = array_filter($param, "strlen"); // leere Einträge Entfernen
@@ -107,9 +107,9 @@ if (isset($_POST['save_user_settings'])) {
     $get_cam_amount = filter_input(INPUT_POST, 'cam_amount', FILTER_SANITIZE_NUMBER_INT);
     $get_cam2cam_amount = filter_input(INPUT_POST, 'cam2cam_amount', FILTER_SANITIZE_NUMBER_INT);
     
-    $merchant_id= abs($_SESSION['merchant_id']);
+    $merchant_id= abs((int)$_SESSION['merchant_id']);
     
-    $rs_actor_member_info = p4c_query("SELECT * FROM `actor_member_info` WHERE `chat_id`='". p4c_escape_string($get_chat_id)."' AND `merchant_id`='".abs($merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_actor_member_info = p4c_query("SELECT * FROM `actor_member_info` WHERE `chat_id`='". p4c_escape_string($get_chat_id)."' AND `merchant_id`='".abs((int)$merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_actor_member_info,__FILE__,__LINE__) === 1) {
        
         $member_info_obj = p4c_fetch_object($rs_actor_member_info);
@@ -119,15 +119,15 @@ if (isset($_POST['save_user_settings'])) {
         $shop_id    = $member_info_obj->p4c_shop_id;
         $actor_id   = $member_info_obj->actor_id;
         
-        $rs_messenger_sync = p4c_query("SELECT AES_DECRYPT(`apikey`, '".AES_KEY."') FROM `messenger_sync` WHERE `actor_id`='".abs($actor_id)."' AND `p4c_shop_id`='".abs($shop_id)."' LIMIT 1;",__FILE__,__LINE__);
+        $rs_messenger_sync = p4c_query("SELECT AES_DECRYPT(`apikey`, '".AES_KEY."') FROM `messenger_sync` WHERE `actor_id`='".abs((int)$actor_id)."' AND `p4c_shop_id`='".abs((int)$shop_id)."' LIMIT 1;",__FILE__,__LINE__);
         
         $param = array(
             "api_key"           => p4c_result($rs_messenger_sync, 0),
             "erocms_amateur_id" => $member_info_obj->erocms_amateur_id,
             "erocms_member_id"  => $member_info_obj->erocms_member_id,
-            "pn_amount"         => abs($get_pn_amount),
-            "cam_amount"        => abs($get_cam_amount),
-            "cam2cam_amount"    => abs($get_cam2cam_amount)
+            "pn_amount"         => abs((int)$get_pn_amount),
+            "cam_amount"        => abs((int)$get_cam_amount),
+            "cam2cam_amount"    => abs((int)$get_cam2cam_amount)
         );
 
         $param = array_filter($param, "strlen"); // leere Einträge Entfernen
@@ -140,12 +140,12 @@ if (isset($_POST['save_user_settings'])) {
             $class_errorlog->log('URL: https://'.$domain.'/erocloud_api/update_actor_member_infos.php?'.$query."\n".$data."\n".print_r($_POST,true),__FILE__,__LINE__);   
         } else {
             p4c_query("UPDATE `actor_member_info` SET
-                `pn_amount`='".abs($get_pn_amount)."',
-                `cam_amount`='".abs($get_cam_amount)."',
-                `cam2cam_amount`='".abs($get_cam2cam_amount)."'
+                `pn_amount`='".abs((int)$get_pn_amount)."',
+                `cam_amount`='".abs((int)$get_cam_amount)."',
+                `cam2cam_amount`='".abs((int)$get_cam2cam_amount)."'
             WHERE
                 `chat_id`    = '". p4c_escape_string($get_chat_id)."' AND
-                `merchant_id`= '".abs($merchant_id)."' LIMIT 1;", __FILE__, __LINE__);
+                `merchant_id`= '".abs((int)$merchant_id)."' LIMIT 1;", __FILE__, __LINE__);
             
             echo $data;
         }
@@ -160,8 +160,8 @@ if (isset($_POST['set_online']) AND $_POST['set_online'] === 'true') {
     }
 
     $rs_actors = p4c_query("SELECT * FROM `group_actors` WHERE
-        `group_id`='".abs($_SESSION['my_chatgroup'])."' AND
-        `merchant_id`='".abs($_SESSION['merchant_id'])."';",__FILE__,__LINE__);
+        `group_id`='".abs((int)$_SESSION['my_chatgroup'])."' AND
+        `merchant_id`='".abs((int)$_SESSION['merchant_id'])."';",__FILE__,__LINE__);
     
     if (p4c_num_rows($rs_actors,__FILE__,__LINE__) === 0) {
         exit;
@@ -170,9 +170,9 @@ if (isset($_POST['set_online']) AND $_POST['set_online'] === 'true') {
     while ($actor_obj = p4c_fetch_object($rs_actors)) {
         $onlinetime = time()+30;
 
-        p4c_query("UPDATE `actors` SET `lastonline` = '".abs($onlinetime)."' WHERE 
+        p4c_query("UPDATE `actors` SET `lastonline` = '".abs((int)$onlinetime)."' WHERE 
             `status`='active' AND
-            `id` = '".abs($actor_obj->actor_id)."' LIMIT 1;",__FILE__,__LINE__);
+            `id` = '".abs((int)$actor_obj->actor_id)."' LIMIT 1;",__FILE__,__LINE__);
     }
 }
 
@@ -180,10 +180,10 @@ if (isset($_POST['pause']) AND isset($_POST['actor_id']) AND $_POST['actor_id'] 
     $actor_id = $_POST['actor_id'];
     
     if ($_POST['pause'] == '0') {
-        p4c_query("UPDATE `actors` SET `messenger_takes_a_break`='1' WHERE `id`='".abs($actor_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
+        p4c_query("UPDATE `actors` SET `messenger_takes_a_break`='1' WHERE `id`='".abs((int)$actor_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
         echo '1';
     } else {
-        p4c_query("UPDATE `actors` SET `messenger_takes_a_break`='0' WHERE `id`='".abs($actor_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
+        p4c_query("UPDATE `actors` SET `messenger_takes_a_break`='0' WHERE `id`='".abs((int)$actor_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
         echo '0';
     }
 }
@@ -192,10 +192,10 @@ if (isset($_POST['online_status']) AND isset($_POST['actor_id']) AND $_POST['act
     $actor_id = $_POST['actor_id'];
     
     if ($_POST['online_status'] == '0') {
-        p4c_query("UPDATE `actors` SET `messenger_online_status`='1' WHERE `id`='".abs($actor_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
+        p4c_query("UPDATE `actors` SET `messenger_online_status`='1' WHERE `id`='".abs((int)$actor_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
         echo '1';
     } else {
-        p4c_query("UPDATE `actors` SET `messenger_online_status`='0' WHERE `id`='".abs($actor_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
+        p4c_query("UPDATE `actors` SET `messenger_online_status`='0' WHERE `id`='".abs((int)$actor_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
         echo '0';
     }
 }
@@ -203,17 +203,17 @@ if (isset($_POST['online_status']) AND isset($_POST['actor_id']) AND $_POST['act
 
 // Nachricht als un-/beantwortet markieren
 if (isset($_POST['marked_as_unanswered']) AND isset($_SESSION['merchant_id'])) {
-    $get_marked_as_unanswered = abs($_POST['marked_as_unanswered']);
+    $get_marked_as_unanswered = abs((int)$_POST['marked_as_unanswered']);
     
     $get_remote_member_id = filter_input(INPUT_POST, 'remote_member_id', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_HIGH);
     $get_remote_member_id = preg_replace( '/[^0-9a-z_]/i', '', $get_remote_member_id);
 
     p4c_query("UPDATE `actor_member_info` SET 
-        `marked_as_unanswered`='".abs($get_marked_as_unanswered)."'
+        `marked_as_unanswered`='".abs((int)$get_marked_as_unanswered)."'
     WHERE
         `chat_id` = '".p4c_escape_string($get_remote_member_id)."' AND
-        `actor_id`= '".abs($_SESSION['actor_id'])."' AND
-        `merchant_id`='". abs($_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__);
+        `actor_id`= '".abs((int)$_SESSION['actor_id'])."' AND
+        `merchant_id`='". abs((int)$_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__);
    
 }
 
@@ -228,7 +228,7 @@ if (isset($_POST['save_user_notes'])) {
         `user_notes`='".p4c_escape_string($text)."'
     WHERE
         `chat_id` = '".p4c_escape_string($get_chat_id)."' AND
-        `merchant_id`='". abs($_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__);
+        `merchant_id`='". abs((int)$_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__);
     
     echo 'ok';   
 
@@ -241,7 +241,7 @@ if (isset($_POST['message_read'])) {
     $get_chat_id = filter_input(INPUT_POST, 'chat_id', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_HIGH);
     $get_chat_id = preg_replace( '/[^0-9a-z_]/i', '', $get_chat_id);
     
-    $rs_actor_member_info = p4c_query("SELECT * FROM `actor_member_info` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `chat_id`='". p4c_escape_string($get_chat_id)."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_actor_member_info = p4c_query("SELECT * FROM `actor_member_info` WHERE `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND `chat_id`='". p4c_escape_string($get_chat_id)."' LIMIT 1;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_actor_member_info,__FILE__,__LINE__) === 0) {
         exit;
     }
@@ -253,7 +253,7 @@ if (isset($_POST['message_read'])) {
     $actor_id   = $member_info_obj->actor_id;
     
     #$rs_messenger_sync = p4c_query("SELECT AES_DECRYPT(`apikey`, '".AES_KEY."') FROM `messenger_sync` WHERE `p4c_shop_id`='".abs($shop_id)."' LIMIT 1;",__FILE__,__LINE__);
-    $rs_messenger_sync = p4c_query("SELECT AES_DECRYPT(`apikey`, '".AES_KEY."') FROM `messenger_sync` WHERE `actor_id`='".abs($actor_id)."' AND `p4c_shop_id`='".abs($shop_id)."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_messenger_sync = p4c_query("SELECT AES_DECRYPT(`apikey`, '".AES_KEY."') FROM `messenger_sync` WHERE `actor_id`='".abs((int)$actor_id)."' AND `p4c_shop_id`='".abs((int)$shop_id)."' LIMIT 1;",__FILE__,__LINE__);
     
     $param = array(
         "api_key"       => p4c_result($rs_messenger_sync, 0),
@@ -269,8 +269,8 @@ if (isset($_POST['message_read'])) {
     
     if ($data === 'ok') {
         #echo $data."\n";
-        p4c_query("UPDATE `chat_messages` SET `gelesen`='1' WHERE `von`='member' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `chat_id`='". p4c_escape_string($get_chat_id)."';",__FILE__,__LINE__);
-        p4c_query("UPDATE `chat_messages_history` SET `gelesen`='1' WHERE `von`='member' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `chat_id`='". p4c_escape_string($get_chat_id)."';",__FILE__,__LINE__);
+        p4c_query("UPDATE `chat_messages` SET `gelesen`='1' WHERE `von`='member' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND `chat_id`='". p4c_escape_string($get_chat_id)."';",__FILE__,__LINE__);
+        p4c_query("UPDATE `chat_messages_history` SET `gelesen`='1' WHERE `von`='member' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND `chat_id`='". p4c_escape_string($get_chat_id)."';",__FILE__,__LINE__);
     }
     
 }
@@ -280,8 +280,8 @@ if (isset($_POST['get_all_usercams']) AND isset($_SESSION['merchant_id']) AND is
     
     $rs_member_cams = p4c_query("SELECT * FROM `member_cams` LEFT JOIN `members` ON
         `member_cams`.`member_id`=`members`.`id` WHERE
-        `member_cams`.`group_id`='".abs($_SESSION['my_chatgroup'])."' AND
-        `member_cams`.`merchant_id`='".abs($_SESSION['merchant_id'])."' AND
+        `member_cams`.`group_id`='".abs((int)$_SESSION['my_chatgroup'])."' AND
+        `member_cams`.`merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
         `datetime` >= '".date("Y-m-d H-i-s", strtotime("-80 seconds"))."';",__FILE__,__LINE__);
         
     $send_jason = array();
@@ -319,7 +319,7 @@ if (isset($_POST['check_url_connect'])) {
     p4c_query("SET NAMES 'utf8'");
     
     $domain = trim($_POST['check_url_connect']);
-    $group_id = abs($_POST['group_id']);
+    $group_id = abs((int)$_POST['group_id']);
     
     $error = 'Es konnte keine Verbindung hergestellt werden.';
 
@@ -364,16 +364,16 @@ if (isset($_POST['check_url_connect'])) {
            
             // Prüfen ob Amateur schon syncronisiert wurde
             $rs_check_sync = p4c_query("SELECT * FROM `messenger_sync` WHERE
-                `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
-                `p4c_shop_id`='".abs($obj->p4c_shop_id)."' AND
-                `remote_actor_id`='".abs($obj->sender_id)."'
+                `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
+                `p4c_shop_id`='".abs((int)$obj->p4c_shop_id)."' AND
+                `remote_actor_id`='".abs((int)$obj->sender_id)."'
             LIMIT 1;",__FILE__,__LINE__);
             
             if (p4c_num_rows($rs_check_sync,__FILE__,__LINE__) === 0) {
                 
                 // prüfe ob Profil (Username) schon beim Merchant existiert
                 $rs_check_actor_profiles = p4c_query("SELECT * FROM `actors` WHERE
-                    `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
+                    `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
                     `username`='".p4c_escape_string($profil_obj->username)."'
                 LIMIT 1;",__FILE__,__LINE__);
             
@@ -386,49 +386,49 @@ if (isset($_POST['check_url_connect'])) {
                 // Wenn Profil nicht existiert
                 if (p4c_num_rows($rs_check_actor_profiles,__FILE__,__LINE__) === 0) {
                     p4c_query("INSERT INTO `actors` SET
-                        `merchant_id`           ='".abs($_SESSION['merchant_id'])."',
+                        `merchant_id`           ='".abs((int)$_SESSION['merchant_id'])."',
                         `username`              ='".p4c_escape_string($profil_obj->username)."',
-                        `lastonline`            ='".abs($profil_obj->lastonline)."',
-                        `cam_user_auto_on`      ='".abs($profil_obj->cam_user_auto_on)."',
-                        `messenger_sound`       ='".abs($profil_obj->messenger_sound)."',
-                        `messenger_takes_a_break`='".abs($profil_obj->messenger_pause_status)."',
-                        `messenger_online_status`='".abs($profil_obj->messenger_online_status)."',
-                        `cam_amount`            ='".abs($profil_obj->cam_preis)."',
+                        `lastonline`            ='".abs((int)$profil_obj->lastonline)."',
+                        `cam_user_auto_on`      ='".abs((int)$profil_obj->cam_user_auto_on)."',
+                        `messenger_sound`       ='".abs((int)$profil_obj->messenger_sound)."',
+                        `messenger_takes_a_break`='".abs((int)$profil_obj->messenger_pause_status)."',
+                        `messenger_online_status`='".abs((int)$profil_obj->messenger_online_status)."',
+                        `cam_amount`            ='".abs((int)$profil_obj->cam_preis)."',
                         `cam_new_user_sound`    ='".p4c_escape_string($profil_obj->cam_new_user_sound)."',
-                        `pn_amount`             ='".abs($profil_obj->pn_preis)."',
-                        `pn_free_if_webcam`     ='".abs($profil_obj->pn_kostenlos_bei_webcam)."',
-                        `cam2cam_amount`        ='".abs($profil_obj->cam2cam_preis)."',
-                        `check_gender`          ='".abs($profil_obj->check_geschlecht)."',
+                        `pn_amount`             ='".abs((int)$profil_obj->pn_preis)."',
+                        `pn_free_if_webcam`     ='".abs((int)$profil_obj->pn_kostenlos_bei_webcam)."',
+                        `cam2cam_amount`        ='".abs((int)$profil_obj->cam2cam_preis)."',
+                        `check_gender`          ='".abs((int)$profil_obj->check_geschlecht)."',
                         `gender`                ='".p4c_escape_string($profil_obj->geschlecht)."',
-                        `check_age`             ='".abs($profil_obj->check_alter)."',
-                        `age`                   ='".abs($profil_obj->alter)."',
-                        `check_star_sign`       ='".abs($profil_obj->check_sternzeichen)."',
+                        `check_age`             ='".abs((int)$profil_obj->check_alter)."',
+                        `age`                   ='".abs((int)$profil_obj->alter)."',
+                        `check_star_sign`       ='".abs((int)$profil_obj->check_sternzeichen)."',
                         `star_sign`             ='".p4c_escape_string($profil_obj->sternzeichen)."',
-                        `check_body_height`     ='".abs($profil_obj->check_groesse)."',
-                        `body_height`           ='".abs($profil_obj->groesse)."',
-                        `check_eye_color`       ='".abs($profil_obj->check_augenfarbe)."',
+                        `check_body_height`     ='".abs((int)$profil_obj->check_groesse)."',
+                        `body_height`           ='".abs((int)$profil_obj->groesse)."',
+                        `check_eye_color`       ='".abs((int)$profil_obj->check_augenfarbe)."',
                         `eye_color`             ='".p4c_escape_string($profil_obj->augenfarbe)."',
-                        `check_hair_color`      ='".abs($profil_obj->check_haarfarbe)."',
+                        `check_hair_color`      ='".abs((int)$profil_obj->check_haarfarbe)."',
                         `hair_color`            ='".p4c_escape_string($profil_obj->haarfarbe)."',
-                        `check_body_weight`     ='".abs($profil_obj->check_gewicht)."',
-                        `body_weight`           ='".abs($profil_obj->gewicht)."',
-                        `check_cup_size`        ='".abs($profil_obj->check_koerbchen_groesse)."',
+                        `check_body_weight`     ='".abs((int)$profil_obj->check_gewicht)."',
+                        `body_weight`           ='".abs((int)$profil_obj->gewicht)."',
+                        `check_cup_size`        ='".abs((int)$profil_obj->check_koerbchen_groesse)."',
                         `cup_size`              ='".p4c_escape_string($profil_obj->koerbchen_groesse)."',
-                        `check_shaven`          ='".abs($profil_obj->check_intimrasur)."',
-                        `shaven`                ='".abs($profil_obj->intimrasur)."',
-                        `check_look`            ='".abs($profil_obj->check_aussehen)."',
+                        `check_shaven`          ='".abs((int)$profil_obj->check_intimrasur)."',
+                        `shaven`                ='".abs((int)$profil_obj->intimrasur)."',
+                        `check_look`            ='".abs((int)$profil_obj->check_aussehen)."',
                         `look`                  ='".p4c_escape_string($profil_obj->aussehen)."',
-                        `check_marital_status`  ='".abs($profil_obj->check_familienstand)."',
+                        `check_marital_status`  ='".abs((int)$profil_obj->check_familienstand)."',
                         `marital_status`        ='".p4c_escape_string($familienstand)."',
-                        `check_sexual_orientation`='".abs($profil_obj->check_sexuelle_orientierung)."',
+                        `check_sexual_orientation`='".abs((int)$profil_obj->check_sexuelle_orientierung)."',
                         `sexual_orientation`    ='".p4c_escape_string($profil_obj->sexuelle_orientierung)."',
-                        `check_looking_for`     ='".abs($profil_obj->check_ich_suche)."',
+                        `check_looking_for`     ='".abs((int)$profil_obj->check_ich_suche)."',
                         `looking_for`           ='".p4c_escape_string($profil_obj->ich_suche)."',
-                        `check_interests`       ='".abs($profil_obj->check_interessen)."',
+                        `check_interests`       ='".abs((int)$profil_obj->check_interessen)."',
                         `interests`             ='".p4c_escape_string($profil_obj->interessen)."',
-                        `check_sexual_preferences`='".abs($profil_obj->check_sexuelle_vorlieben)."',
+                        `check_sexual_preferences`='".abs((int)$profil_obj->check_sexuelle_vorlieben)."',
                         `sexual_preferences`    ='".p4c_escape_string($profil_obj->sexuelle_vorlieben)."',
-                        `check_about_me`        ='".abs($profil_obj->check_ueber_mich)."',
+                        `check_about_me`        ='".abs((int)$profil_obj->check_ueber_mich)."',
                         `about_me`              ='".p4c_escape_string($profil_obj->ueber_mich)."'
                     ;",__FILE__,__LINE__);
                     
@@ -436,8 +436,8 @@ if (isset($_POST['check_url_connect'])) {
                     $new_actor_id = p4c_insert_id();
                     
                     $rs_check_actor_profiles = p4c_query("SELECT * FROM `actors` WHERE
-                        `id` = '".abs($new_actor_id)."' AND
-                        `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
+                        `id` = '".abs((int)$new_actor_id)."' AND
+                        `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
                         `username`='".p4c_escape_string($profil_obj->username)."'
                     LIMIT 1;",__FILE__,__LINE__);
                 }
@@ -447,24 +447,24 @@ if (isset($_POST['check_url_connect'])) {
                 
                 $actor_id = $actor_obj->id;
 
-                $rs_check_group = p4c_query("SELECT * FROM `group_actors` WHERE `actor_id`='".abs($actor_id)."' LIMIT 1;",__FILE__,__LINE__);
+                $rs_check_group = p4c_query("SELECT * FROM `group_actors` WHERE `actor_id`='".abs((int)$actor_id)."' LIMIT 1;",__FILE__,__LINE__);
                 if (p4c_num_rows($rs_check_group,__FILE__,__LINE__) == 0) {
                     p4c_query("INSERT INTO `group_actors` SET
-                        `merchant_id`   = '".abs($_SESSION['merchant_id'])."',
-                        `group_id`      = '".abs($group_id)."',
-                        `actor_id`      = '".abs($actor_id)."';",__FILE__,__LINE__);
+                        `merchant_id`   = '".abs((int)$_SESSION['merchant_id'])."',
+                        `group_id`      = '".abs((int)$group_id)."',
+                        `actor_id`      = '".abs((int)$actor_id)."';",__FILE__,__LINE__);
                     
                     $_SESSION['my_chatgroup'] = $group_id;
                 }
                 
                 // Profil mit Cloud verbinden
                 p4c_query("INSERT INTO `messenger_sync` SET
-                    `merchant_id`   = '".abs($_SESSION['merchant_id'])."',
-                    `actor_id`      = '".abs($actor_id)."',
-                    `remote_actor_id`='".abs($obj->sender_id)."',
+                    `merchant_id`   = '".abs((int)$_SESSION['merchant_id'])."',
+                    `actor_id`      = '".abs((int)$actor_id)."',
+                    `remote_actor_id`='".abs((int)$obj->sender_id)."',
                     `apikey`        = AES_ENCRYPT('".p4c_escape_string($api_key)."','".AES_KEY."'),
                     `domain`        = '". p4c_escape_string($domain)."',
-                    `p4c_shop_id`   = '".abs($obj->p4c_shop_id)."';
+                    `p4c_shop_id`   = '".abs((int)$obj->p4c_shop_id)."';
                 ",__FILE__,__LINE__);
                 
                 // EroCloud-Actor-ID übertragen
@@ -529,7 +529,7 @@ if (isset($_POST['search']) AND isset($_SESSION['my_chatgroup'])) {
         $rs_members = p4c_query("SELECT *, `members`.`id` AS `member_id` FROM `group_actors`, `members` LEFT JOIN `messenger_sync` ON `messenger_sync`.`p4c_shop_id`=`members`.`p4c_shop_id` WHERE
             `members`.`username` LIKE '%". p4c_escape_string($get_search)."%' AND
             `messenger_sync`.`actor_id`=`group_actors`.`actor_id` AND
-            `group_actors`.`group_id`='".abs($_SESSION['my_chatgroup'])."' AND
+            `group_actors`.`group_id`='".abs((int)$_SESSION['my_chatgroup'])."' AND
             `messenger_sync`.`sync_time`!='0000-00-00 00:00:00'
         ORDER BY `lastonline` DESC LIMIT 1000;",__FILE__,__LINE__);
                
@@ -583,29 +583,29 @@ if (isset($_POST['get_commision'])) {
 
     
     if ($_SESSION['logged_in_as'] == 'group' AND isset($_SESSION['my_chatgroup'])) {
-        $sql_movies_group = "AND `movies`.`actor_id` IN (SELECT `actor_id` FROM `group_actors` WHERE `group_id` = '".abs($_SESSION['my_chatgroup'])."' AND `merchant_id` = '".abs($_SESSION['merchant_id'])."')";
-        $sql_photo_alben_group = "AND `photo_albums`.`actor_id` IN (SELECT `actor_id` FROM `group_actors` WHERE `group_id` = '".abs($_SESSION['my_chatgroup'])."' AND `merchant_id` = '".abs($_SESSION['merchant_id'])."')";
-        $sql_messenger_group = "AND `chat_messages_history`.`an_id` IN (SELECT `actor_id` FROM `group_actors` WHERE `group_id` = '".abs($_SESSION['my_chatgroup'])."' AND `merchant_id` = '".abs($_SESSION['merchant_id'])."')";
-        $sql_webcam_group = "AND `revenue_webcam`.`actor_id` IN (SELECT `actor_id` FROM `group_actors` WHERE `group_id` = '".abs($_SESSION['my_chatgroup'])."' AND `merchant_id` = '".abs($_SESSION['merchant_id'])."')";
+        $sql_movies_group = "AND `movies`.`actor_id` IN (SELECT `actor_id` FROM `group_actors` WHERE `group_id` = '".abs((int)$_SESSION['my_chatgroup'])."' AND `merchant_id` = '".abs((int)$_SESSION['merchant_id'])."')";
+        $sql_photo_alben_group = "AND `photo_albums`.`actor_id` IN (SELECT `actor_id` FROM `group_actors` WHERE `group_id` = '".abs((int)$_SESSION['my_chatgroup'])."' AND `merchant_id` = '".abs((int)$_SESSION['merchant_id'])."')";
+        $sql_messenger_group = "AND `chat_messages_history`.`an_id` IN (SELECT `actor_id` FROM `group_actors` WHERE `group_id` = '".abs((int)$_SESSION['my_chatgroup'])."' AND `merchant_id` = '".abs((int)$_SESSION['merchant_id'])."')";
+        $sql_webcam_group = "AND `revenue_webcam`.`actor_id` IN (SELECT `actor_id` FROM `group_actors` WHERE `group_id` = '".abs((int)$_SESSION['my_chatgroup'])."' AND `merchant_id` = '".abs((int)$_SESSION['merchant_id'])."')";
     }
     
     // Fotoalben
     $rs_count_sold_photo_albums_day_all = p4c_query("SELECT COUNT(*), SUM(`actor_commision`) FROM `photo_albums_access` LEFT JOIN `photo_albums` ON `photo_albums_access`.`album_id`=`photo_albums`.`album_id` 
-        WHERE  `photo_albums`.`merchant_id`='".abs($_SESSION['merchant_id'])."' AND
+        WHERE  `photo_albums`.`merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
             `buy_timestamp` LIKE '".date("Y-m")."-%' 
             ".$sql_photo_alben_group."
         ;",__FILE__,__LINE__);
     
     // Movies
     $rs_count_sold_movies_day_all = p4c_query("SELECT SUM(`actor_commision`) FROM `movies_access` LEFT JOIN `movies` ON `movies_access`.`movie_id`=`movies`.`file_id` 
-        WHERE  `movies`.`merchant_id`='".abs($_SESSION['merchant_id'])."' AND
+        WHERE  `movies`.`merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
             `buy_timestamp` LIKE '".date("Y-m")."-%' 
             ".$sql_movies_group."
         ;",__FILE__,__LINE__);
   
     // Messenger
     $rs_count_receive_messages = p4c_query("SELECT SUM(`actor_commision`) FROM `chat_messages_history` WHERE
-        `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
+        `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
         `von`='member' AND
         `datetime` LIKE '".date("Y-m")."-%'
         ".$sql_messenger_group."
@@ -613,7 +613,7 @@ if (isset($_POST['get_commision'])) {
     
     // Webcam
     $rs_count_webcam = p4c_query("SELECT SUM(`commision`) AS `commision` FROM `revenue_webcam` WHERE
-        `merchant_id`='".abs($_SESSION['merchant_id'])."' AND
+        `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND
         `date` LIKE '".date("Y-m")."-%'
         ".$sql_webcam_group."
     ;",__FILE__,__LINE__);    

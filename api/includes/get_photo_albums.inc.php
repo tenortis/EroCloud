@@ -12,9 +12,9 @@ header('Content-Type: text/html; charset=utf-8');
 // Wenn eine Darsteller angegeben wurde
  if(isset($_GET['actor_id'])) {
     
-    $actor_id = abs($_GET['actor_id']);        
+    $actor_id = abs((int)$_GET['actor_id']);        
     // Alle Filme vom Amateur holen
-    $rs_albums_online = p4c_query("SELECT `checksum`, `album_id`, `actor_id`, `online_at`, `status` FROM `photo_albums_online` WHERE `actor_id`='".abs($actor_id)."';",__FILE__,__LINE__);
+    $rs_albums_online = p4c_query("SELECT `checksum`, `album_id`, `actor_id`, `online_at`, `status` FROM `photo_albums_online` WHERE `actor_id`='".abs((int)$actor_id)."';",__FILE__,__LINE__);
     $number_of_albums = p4c_num_rows($rs_albums_online);
     if($number_of_albums == 0) {
         $api['error'] = 'no photo albums found';

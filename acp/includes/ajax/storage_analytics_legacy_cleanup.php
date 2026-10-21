@@ -64,10 +64,10 @@ if (!function_exists('sa_format_bytes')) {
  */
 function sa_inspect_movie_folder($m) {
     $loc = ($m->storage_location !== '') ? $m->storage_location : MOVIES_DEFAULT_DIR;
-    $folder = MOVIES_PATH . '/' . $loc . '/' . abs($m->merchant_id) . '/' . abs($m->id);
+    $folder = MOVIES_PATH . '/' . $loc . '/' . abs((int)$m->merchant_id) . '/' . abs((int)$m->id);
 
     $db_filename = trim((string)$m->filename);
-    $expected_desktop_name = abs($m->id) . '_' . $m->file_id . '.mp4';
+    $expected_desktop_name = abs((int)$m->id) . '_' . $m->file_id . '.mp4';
     $desktop_filename = ($db_filename !== '') ? $db_filename : $expected_desktop_name;
     $desktop_full_path = $folder . '/' . $desktop_filename;
 
@@ -120,7 +120,7 @@ function sa_inspect_movie_folder($m) {
                 // 3. Dateiname muss exakt dem Schema m_{movie_id}_{file_id}.{ext} entsprechen
                 $cond_regex_match = (bool)preg_match('/^m_[0-9]+_[a-z0-9]+\.(mp4|webm|ogv)$/i', $f);
                 // 4. Präfix muss zwingend zur aktuellen Movie-ID gehören (m_{id}_)
-                $cond_belongs_to_id = (strpos($lower_f, 'm_' . abs($m->id) . '_') === 0);
+                $cond_belongs_to_id = (strpos($lower_f, 'm_' . abs((int)$m->id) . '_') === 0);
                 // 5. Darf NIEMALS mit dem Desktop-Dateinamen aus der DB oder dem Standard-Desktop-Namen übereinstimmen
                 $cond_not_desktop_name = (
                     $lower_f !== strtolower($desktop_filename) &&

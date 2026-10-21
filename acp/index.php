@@ -92,7 +92,7 @@ $site = '<!DOCTYPE html>
         #$inf = $dbip->Lookup($ip);
         #echo $inf->country;
         
-        $rs_employee = p4c_query("SELECT * FROM `employee` WHERE `id`='".abs($_SESSION['employee_id'])."' LIMIT 1;");
+        $rs_employee = p4c_query("SELECT * FROM `employee` WHERE `id`='".abs((int)$_SESSION['employee_id'])."' LIMIT 1;");
         $employee = p4c_fetch_object($rs_employee);
         
         $site .= '

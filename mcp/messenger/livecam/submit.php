@@ -32,19 +32,19 @@ function stream_key() {
 // Webcam jetzt starten und Streamname zurückgeben
 if (isset($_POST['cam_senden']) AND $_POST['cam_senden'] == 'true' AND isset($_POST['actor_id'])) {
     
-    $actor_id = abs($_POST['actor_id']);
+    $actor_id = abs((int)$_POST['actor_id']);
     $stream_id = stream_key();
      
-    $rs_check = p4c_query("SELECT * FROM `actors` WHERE `id`='".$actor_id."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
+    $rs_check = p4c_query("SELECT * FROM `actors` WHERE `id`='".$actor_id."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
     
     if (p4c_num_rows($rs_check,__FILE__,__LINE__) > 0) {
     
-        $rs_cam = p4c_query("SELECT * FROM `actor_cams` WHERE `actor_id`='".$actor_id."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
+        $rs_cam = p4c_query("SELECT * FROM `actor_cams` WHERE `actor_id`='".$actor_id."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
         if (p4c_num_rows($rs_cam,__FILE__,__LINE__) > 0) {
             p4c_query("UPDATE `actor_cams` SET
                 `datetime`='".time()."',
                 `stream_id` = '".$stream_id."'
-            WHERE `actor_id`='".$actor_id."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);	
+            WHERE `actor_id`='".$actor_id."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);	
             echo $stream_id;
         } else {
             
@@ -54,7 +54,7 @@ if (isset($_POST['cam_senden']) AND $_POST['cam_senden'] == 'true' AND isset($_P
 	
             p4c_query("INSERT INTO `actor_cams` SET
                 `actor_id`      = '".$actor_id."',
-                `merchant_id`   = '".abs($_SESSION['merchant_id'])."',
+                `merchant_id`   = '".abs((int)$_SESSION['merchant_id'])."',
                 `stream_id`     = '".$stream_id."',
                 `streamserver_url` = '".$streamserver_url."',
                 `datetime`      = '".date("Y-m-d H:i:s")."';", __FILE__, __LINE__);
@@ -70,10 +70,10 @@ if (isset($_POST['cam_senden']) AND $_POST['cam_senden'] == 'true' AND isset($_P
 // Webcam beenden
 if (isset($_POST['cam_beenden']) AND $_POST['cam_beenden'] == 'true' AND isset($_POST['actor_id'])) {
     
-    $actor_id = abs($_POST['actor_id']);
+    $actor_id = abs((int)$_POST['actor_id']);
     
-    p4c_query("DELETE FROM `actor_cams` WHERE `actor_id`='".$actor_id."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
-    p4c_query("DELETE FROM `members_seeing_actor_cam` WHERE `actor_id`='".$actor_id."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
+    p4c_query("DELETE FROM `actor_cams` WHERE `actor_id`='".$actor_id."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
+    p4c_query("DELETE FROM `members_seeing_actor_cam` WHERE `actor_id`='".$actor_id."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
 
 }
 
@@ -85,9 +85,9 @@ if (isset($_POST['activate'])) {
     
     if ($_POST['activate'] == 0) {
         #echo "DELETE FROM `members_seeing_actor_cam` WHERE `chat_id`='". p4c_escape_string($post_chat_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;";
-        p4c_query("DELETE FROM `members_seeing_actor_cam` WHERE `chat_id`='". p4c_escape_string($post_chat_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
+        p4c_query("DELETE FROM `members_seeing_actor_cam` WHERE `chat_id`='". p4c_escape_string($post_chat_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
     } else {
-        p4c_query("UPDATE `members_seeing_actor_cam` SET `cam_watching`='1' WHERE `chat_id`='".p4c_escape_string($post_chat_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
+        p4c_query("UPDATE `members_seeing_actor_cam` SET `cam_watching`='1' WHERE `chat_id`='".p4c_escape_string($post_chat_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
         #echo "UPDATE `members_seeing_actor_cam` SET `cam_watching`='1' WHERE `chat_id`='".p4c_escape_string($post_chat_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;";
     }
 }
@@ -97,7 +97,7 @@ if (isset($_POST['sound'])) {
     $post_chat_id = filter_input(INPUT_POST, 'chat_id', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_HIGH);
     $post_chat_id = preg_replace( '/[^0-9a-z_]/i', '', $post_chat_id);
     
-    p4c_query("UPDATE `members_seeing_actor_cam` SET `cam_sound`='".abs($_POST['sound'])."' WHERE `chat_id`='". p4c_escape_string($post_chat_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
+    p4c_query("UPDATE `members_seeing_actor_cam` SET `cam_sound`='".abs((int)$_POST['sound'])."' WHERE `chat_id`='". p4c_escape_string($post_chat_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
 }
 
 // Profile für die Webcam laden
@@ -109,7 +109,7 @@ if (isset($_POST['group_actors']) AND $_POST['group_actors'] === 'get') {
         $send_jason['error'] = 'no_group_selected';
     } else {
 
-        $rs_group_actors = p4c_query("SELECT * FROM `group_actors` LEFT JOIN `actors` ON `group_actors`.`actor_id`=`actors`.`id` WHERE `group_actors`.`group_id`='".abs($_SESSION['my_chatgroup'])."';",__FILE__,__LINE__);
+        $rs_group_actors = p4c_query("SELECT * FROM `group_actors` LEFT JOIN `actors` ON `group_actors`.`actor_id`=`actors`.`id` WHERE `group_actors`.`group_id`='".abs((int)$_SESSION['my_chatgroup'])."';",__FILE__,__LINE__);
 
         if (p4c_num_rows($rs_group_actors,__FILE__,__LINE__) === 0) {
             $send_jason['error'] = 'actor_not_found';
@@ -128,20 +128,20 @@ if (isset($_POST['group_actors']) AND $_POST['group_actors'] === 'get') {
 }
 
 if (isset($_POST['get_cam_user_auto_on']) AND isset($_POST['actor_id'])) {
-    $actor_id = abs($_POST['actor_id']);
+    $actor_id = abs((int)$_POST['actor_id']);
   
-    $rs_cam_settings = p4c_query("SELECT `cam_user_auto_on` FROM `actors` WHERE `id`='".abs($actor_id)."' AND `merchant_id`='".abs($_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
+    $rs_cam_settings = p4c_query("SELECT `cam_user_auto_on` FROM `actors` WHERE `id`='".abs((int)$actor_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
     echo p4c_result($rs_cam_settings,0);
 
 } else if (isset($_POST['set_cam_user_auto_on']) AND isset($_POST['actor_id'])) {
-    $actor_id = abs($_POST['actor_id']);
-    $cam_user_auto_on = abs($_POST['set_cam_user_auto_on']);
+    $actor_id = abs((int)$_POST['actor_id']);
+    $cam_user_auto_on = abs((int)$_POST['set_cam_user_auto_on']);
   
     p4c_query("UPDATE `actors` SET
-        `cam_user_auto_on`='".abs($cam_user_auto_on)."'
+        `cam_user_auto_on`='".abs((int)$cam_user_auto_on)."'
     WHERE 
-        `id`='".abs($actor_id)."' AND
-        `merchant_id`='".abs($_SESSION['merchant_id'])."'
+        `id`='".abs((int)$actor_id)."' AND
+        `merchant_id`='".abs((int)$_SESSION['merchant_id'])."'
     LIMIT 1;", __FILE__, __LINE__);
     
     echo $_POST['set_cam_user_auto_on'];

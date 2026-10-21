@@ -11,7 +11,7 @@ if (is_logged_in('mcp') === false) {
     exit;
 }
 
-$merchant_id = abs($_SESSION['merchant_id']);
+$merchant_id = abs((int)$_SESSION['merchant_id']);
 
 #$rs_movies = p4c_query("SELECT `id`, `convert_status`, `file_id`, `filename`, `title`, `movie_checked`, `released`
 #     FROM `movies` WHERE `merchant_id`='".abs($merchant_id)."' ORDER BY `id` DESC", __FILE__, __LINE__);
@@ -21,7 +21,7 @@ $rs_movies = p4c_query("SELECT `movies`.`id`, `convert_status`, `file_id`, `chec
     FROM `movies` LEFT JOIN `actors` ON `movies`.`actor_id`=`actors`.`id` WHERE `movies`.`merchant_id`='".abs($merchant_id)."' AND `movies`.`status`!='deleted' AND `actors`.`status`!='deleted' ORDER BY `id` DESC;", __FILE__, __LINE__);
 */
 $rs_movies = p4c_query("SELECT `movies`.`id`, `convert_status`, `file_id`, `checksum`, `filename`, `title`, `movie_checked`, `released`, `actor_id`, `convert_endtime`, `online_at`
-    FROM `movies` WHERE `movies`.`merchant_id`='".abs($merchant_id)."' AND `movies`.`status`!='deleted' ORDER BY `id` DESC;", __FILE__, __LINE__);
+    FROM `movies` WHERE `movies`.`merchant_id`='".abs((int)$merchant_id)."' AND `movies`.`status`!='deleted' ORDER BY `id` DESC;", __FILE__, __LINE__);
 
 
 if (p4c_num_rows($rs_movies) > 0) {
@@ -34,7 +34,7 @@ if (p4c_num_rows($rs_movies) > 0) {
 
     while($movie_ary = p4c_fetch_object($rs_movies)) {
         
-        $rs_actors = p4c_query("SELECT * FROM `actors` WHERE `id`='".abs($movie_ary->actor_id)."' AND `merchant_id`='".abs($merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
+        $rs_actors = p4c_query("SELECT * FROM `actors` WHERE `id`='".abs((int)$movie_ary->actor_id)."' AND `merchant_id`='".abs((int)$merchant_id)."' LIMIT 1;",__FILE__,__LINE__);
         if (p4c_num_rows($rs_actors) > 0) {
             
             $actor_obj = p4c_fetch_object($rs_actors);

@@ -35,7 +35,7 @@ if (p4c_num_rows($rs_ads) == 0) {
 
 $media_obj = p4c_fetch_object($rs_ads);
 
-$site_id = abs($_POST['site_id']);
+$site_id = abs((int)$_POST['site_id']);
 
 $merchant = new Merchant($mysql,$_SESSION['merchant_id']);
 

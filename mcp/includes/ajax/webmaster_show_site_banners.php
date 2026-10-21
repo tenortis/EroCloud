@@ -11,8 +11,8 @@ if (is_logged_in('mcp') === false) {
     exit;
 }
 
-$merchant_id = abs($_SESSION['merchant_id']);
-$site_id     = abs($_POST['site_id']);
+$merchant_id = abs((int)$_SESSION['merchant_id']);
+$site_id     = abs((int)$_POST['site_id']);
 $wmid        = strip_tags($_POST['wmid']);
 
 if (isset($_POST['cid'])) {
@@ -29,7 +29,7 @@ if ($website->get_var("id") == '') {
 }
 
 $rs_ads = p4c_query("SELECT * FROM `ads_media` WHERE 
-    `site_id` = '".abs($site_id)."' AND
+    `site_id` = '".abs((int)$site_id)."' AND
     (`rejected`='0' OR `rejected`='3') AND 
     (`filename`!=`new_filename` OR `new_filename`='')
 ORDER BY `upload_datetime` DESC;",__FILE__,__LINE__);

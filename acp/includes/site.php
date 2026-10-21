@@ -11,7 +11,7 @@ if (!in_array('all', $_SESSION['employee_access_area']) AND !in_array('website',
 
 
 if (is_numeric($_GET['id'])) {
-    $site_id = abs($_GET['id']);
+    $site_id = abs((int)$_GET['id']);
 } else {
     $site_id = p4c_escape_string($_GET['id']);
 }
@@ -69,7 +69,7 @@ if ($s['is_eroads_active'] == 1) {
 }
 
 $rs_ads = p4c_query("SELECT * FROM `ads_media` WHERE 
-    `site_id` = '".abs($s['id'])."'
+    `site_id` = '".abs((int)$s['id'])."'
 ORDER BY `upload_datetime` DESC;",__FILE__,__LINE__);
 
 $number_of_banners = p4c_num_rows($rs_ads);

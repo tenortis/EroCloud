@@ -34,7 +34,7 @@ $file_id = $_GET['file_id'];
 
 $fsk = '16';
 if (isset($_GET['fsk'])) {
-    $fsk_val = abs($_GET['fsk']);
+    $fsk_val = abs((int)$_GET['fsk']);
     if ($fsk_val == 16 || $fsk_val == 18) {
         $fsk = (string)$fsk_val;
     }
@@ -194,7 +194,7 @@ if (!$found_file || !is_file($filename) || filesize($filename) == 0) {
    
     $width = 0;
     if (isset($_GET['w']) AND !empty($_GET['w'])) {
-        $width = abs($_GET['w']);
+        $width = abs((int)$_GET['w']);
     }
     
     if ($width > 900) {$width = 900;}

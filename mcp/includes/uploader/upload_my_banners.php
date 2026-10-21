@@ -142,7 +142,7 @@ $fileTypes = array('jpg','jpeg','png','gif'); // File extensions
 if(isset($_FILES["banners"]) AND isset($_GET['site_id'])) {
     $ret = array();
     
-    $site_id = abs($_GET['site_id']); 
+    $site_id = abs((int)$_GET['site_id']); 
 
     $merchant = new Merchant($mysql,$_SESSION['merchant_id']);
 

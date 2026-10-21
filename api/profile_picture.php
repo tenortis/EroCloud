@@ -21,7 +21,7 @@ $no_pic = MCP_DIR.'/images/movie_poster_nopic.jpg';
 
 $filename = $no_pic;
 
-$rs_picture = p4c_query("SELECT * FROM `actors` WHERE `profile_image_fsk".abs($fsk)."`='".p4c_escape_string($file_id)."' LIMIT 1;",__FILE__,__LINE__);
+$rs_picture = p4c_query("SELECT * FROM `actors` WHERE `profile_image_fsk".abs((int)$fsk)."`='".p4c_escape_string($file_id)."' LIMIT 1;",__FILE__,__LINE__);
 if (p4c_num_rows($rs_picture) == 1) {
     $actor_obj = p4c_fetch_object($rs_picture);
 
@@ -128,7 +128,7 @@ if(filesize($filename) == 0) {
    
     $width = 300;
     if (isset($_GET['w']) AND !empty($_GET['w'])) {
-        $width = abs($_GET['w']);
+        $width = abs((int)$_GET['w']);
     }
     
     if ($width > 900) {$width = 900;}

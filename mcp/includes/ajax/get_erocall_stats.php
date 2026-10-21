@@ -55,11 +55,11 @@ if (isset($_POST['grafik'])) {
             
             $date = date("Y-m",strtotime($_POST['monat']));
 
-            $rs_anzahl_mobil = p4c_query("SELECT COUNT(*) AS `anzahl` FROM `erocall` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `date_time` LIKE '".$date."-%' AND `caller_netz`='TC80' AND `duration_out`>'0' AND `event`='hangup';",__FILE__,__LINE__);
+            $rs_anzahl_mobil = p4c_query("SELECT COUNT(*) AS `anzahl` FROM `erocall` WHERE `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND `date_time` LIKE '".$date."-%' AND `caller_netz`='TC80' AND `duration_out`>'0' AND `event`='hangup';",__FILE__,__LINE__);
             $anzahl_mobil = p4c_result($rs_anzahl_mobil,0);
             $anzahl_mobil = '{"c":[{"v":"Mobil"}, {"v":'.$anzahl_mobil.', "f":"'.$anzahl_mobil.' '.utf8_encode('Gespräche').'"}]}';
 
-            $rs_anzahl_festnetz = p4c_query("SELECT COUNT(*) AS `anzahl` FROM `erocall` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `date_time` LIKE '".$date."-%' AND `caller_netz`='festnetz' AND `duration_out`>'0' AND `event`='hangup';",__FILE__,__LINE__);
+            $rs_anzahl_festnetz = p4c_query("SELECT COUNT(*) AS `anzahl` FROM `erocall` WHERE `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND `date_time` LIKE '".$date."-%' AND `caller_netz`='festnetz' AND `duration_out`>'0' AND `event`='hangup';",__FILE__,__LINE__);
             $anzahl_festnetz = p4c_result($rs_anzahl_festnetz,0);    
             $anzahl_festnetz = '{"c":[{"v":"Festnetz"}, {"v":'.$anzahl_festnetz.', "f":"'.$anzahl_festnetz.' '.utf8_encode('Gespräche').'"}]}';
 
@@ -84,7 +84,7 @@ if (isset($_POST['grafik'])) {
                     $tag = $i;
                     if (strlen($tag) == 1) {$tag = "0$i";}
                     
-                	$rs_anrufe = p4c_query("SELECT SUM(`merchant_payout`) AS `payout`, COUNT(*) AS `anzahl_anrufe`, SUM(`duration_out`) AS `sekunden` FROM `erocall` WHERE `date_time` LIKE '".p4c_escape_string($monat."-".$tag)."%' AND `event`='hangup' AND `merchant_id`='".abs($_SESSION['merchant_id'])."';",__FILE__,__LINE__);
+                	$rs_anrufe = p4c_query("SELECT SUM(`merchant_payout`) AS `payout`, COUNT(*) AS `anzahl_anrufe`, SUM(`duration_out`) AS `sekunden` FROM `erocall` WHERE `date_time` LIKE '".p4c_escape_string($monat."-".$tag)."%' AND `event`='hangup' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."';",__FILE__,__LINE__);
                     if (p4c_num_rows($rs_anrufe) > 0) {
                         $anrufe_ary = p4c_fetch_object($rs_anrufe);
                     	$total = $anrufe_ary->payout;
@@ -96,14 +96,14 @@ if (isset($_POST['grafik'])) {
                         $minuten = 0;
                     } 
     
-                	$rs_caller_festnetznetz = p4c_query("SELECT COUNT(*) FROM `erocall` WHERE `caller_netz`='festnetz' AND `date_time` LIKE '".p4c_escape_string($monat."-".$tag)."%' AND `event`='hangup' AND `merchant_id`='".abs($_SESSION['merchant_id'])."';",__FILE__,__LINE__);
+                	$rs_caller_festnetznetz = p4c_query("SELECT COUNT(*) FROM `erocall` WHERE `caller_netz`='festnetz' AND `date_time` LIKE '".p4c_escape_string($monat."-".$tag)."%' AND `event`='hangup' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."';",__FILE__,__LINE__);
                     if (p4c_num_rows($rs_caller_festnetznetz) > 0) {
                         $anzahl_festnetz = p4c_result($rs_caller_festnetznetz,0);
                     } else {
                         $anzahl_festnetz = 0;
                     }
     
-                	$rs_caller_mobil = p4c_query("SELECT COUNT(*) FROM `erocall` WHERE `caller_netz`='TC80' AND `date_time` LIKE '".p4c_escape_string($monat."-".$tag)."%' AND `event`='hangup' AND `merchant_id`='".abs($_SESSION['merchant_id'])."';",__FILE__,__LINE__);
+                	$rs_caller_mobil = p4c_query("SELECT COUNT(*) FROM `erocall` WHERE `caller_netz`='TC80' AND `date_time` LIKE '".p4c_escape_string($monat."-".$tag)."%' AND `event`='hangup' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."';",__FILE__,__LINE__);
                     if (p4c_num_rows($rs_caller_mobil) > 0) {
                         $anzahl_mobil = p4c_result($rs_caller_mobil,0);
                     } else {
@@ -124,11 +124,11 @@ if (isset($_POST['grafik'])) {
             $bis = date("Y-m-t 23:59:59",strtotime($_POST['monat']));
     
     
-            $rs_mobil = p4c_query("SELECT SUM(`merchant_payout`) FROM `erocall` WHERE `date_time`>='".p4c_escape_string($von)."' AND `date_time`<='".p4c_escape_string($bis)."' AND `caller_netz`='TC80' AND `event`='hangup' AND `merchant_id`='".abs($_SESSION['merchant_id'])."';",__FILE__,__LINE__);
+            $rs_mobil = p4c_query("SELECT SUM(`merchant_payout`) FROM `erocall` WHERE `date_time`>='".p4c_escape_string($von)."' AND `date_time`<='".p4c_escape_string($bis)."' AND `caller_netz`='TC80' AND `event`='hangup' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."';",__FILE__,__LINE__);
             $sum_mobil = p4c_result($rs_mobil,0);
             $total_mobil = '{"c":[{"v":"Mobil"}, {"v":'.$sum_mobil.', "f":"'.number_format($sum_mobil, 2, ',', '.').' EUR"}]}';
         
-            $rs_festnetz = p4c_query("SELECT SUM(`merchant_payout`) FROM `erocall` WHERE `date_time`>='".p4c_escape_string($von)."' AND `date_time`<='".p4c_escape_string($bis)."' AND `caller_netz`='Festnetz' AND `event`='hangup' AND `merchant_id`='".abs($_SESSION['merchant_id'])."';",__FILE__,__LINE__);
+            $rs_festnetz = p4c_query("SELECT SUM(`merchant_payout`) FROM `erocall` WHERE `date_time`>='".p4c_escape_string($von)."' AND `date_time`<='".p4c_escape_string($bis)."' AND `caller_netz`='Festnetz' AND `event`='hangup' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."';",__FILE__,__LINE__);
             $sum_festnetz = p4c_result($rs_festnetz,0);
             $total_festnetz = '{"c":[{"v":"Festnetz"}, {"v":'.$sum_festnetz.', "f":"'.number_format($sum_festnetz, 2, ',', '.').' EUR"}]}';
     
@@ -170,7 +170,7 @@ if (isset($_POST['grafik'])) {
                 $auszahlung = 0.00;
                 $sekunden_gesamt = 0;
                 $date_time = $get_tag.' %';
-                $rs_anrufe = p4c_query("SELECT `duration_out` AS `sekunden`, `merchant_payout`, `date_time`, `caller`, `rufnummer`, `destination_number` AS `ziel` FROM `erocall` WHERE `merchant_id`='".abs($_SESSION['merchant_id'])."' AND `date_time` LIKE '".$date_time."' AND `event`='hangup' AND `duration_out`>'0' ORDER BY `date_time` DESC;",__FILE__,__LINE__);
+                $rs_anrufe = p4c_query("SELECT `duration_out` AS `sekunden`, `merchant_payout`, `date_time`, `caller`, `rufnummer`, `destination_number` AS `ziel` FROM `erocall` WHERE `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' AND `date_time` LIKE '".$date_time."' AND `event`='hangup' AND `duration_out`>'0' ORDER BY `date_time` DESC;",__FILE__,__LINE__);
                 while($anrufe_ary = p4c_fetch_object($rs_anrufe)) {
                     $auszahlung = $auszahlung+$anrufe_ary->merchant_payout;
                     $sekunden_gesamt = $sekunden_gesamt+$anrufe_ary->sekunden;
