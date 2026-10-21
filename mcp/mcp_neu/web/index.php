@@ -229,14 +229,8 @@ $basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'
         <input type="text" id="global-search-input" class="form-control" placeholder="Schnellsuche nach Filmen, Fotoalben oder Profilen...">
       </div>
 
-      <!-- Quick-Actions, Vorschau-Schalter & Partner-Menü -->
+      <!-- Quick-Actions & Partner-Menü -->
       <div class="d-flex align-items-center gap-2 gap-md-3 ms-auto">
-        <!-- Vorschau-Schalter für die ausgeloggte Startseite -->
-        <a href="#/guest" class="btn btn-sm btn-outline-kkc d-none d-lg-flex align-items-center gap-1" title="Vorschau der öffentlichen Startseite (nicht eingeloggt)">
-          <i class="bi bi-eye ec-text-primary"></i>
-          <span>Gast-Startseite testen</span>
-        </a>
-
         <!-- Direktbutton: Film hochladen -->
         <a href="#/movie-upload" class="btn btn-sm btn-primary-kkc d-flex align-items-center gap-1">
           <i class="bi bi-cloud-arrow-up-fill"></i>
