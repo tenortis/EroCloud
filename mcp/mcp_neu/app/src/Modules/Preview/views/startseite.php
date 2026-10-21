@@ -82,20 +82,16 @@ $aktJahr = date('Y');
   </div>
 
   <div class="col-xl-3 col-md-6">
-    <a href="https://merchant.pay4coins.com" target="_blank" rel="noopener" class="text-decoration-none d-block h-100">
-      <div class="card-kkc kpi-card h-100 mb-0">
-        <div class="kpi-icon-box bg-info bg-opacity-10 text-info">
-          <i class="bi bi-credit-card-2-front-fill"></i>
-        </div>
-        <div>
-          <div class="kpi-val" style="font-size: 1.25rem;">Pay4Coins</div>
-          <div class="kpi-label">Abrechnungen &amp; Daten</div>
-          <small class="ec-text-primary fw-semibold">
-            <i class="bi bi-box-arrow-up-right me-1"></i>Zum Partner-Account
-          </small>
-        </div>
+    <div class="card-kkc kpi-card h-100 mb-0">
+      <div class="kpi-icon-box bg-warning bg-opacity-10 text-warning">
+        <i class="bi bi-hourglass-split"></i>
       </div>
-    </a>
+      <div>
+        <div class="kpi-val">2</div>
+        <div class="kpi-label">Inhalte in Prüfung</div>
+        <small class="text-muted">Werden zeitnah freigeschaltet</small>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -232,31 +228,65 @@ $aktJahr = date('Y');
 
   </div>
 
-  <!-- Rechte Spalte: Amoredea-Kachel, Profil-Status & Richtlinien -->
+  <!-- Rechte Spalte: Darsteller-Profile im Überblick & Account-Status -->
   <div class="col-lg-5">
 
-    <!-- Amoredea Highlight-Kachel (aus home.php adaptiert ins Kachel-Design) -->
+    <!-- Darsteller-Profile im Überblick (Statt Amoredea) -->
     <div class="card-kkc">
       <div class="card-kkc-header">
         <div class="card-title">
-          <i class="bi bi-stars text-warning"></i>
-          <span>Vermarktung auf <strong>amore<span style="color:#ff5400;">dea</span></strong></span>
+          <i class="bi bi-people-fill ec-text-primary"></i>
+          <span>Ihre Darsteller-Profile</span>
         </div>
-        <span class="badge-kkc badge-kkc-success">Aktiv</span>
-      </div>
-      <div class="card-kkc-body">
-        <p class="text-muted small mb-3">
-          Über <strong>amoredea</strong> können Ihnen Ihre Zuschauer direkt Trinkgeld bzw. Tribut senden – auch ohne vorherige Registrierung. Zudem können Nutzer Ihre Filme und Fotoalben dort kommentieren und liken.
-        </p>
-        <div class="p-3 rounded border mb-3" style="background-color: var(--kkc-surface-hover); border-color: var(--kkc-border) !important;">
-          <div class="small text-muted mb-1">Direktlink zu Ihrer Darsteller-Seite:</div>
-          <a href="https://amoredea.com/SophiaLove" target="_blank" rel="noopener" class="fw-bold ec-text-primary text-decoration-none font-monospace">
-            <i class="bi bi-link-45deg me-1"></i>https://amoredea.com/SophiaLove
-          </a>
-        </div>
-        <a href="#/actors" class="btn btn-sm btn-outline-kkc w-100">
-          <i class="bi bi-people me-1"></i> Alle Profil-Links anzeigen
+        <a href="#/new-actor" class="btn btn-sm btn-outline-kkc py-1" style="font-size: 0.78rem;">
+          <i class="bi bi-plus-lg me-1"></i> Profil anlegen
         </a>
+      </div>
+      <div class="card-kkc-body p-0">
+        <div class="table-responsive">
+          <table class="kkc-table">
+            <thead>
+              <tr>
+                <th>Profil</th>
+                <th>Inhalte</th>
+                <th>Status</th>
+                <th class="text-end">Aktion</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="sidebar-actor-avatar">SL</span>
+                    <span class="fw-semibold">SophiaLove</span>
+                  </div>
+                </td>
+                <td class="text-muted small">16 Filme · 8 Alben</td>
+                <td><span class="badge-kkc badge-kkc-success">Aktiv</span></td>
+                <td class="text-end">
+                  <a href="#/actor?id=1&amp;name=SophiaLove" class="btn btn-sm btn-outline-kkc py-1 px-2" title="Profil bearbeiten">
+                    <i class="bi bi-pencil-square"></i>
+                  </a>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="sidebar-actor-avatar">MS</span>
+                    <span class="fw-semibold">MiaSweet</span>
+                  </div>
+                </td>
+                <td class="text-muted small">8 Filme · 4 Alben</td>
+                <td><span class="badge-kkc badge-kkc-success">Aktiv</span></td>
+                <td class="text-end">
+                  <a href="#/actor?id=2&amp;name=MiaSweet" class="btn btn-sm btn-outline-kkc py-1 px-2" title="Profil bearbeiten">
+                    <i class="bi bi-pencil-square"></i>
+                  </a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 

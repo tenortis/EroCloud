@@ -86,13 +86,13 @@ $basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'
         <span>Meine Startseite</span>
       </a>
 
-      <!-- 2. Content hochladen (Aufklappbar) -->
-      <a class="sidebar-link sidebar-submenu-toggle" data-bs-toggle="collapse" href="#submenu-upload" role="button" aria-expanded="true" aria-controls="submenu-upload">
+      <!-- 2. Content hochladen (Standardmäßig geschlossen) -->
+      <a class="sidebar-link sidebar-submenu-toggle" data-bs-toggle="collapse" href="#submenu-upload" role="button" aria-expanded="false" aria-controls="submenu-upload">
         <i class="bi bi-cloud-arrow-up-fill"></i>
-        <span>Content hochladen</span>
+        <span class="text-nowrap">Content hochladen</span>
         <i class="bi bi-chevron-right chevron-icon"></i>
       </a>
-      <div class="collapse show sidebar-submenu" id="submenu-upload">
+      <div class="collapse sidebar-submenu" id="submenu-upload">
         <a href="#/movie-upload" class="sidebar-link" data-route="#/movie-upload">
           <i class="bi bi-plus-square-fill"></i>
           <span>Film hochladen</span>
@@ -103,14 +103,14 @@ $basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'
         </a>
       </div>
 
-      <!-- 3. Content in der Cloud (Aufklappbar mit Zähler-Badge) -->
-      <a class="sidebar-link sidebar-submenu-toggle" data-bs-toggle="collapse" href="#submenu-cloud" role="button" aria-expanded="true" aria-controls="submenu-cloud">
+      <!-- 3. Content in der Cloud (Standardmäßig geschlossen, einzeilig mit Zähler-Badge) -->
+      <a class="sidebar-link sidebar-submenu-toggle" data-bs-toggle="collapse" href="#submenu-cloud" role="button" aria-expanded="false" aria-controls="submenu-cloud">
         <i class="bi bi-cloud-fill"></i>
-        <span>Content in der Cloud</span>
+        <span class="text-nowrap">Content in der Cloud</span>
         <span class="sidebar-count-badge ms-auto me-1" title="Anzahl Filme in der Cloud">24</span>
         <i class="bi bi-chevron-right chevron-icon ms-0"></i>
       </a>
-      <div class="collapse show sidebar-submenu" id="submenu-cloud">
+      <div class="collapse sidebar-submenu" id="submenu-cloud">
         <a href="#/movies" class="sidebar-link" data-route="#/movies">
           <i class="bi bi-collection-play-fill"></i>
           <span>Filme in der Cloud</span>
@@ -121,13 +121,13 @@ $basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'
         </a>
       </div>
 
-      <!-- 4. Profile (Aufklappbar inkl. Darsteller-Liste) -->
-      <a class="sidebar-link sidebar-submenu-toggle" data-bs-toggle="collapse" href="#submenu-actors" role="button" aria-expanded="true" aria-controls="submenu-actors">
+      <!-- 4. Profile (Standardmäßig geschlossen) -->
+      <a class="sidebar-link sidebar-submenu-toggle" data-bs-toggle="collapse" href="#submenu-actors" role="button" aria-expanded="false" aria-controls="submenu-actors">
         <i class="bi bi-person-circle"></i>
-        <span>Profile</span>
+        <span class="text-nowrap">Profile</span>
         <i class="bi bi-chevron-right chevron-icon"></i>
       </a>
-      <div class="collapse show sidebar-submenu" id="submenu-actors">
+      <div class="collapse sidebar-submenu" id="submenu-actors">
         <a href="#/actors" class="sidebar-link" data-route="#/actors">
           <i class="bi bi-people-fill"></i>
           <span>Alle Profile anzeigen</span>

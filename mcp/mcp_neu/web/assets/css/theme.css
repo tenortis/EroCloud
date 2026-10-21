@@ -197,17 +197,18 @@ code, kbd, samp, pre, .font-monospace {
 .sidebar-link {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
-  padding: 0.58rem 0.8rem;
+  gap: 0.6rem;
+  padding: 0.56rem 0.72rem;
   border-radius: 0.5rem;
   color: var(--kkc-sidebar-text);
   font-weight: 500;
-  font-size: 0.865rem;
+  font-size: 0.855rem;
   text-decoration: none;
   transition: all 0.15s ease;
   position: relative;
   margin-bottom: 0.15rem;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .sidebar-link > i {

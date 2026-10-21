@@ -72,21 +72,33 @@ const App = {
     const params = new URLSearchParams(queryPart || '');
     const apiRoute = pathPart || 'startseite';
 
-    // Aktiven Sidebar-Link hervorheben
+    // Aktiven Sidebar-Link hervorheben & nur das zugehörige Submenü öffnen
+    let activeCollapseId = null;
+
     document.querySelectorAll('.sidebar-link[data-route]').forEach(link => {
       const linkRoute = (link.getAttribute('data-route') || '').replace(/^#\/?/, '');
       if (linkRoute === rawHash || linkRoute === pathPart) {
         link.classList.add('active');
-        // Falls sich der Link in einem eingeklappten Submenü befindet -> automatisch öffnen
         const parentCollapse = link.closest('.collapse');
-        if (parentCollapse && !parentCollapse.classList.contains('show')) {
-          const bsCollapse = bootstrap.Collapse.getOrCreateInstance(parentCollapse, { toggle: false });
-          bsCollapse.show();
-          const trigger = document.querySelector(`[data-bs-target="#${parentCollapse.id}"]`);
-          if (trigger) trigger.setAttribute('aria-expanded', 'true');
+        if (parentCollapse) {
+          activeCollapseId = parentCollapse.id;
         }
       } else {
         link.classList.remove('active');
+      }
+    });
+
+    // Submenüs steuern: Nur das zur aktuellen Unterseite gehörende Submenü öffnen, alle anderen schließen
+    document.querySelectorAll('.sidebar-submenu.collapse').forEach(collapseEl => {
+      const trigger = document.querySelector(`[href="#${collapseEl.id}"], [data-bs-target="#${collapseEl.id}"]`);
+      const bsCollapse = bootstrap.Collapse.getOrCreateInstance(collapseEl, { toggle: false });
+
+      if (activeCollapseId && collapseEl.id === activeCollapseId) {
+        bsCollapse.show();
+        if (trigger) trigger.setAttribute('aria-expanded', 'true');
+      } else {
+        bsCollapse.hide();
+        if (trigger) trigger.setAttribute('aria-expanded', 'false');
       }
     });
 
