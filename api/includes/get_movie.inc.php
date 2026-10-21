@@ -38,8 +38,22 @@ if (is_file($temp_file) AND $temp_file_time < strtotime("-7 hours")) {
     @unlink($temp_file);
 }
 
-// Wenn tempfile nicht existiert oder die letzte Änderung der Datei älter ist als 50 Minuten
-if (!is_file($temp_file) OR $temp_file_time < strtotime("-50 Minutes")) {
+$cached_api = null;
+if (is_file($temp_file) AND $temp_file_time >= strtotime("-50 Minutes")) {
+    $raw_temp = @file_get_contents($temp_file);
+    if (is_string($raw_temp) && $raw_temp !== '') {
+        $decoded_temp = json_decode($raw_temp, true);
+        if (is_array($decoded_temp) && array_key_exists('visible_for_website', $decoded_temp)) {
+            $cached_api = $decoded_temp;
+        }
+    }
+    if ($cached_api === null) {
+        @unlink($temp_file);
+    }
+}
+
+// Wenn tempfile nicht existiert, ungültig war oder die letzte Änderung der Datei älter ist als 50 Minuten
+if ($cached_api === null) {
     
     // Film n vom Amateur aus DB holen
     /*
@@ -97,7 +111,14 @@ if (!is_file($temp_file) OR $temp_file_time < strtotime("-50 Minutes")) {
         }   
         
         // Temporäre Datei erstellen
-        file_put_contents($temp_file,json_encode($api));
+        $encoded_json = json_encode($api, defined('JSON_INVALID_UTF8_SUBSTITUTE') ? JSON_INVALID_UTF8_SUBSTITUTE : 0);
+        if ($encoded_json !== false) {
+            $temp_dir = dirname($temp_file);
+            if (!is_dir($temp_dir)) {
+                @mkdir($temp_dir, 0777, true);
+            }
+            @file_put_contents($temp_file, $encoded_json, LOCK_EX);
+        }
 
         // Wenn Film zur Domain gehört
         if ($domain == $m->field('visible_for_website')) {
@@ -106,15 +127,16 @@ if (!is_file($temp_file) OR $temp_file_time < strtotime("-50 Minutes")) {
         }
         
     }    
-// Wenn temporäre Datei existiert
+// Wenn gültige temporäre Datei existiert
 } else {
-    $api = json_decode(file_get_contents($temp_file), true);
+    $api = $cached_api;
+    $visible_for_website = isset($api['visible_for_website']) ? $api['visible_for_website'] : '';
 
     // Wenn Film auf Website angezeigt werden darf
-    if ($api['visible_for_website'] == 'public') {
+    if ($visible_for_website == 'public') {
     
-    } else if ($domain == $api['visible_for_website']) {
-        $m = new MovieOnline($mysql,$api['movie_id']);
+    } else if ($domain == $visible_for_website) {
+        $m = new MovieOnline($mysql, isset($api['movie_id']) ? $api['movie_id'] : '');
         $api['domain'] = $domain;
         $api['status'] = $m->field('status');
     } else {

@@ -16,8 +16,6 @@ header('Content-Type: text/html; charset=utf-8');
 $rawPid = isset($_GET['pid']) ? (string)$_GET['pid'] : '';
 if (strlen($rawPid) !== 10) {
     header('Location: ' . LOGIN_URL . '?ref=erocloud');
-    p4c_close(DB_HOST);
-    p4c_errorlog(error_get_last());
     exit;
 }
 
@@ -131,7 +129,5 @@ if ($data === 'ok') {
     }
 }
 
-p4c_close(DB_HOST);
 header('Location: ' . LOGIN_URL . '?logout&ref=erocloud');
-p4c_errorlog(error_get_last());
 exit;

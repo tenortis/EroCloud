@@ -325,6 +325,29 @@ function movie_checksum($movie) {
 }
 
 function photo_album_checksum($album) {
+    if (is_object($album)) {
+        if (method_exists($album, 'field')) {
+            $album = array(
+                'merchant_id'         => $album->field('merchant_id'),
+                'number_of_photos'    => $album->field('number_of_photos'),
+                'preview_image_fsk16' => $album->field('preview_image_fsk16'),
+                'preview_image_fsk18' => $album->field('preview_image_fsk18'),
+                'title'               => $album->field('title'),
+                'description'         => $album->field('description'),
+                'meta_title'          => $album->field('meta_title'),
+                'meta_description'    => $album->field('meta_description'),
+                'seo_url'             => $album->field('seo_url'),
+                'online_at'           => $album->field('online_at'),
+                'amount_webmaster'    => $album->field('amount_webmaster'),
+                'amount_download'     => $album->field('amount_download'),
+            );
+        } else {
+            $album = (array)$album;
+        }
+    } elseif (!is_array($album)) {
+        $album = array();
+    }
+
     $fsk16 = isset($album['fsk16']) ? $album['fsk16'] : (isset($album['preview_image_fsk16']) ? $album['preview_image_fsk16'] : '');
     $fsk18 = isset($album['fsk18']) ? $album['fsk18'] : (isset($album['preview_image_fsk18']) ? $album['preview_image_fsk18'] : '');
 

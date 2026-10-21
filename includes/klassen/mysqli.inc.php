@@ -9,6 +9,7 @@ if (!defined('SAFE_INC'))
 class p4c_mysqli {
     
     private $connect;
+    private $is_closed = false;
     public $error_log;
     
     public function __construct($dbhost, $dbuser, $dbpass, $dbname) {
@@ -96,6 +97,10 @@ class p4c_mysqli {
     }
     
     public function close() {
+        if ($this->is_closed || !$this->connect) {
+            return true;
+        }
+        $this->is_closed = true;
         return $this->connect->close();
     }
 }

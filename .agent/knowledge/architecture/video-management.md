@@ -154,13 +154,13 @@ Ein Administrator prüft das Video im **Admin Control Panel (ACP)**:
 
 ## 7. 📋 Händler-Filmliste (MCP)
 Die Übersicht aller hochgeladenen Filme des Händlers im Merchant Control Panel (MCP):
-* **Pfad**: `mcp/includes/movies.php` (AJAX-Quelle: `mcp/includes/ajax/movies.php` über Route `/Movies`).
-* **Funktion**: Listet alle hochgeladenen Filme tabellarisch auf (unter Verwendung von jQuery DataTables).
-* **Anzeigefelder**:
-  * **Status**: Zeigt über Icons an, ob der Film z. B. konvertiert wird, online ist oder abgelehnt wurde.
-  * **ID, Vorschaubilder, Filmtitel, Darsteller**.
-  * **Online ab (`online_at`)**: Zeigt an, wann der Film veröffentlicht werden soll (deutsches Format `d.m.Y H:i` mit zeitlich korrekter Sortierung über `title-string`).
-  * **Käufe (Streaming/Download) & Provision**.
+* **Neues MCP (`mcp/mcp_neu/` -> Route `#/movies`)**:
+  * **Controller & View**: `mcp/mcp_neu/app/src/Modules/Movies/MoviesController.php` & `views/list.php`.
+  * **Wichtige Produktregel (Keine Umsätze in der EroCloud)**: Da die Partner ihre echten Umsätze und Abrechnungen direkt in ihrer EroCMS-Seite oder im Pay4Coins-Account einsehen, werden im neuen EroCloud MCP **keine Umsatzzahlen, Provisionen oder Verkaufszahlen** (Käufe Streaming/Download) angezeigt.
+  * **KPI-Kacheln**: *Filme gesamt*, *Filme Online*, *In Prüfung / Konvertierung*, *Abgelehnt / Korrektur nötig*.
+  * **Tabellenspalten**: *Status*, *ID*, *Vorschaubilder (FSK16 / FSK18)*, *Filmtitel (inkl. Laufzeit & Auflösung)*, *Darsteller*, *Online ab (`d.m.Y H:i`)* und *Aktion (Bearbeiten)*.
+* **Legacy-MCP (`mcp/includes/movies.php` / `mcp/includes/ajax/movies.php` über Route `/Movies`)**:
+  * Listet im Altsystem alle hochgeladenen Filme tabellarisch auf (jQuery DataTables).
 
 ---
 

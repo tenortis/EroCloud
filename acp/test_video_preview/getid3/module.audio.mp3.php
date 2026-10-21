@@ -1705,7 +1705,7 @@ class getid3_mp3 extends getid3_handler
 	}
 
 	public static function MPEGaudioHeaderValid($rawarray, $echoerrors=false, $allowBitrate15=false) {
-		if (($rawarray['synch'] & 0x0FFE) != 0x0FFE) {
+		if (!is_array($rawarray) || !isset($rawarray['synch']) || (($rawarray['synch'] & 0x0FFE) != 0x0FFE)) {
 			return false;
 		}
 

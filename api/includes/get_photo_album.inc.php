@@ -33,8 +33,22 @@ if (is_file($temp_file)) {
     $temp_file_time = 0;
 }
 
-// Wenn Datei nicht existiert oder die letzte Änderung der Datei älter ist als 50 Minuten
-if (!is_file($temp_file) OR $temp_file_time  < strtotime("-50 minutes")) {
+$cached_api = null;
+if (is_file($temp_file) AND $temp_file_time >= strtotime("-50 minutes")) {
+    $raw_temp = @file_get_contents($temp_file);
+    if (is_string($raw_temp) && $raw_temp !== '') {
+        $decoded_temp = json_decode($raw_temp, true);
+        if (is_array($decoded_temp) && isset($decoded_temp['album_id'])) {
+            $cached_api = $decoded_temp;
+        }
+    }
+    if ($cached_api === null) {
+        @unlink($temp_file);
+    }
+}
+
+// Wenn Datei nicht existiert, ungültig war oder die letzte Änderung der Datei älter ist als 50 Minuten
+if ($cached_api === null) {
 
     // Alle Fotoalben vom Amateur holen
     $rs_album = p4c_query("SELECT `id` FROM `photo_albums_online` WHERE `album_id`='". p4c_escape_string($album_id)."' LIMIT 1; ",__FILE__,__LINE__);
@@ -70,9 +84,16 @@ if (!is_file($temp_file) OR $temp_file_time  < strtotime("-50 minutes")) {
         $api['status']          = $a->field('status');
         
         // Temporäre Datei erstellen
-        file_put_contents($temp_file,json_encode($api));
+        $encoded_json = json_encode($api, defined('JSON_INVALID_UTF8_SUBSTITUTE') ? JSON_INVALID_UTF8_SUBSTITUTE : 0);
+        if ($encoded_json !== false) {
+            $temp_dir = dirname($temp_file);
+            if (!is_dir($temp_dir)) {
+                @mkdir($temp_dir, 0777, true);
+            }
+            @file_put_contents($temp_file, $encoded_json, LOCK_EX);
+        }
     }    
-// Wenn temporäre Datei existiert
+// Wenn gültige temporäre Datei existiert
 } else {
-    $api = json_decode(file_get_contents($temp_file), true);    
+    $api = $cached_api;    
 }

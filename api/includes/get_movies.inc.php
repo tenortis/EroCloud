@@ -54,8 +54,22 @@ if(isset($_GET['actor']) AND $_GET['actor'] == 'me') {
         $temp_file_time = 0;
     }
 
-    // Wenn Datei nicht existiert oder die letzte Änderung der Datei älter ist als 50 Minuten
-    if (!is_file($temp_file) OR $temp_file_time  < strtotime("-50 minutes")) {
+    $cached_api = null;
+    if (is_file($temp_file) AND $temp_file_time >= strtotime("-50 minutes")) {
+        $raw_temp = @file_get_contents($temp_file);
+        if (is_string($raw_temp) && $raw_temp !== '') {
+            $decoded_temp = json_decode($raw_temp, true);
+            if (is_array($decoded_temp)) {
+                $cached_api = $decoded_temp;
+            }
+        }
+        if ($cached_api === null) {
+            @unlink($temp_file);
+        }
+    }
+
+    // Wenn Datei nicht existiert, ungültig war oder die letzte Änderung der Datei älter ist als 50 Minuten
+    if ($cached_api === null) {
 
         // Alle Filme vom Amateur holen
         #$rs_movies_online = p4c_query("SELECT `checksum`, `file_id`, `actor_id`, `online_at` FROM `movies_online` WHERE `status`!='deleted' AND `actor_id`='".abs($actor_id)."';",__FILE__,__LINE__);
