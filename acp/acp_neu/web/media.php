@@ -6,7 +6,9 @@ declare(strict_types=1);
  * Ersetzt acp/includes/movie_player.php, acp/includes/movie_poster.php und Cross-Domain-Aufrufe.
  */
 
-define('SAFE_INC', 1);
+if (!defined('SAFE_INC')) {
+    define('SAFE_INC', 1);
+}
 
 require_once dirname(__DIR__) . '/app/bootstrap.php';
 

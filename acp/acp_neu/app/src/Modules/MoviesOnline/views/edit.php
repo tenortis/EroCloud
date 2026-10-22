@@ -898,7 +898,7 @@ $buysCount = (int)($purchasesData['total_buys'] ?? 0);
                     <td>
                       <?php if ($vTime !== null): ?>
                         <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 font-monospace"
-                                onclick="document.getElementById('tab-btn-me-edit').click(); App.seekMoviePlayerTo(<?= $vTime ?>)">
+                                onclick="document.getElementById('tab-btn-me-edit').click(); App.seekMoviePlayer(<?= $vTime ?>)">
                           <i class="bi bi-play-fill"></i> <?= gmdate('i:s', (int)$vTime) ?>
                         </button>
                       <?php else: ?>
@@ -967,7 +967,7 @@ $buysCount = (int)($purchasesData['total_buys'] ?? 0);
                   ?>
                   <div class="d-flex align-items-start gap-2 py-1.5 px-2 border-bottom small">
                     <button type="button" class="btn btn-xs btn-outline-kkc py-0 px-1.5 font-monospace flex-shrink-0"
-                            onclick="document.getElementById('tab-btn-me-edit').click(); App.seekMoviePlayerTo(<?= $sTime ?>)">
+                            onclick="document.getElementById('tab-btn-me-edit').click(); App.seekMoviePlayer(<?= $sTime ?>)">
                       <?= gmdate('i:s', (int)$sTime) ?>–<?= gmdate('i:s', (int)$eTime) ?>
                     </button>
                     <span><?= View::e($sText) ?></span>

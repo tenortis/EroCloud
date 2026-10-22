@@ -65,4 +65,23 @@ class Request
 
         return $default;
     }
+
+    /**
+     * Liest das übertragene CSRF-Token aus POST (_csrf / csrf_token), Header (X-CSRF-Token) oder GET (_csrf).
+     */
+    public function csrfToken(): string
+    {
+        $postToken = $_POST['_csrf'] ?? $_POST['csrf_token'] ?? '';
+        if (is_string($postToken) && $postToken !== '') {
+            return trim($postToken);
+        }
+
+        $headerToken = $this->header('X-CSRF-Token');
+        if ($headerToken !== '') {
+            return trim($headerToken);
+        }
+
+        $getToken = $_GET['_csrf'] ?? '';
+        return is_string($getToken) ? trim($getToken) : '';
+    }
 }

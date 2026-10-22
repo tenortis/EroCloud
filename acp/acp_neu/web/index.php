@@ -7,7 +7,9 @@ declare(strict_types=1);
  * Markenfarbe: Pay4Coins-Blau (#4297D7 / #0284C7) | Standard: Hellmodus (Light Mode)
  */
 
-define('SAFE_INC', 1);
+if (!defined('SAFE_INC')) {
+    define('SAFE_INC', 1);
+}
 
 require_once __DIR__ . '/../app/bootstrap.php';
 

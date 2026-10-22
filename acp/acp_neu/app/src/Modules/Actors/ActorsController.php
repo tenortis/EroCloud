@@ -413,11 +413,9 @@ final class ActorsController
         $rsActor = \p4c_query(
             "SELECT a.*,
                     m.`partner_id`,
-                    m.`status` AS `merchant_status`,
                     AES_DECRYPT(m.`username`, '" . AES_KEY . "') AS `merchant_username`,
                     AES_DECRYPT(m.`firstname`, '" . AES_KEY . "') AS `merchant_firstname`,
-                    AES_DECRYPT(m.`lastname`, '" . AES_KEY . "') AS `merchant_lastname`,
-                    AES_DECRYPT(m.`company`, '" . AES_KEY . "') AS `merchant_company`
+                    AES_DECRYPT(m.`surname`, '" . AES_KEY . "') AS `merchant_surname`
              FROM `actors` a
              LEFT JOIN `merchants` m ON a.`merchant_id` = m.`id`
              WHERE a.`id` = '" . $actorId . "'
@@ -471,10 +469,10 @@ final class ActorsController
             'id'                          => $actorId,
             'merchant_id'                 => abs((int)$obj->merchant_id),
             'partner_id'                  => abs((int)($obj->partner_id ?? 0)),
-            'merchant_status'             => (string)($obj->merchant_status ?? ''),
+            'merchant_status'             => 'active',
             'merchant_username'           => $this->cleanUtf8((string)($obj->merchant_username ?? '')),
-            'merchant_fullname'           => trim($this->cleanUtf8((string)($obj->merchant_firstname ?? '') . ' ' . (string)($obj->merchant_lastname ?? ''))),
-            'merchant_company'            => $this->cleanUtf8((string)($obj->merchant_company ?? '')),
+            'merchant_fullname'           => trim($this->cleanUtf8((string)($obj->merchant_firstname ?? '') . ' ' . (string)($obj->merchant_surname ?? ''))),
+            'merchant_company'            => '',
             'md5_checksum'                => (string)$obj->md5_checksum,
             'created_fmt'                 => $createdFmt,
             'lastonline_fmt'              => $lastOnlineFmt,
@@ -610,7 +608,7 @@ final class ActorsController
         $actorMovies = [];
         $rsMovies    = \p4c_query(
             "SELECT m.`id`, m.`file_id`, m.`status`, m.`released`, m.`movie_checked`, m.`convert_status`,
-                    m.`title`, m.`selling_price`, m.`playtime_string`, m.`online_at`, m.`resolution`,
+                    m.`title`, m.`amount_own`, m.`playtime_seconds`, m.`amount_second`, m.`playtime_string`, m.`online_at`, m.`resolution`,
                     mo.`id` AS `online_id`, mo.`purchases`, mo.`views`
              FROM `movies` m
              LEFT JOIN `movies_online` mo ON m.`file_id` = mo.`file_id`
@@ -643,6 +641,11 @@ final class ActorsController
                     : ('#/movie-edit?id=' . ($onlineId > 0 ? $onlineId : $mId));
                 $actionLabel = $isChecking ? 'Jetzt prüfen' : 'Bearbeiten';
 
+                $coinsOwn = abs((int)($mov->amount_own ?? 0));
+                if ($coinsOwn === 0) {
+                    $coinsOwn = (int)round(abs((int)($mov->playtime_seconds ?? 0)) * (float)($mov->amount_second ?? 0));
+                }
+
                 $actorMovies[] = [
                     'id'             => $mId,
                     'online_id'      => $onlineId,
@@ -651,7 +654,7 @@ final class ActorsController
                     'workflow_badge' => $workflowBadge,
                     'is_checking'    => $isChecking,
                     'title'          => $this->cleanUtf8((string)$mov->title),
-                    'selling_price'  => number_format((float)$mov->selling_price, 2, ',', '.'),
+                    'selling_price'  => (string)$coinsOwn,
                     'playtime'       => (string)($mov->playtime_string ?: '-'),
                     'resolution'     => (string)($mov->resolution ?: 'HD'),
                     'online_at'      => (string)$mov->online_at,
@@ -667,7 +670,7 @@ final class ActorsController
         $actorAlbums = [];
         $rsAlbums    = \p4c_query(
             "SELECT pa.`id`, pa.`album_id`, pa.`status`, pa.`released`, pa.`album_checked`,
-                    pa.`title`, pa.`number_of_photos`, pa.`selling_price`, pa.`online_at`,
+                    pa.`title`, pa.`number_of_photos`, pa.`amount_download`, pa.`online_at`,
                     pao.`id` AS `online_id`, pao.`purchases`, pao.`views`
              FROM `photo_albums` pa
              LEFT JOIN `photo_albums_online` pao ON pa.`album_id` = pao.`album_id`
@@ -708,7 +711,7 @@ final class ActorsController
                     'is_checking'      => $isChecking,
                     'title'            => $this->cleanUtf8((string)$alb->title),
                     'number_of_photos' => abs((int)$alb->number_of_photos),
-                    'selling_price'    => number_format((float)$alb->selling_price, 2, ',', '.'),
+                    'selling_price'    => number_format(abs((int)($alb->amount_download ?? 0)) / 100, 2, ',', '.'),
                     'online_at'        => (string)$alb->online_at,
                     'purchases'        => abs((int)($alb->purchases ?? 0)),
                     'views'            => abs((int)($alb->views ?? 0)),

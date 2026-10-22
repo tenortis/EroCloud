@@ -95,7 +95,7 @@ function aic_file_or_exec_exists($path) {
     if (@file_exists($path)) {
         return true;
     }
-    if (function_exists('exec')) {
+    if (DIRECTORY_SEPARATOR === '/' && function_exists('exec')) {
         $out = array();
         $ret = 1;
         @exec('test -e ' . escapeshellarg($path) . ' && echo 1', $out, $ret);

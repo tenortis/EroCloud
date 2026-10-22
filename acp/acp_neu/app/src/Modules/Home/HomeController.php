@@ -384,12 +384,12 @@ class HomeController
 
         // 4. Webseiten (sites)
         if (function_exists('acp_has_access') && acp_has_access('websites')) {
-            $whereSite = "`url` LIKE '%" . $escQ . "%'";
+            $whereSite = "`domain` LIKE '%" . $escQ . "%'";
             if ($cleanId > 0) {
-                $whereSite = "(`id` = '" . $cleanId . "' OR " . $whereSite . ")";
+                $whereSite = "(`id` = '" . $cleanId . "' OR `p4c_shop_id` = '" . $cleanId . "' OR `partner_id` = '" . $cleanId . "' OR " . $whereSite . ")";
             }
             $rsSites = p4c_query(
-                "SELECT `id`, `url`, `merchant_id`
+                "SELECT `id`, `domain`, `partner_id`, `p4c_shop_id`, `status`
                  FROM `sites`
                  WHERE " . $whereSite . "
                  ORDER BY `id` DESC
@@ -405,9 +405,9 @@ class HomeController
                         'type_label'   => 'Webseite',
                         'icon'         => 'bi-globe2',
                         'id'           => $sid,
-                        'title'        => self::decodeLegacyText((string)($s->url ?? ('Site #' . $sid))),
-                        'subtitle'     => 'Merchant #' . abs((int)($s->merchant_id ?? 0)),
-                        'status_label' => 'Domain',
+                        'title'        => self::decodeLegacyText((string)($s->domain ?? ('Site #' . $sid))),
+                        'subtitle'     => 'Shop #' . abs((int)($s->p4c_shop_id ?? 0)) . ' • Partner-ID: ' . abs((int)($s->partner_id ?? 0)),
+                        'status_label' => (string)($s->status ?? 'Domain'),
                         'route'        => '#/site?id=' . $sid,
                     ];
                 }

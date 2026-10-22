@@ -52,6 +52,11 @@ class Response
         exit;
     }
 
+    public static function success(array $data = [], int $status = 200): void
+    {
+        self::json(array_merge(['status' => 'ok'], $data), $status);
+    }
+
     public static function error(string $message, int $status = 400): void
     {
         self::json([

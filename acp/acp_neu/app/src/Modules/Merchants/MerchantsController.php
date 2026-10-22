@@ -494,8 +494,8 @@ final class MerchantsController
         $actors = [];
         $rsActors = p4c_query(
             "SELECT
-                `id`, `username`, `status`, `is_displayed_as`, `main_category`,
-                `profile_image_fsk16`, `profile_image_fsk18`, `create_date`, `lastonline`
+                `id`, `username`, `status`, `is_displayed_as`, `actor_categories`,
+                `profile_image_fsk16`, `profile_image_fsk18`, `created_datetime`, `lastonline`
              FROM `actors`
              WHERE `merchant_id` = '" . $merchantId . "'
              ORDER BY `id` DESC;",
@@ -508,12 +508,14 @@ final class MerchantsController
                 $f16 = trim((string)($a->profile_image_fsk16 ?? ''));
                 $f18 = trim((string)($a->profile_image_fsk18 ?? ''));
                 $lastOnTs = abs((int)($a->lastonline ?? 0));
+                $catsArr  = array_filter(array_map('trim', explode(',', (string)($a->actor_categories ?? ''))));
+                $mainCat  = in_array('porn', $catsArr, true) ? 'porn' : (in_array('fetish', $catsArr, true) ? 'fetish' : '');
                 $actors[] = [
                     'id'              => $aid,
                     'username'        => $this->toUtf8((string)($a->username ?? '')),
                     'status'          => (string)($a->status ?? 'active'),
                     'is_displayed_as' => (string)($a->is_displayed_as ?? ''),
-                    'main_category'   => (string)($a->main_category ?? ''),
+                    'main_category'   => $mainCat,
                     'has_fsk16'       => $f16 !== '',
                     'has_fsk18'       => $f18 !== '',
                     'avatar_fsk16'    => 'media.php?type=actor_avatar&actor_id=' . $aid . '&fsk=16&w=80',
@@ -522,7 +524,7 @@ final class MerchantsController
                     'avatar_fsk18_lg' => 'media.php?type=actor_avatar&actor_id=' . $aid . '&fsk=18&w=600',
                     'movies_count'    => $actorMovieCounts[$aid] ?? 0,
                     'albums_count'    => $actorAlbumCounts[$aid] ?? 0,
-                    'create_date_de'  => $this->formatDateTimeDe((string)($a->create_date ?? '')),
+                    'create_date_de'  => $this->formatDateTimeDe((string)($a->created_datetime ?? '')),
                     'lastonline_de'   => $lastOnTs > 0 ? date('d.m.Y H:i', $lastOnTs) : '-',
                 ];
             }
@@ -556,7 +558,7 @@ final class MerchantsController
         $rsRecMov = p4c_query(
             "SELECT
                 m.`id`, m.`actor_id`, m.`title`, m.`status`, m.`released`, m.`movie_checked`,
-                m.`price`, m.`playtime_string`, m.`create_date`,
+                m.`amount_own`, m.`playtime_seconds`, m.`amount_second`, m.`playtime_string`, m.`create_datetime`,
                 a.`username` AS `actor_name`,
                 mo.`id` AS `online_id`
              FROM `movies` m
@@ -573,6 +575,10 @@ final class MerchantsController
                 $mid        = abs((int)$mv->id);
                 $onlineId   = abs((int)($mv->online_id ?? 0));
                 $isChecking = ((string)$mv->released === '1' && ((string)$mv->movie_checked === '0000-00-00 00:00:00' || (string)$mv->movie_checked === '000-00-00 00:00:00') && (string)$mv->status === 'active');
+                $coinsOwn   = abs((int)($mv->amount_own ?? 0));
+                if ($coinsOwn === 0) {
+                    $coinsOwn = (int)round(abs((int)($mv->playtime_seconds ?? 0)) * (float)($mv->amount_second ?? 0));
+                }
                 $recentMovies[] = [
                     'id'          => $mid,
                     'online_id'   => $onlineId,
@@ -583,9 +589,9 @@ final class MerchantsController
                     'released'    => (string)($mv->released ?? '0'),
                     'is_online'   => $onlineId > 0,
                     'is_checking' => $isChecking,
-                    'price_fmt'   => number_format((float)($mv->price ?? 0), 2, ',', '.') . ' €',
+                    'price_fmt'   => $coinsOwn . ' Coins',
                     'playtime'    => (string)($mv->playtime_string ?? '-'),
-                    'date_de'     => $this->formatDateTimeDe((string)($mv->create_date ?? '')),
+                    'date_de'     => $this->formatDateTimeDe((string)($mv->create_datetime ?? '')),
                     'target_url'  => $onlineId > 0
                         ? '#/movie-edit?id=' . $onlineId
                         : ($isChecking ? '#/movie-checking?id=' . $mid : '#/movies-drafts?q=' . $mid),
@@ -597,7 +603,8 @@ final class MerchantsController
         $coActors = [];
         $rsCo = p4c_query(
             "SELECT
-                `id`, `is_owner`, `creator_name`, `checked_status`, `checked_by`, `checked_on`, `created_at`,
+                `id`, `is_owner`, `creator_name`, `nickname_not_public`, `checked_status`,
+                `checked_by_employee` AS `checked_by`, `checked_on`, `create_datetime` AS `created_at`,
                 AES_DECRYPT(`first_name`, '" . $aesKeyEsc . "') AS `dec_first_name`,
                 AES_DECRYPT(`last_name`, '" . $aesKeyEsc . "') AS `dec_last_name`
              FROM `co_actors`
@@ -610,10 +617,11 @@ final class MerchantsController
             while ($ca = p4c_fetch_object($rsCo)) {
                 $fn = $this->toUtf8((string)($ca->dec_first_name ?? ''));
                 $ln = $this->toUtf8((string)($ca->dec_last_name ?? ''));
+                $cName = $this->toUtf8((string)($ca->creator_name ?: ($ca->nickname_not_public ?? '')));
                 $coActors[] = [
                     'id'             => abs((int)$ca->id),
                     'is_owner'       => (int)($ca->is_owner ?? 0) === 1,
-                    'creator_name'   => $this->toUtf8((string)($ca->creator_name ?? '')),
+                    'creator_name'   => $cName,
                     'real_name'      => trim($fn . ' ' . $ln),
                     'checked_status' => (string)($ca->checked_status ?? 'pending'),
                     'checked_by'     => $this->toUtf8((string)($ca->checked_by ?? '')),

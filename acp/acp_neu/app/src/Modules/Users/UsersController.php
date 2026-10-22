@@ -342,7 +342,7 @@ final class UsersController
             "SELECT
                 u.*,
                 s.`domain` AS `site_domain`,
-                s.`name` AS `site_name`,
+                s.`domain` AS `site_name`,
                 s.`status` AS `site_status`
              FROM `members` u
              LEFT JOIN `sites` s ON s.`p4c_shop_id` = u.`p4c_shop_id`

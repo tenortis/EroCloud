@@ -342,7 +342,7 @@ const App = {
   },
 
   seekMoviePlayer(seconds) {
-    const tabBtn = document.getElementById('tab-btn-review');
+    const tabBtn = document.getElementById('tab-btn-review') || document.getElementById('tab-btn-me-edit');
     if (tabBtn && !tabBtn.classList.contains('active')) {
       tabBtn.click();
     }
@@ -351,6 +351,10 @@ const App = {
     video.currentTime = Math.max(0, Number(seconds) || 0);
     video.play().catch(() => {});
     video.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  },
+
+  seekMoviePlayerTo(seconds) {
+    this.seekMoviePlayer(seconds);
   },
 
   skipMoviePlayer(deltaSec) {

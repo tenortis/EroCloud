@@ -24,7 +24,11 @@ class p4c_errorlog {
             $uri = isset($_SERVER['REQUEST_URI']) ? ' ' . $_SERVER['REQUEST_URI'] : '';
             $context = '[' . $_SERVER['HTTP_HOST'] . $uri . '] ';
         }
-        error_log("[" . $this->date . "] " . $context . $error . " in " . $file . " on line " . $line . "\n", 3, SOURCEDIR . '/log/.errorlog');
+        $logDir = SOURCEDIR . '/log';
+        if (!is_dir($logDir)) {
+            @mkdir($logDir, 0775, true);
+        }
+        error_log("[" . $this->date . "] " . $context . $error . " in " . $file . " on line " . $line . "\n", 3, $logDir . '/.errorlog');
         return "Sorry! Es ist ein Fehler aufgetreten.";
     }   
 }
