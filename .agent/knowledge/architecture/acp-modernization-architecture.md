@@ -150,3 +150,16 @@ acp/acp_neu/ (später: acp/)
   * **Tab 3 – Visa/Mastercard BRAM-Regelwerk & Prompt:** Übersicht der aktiven Kategorien & Schlagwörter sowie Live-Editoren für `includes/ai_rules/bram_system_prompt.md` und `includes/ai_rules/bram_keyword_rules.json` (`save_rules`).
   * **Tab 4 – Analyse-Historie & Filter:** Echtzeit-Filterung über `movies_ai_analysis` nach BRAM-Status, Untertitel-Status und Volltext/ID (`filter_history`).
   * **Tab 5 – Transkript- & VTT-Inspektor:** Gesamtauswertung aller `.vtt`-Transkripte auf Klammer-Tags, Sprachverteilung, Filme ohne Dialog und Phrasen-Wiederholungen (`inspect_transcripts`) inkl. 1-Klick-Bestandsbereinigung (`clean_all_vtt_transcripts`) und Re-Queue exotischer Sprachen (`requeue_exotic_lang_movies`).
+
+---
+
+## 8. 👤 Modul „Profile“ (`Actors`)
+
+* **`App\Modules\Actors` (`ActorsController.php`, `views/list.php`, `views/detail.php`):**
+  * **`#/actors` (`GET ?route=actors`):** Gesamtübersicht aller Darsteller-Profile (`actors`) mit 4 KPI-Kacheln (Aktive Profile & Neu 5T, Hauptkategorie & Cam, Profilbilder FSK16/FSK18, Status-Übersicht), gebündelter Vorab-Aggregation von Filmen und Fotoalben pro Profil (0 N+1 Queries), Filterung nach Status (`active`, `blocked`, `deleted`, `new_5d`), Hauptkategorie (`porn`, `fetish`, `none`), Anzeigegruppe (`female`..`trans`), Profilbild-Status, Händler-ID (`merchant_id`), AES-entschlüsselter Volltextsuche, Sortierung und Paginierung.
+  * **`#/actor?id=...` (`GET ?route=actor&id=...`):** 3-Tab-Bearbeitungs-Cockpit (*1. Profil-Daten & Kategorisierung*, *2. Zugeordnete Videos*, *3. Zugeordnete Fotoalben*) inkl. Vorheriges/Nächstes-Profil-Navigation. Lädt alle Profildaten, Kategorien, Videos (`LEFT JOIN movies_online`) und Fotoalben (`LEFT JOIN photo_albums_online`) in nur 7 gebündelten Queries statt ~60+ Einzel-Queries der Legacy-Klasse `Actor`.
+  * **Speichern, Profilbild-Löschung & Händler-Wechsel:**
+    * `POST ?route=actors/save`: Speichert alle Profilfelder, Kategorien (`categorys[]`), Sonder-Provisionen (`amoredea_provision_content`, `amoredea_provision_obolus`), `obolus_type`, Steckbrief-Merkmale + `check_*`-Schalter, aktualisiert `actor_checksum($actorId)`, synchronisiert `group_actors.is_displayed_as` und kaskadiert `status = 'deleted'` auf `movies`, `movies_online`, `photo_albums` und `photo_albums_online`.
+    * `POST ?route=actors/delete-image`: Löscht FSK16- oder FSK18-Profilbilder inkl. `actor_checksum($actorId)`.
+    * `POST ?route=actors/reassign-merchant`: Reiht einen kompletten Profil-Inhaberwechsel (`actor_reassign`) in die Hintergrund-Warteschlange ein.
+    * *(Hinweis: Die veralteten Bereiche **0900-Rufnummern / erocall** sowie **Chats / Neue-User-Nachrichten** wurden gemäß Vorgabe vollständig entfernt.)*

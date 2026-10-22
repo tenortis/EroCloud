@@ -291,6 +291,89 @@ if ($type === 'co_actor') {
 }
 
 // ============================================================================
+// 2a-bis. DARSTELLER-PROFILBILDER FSK16 / FSK18 (type=actor_avatar)
+// ============================================================================
+if ($type === 'actor_avatar') {
+    $actorId  = isset($_GET['actor_id']) ? abs((int)$_GET['actor_id']) : 0;
+    $fsk      = (isset($_GET['fsk']) && abs((int)$_GET['fsk']) === 18) ? 18 : 16;
+    $reqWidth = isset($_GET['w']) ? abs((int)$_GET['w']) : 0;
+
+    if ($actorId <= 0) {
+        @session_write_close();
+        p4c_close(DB_HOST);
+        acp_media_output_svg_placeholder('Kein Profil', 'FSK' . $fsk, 160, 160);
+    }
+
+    $rsAct = p4c_query(
+        "SELECT `id`, `merchant_id`, `username`, `profile_image_fsk16`, `profile_image_fsk18`
+         FROM `actors`
+         WHERE `id` = '" . $actorId . "'
+         LIMIT 1;",
+        __FILE__,
+        __LINE__
+    );
+    @session_write_close();
+
+    if (!$rsAct || p4c_num_rows($rsAct) === 0) {
+        p4c_close(DB_HOST);
+        acp_media_output_svg_placeholder('Profil #' . $actorId, 'Nicht gefunden', 160, 160);
+    }
+
+    $actObj   = p4c_fetch_object($rsAct);
+    p4c_close(DB_HOST);
+
+    $colName  = $fsk === 18 ? 'profile_image_fsk18' : 'profile_image_fsk16';
+    $imgFile  = trim((string)($actObj->$colName ?? ''));
+    $uname    = trim((string)($actObj->username ?? ('#' . $actorId)));
+
+    if ($imgFile === '') {
+        acp_media_output_svg_placeholder('Kein FSK' . $fsk, $uname, 160, 160);
+    }
+
+    $candidate = rtrim((string)PROFILE_IMAGE_PATH, '/\\') . '/'
+        . (string)MERCHANT_DEFAULT_DIR . '/'
+        . abs((int)$actObj->merchant_id) . '/'
+        . abs((int)$actObj->id) . '/'
+        . basename($imgFile);
+
+    if (!is_file($candidate) || filesize($candidate) === 0) {
+        acp_media_output_svg_placeholder('FSK' . $fsk . ' Bild', $uname, 160, 160);
+    }
+
+    $mtime = (int)@filemtime($candidate);
+    $mime  = function_exists('mime_content_type') ? (string)@mime_content_type($candidate) : 'image/jpeg';
+    if ($mime === '') {
+        $mime = 'image/jpeg';
+    }
+
+    header('Cache-Control: private, max-age=600');
+    header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $mtime ?: time()) . ' GMT');
+
+    if ($reqWidth > 0 && $reqWidth <= 800 && ($mime === 'image/jpeg' || $mime === 'image/png') && function_exists('imagecreatetruecolor')) {
+        $imgSize = @getimagesize($candidate);
+        if (is_array($imgSize) && $imgSize[0] > $reqWidth && $imgSize[1] > 0) {
+            $srcImg = $mime === 'image/png' ? @imagecreatefrompng($candidate) : @imagecreatefromjpeg($candidate);
+            if ($srcImg !== false) {
+                $ratio     = $imgSize[0] / $imgSize[1];
+                $newWidth  = $reqWidth;
+                $newHeight = max(1, (int)round($newWidth / $ratio));
+                $dstImg    = imagecreatetruecolor($newWidth, $newHeight);
+                imagecopyresampled($dstImg, $srcImg, 0, 0, 0, 0, $newWidth, $newHeight, $imgSize[0], $imgSize[1]);
+                header('Content-Type: image/jpeg');
+                imagejpeg($dstImg, null, 88);
+                imagedestroy($dstImg);
+                imagedestroy($srcImg);
+                exit;
+            }
+        }
+    }
+
+    header('Content-Type: ' . $mime);
+    readfile($candidate);
+    exit;
+}
+
+// ============================================================================
 // 2b. FOTOALBUM COVER-POSTER (type=album_poster) & EINZELFOTO (type=album_photo)
 // ============================================================================
 if ($type === 'album_poster' || $type === 'album_photo') {

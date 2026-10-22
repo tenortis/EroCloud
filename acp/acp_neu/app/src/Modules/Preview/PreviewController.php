@@ -44,34 +44,6 @@ final class PreviewController
         ]);
     }
 
-    // 4. Profile (actors)
-    public function actors(): string
-    {
-        return $this->renderPlaceholder(
-            'bi-person-bounding-box',
-            'Profile',
-            'Darsteller-Profile',
-            'Verwalte alle angelegten Darsteller-Profile, prüfe neue Profile und steuere Freischaltungen.',
-            'actors',
-            '/Actors',
-            'acp/includes/actors.php'
-        );
-    }
-
-    public function actor(): string
-    {
-        $id = abs((int)$this->request->get('id', 0));
-        return $this->renderPlaceholder(
-            'bi-person-vcard-fill',
-            'Profile',
-            'Darsteller-Profil Details' . ($id > 0 ? ' (#' . $id . ')' : ''),
-            'Detailansicht und Bearbeitung eines Darsteller-Profils inkl. Profilbildern, Steckbrief und Status.',
-            'actor' . ($id > 0 ? '?id=' . $id : ''),
-            '/Actor/' . ($id > 0 ? $id : ''),
-            'acp/includes/actor.php'
-        );
-    }
-
     // 5. Webseiten (websites)
     public function sites(): string
     {

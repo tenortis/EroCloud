@@ -104,6 +104,7 @@ class Router
         $aiComplianceCtrl        = 'App\\Modules\\AiCompliance\\AiComplianceController';
         $contentCleanupCtrl      = 'App\\Modules\\ContentCleanup\\ContentCleanupController';
         $storageAnalyticsCtrl    = 'App\\Modules\\StorageAnalytics\\StorageAnalyticsController';
+        $actorsCtrl              = 'App\\Modules\\Actors\\ActorsController';
         $previewCtrl             = 'App\\Modules\\Preview\\PreviewController';
 
         // 1. Startseite (Echtes Admin-Dashboard, Globale Schnellsuche, Notizen & Live-Counter)
@@ -154,8 +155,11 @@ class Router
         self::register('storage-analytics/legacy-cleanup', $storageAnalyticsCtrl, 'legacyCleanup', 'content_online');
 
         // 4. Profile (actors)
-        self::register('actors', $previewCtrl, 'actors', 'actors');
-        self::register('actor', $previewCtrl, 'actor', 'actors');
+        self::register('actors', $actorsCtrl, 'list', 'actors');
+        self::register('actor', $actorsCtrl, 'detail', 'actors');
+        self::register('actors/save', $actorsCtrl, 'save', 'actors');
+        self::register('actors/delete-image', $actorsCtrl, 'deleteImage', 'actors');
+        self::register('actors/reassign-merchant', $actorsCtrl, 'reassignMerchant', 'actors');
 
         // 5. Webseiten (websites)
         self::register('sites', $previewCtrl, 'sites', 'websites');

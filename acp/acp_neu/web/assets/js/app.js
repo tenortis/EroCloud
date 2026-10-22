@@ -308,6 +308,39 @@ const App = {
     }
   },
 
+  openImageLightbox(src, title) {
+    if (!src) return;
+    let modalEl = document.getElementById('ecGlobalImageLightboxModal');
+    if (!modalEl) {
+      modalEl = document.createElement('div');
+      modalEl.id = 'ecGlobalImageLightboxModal';
+      modalEl.className = 'modal fade';
+      modalEl.tabIndex = -1;
+      modalEl.setAttribute('aria-hidden', 'true');
+      modalEl.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+          <div class="modal-content border-0 shadow-lg" style="background: var(--kkc-surface-card);">
+            <div class="modal-header border-bottom py-2 px-3">
+              <h6 class="modal-title fw-bold mb-0" id="ecGlobalImageLightboxTitle">Bildvorschau</h6>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body p-3 text-center bg-dark rounded-bottom">
+              <img id="ecGlobalImageLightboxImg" src="" alt="Vorschau" class="img-fluid rounded shadow" style="max-height: 78vh; object-fit: contain;">
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modalEl);
+    }
+    const imgEl = document.getElementById('ecGlobalImageLightboxImg');
+    const titleEl = document.getElementById('ecGlobalImageLightboxTitle');
+    if (imgEl) imgEl.src = src;
+    if (titleEl) titleEl.textContent = title || 'Bildvorschau';
+    if (window.bootstrap?.Modal) {
+      window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  },
+
   seekMoviePlayer(seconds) {
     const tabBtn = document.getElementById('tab-btn-review');
     if (tabBtn && !tabBtn.classList.contains('active')) {
@@ -3783,6 +3816,186 @@ const App = {
         this.batchAutoRunning = false;
         document.querySelectorAll('.btn-sa-batch-run').forEach(b => { b.disabled = false; });
         if (stopBtn) stopBtn.style.display = 'none';
+      }
+    }
+  },
+
+  // ========================================================================
+  // 11. Darsteller-Profile (#/actors & #/actor?id=...)
+  // ========================================================================
+  Actors: {
+    submitFilterForm(event) {
+      if (event) event.preventDefault();
+      const form = document.getElementById('actors-filter-form');
+      if (!form) return false;
+
+      const fd = new FormData(form);
+      const params = new URLSearchParams();
+
+      const status = (fd.get('status') || 'all').toString().trim();
+      const mainCat = (fd.get('main_cat') || 'all').toString().trim();
+      const displayGrp = (fd.get('display_group') || 'all').toString().trim();
+      const imgFilter = (fd.get('img_filter') || 'all').toString().trim();
+      const merchantId = parseInt((fd.get('merchant_id') || '0').toString(), 10) || 0;
+      const sort = (fd.get('sort') || 'id_desc').toString().trim();
+      const limit = parseInt((fd.get('limit') || '50').toString(), 10) || 50;
+      const q = (fd.get('q') || '').toString().trim();
+
+      if (status !== 'all') params.set('status', status);
+      if (mainCat !== 'all') params.set('main_cat', mainCat);
+      if (displayGrp !== 'all') params.set('display_group', displayGrp);
+      if (imgFilter !== 'all') params.set('img_filter', imgFilter);
+      if (merchantId > 0) params.set('merchant_id', String(merchantId));
+      if (sort !== 'id_desc') params.set('sort', sort);
+      if (limit !== 50) params.set('limit', String(limit));
+      if (q !== '') params.set('q', q);
+
+      const qs = params.toString();
+      const targetHash = `#/actors${qs ? '?' + qs : ''}`;
+      if (window.location.hash === targetHash) {
+        App.handleRoute();
+      } else {
+        window.location.hash = targetHash;
+      }
+      return false;
+    },
+
+    quickFilterTable(query) {
+      const q = String(query || '').trim().toLowerCase();
+      document.querySelectorAll('.actor-list-row').forEach(row => {
+        const hay = row.getAttribute('data-search') || '';
+        row.classList.toggle('d-none', !(q === '' || hay.includes(q)));
+      });
+    },
+
+    filterSubTable(rowClass, query) {
+      const q = String(query || '').trim().toLowerCase();
+      document.querySelectorAll(`.${rowClass}`).forEach(row => {
+        const hay = row.getAttribute('data-search') || '';
+        row.classList.toggle('d-none', !(q === '' || hay.includes(q)));
+      });
+    },
+
+    onStatusChange(val) {
+      const warnEl = document.getElementById('actor-delete-warning');
+      if (warnEl) {
+        warnEl.classList.toggle('d-none', val !== 'deleted');
+      }
+    },
+
+    async saveActor(event) {
+      if (event) event.preventDefault();
+      const form = document.getElementById('actor-edit-form');
+      if (!form) return false;
+
+      const statusVal = document.getElementById('actor-status-select')?.value || '';
+      if (statusVal === 'deleted') {
+        if (!window.confirm('Achtung: Möchtest du dieses Darsteller-Profil wirklich endgültig auf GELÖSCHT setzen? Dadurch werden auch alle zugeordneten Filme und Fotoalben als gelöscht markiert.')) {
+          return false;
+        }
+      }
+
+      const fd = new FormData(form);
+      fd.set('_csrf', App.csrfToken);
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=actors/save`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.status !== 'ok') {
+          App.toast(data.message || 'Fehler beim Speichern des Darsteller-Profils.', 'danger');
+          return false;
+        }
+
+        App.resetLogoutCountdown();
+        App.toast(data.message || 'Darsteller-Profil erfolgreich gespeichert.', 'success');
+        App.handleRoute();
+      } catch (err) {
+        App.toast('Netzwerkfehler beim Speichern: ' + err.message, 'danger');
+      }
+      return false;
+    },
+
+    async deleteProfileImage(actorId, fsk) {
+      const fskNum = parseInt(fsk, 10) === 16 ? 16 : 18;
+      if (!window.confirm(`Möchtest du das FSK${fskNum}-Profilbild von Profil #${actorId} wirklich löschen?`)) {
+        return;
+      }
+
+      const fd = new FormData();
+      fd.append('_csrf', App.csrfToken);
+      fd.append('actor_id', String(actorId));
+      fd.append('fsk', String(fskNum));
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=actors/delete-image`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.status !== 'ok') {
+          App.toast(data.message || 'Profilbild konnte nicht gelöscht werden.', 'danger');
+          return;
+        }
+
+        App.resetLogoutCountdown();
+        App.toast(data.message || `FSK${fskNum}-Profilbild gelöscht.`, 'success');
+        App.handleRoute();
+      } catch (err) {
+        App.toast('Netzwerkfehler: ' + err.message, 'danger');
+      }
+    },
+
+    async reassignMerchant(actorId) {
+      const inp = document.getElementById('actor-reassign-merchant-input');
+      const newMerchantId = parseInt(inp?.value || '0', 10) || 0;
+      if (newMerchantId <= 0) {
+        App.toast('Bitte gib eine gültige Ziel-Händler-ID (MID) ein.', 'warning');
+        return;
+      }
+
+      if (!window.confirm(`Möchtest du das Darsteller-Profil #${actorId} samt aller Videos und Fotoalben wirklich dem Händler #${newMerchantId} zuweisen?`)) {
+        return;
+      }
+
+      const fd = new FormData();
+      fd.append('_csrf', App.csrfToken);
+      fd.append('actor_id', String(actorId));
+      fd.append('new_merchant_id', String(newMerchantId));
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=actors/reassign-merchant`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.status !== 'ok') {
+          App.toast(data.message || 'Händler-Zuweisung konnte nicht gestartet werden.', 'danger');
+          return;
+        }
+
+        App.resetLogoutCountdown();
+        App.toast(data.message || 'Händler-Zuweisung wurde in die Warteschlange eingetragen.', 'success');
+        App.handleRoute();
+      } catch (err) {
+        App.toast('Netzwerkfehler: ' + err.message, 'danger');
       }
     }
   }
