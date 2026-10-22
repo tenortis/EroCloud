@@ -492,13 +492,13 @@ const App = {
                      onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.classList.remove('d-none');">
                 <i class="bi ${fallbackIcon} text-muted d-none"></i>
               </div>
-              <div class="flex-grow-1 min-w-0">
-                <div class="d-flex align-items-center gap-2 mb-1">
+              <div class="ec-search-body">
+                <div class="ec-search-title-row mb-1">
                   ${typeBadge}
                   <span class="font-monospace fw-semibold text-muted flex-shrink-0" style="font-size: 0.75rem;">#${ parseInt(item.id, 10) }</span>
-                  <span class="fw-semibold text-truncate" style="font-size: 0.85rem;">${this.escapeHtml(item.title)}</span>
+                  <span class="ec-search-title" title="${this.escapeHtml(item.title)}">${this.escapeHtml(item.title)}</span>
                 </div>
-                <div class="d-flex align-items-center flex-wrap gap-2 text-muted" style="font-size: 0.73rem;">
+                <div class="d-flex align-items-center flex-wrap gap-2 text-muted text-truncate" style="font-size: 0.73rem;">
                   <span><i class="bi bi-person-circle me-1"></i>${this.escapeHtml(item.actor_name || '-')}</span>
                   ${metaHtml}
                 </div>

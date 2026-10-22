@@ -428,18 +428,45 @@ code, kbd, samp, pre, .font-monospace {
 .ec-global-search-list {
   max-height: 410px;
   overflow-y: auto;
-  divide-y: 1px solid var(--kkc-border);
+  overflow-x: hidden;
 }
 
 .ec-search-item {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
   padding: 0.65rem 0.85rem;
   text-decoration: none;
   color: var(--kkc-text);
   border-bottom: 1px solid var(--kkc-border);
   transition: background-color 0.12s ease;
+}
+
+.ec-search-body {
+  flex: 1 1 0%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.ec-search-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.ec-search-title {
+  flex: 1 1 0%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 0.85rem;
 }
 
 .ec-search-item:last-child {
