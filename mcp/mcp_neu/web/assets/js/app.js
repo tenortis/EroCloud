@@ -127,7 +127,31 @@ const App = {
   },
 
   async handleRoute() {
-    const rawHash = window.location.hash.replace(/^#\/?/, '') || 'startseite';
+    if (this.conversionPollTimer) {
+      clearInterval(this.conversionPollTimer);
+      this.conversionPollTimer = null;
+    }
+
+    let rawHash = window.location.hash.replace(/^#\/?/, '') || 'startseite';
+
+    // Rückwärtskompatibilität für alte MCP-Hash-Links (z.B. #actor-123, #photo-album-123, #movie-123, #home)
+    const legacyActorMatch = rawHash.match(/^actor-(\d+)$/);
+    const legacyAlbumMatch = rawHash.match(/^photo-album-(\d+)$/);
+    const legacyMovieMatch = rawHash.match(/^movie-(\d+)$/);
+    if (legacyActorMatch) {
+      rawHash = `actor?id=${legacyActorMatch[1]}`;
+      window.history.replaceState(null, '', `#/${rawHash}`);
+    } else if (legacyAlbumMatch) {
+      rawHash = `photo-album?id=${legacyAlbumMatch[1]}`;
+      window.history.replaceState(null, '', `#/${rawHash}`);
+    } else if (legacyMovieMatch) {
+      rawHash = `movie?id=${legacyMovieMatch[1]}`;
+      window.history.replaceState(null, '', `#/${rawHash}`);
+    } else if (rawHash === 'home') {
+      rawHash = 'startseite';
+      window.history.replaceState(null, '', '#/startseite');
+    }
+
     const [pathPart, queryPart] = rawHash.split('?');
     const params = new URLSearchParams(queryPart || '');
     const apiRoute = pathPart || 'startseite';
@@ -2088,6 +2112,131 @@ const App = {
         }
       });
     }
+
+    // 10. Live-Konvertierungsstatus Polling & Auto-Reload (auf Detailseite & Upload Schritt 3)
+    this.initMovieConversionPolling();
+  },
+
+  initMovieConversionPolling() {
+    if (this.conversionPollTimer) {
+      clearInterval(this.conversionPollTimer);
+      this.conversionPollTimer = null;
+    }
+
+    const liveBox = document.getElementById('movie-conversion-live-box');
+    if (!liveBox) return;
+
+    const movieId = parseInt(liveBox.getAttribute('data-movie-id') || '0', 10);
+    if (!movieId) return;
+
+    const refreshBtn = document.getElementById('btn-refresh-conversion-status');
+    let isFetching = false;
+
+    const checkConversionStatus = async (isManual = false) => {
+      if (isFetching) return;
+      if (!document.body.contains(liveBox)) {
+        if (this.conversionPollTimer) {
+          clearInterval(this.conversionPollTimer);
+          this.conversionPollTimer = null;
+        }
+        return;
+      }
+
+      isFetching = true;
+      const origBtnHtml = refreshBtn ? refreshBtn.innerHTML : '';
+      if (isManual && refreshBtn) {
+        refreshBtn.disabled = true;
+        refreshBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Prüfe Status...';
+      }
+
+      try {
+        const res = await fetch(`${this.basePath}/api.php?route=movies/conversion-status&id=${movieId}&_t=${Date.now()}`, {
+          method: 'GET',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          cache: 'no-store'
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.status === 'ok') {
+            const cStatus = parseInt(data.convert_status ?? 0, 10);
+            const qInfo = data.queue || {};
+
+            const titleEl = document.getElementById('conv-status-title');
+            const subEl = document.getElementById('conv-status-subtitle');
+            const badgeEl = document.getElementById('conv-queue-badge');
+            const remEl = document.getElementById('conv-remaining-label');
+            const progBar = document.getElementById('conv-progress-bar');
+
+            if (cStatus === 2) {
+              if (this.conversionPollTimer) {
+                clearInterval(this.conversionPollTimer);
+                this.conversionPollTimer = null;
+              }
+              this.toast('Dein Video wurde fertig konvertiert! Die Vorschaubilder stehen jetzt bereit.', 'success');
+              const targetHash = `#/movie?id=${movieId}`;
+              if (window.location.hash === targetHash) {
+                this.handleRoute();
+              } else {
+                window.location.hash = targetHash;
+              }
+              return;
+            }
+
+            if (cStatus === 3) {
+              if (this.conversionPollTimer) {
+                clearInterval(this.conversionPollTimer);
+                this.conversionPollTimer = null;
+              }
+              this.toast('Bei der Konvertierung der Videodatei ist ein Fehler aufgetreten.', 'danger');
+              this.handleRoute();
+              return;
+            }
+
+            if (titleEl) {
+              titleEl.textContent = cStatus === 1
+                ? 'Dein Video wird gerade aktiv konvertiert...'
+                : 'Dein Video befindet sich in der Konvertierungs-Warteschlange';
+            }
+            if (subEl && qInfo.status_hint) {
+              subEl.textContent = qInfo.status_hint;
+            }
+            if (badgeEl && qInfo.queue_position) {
+              badgeEl.textContent = `#${qInfo.queue_position} von ${qInfo.total_active || qInfo.queue_position}`;
+              badgeEl.className = `badge ${cStatus === 1 ? 'bg-primary' : 'bg-secondary'}`;
+            }
+            if (remEl && qInfo.estimated_remaining_label) {
+              remEl.innerHTML = `<i class="bi bi-clock-history me-1"></i>${this.escapeHtml(qInfo.estimated_remaining_label)}`;
+            }
+            if (progBar && typeof qInfo.progress_percent !== 'undefined') {
+              const pct = Math.max(8, Math.min(99, parseInt(qInfo.progress_percent, 10) || 10));
+              progBar.style.width = `${pct}%`;
+              progBar.setAttribute('aria-valuenow', String(pct));
+            }
+
+            if (isManual) {
+              this.toast('Konvertierungsstatus wurde aktualisiert.', 'info');
+            }
+          }
+        }
+      } catch (_) {
+        // Stiller Fallback beim Hintergrund-Polling
+      } finally {
+        isFetching = false;
+        if (isManual && refreshBtn) {
+          refreshBtn.disabled = false;
+          refreshBtn.innerHTML = origBtnHtml || '<i class="bi bi-arrow-clockwise me-1"></i> Status jetzt aktualisieren';
+        }
+      }
+    };
+
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => checkConversionStatus(true));
+    }
+
+    this.conversionPollTimer = setInterval(() => {
+      checkConversionStatus(false);
+    }, 8000);
   },
 
   // ========================================================================
