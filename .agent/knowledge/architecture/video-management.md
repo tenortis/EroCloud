@@ -104,7 +104,9 @@ Ein Hintergrund-Cronjob kümmert sich um die automatische Aufbereitung der hochg
     * **Post-Conversion-Re-Analyze:** Nach Abschluss liest `getID3` Auflösung und Spieldauer frisch aus der fertigen `.mp4`-Datei aus und berechnet bei Bedarf `amount_own` nach, falls die Rohdatei beim Upload keine Header-Metadaten hatte.
   * **2. Vorschaubilder (`thumb_{id}_{file_id}_1..10.jpg`)**:
     * Sobald die fertige MP4-Datei (`{id}_{file_id}.mp4`) existiert, wird `convert_status = '2'` gesetzt und FFmpeg extrahiert 10 gleichmäßig über die Laufzeit verteilte Screenshots mit max. `1024px` Breite (`scale=min(1024\,iw):-2`).
-  * **3. Datenbereinigung**:
+  * **3. Automatische Creator-Benachrichtigung mit Direkt-Login (`EroCloudMailer` & `EroCloudMagicLink`)**:
+    * Direkt nach dem Erzeugen der 10 Vorschaubilder prüft `cronjobs/convert_movie.php` über `EroCloudNotificationCenter`, ob der Creator die Benachrichtigung aktiviert hat (`movies.notify_on_convert == 1` und `event_key = 'movie_converted'`), versendet die spam-sichere System-E-Mail (ohne Filmtitel, mit verschlüsseltem Auto-Login-Button `#/movie?id=...` und 1-Klick-Abmeldelink) und setzt `movies.notify_sent_at`. Alle Details sind in `@email-notification-and-magic-link-system.md` dokumentiert.
+  * **4. Datenbereinigung**:
     * Sofern die hochgeladene Originaldatei einen anderen Dateinamen/Endung als `{id}_{file_id}.mp4` hatte, wird sie per `unlink($org_file)` gelöscht.
   * *(Historischer Hinweis: Bis Oktober 2026 wurden zusätzlich `m_{id}_{file_id}.mp4`, `m_{id}_{file_id}.webm` und `m_{id}_{file_id}.ogv` konvertiert. Diese Konvertierungsschritte wurden aus `cronjobs/convert_movie.php` entfernt, da `api/movie_player.php` ausschließlich die Haupt-MP4 streamt und alle modernen Mobilgeräte diese direkt per HTTP-Range-Streaming abspielen).*
 

@@ -20,6 +20,7 @@ usage: 'Wird automatisch herangezogen bei Fragen oder Arbeiten an Server-Konfigu
 | **Betriebssystem** | **Debian GNU/Linux 11 (Bullseye)** (`VERSION_ID="11"`, Kernel `5.10.0-46-amd64`) |
 | **Server Control Panel** | **LiveConfig `2.19.4-release`** (Port `8443`) |
 | **Webserver** | **Apache httpd `2.4.67`** (`2.4.67-1~deb11u3`) – aktive Module: `fcgid`, `http2`, `rewrite`, `ssl`, `suexec` |
+| **Mailserver (SMTP/IMAP)** | **Postfix & Dovecot (`mail.erocloud.net`)** – Let's Encrypt RSA 2048-Bit TLS, SPF, DKIM (2048-Bit), DMARC (`p=quarantine`) & SMTP-Absender-IP-Maskierung (Details in `@email-notification-and-magic-link-system.md`) |
 | **Datenbank-Server** | **MariaDB `10.5.29`** (`1:10.5.29-0+deb11u1`) |
 | **Speicher-Mounts** | `/` (`375,66 GiB` Systemplatte) sowie `/var/www/web1/cloud_storage` (`5,20 TiB` Medienspeicher) |
 

@@ -421,13 +421,12 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
       <form id="form-mcp-notifications">
         <div class="modal-body">
           <p class="text-muted small mb-3">
-            Lege hier fest, über welche Ereignisse und Neuigkeiten wir dich per <strong>E-Mail</strong> oder <strong>Push-Benachrichtigung</strong> informieren dürfen. Deine Einstellungen gelten sofort für dein gesamtes Creator-Konto:
+            Lege hier fest, über welche Ereignisse und Neuigkeiten wir dich per <strong>E-Mail</strong> informieren dürfen. Deine Einstellungen gelten sofort für dein gesamtes Creator-Konto:
           </p>
-          <div class="list-group">
+          <div class="list-group mb-3">
             <?php foreach ($notifMatrix as $evKey => $meta): ?>
               <?php
               $emailChecked = !empty($meta['channels']['email']);
-              $pushChecked  = !empty($meta['channels']['push']);
               $safeEvKey    = htmlspecialchars((string)$evKey, ENT_QUOTES, 'UTF-8');
               $safeIcon     = htmlspecialchars((string)($meta['icon'] ?? 'bi-bell'), ENT_QUOTES, 'UTF-8');
               $safeBadge    = htmlspecialchars((string)($meta['badge'] ?? ''), ENT_QUOTES, 'UTF-8');
@@ -446,8 +445,8 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
                     <div class="small text-muted"><?= $safeDesc ?></div>
                   </div>
                   <div class="col-12 col-md-5">
-                    <div class="d-flex justify-content-md-end gap-4 pt-2 pt-md-0">
-                      <div class="form-check form-switch">
+                    <div class="d-flex justify-content-md-end align-items-center gap-4 pt-2 pt-md-0">
+                      <div class="form-check form-switch mb-0">
                         <input class="form-check-input" type="checkbox" role="switch"
                                id="notif_email_<?= $safeEvKey ?>"
                                name="email_events[]"
@@ -457,14 +456,12 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
                           <i class="bi bi-envelope me-1 text-primary"></i>E-Mail
                         </label>
                       </div>
-                      <div class="form-check form-switch">
+                      <div class="form-check form-switch mb-0 opacity-50" title="Push-Benachrichtigungen folgen in Kürze">
                         <input class="form-check-input" type="checkbox" role="switch"
                                id="notif_push_<?= $safeEvKey ?>"
-                               name="push_events[]"
-                               value="<?= $safeEvKey ?>"
-                               <?= $pushChecked ? 'checked' : '' ?>>
-                        <label class="form-check-label small fw-semibold" for="notif_push_<?= $safeEvKey ?>">
-                          <i class="bi bi-bell me-1 text-primary"></i>Push
+                               disabled>
+                        <label class="form-check-label small text-muted" for="notif_push_<?= $safeEvKey ?>">
+                          <i class="bi bi-bell me-1"></i>Push <span class="badge bg-secondary bg-opacity-10 text-secondary border ms-1" style="font-size: 0.65rem;">In Kürze</span>
                         </label>
                       </div>
                     </div>
@@ -472,6 +469,10 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
                 </div>
               </div>
             <?php endforeach; ?>
+          </div>
+          <div class="d-flex align-items-center gap-2 px-3 py-2 rounded-3 border bg-light small text-muted">
+            <i class="bi bi-info-circle text-primary"></i>
+            <span><strong>Ausblick:</strong> Push-Benachrichtigungen direkt auf dein Smartphone oder deinen Browser stehen dir in Kürze zusätzlich zur Verfügung.</span>
           </div>
         </div>
         <div class="modal-footer border-top d-flex justify-content-between">

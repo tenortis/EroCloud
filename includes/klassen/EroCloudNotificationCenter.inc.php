@@ -40,7 +40,7 @@ class EroCloudNotificationCenter
                 'icon'        => 'bi-film',
                 'defaults'    => [
                     self::CHANNEL_EMAIL => 1,
-                    self::CHANNEL_PUSH  => 1,
+                    self::CHANNEL_PUSH  => 0,
                 ],
             ],
             self::EVENT_CONTENT_REVIEWED => [
@@ -50,7 +50,7 @@ class EroCloudNotificationCenter
                 'icon'        => 'bi-patch-check',
                 'defaults'    => [
                     self::CHANNEL_EMAIL => 1,
-                    self::CHANNEL_PUSH  => 1,
+                    self::CHANNEL_PUSH  => 0,
                 ],
             ],
             self::EVENT_NEWSLETTER => [

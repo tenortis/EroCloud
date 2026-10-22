@@ -40,9 +40,7 @@ foreach ($actors as $actItem) {
         $actorNamesSummary[] = (string)$actItem['username'];
     }
 }
-$creatorContextLabel = !empty($actorNamesSummary)
-    ? implode(', ', array_slice($actorNamesSummary, 0, 2))
-    : ((string)($merchantUsername ?? '') !== '' ? (string)$merchantUsername : ('Account #' . (int)($merchantId ?? 0)));
+$singleCreatorProfileName = (count($actorNamesSummary) === 1) ? $actorNamesSummary[0] : '';
 ?>
 
 <!-- Page Header & Personal Greeting -->
@@ -676,35 +674,35 @@ $creatorContextLabel = !empty($actorNamesSummary)
   <div class="card-kkc-body p-0">
     <div class="row g-0">
       <!-- Linke Spalte: Persönliches Profil (Martin Zimmermann) & Testlauf-Hinweis -->
-      <div class="col-lg-4 p-4 d-flex flex-column justify-content-between" style="background: rgba(66, 151, 215, 0.045); border-right: 1px solid var(--kkc-border);">
+      <div class="col-lg-4 p-4 d-flex flex-column justify-content-between" style="background: linear-gradient(160deg, rgba(66, 151, 215, 0.08) 0%, rgba(66, 151, 215, 0.025) 100%); border-right: 1px solid var(--kkc-border);">
         <div>
           <!-- Testlauf-Badge -->
-          <div class="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill ec-bg-primary-subtle ec-text-primary fw-semibold small mb-3">
+          <div class="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill ec-bg-primary-subtle ec-text-primary fw-semibold small mb-4">
             <i class="bi bi-stars"></i>
             <span>Neuer Bereich im Testlauf &bull; Direkt-Draht</span>
           </div>
 
-          <!-- Martin Zimmermann Avatar & Name (analog EroCMS) -->
-          <div class="d-flex align-items-center gap-3 mb-3 p-3 rounded-3 border" style="background-color: var(--kkc-card-bg); border-color: var(--kkc-border) !important;">
+          <!-- Martin Zimmermann Avatar & Name (offen & harmonisch ohne Kasten-in-Kasten) -->
+          <div class="d-flex align-items-center gap-3 mb-4">
             <div class="position-relative flex-shrink-0">
               <img src="assets/img/ceo-150x150.jpg"
                    onerror="this.onerror=null;this.src='https://erocms.net/images/ceo-150x150.jpg';"
                    alt="Martin Zimmermann"
-                   class="rounded-circle border border-3 shadow-sm object-fit-cover"
-                   style="width: 72px; height: 72px; border-color: var(--kkc-card-bg) !important;">
-              <span class="position-absolute" style="bottom: -2px; right: -2px; font-size: 1.35rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));">👋</span>
+                   class="rounded-circle object-fit-cover"
+                   style="width: 82px; height: 82px; border: 3px solid var(--kkc-surface); box-shadow: 0 6px 18px rgba(2, 132, 199, 0.22);">
+              <span class="position-absolute" style="bottom: -2px; right: -2px; font-size: 1.4rem; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));">👋</span>
             </div>
             <div>
-              <div class="fw-bold" style="font-size: 1.02rem; line-height: 1.2;">Martin Zimmermann</div>
-              <div class="ec-text-primary small fw-semibold mt-1">CEO &amp; Entwickler</div>
-              <div class="text-muted" style="font-size: 0.74rem;">Dein persönlicher Ansprechpartner</div>
+              <div class="fw-bold text-body" style="font-size: 1.12rem; line-height: 1.2;">Martin Zimmermann</div>
+              <div class="ec-text-primary fw-semibold mt-1" style="font-size: 0.86rem;">Chefentwickler (CTO)</div>
+              <div class="text-muted mt-1" style="font-size: 0.78rem;">Dein direkter Draht in die Technik</div>
             </div>
           </div>
 
           <h5 class="fw-bold mb-2">
             <?= $greetingName !== '' ? 'Hallo ' . View::e($greetingName) . ', ist dir etwas aufgefallen?' : 'Fehler entdeckt oder eine Idee?' ?>
           </h5>
-          <p class="text-muted mb-3" style="font-size: 0.88rem; line-height: 1.55;">
+          <p class="text-muted mb-3" style="font-size: 0.9rem; line-height: 1.6;">
             Dieser neue EroCloud-Partnerbereich befindet sich aktuell noch im <strong>Testlauf</strong>. Wenn dir hier irgendwo ein Fehler auffällt, etwas noch nicht wie gewohnt funktioniert oder du dir eine Verbesserung wünschst, kannst du es mir hier direkt melden!
           </p>
         </div>
@@ -716,7 +714,7 @@ $creatorContextLabel = !empty($actorNamesSummary)
           </div>
           <div class="d-flex align-items-center gap-2">
             <i class="bi bi-cpu-fill ec-text-primary flex-shrink-0"></i>
-            <span>Dein Account, deine Profile &amp; das zentrale Error-Log werden automatisch mitgesendet</span>
+            <span>Zentrales Error-Log &amp; Diagnosedaten werden automatisch mitgesendet</span>
           </div>
           <div class="d-flex align-items-center gap-2">
             <i class="bi bi-reply-fill ec-text-primary flex-shrink-0"></i>
@@ -787,7 +785,7 @@ $creatorContextLabel = !empty($actorNamesSummary)
             <label for="ec-feedback-message" class="form-label fw-semibold small text-uppercase text-muted mb-1" id="ec-feedback-label">
               2. Welches Problem oder welcher Fehler ist dir im neuen Bereich aufgefallen?
             </label>
-            <textarea class="form-control rounded-3" id="ec-feedback-message" name="message" rows="3" placeholder="Beschreibe mir kurz, wo das Problem auftritt und was genau passiert (z. B. beim Film-Upload, in den Fotoalben, bei deinen Profilen...)" required style="font-size: 0.92rem;"></textarea>
+            <textarea class="form-control rounded-3" id="ec-feedback-message" name="message" rows="6" placeholder="Beschreibe mir kurz, wo das Problem auftritt und was genau passiert (z. B. beim Film-Upload, in den Fotoalben, bei deinen Profilen...)" required style="font-size: 0.92rem; min-height: 145px;"></textarea>
           </div>
 
           <!-- 3. Dateianhänge (max. 3 Dateien: Screenshots / Fotos / PDF) -->
@@ -817,7 +815,11 @@ $creatorContextLabel = !empty($actorNamesSummary)
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
             <span class="text-muted" style="font-size: 0.78rem;">
               <i class="bi bi-shield-check text-success me-1"></i>
-              Creator-Profil (<strong><?= View::e($creatorContextLabel) ?></strong>) &amp; zentrales Error-Log werden automatisch beigefügt.
+              <?php if ($singleCreatorProfileName !== ''): ?>
+                Creator-Profil: <strong><?= View::e($singleCreatorProfileName) ?></strong> &amp; zentrales Error-Log werden automatisch beigefügt.
+              <?php else: ?>
+                Zentrales Error-Log &amp; technische Diagnosedaten werden automatisch beigefügt.
+              <?php endif; ?>
             </span>
             <button type="submit" id="ec-feedback-submit-btn" class="btn btn-primary-kkc rounded-pill px-4 py-2 fw-semibold shadow-sm">
               <i class="bi bi-send-fill me-2"></i>Nachricht absenden

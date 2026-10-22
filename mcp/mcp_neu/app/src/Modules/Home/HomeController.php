@@ -101,6 +101,7 @@ class HomeController
                     'marital_status'     => self::decodeLegacyText((string)($row->marital_status ?? '')),
                     'movies_count'       => 0,
                     'albums_count'       => 0,
+                    'latest_movie_id'    => 0,
                 ];
             }
         }
@@ -118,6 +119,7 @@ class HomeController
 
         if ($rsMovies && p4c_num_rows($rsMovies) > 0) {
             while ($m = p4c_fetch_object($rsMovies)) {
+                $movieId = abs((int)$m->id);
                 $actorId = abs((int)$m->actor_id);
                 // Falls das zugehörige Profil gelöscht wurde, überspringen (analog ajax/movies.php)
                 if ($actorId > 0 && !isset($actorMap[$actorId])) {
@@ -127,6 +129,9 @@ class HomeController
                 $moviesTotal++;
                 if (isset($actors[$actorId])) {
                     $actors[$actorId]['movies_count']++;
+                    if ($movieId > $actors[$actorId]['latest_movie_id']) {
+                        $actors[$actorId]['latest_movie_id'] = $movieId;
+                    }
                 }
 
                 $checked      = (string)$m->movie_checked;
@@ -223,6 +228,17 @@ class HomeController
 
         $contentPending = $moviesPending + $albumsPending;
 
+        // Darsteller-Profile nach aktuellstem Film-Upload sortieren (aktiv genutzte Profile zuerst, sonst alphabetisch)
+        $sortedActors = array_values($actors);
+        usort($sortedActors, static function (array $a, array $b): int {
+            $latestA = (int)($a['latest_movie_id'] ?? 0);
+            $latestB = (int)($b['latest_movie_id'] ?? 0);
+            if ($latestA !== $latestB) {
+                return $latestB <=> $latestA;
+            }
+            return strnatcasecmp((string)($a['username'] ?? ''), (string)($b['username'] ?? ''));
+        });
+
         return View::render('Home', 'dashboard', [
             'merchantId'                => $merchantId,
             'partnerId'                 => $partnerId,
@@ -233,7 +249,7 @@ class HomeController
             'acceptContentRulesDate'    => $acceptContentRules,
             'hasInactiveOrBlockedActor' => $hasInactiveOrBlockedActor,
             'canCreateActor'            => count($actors) < $minActorProfiles,
-            'actors'                    => array_values($actors),
+            'actors'                    => $sortedActors,
             'actorsTotal'               => count($actors),
             'activeActorsCount'         => $activeActorsCount,
             'moviesTotal'               => $moviesTotal,
@@ -483,9 +499,14 @@ class HomeController
         }
 
         // Aussagekräftigen Creator-Namen für die KKC-Übersicht aufbauen
-        $primaryLabel = !empty($actorLabels)
-            ? implode(', ', array_slice($actorLabels, 0, 2))
-            : ($merchantUsername !== '' ? $merchantUsername : ('Merchant #' . $merchantId));
+        if (count($actorLabels) === 1) {
+            $primaryLabel = $actorLabels[0];
+        } elseif (count($actorLabels) > 1) {
+            $baseOwner = $merchantUsername !== '' ? $merchantUsername : ($realName !== '' ? $realName : ('Merchant #' . $merchantId));
+            $primaryLabel = $baseOwner . ' (' . count($actorLabels) . ' Profile)';
+        } else {
+            $primaryLabel = $merchantUsername !== '' ? $merchantUsername : ('Merchant #' . $merchantId);
+        }
 
         $creatorNameParts = [$primaryLabel];
         if ($realName !== '' && stripos($primaryLabel, $realName) === false) {

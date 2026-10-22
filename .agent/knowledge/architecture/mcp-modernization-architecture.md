@@ -115,7 +115,9 @@ mcp_neu/ (später: mcp/)
    * Verifiziert den Login via cURL bei `https://api.pay4coins.com/remote/merchant_login.php`.
    * Ruft bei `'ok'` die Stammdaten von `https://api.pay4coins.com/remote/erocloud_merchant_data.php` ab, legt den Partner in `merchants` an bzw. aktualisiert ihn (AES-verschlüsselt mit `AES_KEY`), setzt die MCP-Session (`$_SESSION['logged_id'] = 'mcp'`, `$_SESSION['logged_in_as'] = 'merchant'`, `$_SESSION['merchant_id']`) und leitet auf `Startseite` weiter.
 3. **Eingeloggter Zustand (`/Startseite` $\rightarrow$ `web/index.php` + `#/startseite`):**
-   * Rendert die App-Shell (Topbar + linke Sidebar mit Darsteller-Profilen, Upload-/Cloud-Menü, API-Key-Modal, FAQ/Support/Impressum) und lädt per JS das Partner-Dashboard (`api.php?route=startseite`).
+   * Rendert die App-Shell (Topbar + linke Sidebar mit Darsteller-Profilen, Upload-/Cloud-Menü, Benachrichtigungs-Modal `#modal-notifications`, API-Key-Modal, FAQ/Support/Impressum dynamisch aus der DB) und lädt per JS das Partner-Dashboard (`api.php?route=startseite`).
+4. **Direkt-Login über Magic-Link (`web/index.php?ml=<token>` via `EroCloudMagicLink`):**
+   * Links aus E-Mails oder Push-Benachrichtigungen loggen den Creator automatisch und sicher ein (`session_regenerate_id(true)`) und leiten sofort per `302` (`Referrer-Policy: no-referrer`) auf die gewünschte Ziel-Ansicht (z. B. `#/movie?id=8482`) weiter. Details siehe `@email-notification-and-magic-link-system.md`.
 
 ---
 
