@@ -170,8 +170,9 @@ final class MoviesOnlineController
                 "mo.`file_id` LIKE '%" . $escSearch . "%'",
                 "a.`username` LIKE '%" . $escSearch . "%'",
             ];
-            if (ctype_digit($search)) {
-                $numSearch = abs((int)$search);
+            $cleanNum = ltrim($search, '#');
+            if ($cleanNum !== '' && ctype_digit($cleanNum)) {
+                $numSearch = abs((int)$cleanNum);
                 $searchConds[] = "mo.`id` = '" . $numSearch . "'";
                 $searchConds[] = "m.`id` = '" . $numSearch . "'";
                 $searchConds[] = "mo.`merchant_id` = '" . $numSearch . "'";

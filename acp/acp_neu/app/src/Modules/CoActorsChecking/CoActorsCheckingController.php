@@ -74,9 +74,11 @@ final class CoActorsCheckingController
         \CoActorManager::ensureSchema();
 
         // Filter- & Sortier-Parameter
-        $statusFilter = trim((string)$this->request->get('status', 'under_review'));
+        $searchQuery  = trim((string)$this->request->get('q', ''));
+        $rawStatus    = $this->request->get('status');
+        $statusFilter = trim((string)($rawStatus ?? ($searchQuery !== '' ? 'all' : 'under_review')));
         if (!in_array($statusFilter, ['under_review', 'verified', 'rejected', 'pending_qr', 'all'], true)) {
-            $statusFilter = 'under_review';
+            $statusFilter = $searchQuery !== '' ? 'all' : 'under_review';
         }
 
         $roleFilter = trim((string)$this->request->get('role', 'all'));
@@ -90,7 +92,6 @@ final class CoActorsCheckingController
         }
 
         $sortFilter  = trim((string)$this->request->get('sort', 'priority'));
-        $searchQuery = trim((string)$this->request->get('q', ''));
 
         // 1. Globale KPI-Zähler über alle aktiven co_actors ermitteln
         $counts = [
@@ -160,8 +161,9 @@ final class CoActorsCheckingController
         }
 
         if ($searchQuery !== '') {
-            $escQ = p4c_escape_string($searchQuery);
-            $numQ = ctype_digit($searchQuery) ? abs((int)$searchQuery) : 0;
+            $escQ     = p4c_escape_string($searchQuery);
+            $cleanNum = ltrim($searchQuery, '#');
+            $numQ     = ($cleanNum !== '' && ctype_digit($cleanNum)) ? abs((int)$cleanNum) : 0;
             $searchConds = [
                 "c.`creator_name` LIKE '%" . $escQ . "%'",
                 "CAST(AES_DECRYPT(c.`nickname_not_public`, '" . AES_KEY . "') AS CHAR) LIKE '%" . $escQ . "%'",

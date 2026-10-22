@@ -212,8 +212,9 @@ final class UsersController
                 "u.`domain` LIKE '%" . $qEsc . "%'",
                 "u.`remote_member_id` LIKE '%" . $qEsc . "%'",
             ];
-            if (ctype_digit($searchQuery)) {
-                $numQ = abs((int)$searchQuery);
+            $cleanNum = ltrim($searchQuery, '#');
+            if ($cleanNum !== '' && ctype_digit($cleanNum)) {
+                $numQ = abs((int)$cleanNum);
                 $qParts[] = "u.`id` = '" . $numQ . "'";
                 $qParts[] = "u.`p4c_shop_id` = '" . $numQ . "'";
             }

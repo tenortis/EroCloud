@@ -234,9 +234,10 @@ final class ActorsController
         }
 
         if ($searchQuery !== '') {
-            $escQ = \p4c_escape_string($searchQuery);
-            if (ctype_digit($searchQuery)) {
-                $numQ    = abs((int)$searchQuery);
+            $escQ     = \p4c_escape_string($searchQuery);
+            $cleanNum = ltrim($searchQuery, '#');
+            if ($cleanNum !== '' && ctype_digit($cleanNum)) {
+                $numQ    = abs((int)$cleanNum);
                 $where[] = "(a.`id` = '{$numQ}' OR a.`merchant_id` = '{$numQ}' OR m.`partner_id` = '{$numQ}' OR a.`username` LIKE '%{$escQ}%')";
             } else {
                 $where[] = "(a.`username` LIKE '%{$escQ}%' OR CAST(AES_DECRYPT(m.`username`, '" . AES_KEY . "') AS CHAR) LIKE '%{$escQ}%' OR a.`admin_infos` LIKE '%{$escQ}%')";

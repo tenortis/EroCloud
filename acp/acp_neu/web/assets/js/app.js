@@ -1229,6 +1229,10 @@ const App = {
   },
 
   applyMoviesOnlineFilters(pageOverride) {
+    if (pageOverride && typeof pageOverride === 'object' && typeof pageOverride.preventDefault === 'function') {
+      pageOverride.preventDefault();
+      pageOverride = 1;
+    }
     const q = (document.getElementById('mo-filter-q')?.value || '').trim();
     const status = document.getElementById('mo-filter-status')?.value || 'all';
     const cat = document.getElementById('mo-filter-cat')?.value || 'all';
@@ -1237,7 +1241,7 @@ const App = {
     const bram = document.getElementById('mo-filter-bram')?.value || 'all';
     const sort = document.getElementById('mo-filter-sort')?.value || 'id_desc';
     const perPage = document.getElementById('mo-filter-per-page')?.value || '100';
-    const page = pageOverride ? Number(pageOverride) : 1;
+    const page = (typeof pageOverride === 'number' || typeof pageOverride === 'string') ? (Number(pageOverride) || 1) : 1;
 
     const params = new URLSearchParams();
     if (q !== '') params.set('q', q);
@@ -2183,7 +2187,7 @@ const App = {
       if (this.searchDebounceTimer) {
         clearTimeout(this.searchDebounceTimer);
       }
-      if (q.length < 2) {
+      if (q.length < 2 && !/^#?\d+$/.test(q)) {
         this.hideGlobalSearchDropdown();
         return;
       }
@@ -3829,29 +3833,25 @@ const App = {
   // ========================================================================
   Actors: {
     submitFilterForm(event) {
-      if (event) event.preventDefault();
-      const form = document.getElementById('actors-filter-form');
-      if (!form) return false;
-
-      const fd = new FormData(form);
+      if (event && typeof event.preventDefault === 'function') {
+        event.preventDefault();
+      }
       const params = new URLSearchParams();
 
-      const status = (fd.get('status') || 'all').toString().trim();
-      const mainCat = (fd.get('main_cat') || 'all').toString().trim();
-      const displayGrp = (fd.get('display_group') || 'all').toString().trim();
-      const imgFilter = (fd.get('img_filter') || 'all').toString().trim();
-      const merchantId = parseInt((fd.get('merchant_id') || '0').toString(), 10) || 0;
-      const sort = (fd.get('sort') || 'id_desc').toString().trim();
-      const limit = parseInt((fd.get('limit') || '50').toString(), 10) || 50;
-      const q = (fd.get('q') || '').toString().trim();
+      const q          = (document.getElementById('act-filter-q')?.value || '').trim();
+      const status     = (document.getElementById('act-filter-status')?.value || 'all').trim();
+      const mainCat    = (document.getElementById('act-filter-cat')?.value || 'all').trim();
+      const imgFilter  = (document.getElementById('act-filter-img')?.value || 'all').trim();
+      const sort       = (document.getElementById('act-filter-sort')?.value || 'id_desc').trim();
+      const merchantId = parseInt(document.getElementById('act-filter-merchant')?.value || '0', 10) || 0;
+      const perPage    = parseInt(document.getElementById('act-filter-perpage')?.value || '50', 10) || 50;
 
       if (status !== 'all') params.set('status', status);
       if (mainCat !== 'all') params.set('main_cat', mainCat);
-      if (displayGrp !== 'all') params.set('display_group', displayGrp);
       if (imgFilter !== 'all') params.set('img_filter', imgFilter);
       if (merchantId > 0) params.set('merchant_id', String(merchantId));
       if (sort !== 'id_desc') params.set('sort', sort);
-      if (limit !== 50) params.set('limit', String(limit));
+      if (perPage !== 50) params.set('per_page', String(perPage));
       if (q !== '') params.set('q', q);
 
       const qs = params.toString();
@@ -3866,7 +3866,7 @@ const App = {
 
     quickFilterTable(query) {
       const q = String(query || '').trim().toLowerCase();
-      document.querySelectorAll('.actor-list-row').forEach(row => {
+      document.querySelectorAll('.act-table-row').forEach(row => {
         const hay = row.getAttribute('data-search') || '';
         row.classList.toggle('d-none', !(q === '' || hay.includes(q)));
       });
@@ -3881,22 +3881,29 @@ const App = {
     },
 
     onStatusChange(val) {
-      const warnEl = document.getElementById('actor-delete-warning');
+      const warnEl = document.getElementById('act-status-delete-warning');
       if (warnEl) {
-        warnEl.classList.toggle('d-none', val !== 'deleted');
+        warnEl.style.display = (val === 'deleted') ? '' : 'none';
       }
     },
 
     async saveActor(event) {
       if (event) event.preventDefault();
-      const form = document.getElementById('actor-edit-form');
+      const form = document.getElementById('actorEditForm');
       if (!form) return false;
 
-      const statusVal = document.getElementById('actor-status-select')?.value || '';
+      const checkedRadio = form.querySelector('input[name="actor_status"]:checked');
+      const statusVal = checkedRadio ? checkedRadio.value : '';
       if (statusVal === 'deleted') {
         if (!window.confirm('Achtung: Möchtest du dieses Darsteller-Profil wirklich endgültig auf GELÖSCHT setzen? Dadurch werden auch alle zugeordneten Filme und Fotoalben als gelöscht markiert.')) {
           return false;
         }
+      }
+
+      const btn = document.getElementById('btn-actor-save-submit');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Speichere...';
       }
 
       const fd = new FormData(form);
@@ -3915,6 +3922,10 @@ const App = {
 
         if (!res.ok || data.status !== 'ok') {
           App.toast(data.message || 'Fehler beim Speichern des Darsteller-Profils.', 'danger');
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-floppy-fill me-1"></i>Alle Profildaten &amp; Kategorien speichern';
+          }
           return false;
         }
 
@@ -3923,20 +3934,24 @@ const App = {
         App.handleRoute();
       } catch (err) {
         App.toast('Netzwerkfehler beim Speichern: ' + err.message, 'danger');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-floppy-fill me-1"></i>Alle Profildaten &amp; Kategorien speichern';
+        }
       }
       return false;
     },
 
     async deleteProfileImage(actorId, fsk) {
-      const fskNum = parseInt(fsk, 10) === 16 ? 16 : 18;
-      if (!window.confirm(`Möchtest du das FSK${fskNum}-Profilbild von Profil #${actorId} wirklich löschen?`)) {
+      const fskCode = String(fsk || '').toUpperCase().includes('16') ? 'FSK16' : 'FSK18';
+      if (!window.confirm(`Möchtest du das ${fskCode}-Profilbild von Profil #${actorId} wirklich löschen?`)) {
         return;
       }
 
       const fd = new FormData();
       fd.append('_csrf', App.csrfToken);
       fd.append('actor_id', String(actorId));
-      fd.append('fsk', String(fskNum));
+      fd.append('fsk', fskCode);
 
       try {
         const res = await fetch(`${App.basePath}/api.php?route=actors/delete-image`, {
@@ -3955,7 +3970,7 @@ const App = {
         }
 
         App.resetLogoutCountdown();
-        App.toast(data.message || `FSK${fskNum}-Profilbild gelöscht.`, 'success');
+        App.toast(data.message || `${fskCode}-Profilbild gelöscht.`, 'success');
         App.handleRoute();
       } catch (err) {
         App.toast('Netzwerkfehler: ' + err.message, 'danger');
@@ -3963,10 +3978,10 @@ const App = {
     },
 
     async reassignMerchant(actorId) {
-      const inp = document.getElementById('actor-reassign-merchant-input');
+      const inp = document.getElementById('act-reassign-merchant-select');
       const newMerchantId = parseInt(inp?.value || '0', 10) || 0;
       if (newMerchantId <= 0) {
-        App.toast('Bitte gib eine gültige Ziel-Händler-ID (MID) ein.', 'warning');
+        App.toast('Bitte wähle zuerst einen gültigen Ziel-Händler (MID) aus der Liste aus.', 'warning');
         return;
       }
 

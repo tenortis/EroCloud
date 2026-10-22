@@ -107,8 +107,9 @@ final class PhotoAlbumsOnlineController
                 "ao.`album_id` LIKE '%" . $escSearch . "%'",
                 "a.`username` LIKE '%" . $escSearch . "%'",
             ];
-            if (ctype_digit($search)) {
-                $numSearch = abs((int)$search);
+            $cleanNum = ltrim($search, '#');
+            if ($cleanNum !== '' && ctype_digit($cleanNum)) {
+                $numSearch = abs((int)$cleanNum);
                 $searchConds[] = "ao.`id` = '" . $numSearch . "'";
                 $searchConds[] = "pa.`id` = '" . $numSearch . "'";
                 $searchConds[] = "ao.`merchant_id` = '" . $numSearch . "'";

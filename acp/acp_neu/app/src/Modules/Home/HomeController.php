@@ -270,14 +270,16 @@ class HomeController
      */
     public function globalSearch(): void
     {
-        $q = trim((string)$this->request->get('q', ''));
-        if (mb_strlen($q) < 2) {
+        $q       = trim((string)$this->request->get('q', ''));
+        $rawNum  = ltrim($q, '#');
+        $isNumId = ($rawNum !== '' && ctype_digit($rawNum));
+        if (mb_strlen($q) < 2 && !$isNumId) {
             Response::json(['status' => 'ok', 'items' => []]);
             return;
         }
 
-        $cleanId = abs((int)ltrim($q, '#'));
-        $escQ    = p4c_escape_string($q);
+        $cleanId = $isNumId ? abs((int)$rawNum) : 0;
+        $escQ    = p4c_escape_string($isNumId ? $rawNum : $q);
         $items   = [];
 
         // 1. Darsteller-Profile (actors)
@@ -406,8 +408,8 @@ class HomeController
                         'icon'         => 'bi-globe2',
                         'id'           => $sid,
                         'title'        => self::decodeLegacyText((string)($s->domain ?? ('Site #' . $sid))),
-                        'subtitle'     => 'Shop #' . abs((int)($s->p4c_shop_id ?? 0)) . ' • Partner-ID: ' . abs((int)($s->partner_id ?? 0)),
-                        'status_label' => (string)($s->status ?? 'Domain'),
+                        'subtitle'     => 'Shop #' . abs((int)($s->p4c_shop_id ?? 0)) . ' • Partner-ID: ' . (string)($s->partner_id ?: '-'),
+                        'status_label' => ((int)($s->status ?? 0) === 1 ? 'Aktiv' : 'Inaktiv'),
                         'route'        => '#/site?id=' . $sid,
                     ];
                 }

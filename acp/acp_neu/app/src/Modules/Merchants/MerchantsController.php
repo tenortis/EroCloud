@@ -289,8 +289,9 @@ final class MerchantsController
                 "CAST(AES_DECRYPT(m.`last_ip`, '" . $aesKeyEsc . "') AS CHAR) LIKE '%" . $qEsc . "%'",
                 "EXISTS (SELECT 1 FROM `actors` a WHERE a.`merchant_id` = m.`id` AND a.`username` LIKE '%" . $qEsc . "%')",
             ];
-            if (ctype_digit($searchQuery)) {
-                $qParts[] = "m.`id` = '" . abs((int)$searchQuery) . "'";
+            $cleanNum = ltrim($searchQuery, '#');
+            if ($cleanNum !== '' && ctype_digit($cleanNum)) {
+                $qParts[] = "m.`id` = '" . abs((int)$cleanNum) . "'";
             }
             $whereParts[] = '(' . implode(' OR ', $qParts) . ')';
         }
