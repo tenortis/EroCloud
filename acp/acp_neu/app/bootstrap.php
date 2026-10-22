@@ -120,7 +120,16 @@ if (!function_exists('acp_has_access')) {
         $accessList = isset($_SESSION['employee_access_area']) && is_array($_SESSION['employee_access_area'])
             ? $_SESSION['employee_access_area']
             : [];
-        return in_array('all', $accessList, true) || in_array($area, $accessList, true);
+        if (in_array('all', $accessList, true)) {
+            return true;
+        }
+        foreach (explode(',', $area) as $reqArea) {
+            $reqArea = trim($reqArea);
+            if ($reqArea !== '' && in_array($reqArea, $accessList, true)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
 

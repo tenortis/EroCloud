@@ -344,18 +344,18 @@ final class MoviesCheckingController
             $onlineInfo['online_status']       = (string)($onObj->status ?? 'active');
 
             $rsAcc = p4c_query(
-                "SELECT `buy_datetime`, `view_datetime`
+                "SELECT `buy_timestamp`, `access_token_datetime`
                  FROM `movies_access`
-                 WHERE `file_id` = '" . p4c_escape_string($fileId) . "'
-                 ORDER BY `id` DESC;",
+                 WHERE `movie_id` = '" . p4c_escape_string($fileId) . "'
+                 ORDER BY `buy_timestamp` DESC;",
                 __FILE__,
                 __LINE__
             );
             if ($rsAcc && p4c_num_rows($rsAcc) > 0) {
                 $onlineInfo['purchase_count'] = (int)p4c_num_rows($rsAcc);
                 $firstAcc = p4c_fetch_object($rsAcc);
-                $onlineInfo['last_buy_datetime']  = (string)($firstAcc->buy_datetime ?? '');
-                $onlineInfo['last_view_datetime'] = (string)($firstAcc->view_datetime ?? '');
+                $onlineInfo['last_buy_datetime']  = (string)($firstAcc->buy_timestamp ?? '');
+                $onlineInfo['last_view_datetime'] = (string)($firstAcc->access_token_datetime ?? '');
             }
         }
 
@@ -401,13 +401,30 @@ final class MoviesCheckingController
             'fetish'           => [],
             'porn'             => [],
         ];
-        $rsCats = p4c_query("SELECT `id_name`, `type`, `de` FROM `movie_categories` ORDER BY `type` ASC, `de` ASC;", __FILE__, __LINE__);
+        $searchHaystack = mb_strtolower($title . ' ' . strip_tags($description), 'UTF-8');
+        $rsCats = p4c_query("SELECT * FROM `movie_categories` ORDER BY `category_group` ASC, `name_id` ASC;", __FILE__, __LINE__);
         if ($rsCats && p4c_num_rows($rsCats) > 0) {
             while ($c = p4c_fetch_object($rsCats)) {
-                $cType  = (string)($c->type ?? 'porn');
-                $idName = (string)($c->id_name ?? '');
-                $deName = self::decodeText((string)($c->de ?? ''));
-                $inText = ($deName !== '' && (mb_stripos($title, $deName) !== false || mb_stripos($description, $deName) !== false));
+                $cType  = (string)($c->category_group ?? 'porn');
+                $idName = (string)($c->name_id ?? '');
+                $deName = self::decodeText((string)($c->de_name_value ?? ''));
+                $deText = self::decodeText((string)($c->de_name_text ?? ''));
+                $moreSw = self::decodeText((string)($c->more_search_words ?? ''));
+
+                $inText = false;
+                if ($idName !== '' && mb_strpos($searchHaystack, mb_strtolower($idName, 'UTF-8')) !== false) {
+                    $inText = true;
+                } elseif ($deName !== '' && mb_strpos($searchHaystack, mb_strtolower($deName, 'UTF-8')) !== false) {
+                    $inText = true;
+                } elseif ($moreSw !== '') {
+                    foreach (explode(',', $moreSw) as $sw) {
+                        $swTrim = trim(mb_strtolower($sw, 'UTF-8'));
+                        if ($swTrim !== '' && mb_strpos($searchHaystack, $swTrim) !== false) {
+                            $inText = true;
+                            break;
+                        }
+                    }
+                }
 
                 if (!isset($categoriesByType[$cType])) {
                     $categoriesByType[$cType] = [];
@@ -415,6 +432,7 @@ final class MoviesCheckingController
                 $categoriesByType[$cType][] = [
                     'id_name'  => $idName,
                     'de'       => $deName,
+                    'de_text'  => $deText,
                     'selected' => in_array($idName, $selectedSlaves, true),
                     'in_text'  => $inText,
                 ];
@@ -590,11 +608,11 @@ final class MoviesCheckingController
             $rawCategories = [];
         }
         $validCategories = [];
-        $rsValidCats = p4c_query("SELECT `id_name` FROM `movie_categories`;", __FILE__, __LINE__);
+        $rsValidCats = p4c_query("SELECT `name_id` FROM `movie_categories`;", __FILE__, __LINE__);
         $allowedCatSet = [];
         if ($rsValidCats) {
             while ($vc = p4c_fetch_object($rsValidCats)) {
-                $allowedCatSet[(string)$vc->id_name] = true;
+                $allowedCatSet[(string)$vc->name_id] = true;
             }
         }
         foreach ($rawCategories as $catKey) {
@@ -621,34 +639,34 @@ final class MoviesCheckingController
 
         $description = trim((string)$this->request->post('description', ''));
         $description = str_replace(['€', "\xe2\x80\x8b"], ['Euro', ''], $description);
-        $description = trim(strip_tags($description, '<a><br><p><ul><ol><li><b><i><h1><h2><h3><h4><h5><h6>'));
+        $description = trim(strip_tags($description, '<a><br><p><ul><ol><li><b><i><h1><h2><h3><h4><h5><h6><u><em><strong><pre><address>'));
         if ($description === '') {
             $errors[] = 'Bitte gib eine Filmbeschreibung ein.';
         }
 
         // 4. Online-ab Datum validieren
-        $onlineAt = trim((string)$this->request->post('online_at', ''));
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $onlineAt) || strtotime($onlineAt) === false) {
-            $errors[] = 'Bitte gib ein gültiges Online-ab-Datum im Format JJJJ-MM-TT an.';
+        $onlineAtRaw = trim((string)$this->request->post('online_at', ''));
+        $onlineAtTs  = $onlineAtRaw !== '' ? strtotime($onlineAtRaw) : false;
+        if ($onlineAtTs === false) {
+            $errors[] = 'Bitte gib ein gültiges Online-ab-Datum an.';
+            $onlineAt = date('Y-m-d H:i:s');
+        } else {
+            $onlineAt = date('Y-m-d H:i:s', $onlineAtTs);
         }
 
-        // 5. Streaming-Preis & Download-Preis validieren
+        // 5. Streaming-Preis & Download-Aufschlag validieren
         $amountSecondRaw = str_replace(',', '.', trim((string)$this->request->post('amount_second', '0.00')));
         $amountSecondVal = (float)$amountSecondRaw;
-        if (!is_numeric($amountSecondRaw) || $amountSecondVal < 0.0 || $amountSecondVal > 1.60) {
-            $errors[] = 'Bitte wähle einen gültigen Streaming-Preis zwischen 0,00 und 1,60 Coins/Sekunde.';
+        if (!is_numeric($amountSecondRaw) || $amountSecondVal < 0.0 || $amountSecondVal > 100.0) {
+            $errors[] = 'Bitte wähle einen gültigen Streaming-Preis pro Sekunde.';
         }
-        $amountSecondFormatted = number_format($amountSecondVal, 2, '.', '');
-        $amountWebmaster = $amountSecondVal > 0 ? number_format(round(($playtime * $amountSecondVal) / 10, 2), 2, '.', '') : '0.00';
+        $amountSecondFormatted = number_format($amountSecondVal, 1, '.', '');
+        $amountWebmaster = abs((int)($m->amount_webmaster ?? 0));
 
         $asDownload = abs((int)$this->request->post('as_download', 0)) === 1 ? 1 : 0;
         $amountDownload = abs((int)$this->request->post('amount_download', 0));
-        if ($asDownload === 1) {
-            if ($amountDownload < 10 || $amountDownload > 2500) {
-                $errors[] = 'Der Download-Preis muss zwischen 10 und 2.500 Coins liegen.';
-            }
-        } else {
-            $amountDownload = 0;
+        if ($amountDownload > 2500) {
+            $amountDownload = 150;
         }
 
         // 6. Vorschaubilder (FSK16: 1..11, FSK18: 1..10 oder 12)
@@ -665,10 +683,10 @@ final class MoviesCheckingController
         $metaTitle = trim(strip_tags((string)$this->request->post('meta_title', '')));
         $metaDesc  = trim(strip_tags((string)$this->request->post('meta_description', '')));
         if (mb_strlen($metaTitle) > 65) {
-            $errors[] = 'Der Meta-Title darf maximal 65 Zeichen lang sein.';
+            $metaTitle = mb_substr($metaTitle, 0, 65, 'UTF-8');
         }
         if (mb_strlen($metaDesc) > 156) {
-            $errors[] = 'Die Meta-Description darf maximal 156 Zeichen lang sein.';
+            $metaDesc = mb_substr($metaDesc, 0, 156, 'UTF-8');
         }
 
         $seoUrlRaw = trim((string)$this->request->post('seo_url', ''));
@@ -682,11 +700,12 @@ final class MoviesCheckingController
             $errors[] = 'Bitte wähle eine gültige Sprache für den Film.';
         }
 
-        $quality = abs((int)$this->request->post('quality', 3));
-        if ($quality > 5) {
-            $quality = 5;
+        $qualityRaw = strtolower(trim((string)$this->request->post('quality', 'hd')));
+        if (!in_array($qualityRaw, ['sd', 'hd', 'fhd', '2k', '4k', '6k'], true)) {
+            $qualityRaw = 'hd';
         }
-        $preview = abs((int)$this->request->post('preview', 1)) === 1 ? 1 : 0;
+        $quality = $qualityRaw;
+        $preview = abs((int)$this->request->post('preview', 0)) === 1 ? 1 : 0;
 
         $visibleForWebsite = trim((string)$this->request->post('visible_for_website', 'public'));
         if (in_array('poppers', $validCategories, true) && $visibleForWebsite === 'public') {
@@ -736,31 +755,32 @@ final class MoviesCheckingController
         $now = date('Y-m-d H:i:s');
 
         // Checksumme berechnen
-        $checksumObj = clone $m;
-        $checksumObj->merchant_id         = $merchantId;
-        $checksumObj->actor_id            = $actorId;
-        $checksumObj->quality             = $quality;
-        $checksumObj->preview             = $preview;
-        $checksumObj->preview_image_fsk16 = $fsk16;
-        $checksumObj->preview_image_fsk18 = $fsk18;
-        $checksumObj->title               = $title;
-        $checksumObj->description         = $description;
-        $checksumObj->meta_title          = $metaTitle;
-        $checksumObj->meta_description    = $metaDesc;
-        $checksumObj->seo_url             = $seoUrl;
-        $checksumObj->movie_language      = $movieLanguage;
-        $checksumObj->category_master     = $categoryMaster;
-        $checksumObj->category_slave      = $categorySlaveStr;
-        $checksumObj->online_at           = $onlineAt;
-        $checksumObj->amount_second       = $amountSecondFormatted;
-        $checksumObj->amount_own          = '0.00';
-        $checksumObj->amount_webmaster    = $amountWebmaster;
-        $checksumObj->as_download         = $asDownload;
-        $checksumObj->amount_download     = $amountDownload;
-        $checksumObj->status              = $movieStatus;
-        $checksumObj->visible_for_website = $visibleForWebsite;
+        $checksumData = [
+            'merchant_id'         => $merchantId,
+            'actor_id'            => $actorId,
+            'quality'             => $quality,
+            'preview'             => $preview,
+            'preview_image_fsk16' => $fsk16,
+            'preview_image_fsk18' => $fsk18,
+            'title'               => $title,
+            'description'         => $description,
+            'meta_title'          => $metaTitle,
+            'meta_description'    => $metaDesc,
+            'seo_url'             => $seoUrl,
+            'movie_language'      => $movieLanguage,
+            'category_master'     => $categoryMaster,
+            'category_slave'      => $categorySlaveStr,
+            'online_at'           => $onlineAt,
+            'amount_second'       => $amountSecondFormatted,
+            'amount_own'          => (string)($m->amount_own ?? '0.00'),
+            'amount_webmaster'    => $amountWebmaster,
+            'as_download'         => $asDownload,
+            'amount_download'     => $amountDownload,
+            'status'              => $movieStatus,
+            'visible_for_website' => $visibleForWebsite,
+        ];
 
-        $checksum = function_exists('movie_checksum') ? (string)movie_checksum($checksumObj) : md5($fileId . $now);
+        $checksum = function_exists('movie_checksum') ? (string)movie_checksum($checksumData) : md5($fileId . $now);
 
         // Haupttabelle movies aktualisieren
         p4c_query(

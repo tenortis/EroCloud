@@ -638,7 +638,7 @@ $categoryGroupLabels = [
                   </div>
                 </div>
 
-                <!-- Download-Option & Download-Preis -->
+                <!-- Download-Option & Download-Aufschlag -->
                 <div class="col-md-5">
                   <label class="form-label small fw-bold mb-1">Als Download anbieten</label>
                   <select name="as_download" id="mc-input-as-download" class="form-select form-select-sm"
@@ -649,29 +649,38 @@ $categoryGroupLabels = [
                 </div>
 
                 <div class="col-md-7" id="mc-download-price-wrap" style="<?= empty($movie['as_download']) ? 'opacity: 0.5;' : '' ?>">
-                  <label class="form-label small fw-bold mb-1">Download-Preis (10–2.500 Coins)</label>
+                  <label class="form-label small fw-bold mb-1">Download-Aufschlag (%)</label>
                   <select name="amount_download" id="mc-input-amount-download" class="form-select form-select-sm">
-                    <?php for ($i = 10; $i <= 2500; $i += 5): ?>
-                    <option value="<?= $i ?>" <?= (int)$movie['amount_download'] === $i ? 'selected' : '' ?>><?= $i ?> Coins</option>
+                    <?php for ($i = 0; $i <= 150; $i++): ?>
+                    <option value="<?= $i ?>" <?= (int)$movie['amount_download'] === $i ? 'selected' : '' ?>>
+                      +<?= $i ?>%<?= $i === 0 ? ' (gleicher Preis wie Stream)' : ($i === 10 ? ' (Empfohlen)' : '') ?>
+                    </option>
                     <?php endfor; ?>
                   </select>
                 </div>
 
                 <!-- Qualität, Vorschau & Sichtbarkeit -->
                 <div class="col-md-4">
-                  <label class="form-label small fw-bold mb-1">Qualitäts-Einstufung</label>
+                  <label class="form-label small fw-bold mb-1">Qualitäts-Stufe</label>
+                  <?php
+                    $qualityOptions = ['sd' => 'SD', 'hd' => 'HD (720p)', 'fhd' => 'Full HD (1080p)', '2k' => '2K', '4k' => '4K', '6k' => '6K'];
+                    $currentQuality = strtolower(trim((string)($movie['quality'] ?? '')));
+                    if (!isset($qualityOptions[$currentQuality])) {
+                        $currentQuality = 'hd';
+                    }
+                  ?>
                   <select name="quality" class="form-select form-select-sm">
-                    <?php for ($q = 0; $q <= 5; $q++): ?>
-                    <option value="<?= $q ?>" <?= (int)$movie['quality'] === $q ? 'selected' : '' ?>><?= $q ?> Sterne</option>
-                    <?php endfor; ?>
+                    <?php foreach ($qualityOptions as $qKey => $qLabel): ?>
+                    <option value="<?= View::e($qKey) ?>" <?= $currentQuality === $qKey ? 'selected' : '' ?>><?= View::e($qLabel) ?></option>
+                    <?php endforeach; ?>
                   </select>
                 </div>
 
                 <div class="col-md-4">
-                  <label class="form-label small fw-bold mb-1">Vorschau-Trailer</label>
+                  <label class="form-label small fw-bold mb-1">Ist der Film ein Trailer?</label>
                   <select name="preview" class="form-select form-select-sm">
-                    <option value="1" <?= (int)$movie['preview'] === 1 ? 'selected' : '' ?>>Ja (aktiv)</option>
-                    <option value="0" <?= (int)$movie['preview'] === 0 ? 'selected' : '' ?>>Nein</option>
+                    <option value="0" <?= (int)$movie['preview'] === 0 ? 'selected' : '' ?>>Nein (Vollfilm)</option>
+                    <option value="1" <?= (int)$movie['preview'] === 1 ? 'selected' : '' ?>>Ja (Trailer)</option>
                   </select>
                 </div>
 

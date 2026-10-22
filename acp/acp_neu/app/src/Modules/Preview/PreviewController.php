@@ -58,19 +58,6 @@ final class PreviewController
         );
     }
 
-    public function moviesBlocked(): string
-    {
-        return $this->renderPlaceholder(
-            'bi-slash-circle',
-            'Content prüfen',
-            'Filme abgelehnt / gesperrt',
-            'Übersicht aller abgelehnten oder gesperrten Filme mit Ablehnungsgrund und Bearbeitungsstatus.',
-            'movies-blocked',
-            '/gesperrte-Filme',
-            'acp/includes/movies_blocked.php'
-        );
-    }
-
     public function aiCompliance(): string
     {
         return $this->renderPlaceholder(
@@ -85,73 +72,6 @@ final class PreviewController
     }
 
     // 3. Content Online (content_online)
-    public function moviesOnline(): string
-    {
-        return $this->renderPlaceholder(
-            'bi-collection-play-fill',
-            'Content Online',
-            'Filme online',
-            'Verwalte alle freigeschalteten und veröffentlichten Filme in der EroCloud.',
-            'movies-online',
-            '/Filme-online',
-            'acp/includes/movies_online.php'
-        );
-    }
-
-    public function movieEdit(): string
-    {
-        $id = abs((int)$this->request->get('id', 0));
-        return $this->renderPlaceholder(
-            'bi-pencil-square',
-            'Content Online',
-            'Film bearbeiten' . ($id > 0 ? ' (#' . $id . ')' : ''),
-            'Bearbeite Titel, Beschreibung, Kategorien, Vorschaubilder und Status eines veröffentlichten Films.',
-            'movie-edit' . ($id > 0 ? '?id=' . $id : ''),
-            '/Film-bearbeiten/' . ($id > 0 ? $id : ''),
-            'acp/includes/movie_edit.php'
-        );
-    }
-
-    public function moviesDrafts(): string
-    {
-        return $this->renderPlaceholder(
-            'bi-clock-history',
-            'Content Online',
-            'Filme in Planung',
-            'Übersicht aller angelegten Film-Entwürfe, die noch nicht zur Prüfung eingereicht wurden.',
-            'movies-drafts',
-            '/Filme-in-Planung',
-            'acp/includes/movies_drafts.php'
-        );
-    }
-
-    public function photoAlbumsOnline(): string
-    {
-        return $this->renderPlaceholder(
-            'bi-journal-album',
-            'Content Online',
-            'Fotoalben online',
-            'Verwalte alle freigeschalteten und veröffentlichten Fotoalben in der EroCloud.',
-            'photo-albums-online',
-            '/Fotoalben-online',
-            'acp/includes/photo_albums_online.php'
-        );
-    }
-
-    public function photoAlbumEdit(): string
-    {
-        $id = abs((int)$this->request->get('id', 0));
-        return $this->renderPlaceholder(
-            'bi-pencil-square',
-            'Content Online',
-            'Fotoalbum bearbeiten' . ($id > 0 ? ' (#' . $id . ')' : ''),
-            'Bearbeite Metadaten, Coverbilder und Einzelbilder eines veröffentlichten Fotoalbums.',
-            'photo-album-edit' . ($id > 0 ? '?id=' . $id : ''),
-            '/Fotoalbum-bearbeiten/' . ($id > 0 ? $id : ''),
-            'acp/includes/photo_album_edit.php'
-        );
-    }
-
     public function contentCleanup(): string
     {
         return $this->renderPlaceholder(

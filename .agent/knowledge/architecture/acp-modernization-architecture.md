@@ -103,3 +103,18 @@ acp/acp_neu/ (später: acp/)
 * **`App\Modules\PhotoAlbumsChecking` (`#/photo-albums-checking` & `#/photo-album-checking?id=...`):**
   * Fotoalben-Warteschlange mit KPI-Kacheln, Echtzeit-Filterung, FSK16/FSK18-Cover-Lightbox, BRAM-Textanalyse und 18+ ID-Shot-Status.
   * Einzelprüfung mit FSK16/FSK18-Cover-Großansicht, 1-Klick-Verifizierung für mitwirkende Personen (`CoActorManager`), interaktivem Einzelfoto-Grid (inkl. 1-Klick-Ablehnung einzelner Fotos per AJAX `photo-albums-checking/toggle-photo` & durchblätterbarer Galerie-Lightbox), Duplikat-Titel-Erkennung, Kategorie-Hervorhebung (aus Text & Darsteller-Profil), Freigabe (`photo-albums-checking/approve` inkl. `photo_albums_online`-Sync & `PointsSystem`) und Ablehnung (`photo-albums-checking/reject` inkl. Historie).
+
+---
+
+## 5. 📚 Module „Film-/Fotoalben-Gesamtübersicht“ (`MoviesOnline` & `PhotoAlbumsOnline`)
+
+* **Modulübergreifende Content-Switcher-Leiste (`MoviesOnlineController::getContentSwitcherCounts()`):**
+  * Verbindet alle 6 Content-Listen (`#/movies-online`, `#/movies-drafts`, `#/movies-blocked`, `#/movies-checking`, `#/photo-albums-online`, `#/photo-albums-checking`) mit Live-Zählern für nahtlosen 1-Klick-Wechsel.
+* **`App\Modules\MoviesOnline` (`MoviesOnlineController.php`):**
+  * **`#/movies-online` (`views/list.php`):** Gesamtübersicht aller veröffentlichten Filme (`movies_online`) inkl. 4 KPI-Kacheln, gecachter & per 1-Klick neu berechenbarer Speicherplatz-Anzeige (`POST ?route=movies-online/recalc-size`), Server-Suche, Status-/Kategorie-/Qualitäts-/Sprach-/BRAM-Filterung, Sortierung und Paginierung.
+  * **`#/movie-edit?id=...` (`views/edit.php`):** 5-Tab-Bearbeitungs-Cockpit (*1. Bearbeiten*, *2. BRAM & KI-Analyse*, *3. Audio & Transkript (.vtt)*, *4. Käufe & Zugriffe (`movies_access`)*, *5. Technische Details*) inkl. synchronem Speichern in `movies_online` + `movies`, `movie_checksum()`-Neuberechnung, Shop-Kategorien-Bereinigung bei Löschung und physischem Datei-Cleanup (`POST ?route=movies-online/save`).
+  * **`#/movies-drafts` (`views/drafts.php`):** Übersicht aller Filme in Planung (`released = '0' AND status != 'deleted'`) mit Konvertierungsstatus (`convert_status`), Ordnergröße und Echtzeit-Filterung.
+  * **`#/movies-blocked` (`views/blocked.php`):** Übersicht aller abgelehnten, gesperrten und gelöschten Filme (`convert_status > '1' AND (released = '2' OR status != 'active')`) inkl. letzter Ablehnungsbegründung aus `rejection_reason_movie_history`.
+* **`App\Modules\PhotoAlbumsOnline` (`PhotoAlbumsOnlineController.php`):**
+  * **`#/photo-albums-online` (`views/list.php`):** Gesamtübersicht aller veröffentlichten Fotoalben (`photo_albums_online`) inkl. 4 KPI-Kacheln, Speicherplatz-Neuberechnung (`POST ?route=photo-albums-online/recalc-size`), FSK16/FSK18-Cover-Lightbox, Live-BRAM-Badges, Aufruf-/Verkaufszahlen, Filterung, Sortierung und Paginierung.
+  * **`#/photo-album-edit?id=...` (`views/edit.php`):** Vollständiges Bearbeitungs-Cockpit für veröffentlichte Fotoalben inkl. FSK16/FSK18-Großansicht, 18+ Mitwirkenden-Prüfung (`CoActorManager`), interaktivem Einzelfoto-Grid (`photo_albums_photos`) mit 1-Klick-Foto-Sperre & Galerie-Lightbox, Duplikat-Titel-Prüfung, SEO-Editor und synchronem Speichern in `photo_albums_online` + `photo_albums` inkl. `photo_album_checksum()` (`POST ?route=photo-albums-online/save`).

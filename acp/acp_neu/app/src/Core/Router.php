@@ -97,7 +97,9 @@ class Router
     {
         $homeCtrl                = 'App\\Modules\\Home\\HomeController';
         $moviesCheckingCtrl      = 'App\\Modules\\MoviesChecking\\MoviesCheckingController';
+        $moviesOnlineCtrl        = 'App\\Modules\\MoviesOnline\\MoviesOnlineController';
         $photoAlbumsCheckingCtrl = 'App\\Modules\\PhotoAlbumsChecking\\PhotoAlbumsCheckingController';
+        $photoAlbumsOnlineCtrl   = 'App\\Modules\\PhotoAlbumsOnline\\PhotoAlbumsOnlineController';
         $previewCtrl             = 'App\\Modules\\Preview\\PreviewController';
 
         // 1. Startseite (Echtes Admin-Dashboard, Globale Schnellsuche, Notizen & Live-Counter)
@@ -113,27 +115,31 @@ class Router
         self::register('movie-checking', $moviesCheckingCtrl, 'detail', 'content_check');
         self::register('movies-checking/approve', $moviesCheckingCtrl, 'approve', 'content_check');
         self::register('movies-checking/reject', $moviesCheckingCtrl, 'reject', 'content_check');
-        self::register('movies-checking/co-actor-action', $moviesCheckingCtrl, 'coActorAction', 'content_check');
-        self::register('movies-checking/ai-action', $moviesCheckingCtrl, 'aiAction', 'content_check');
-        self::register('movies-checking/file-meta', $moviesCheckingCtrl, 'fileMeta', 'content_check');
+        self::register('movies-checking/co-actor-action', $moviesCheckingCtrl, 'coActorAction', 'content_check,content_online');
+        self::register('movies-checking/ai-action', $moviesCheckingCtrl, 'aiAction', 'content_check,content_online');
+        self::register('movies-checking/file-meta', $moviesCheckingCtrl, 'fileMeta', 'content_check,content_online');
 
         self::register('photo-albums-checking', $photoAlbumsCheckingCtrl, 'list', 'content_check');
         self::register('photo-album-checking', $photoAlbumsCheckingCtrl, 'detail', 'content_check');
-        self::register('photo-albums-checking/toggle-photo', $photoAlbumsCheckingCtrl, 'togglePhoto', 'content_check');
+        self::register('photo-albums-checking/toggle-photo', $photoAlbumsCheckingCtrl, 'togglePhoto', 'content_check,content_online');
         self::register('photo-albums-checking/approve', $photoAlbumsCheckingCtrl, 'approve', 'content_check');
         self::register('photo-albums-checking/reject', $photoAlbumsCheckingCtrl, 'reject', 'content_check');
-        self::register('photo-albums-checking/co-actor-action', $photoAlbumsCheckingCtrl, 'coActorAction', 'content_check');
+        self::register('photo-albums-checking/co-actor-action', $photoAlbumsCheckingCtrl, 'coActorAction', 'content_check,content_online');
 
         self::register('co-actors-checking', $previewCtrl, 'coActorsChecking', 'content_check');
-        self::register('movies-blocked', $previewCtrl, 'moviesBlocked', 'content_check');
+        self::register('movies-blocked', $moviesOnlineCtrl, 'blocked', 'content_check,content_online');
         self::register('ai-compliance', $previewCtrl, 'aiCompliance', 'content_check');
 
         // 3. Content Online (content_online)
-        self::register('movies-online', $previewCtrl, 'moviesOnline', 'content_online');
-        self::register('movie-edit', $previewCtrl, 'movieEdit', 'content_online');
-        self::register('movies-drafts', $previewCtrl, 'moviesDrafts', 'content_online');
-        self::register('photo-albums-online', $previewCtrl, 'photoAlbumsOnline', 'content_online');
-        self::register('photo-album-edit', $previewCtrl, 'photoAlbumEdit', 'content_online');
+        self::register('movies-online', $moviesOnlineCtrl, 'list', 'content_online');
+        self::register('movies-online/recalc-size', $moviesOnlineCtrl, 'recalcSize', 'content_online');
+        self::register('movie-edit', $moviesOnlineCtrl, 'edit', 'content_online');
+        self::register('movies-online/save', $moviesOnlineCtrl, 'save', 'content_online');
+        self::register('movies-drafts', $moviesOnlineCtrl, 'drafts', 'content_online');
+        self::register('photo-albums-online', $photoAlbumsOnlineCtrl, 'list', 'content_online');
+        self::register('photo-albums-online/recalc-size', $photoAlbumsOnlineCtrl, 'recalcSize', 'content_online');
+        self::register('photo-album-edit', $photoAlbumsOnlineCtrl, 'edit', 'content_online');
+        self::register('photo-albums-online/save', $photoAlbumsOnlineCtrl, 'save', 'content_online');
         self::register('content-cleanup', $previewCtrl, 'contentCleanup', 'content_online');
         self::register('storage-analytics', $previewCtrl, 'storageAnalytics', 'content_online');
 

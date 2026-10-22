@@ -1149,6 +1149,398 @@ const App = {
   },
 
   // ========================================================================
+  // 3c. Film- & Fotoalben-Gesamtübersicht (MoviesOnline & PhotoAlbumsOnline)
+  // ========================================================================
+  openLightbox(imgUrl, title = 'Bildvorschau') {
+    const existingModal = document.getElementById('mcImagePreviewModal');
+    if (existingModal) {
+      this.openImagePreviewModal(imgUrl, title);
+      return;
+    }
+
+    let modalEl = document.getElementById('ecGlobalLightboxModal');
+    if (!modalEl) {
+      modalEl = document.createElement('div');
+      modalEl.id = 'ecGlobalLightboxModal';
+      modalEl.className = 'modal fade';
+      modalEl.tabIndex = -1;
+      modalEl.setAttribute('aria-hidden', 'true');
+      modalEl.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+          <div class="modal-content" style="background: var(--kkc-card-bg); border: 1px solid var(--kkc-border);">
+            <div class="modal-header py-2 px-3">
+              <h5 class="modal-title h6 mb-0" id="ecGlobalLightboxTitle">Bildvorschau</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body p-2 text-center bg-dark">
+              <img src="" id="ecGlobalLightboxImg" alt="Vorschau" class="img-fluid rounded" style="max-height: 82vh;">
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modalEl);
+    }
+
+    const titleEl = document.getElementById('ecGlobalLightboxTitle');
+    const imgEl = document.getElementById('ecGlobalLightboxImg');
+    if (titleEl) titleEl.textContent = title;
+    if (imgEl) imgEl.src = imgUrl;
+
+    if (window.bootstrap?.Modal) {
+      window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  },
+
+  applyMoviesOnlineFilters(pageOverride) {
+    const q = (document.getElementById('mo-filter-q')?.value || '').trim();
+    const status = document.getElementById('mo-filter-status')?.value || 'all';
+    const cat = document.getElementById('mo-filter-cat')?.value || 'all';
+    const quality = document.getElementById('mo-filter-quality')?.value || 'all';
+    const lang = document.getElementById('mo-filter-lang')?.value || 'all';
+    const bram = document.getElementById('mo-filter-bram')?.value || 'all';
+    const sort = document.getElementById('mo-filter-sort')?.value || 'id_desc';
+    const perPage = document.getElementById('mo-filter-per-page')?.value || '100';
+    const page = pageOverride ? Number(pageOverride) : 1;
+
+    const params = new URLSearchParams();
+    if (q !== '') params.set('q', q);
+    if (status !== 'all') params.set('status', status);
+    if (cat !== 'all') params.set('cat', cat);
+    if (quality !== 'all') params.set('quality', quality);
+    if (lang !== 'all') params.set('lang', lang);
+    if (bram !== 'all') params.set('bram', bram);
+    if (sort !== 'id_desc') params.set('sort', sort);
+    if (perPage !== '100') params.set('per_page', perPage);
+    if (page > 1) params.set('page', String(page));
+
+    const qs = params.toString();
+    const targetHash = `#/movies-online${qs ? '?' + qs : ''}`;
+    if (window.location.hash === targetHash) {
+      this.handleRoute();
+    } else {
+      window.location.hash = targetHash;
+    }
+  },
+
+  resetMoviesOnlineFilters() {
+    window.location.hash = '#/movies-online';
+  },
+
+  goToMoviesOnlinePage(page) {
+    this.applyMoviesOnlineFilters(page);
+  },
+
+  quickFilterMoviesOnlineTable(query) {
+    const q = String(query || '').trim().toLowerCase();
+    document.querySelectorAll('.mo-movie-row').forEach(row => {
+      const hay = row.getAttribute('data-search') || '';
+      row.classList.toggle('d-none', q !== '' && !hay.includes(q));
+    });
+  },
+
+  async recalcOnlineMoviesSize() {
+    const btn = document.getElementById('mo-recalc-size-btn');
+    const sizeTextEl = document.getElementById('mo-storage-size-text');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Berechne...';
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('_csrf', this.csrfToken);
+
+      const res = await fetch(`${this.basePath}/api.php?route=movies-online/recalc-size`, {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': this.csrfToken },
+        body: formData
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.status !== 'ok') {
+        this.toast(data.message || 'Speicherplatz konnte nicht berechnet werden.', 'danger');
+        return;
+      }
+
+      this.resetLogoutCountdown();
+      if (sizeTextEl && data.formatted) {
+        sizeTextEl.textContent = data.formatted;
+      }
+      this.toast(data.message || 'Speicherplatz der Online-Filme neu berechnet.', 'success');
+    } catch (err) {
+      this.toast('Verbindungsfehler: ' + err.message, 'danger');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-hdd-stack me-1"></i> Speichergröße neu berechnen';
+      }
+    }
+  },
+
+  async submitMovieOnlineSave(event) {
+    if (event) event.preventDefault();
+    const form = document.getElementById('movie-online-save-form');
+    const btn = document.getElementById('me-save-btn');
+    if (!form) return false;
+
+    const statusSel = form.querySelector('select[name="movie_status"]');
+    if (statusSel && statusSel.value === 'deleted') {
+      const ok = window.confirm('Möchtest du diesen Film wirklich auf „Gelöscht“ setzen? Alle Videodateien auf dem Server werden unwiderruflich gelöscht und der Film wird aus movies_online entfernt!');
+      if (!ok) return false;
+    }
+
+    const formData = new FormData(form);
+    formData.append('_csrf', this.csrfToken);
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Speichere Änderungen...';
+    }
+
+    try {
+      const res = await fetch(`${this.basePath}/api.php?route=movies-online/save`, {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': this.csrfToken },
+        body: formData
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.status !== 'ok') {
+        this.toast(data.message || 'Änderungen konnten nicht gespeichert werden.', 'danger');
+        return false;
+      }
+
+      this.resetLogoutCountdown();
+      this.toast(data.message || 'Änderungen am Online-Film wurden erfolgreich gespeichert.', 'success');
+      this.refreshSidebarCounts();
+
+      if (data.deleted) {
+        window.location.hash = '#/movies-online';
+      } else {
+        this.handleRoute();
+      }
+    } catch (err) {
+      this.toast('Verbindungsfehler: ' + err.message, 'danger');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Änderungen an Online-Film speichern';
+      }
+    }
+    return false;
+  },
+
+  filterMoviePurchasesTable(query) {
+    const q = String(query || '').trim().toLowerCase();
+    document.querySelectorAll('.me-purchase-row').forEach(row => {
+      const hay = row.getAttribute('data-search') || '';
+      row.classList.toggle('d-none', q !== '' && !hay.includes(q));
+    });
+  },
+
+  setMoviesDraftsFilter(filterKey, btnEl) {
+    this.moviesDraftsFilter = filterKey || 'all';
+    if (btnEl && btnEl.parentElement) {
+      btnEl.parentElement.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+      btnEl.classList.add('active');
+    }
+    this.filterMoviesDraftsList();
+  },
+
+  filterMoviesDraftsList() {
+    const q = (document.getElementById('md-search-input')?.value || '').trim().toLowerCase();
+    const filter = this.moviesDraftsFilter || 'all';
+    let visible = 0;
+
+    document.querySelectorAll('.md-draft-row').forEach(row => {
+      const hay = row.getAttribute('data-search') || '';
+      const conv = parseInt(row.getAttribute('data-conv') || '0', 10);
+      const isChecked = row.getAttribute('data-checked') === '1';
+
+      let passFilter = true;
+      if (filter === 'ready') passFilter = (conv === 2);
+      else if (filter === 'converting') passFilter = (conv < 2);
+      else if (filter === 'error') passFilter = (conv > 2);
+      else if (filter === 'checked') passFilter = isChecked;
+
+      const passSearch = (q === '' || hay.includes(q));
+      const show = passFilter && passSearch;
+      row.classList.toggle('d-none', !show);
+      if (show) visible++;
+    });
+
+    const cntEl = document.getElementById('md-visible-cnt');
+    if (cntEl) cntEl.textContent = String(visible);
+  },
+
+  setMoviesBlockedFilter(filterKey, btnEl) {
+    this.moviesBlockedFilter = filterKey || 'all';
+    if (btnEl && btnEl.parentElement) {
+      btnEl.parentElement.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+      btnEl.classList.add('active');
+    }
+    this.filterMoviesBlockedList();
+  },
+
+  filterMoviesBlockedList() {
+    const q = (document.getElementById('mb-search-input')?.value || '').trim().toLowerCase();
+    const filter = this.moviesBlockedFilter || 'all';
+    let visible = 0;
+
+    document.querySelectorAll('.mb-blocked-row').forEach(row => {
+      const hay = row.getAttribute('data-search') || '';
+      const released = parseInt(row.getAttribute('data-released') || '0', 10);
+      const status = row.getAttribute('data-status') || '';
+
+      let passFilter = true;
+      if (filter === 'rejected') passFilter = (released === 2);
+      else if (filter === 'blocked') passFilter = (status === 'blocked');
+      else if (filter === 'deleted') passFilter = (status === 'deleted');
+
+      const passSearch = (q === '' || hay.includes(q));
+      const show = passFilter && passSearch;
+      row.classList.toggle('d-none', !show);
+      if (show) visible++;
+    });
+
+    const cntEl = document.getElementById('mb-visible-cnt');
+    if (cntEl) cntEl.textContent = String(visible);
+  },
+
+  applyPhotoAlbumsOnlineFilters(pageOverride) {
+    const q = (document.getElementById('pao-filter-q')?.value || '').trim();
+    const status = document.getElementById('pao-filter-status')?.value || 'all';
+    const cat = document.getElementById('pao-filter-cat')?.value || 'all';
+    const sort = document.getElementById('pao-filter-sort')?.value || 'id_desc';
+    const perPage = document.getElementById('pao-filter-per-page')?.value || '100';
+    const page = pageOverride ? Number(pageOverride) : 1;
+
+    const params = new URLSearchParams();
+    if (q !== '') params.set('q', q);
+    if (status !== 'all') params.set('status', status);
+    if (cat !== 'all') params.set('cat', cat);
+    if (sort !== 'id_desc') params.set('sort', sort);
+    if (perPage !== '100') params.set('per_page', perPage);
+    if (page > 1) params.set('page', String(page));
+
+    const qs = params.toString();
+    const targetHash = `#/photo-albums-online${qs ? '?' + qs : ''}`;
+    if (window.location.hash === targetHash) {
+      this.handleRoute();
+    } else {
+      window.location.hash = targetHash;
+    }
+  },
+
+  resetPhotoAlbumsOnlineFilters() {
+    window.location.hash = '#/photo-albums-online';
+  },
+
+  goToPhotoAlbumsOnlinePage(page) {
+    this.applyPhotoAlbumsOnlineFilters(page);
+  },
+
+  quickFilterPhotoAlbumsOnlineTable(query) {
+    const q = String(query || '').trim().toLowerCase();
+    document.querySelectorAll('.pao-album-row').forEach(row => {
+      const hay = row.getAttribute('data-search') || '';
+      row.classList.toggle('d-none', q !== '' && !hay.includes(q));
+    });
+  },
+
+  async recalcOnlineAlbumsSize() {
+    const btn = document.getElementById('pao-recalc-size-btn');
+    const sizeTextEl = document.getElementById('pao-storage-size-text');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Berechne...';
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('_csrf', this.csrfToken);
+
+      const res = await fetch(`${this.basePath}/api.php?route=photo-albums-online/recalc-size`, {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': this.csrfToken },
+        body: formData
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.status !== 'ok') {
+        this.toast(data.message || 'Speicherplatz konnte nicht berechnet werden.', 'danger');
+        return;
+      }
+
+      this.resetLogoutCountdown();
+      if (sizeTextEl && data.formatted) {
+        sizeTextEl.textContent = data.formatted;
+      }
+      this.toast(data.message || 'Speicherplatz der Online-Fotoalben neu berechnet.', 'success');
+    } catch (err) {
+      this.toast('Verbindungsfehler: ' + err.message, 'danger');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-hdd-stack me-1"></i> Speichergröße neu berechnen';
+      }
+    }
+  },
+
+  async submitPhotoAlbumOnlineSave(event) {
+    if (event) event.preventDefault();
+    const form = document.getElementById('pao-edit-form');
+    const btn = document.getElementById('pao-save-btn');
+    if (!form) return false;
+
+    const statusSel = document.getElementById('pao-status-select');
+    if (statusSel && statusSel.value === 'deleted') {
+      const ok = window.confirm('Möchtest du dieses Fotoalbum wirklich auf „Löschen“ setzen? Alle Bilddateien auf dem Server werden unwiderruflich gelöscht und das Album wird aus photo_albums_online entfernt!');
+      if (!ok) return false;
+    }
+
+    const formData = new FormData(form);
+    formData.append('_csrf', this.csrfToken);
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Speichere Änderungen...';
+    }
+
+    try {
+      const res = await fetch(`${this.basePath}/api.php?route=photo-albums-online/save`, {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': this.csrfToken },
+        body: formData
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.status !== 'ok') {
+        this.toast(data.message || 'Änderungen konnten nicht gespeichert werden.', 'danger');
+        return false;
+      }
+
+      this.resetLogoutCountdown();
+      this.toast(data.message || 'Änderungen am Online-Fotoalbum wurden erfolgreich gespeichert.', 'success');
+      this.refreshSidebarCounts();
+
+      if (data.deleted) {
+        window.location.hash = '#/photo-albums-online';
+      } else {
+        this.handleRoute();
+      }
+    } catch (err) {
+      this.toast('Verbindungsfehler: ' + err.message, 'danger');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-floppy-fill me-1"></i> Änderungen speichern';
+      }
+    }
+    return false;
+  },
+
+  // ========================================================================
   // 4. Dashboard: Gemeinsame Notizen & Persönliche Notizen (AJAX)
   // ========================================================================
   async adminNotesAction(action) {
