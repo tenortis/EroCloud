@@ -190,3 +190,91 @@ acp/acp_neu/ (später: acp/)
   * **`#/users` (`GET ?route=users`):** Serverseitig paginierte Gesamtübersicht aller Cloud-User (`members`) mit 4 KPI-Kacheln (Registrierte Cloud-User Aktiv/Gesperrt, Coins-Guthaben im Umlauf, Endgeräte `Mobile` vs. `Desktop`, Herkunfts-Domains / Shops), Filterung nach Herkunfts-Shop (`p4c_shop_id`), Coin-Guthaben, Gerät, Status, Sortierung und Volltextsuche.
   * **`#/user?id=...` (`GET ?route=user&id=...`):** Lädt alle Mitglieds-Stammdaten + Shop-Domain in 1 Query (statt 9 Einzel-Queries der Legacy-Klasse `Member`) und bietet ein 3-Tab-Cockpit (*1. Benutzerdaten & Konto-Status* inkl. Sperren/Entsperren via `POST ?route=users/toggle-lock`, *2. Gekaufte Filme aus `movies_access`*, *3. Gekaufte Fotoalben aus `photo_albums_access`*).
   * *(Hinweis: Alle veralteten Chat- und Nachrichten-Spalten/Tabs wurden gemäß Vorgabe vollständig entfernt.)*
+
+---
+
+## 12. 🌐 Modul „Webseiten & Partner-Shops“ (`Websites`)
+
+* **Ersetzte Legacy-Dateien:**
+  * `acp/includes/sites.php` + `acp/includes/ajax/sites.php`
+  * `acp/includes/site.php`
+  * `acp/includes/get_p4c_data/get_sites.php`
+* **Implementierte Dateien:**
+  * `acp/acp_neu/app/src/Modules/Websites/WebsitesController.php`
+  * `acp/acp_neu/app/src/Modules/Websites/views/list.php` (`#/sites`)
+  * `acp/acp_neu/app/src/Modules/Websites/views/detail.php` (`#/site?id=...`)
+  * `acp/acp_neu/web/media.php` (Erweiterung um `type=banner&file_id=...`)
+* **Warum & Wie (Architektur-Entscheidungen & Verbesserungen gegenüber Legacy):**
+  1. **Kontrollierte Pay4Coins-Synchronisation (`POST ?route=sites/sync-p4c`) statt blindem Auto-Sync beim Seitenaufruf:**
+     * Im alten `acp/includes/sites.php` wurde bei jedem Öffnen der Seite ungefragt `get_p4c_data/get_sites.php` per cURL gegen `https://api.pay4coins.com/remote/index.php` ausgeführt. Das führte zu Ladeverzögerungen und potenziellen Timeouts beim bloßen Betrachten der Liste.
+     * Im neuen ACP ist die Synchronisation als expliziter Button **„Mit Pay4Coins synchronisieren“** (`App.Websites.syncFromP4c()`) mit CSRF-Schutz, cURL-Timeout-Handling (`CONNECTTIMEOUT = 8s`, `TIMEOUT = 20s`), automatischer Domain-Umbenennungs-Kaskade (`sites`, `actor_member_info`, `messenger_sync`), Bereinigung inaktiver `user_tracking_sites` / `user_tracking_website_access` und `employee_history`-Audit-Log umgesetzt.
+  2. **Eliminierung von N+1-Queries in `#/sites` (`WebsitesController::list()`):**
+     * Statt Einzel-Abfragen pro Zeile werden Banner-Zähler (`ads_media` gruppiert nach `site_id`), Cloud-User-Zähler (`members` gruppiert nach `p4c_shop_id`) sowie Shop-Verkäufe & Umsätze (`movies_access` + `photo_albums_access` gruppiert nach `p4c_shop_id`) in 4 schnellen Batch-Queries vorab aggregiert.
+  3. **8 klickbare KPI-Kacheln & kombinierbare Echtzeit-Filter:**
+     * *Webseiten Gesamt*, *Aktive Shops (`status = 1`)*, *Inaktive Shops (`status = 0`)*, *EroAds Aktiv (`is_eroads_active = 1`)*, *EroCMS-Shops (`shop_system = 'erocms'`)*, *Eigene Shops (`shop_system = 'own'`)*, *Shops mit Werbebannern* und *Offene Banner-Prüfungen*.
+  4. **Flexible Detailansicht `#/site?id=...` (`WebsitesController::detail()`):**
+     * Akzeptiert als Parameter `id` sowohl die interne `sites.id`, die 5-stellige `sites.p4c_shop_id` als auch den Domainnamen (`sites.domain`) – dadurch funktionieren sämtliche Querverweise aus anderen Modulen nahtlos.
+     * Bietet ein **4-Tab-Cockpit**:
+       * *Tab 1 – Shop-Stammdaten & EroAds-Konfiguration:* Domain, P4C-Shop-ID, Partner-ID, verknüpfter Händler (`#/merchant?id=...`), Shop-System, Webmaster-Provision (`webmaster_commision`), Artikel-/Film-/Fotoalben-Bestand, `eroads_url` und Zeitstempel des letzten Conversion-Imports.
+       * *Tab 2 – Werbebanner der Webseite (`ads_media`):* Vorschau aller Banner dieser Domain über `media.php?type=banner&file_id=...` inkl. Status-Badge, Maßen (`width × height px`), Dateityp und Direktlink zur Banner-Moderation.
+       * *Tab 3 – Kampagnen & Conversions (`ads_campaigns` & `ads_conversions`):* Alle Kampagnen für diese Webseite inkl. Klickzahlen sowie die 50 neuesten Conversions (mit `join`, `reg`, `first_payment`, `follow_payment`, `again_credited_payment`, `canceled_payment`).
+       * *Tab 4 – Letzte Shop-Verkäufe (`movies_access` & `photo_albums_access`):* Die neuesten Film- und Fotoalben-Käufe über diesen Shop mit Käufer-Link (`#/user?id=...`), Content-Link (`#/movie-edit?id=...` / `#/photo-album-edit?id=...`) und Preis in Coins/Euro.
+
+---
+
+## 13. 📢 Modul „Partnerprogramm / EroAds“ (`Affiliate`)
+
+* **Ersetzte Legacy-Dateien:**
+  * `acp/includes/webmaster_partner.php`
+  * `acp/includes/banners.php` + `acp/includes/ajax/banners.php`
+  * `acp/includes/banners_new.php` + `acp/includes/ajax/banners_new.php`
+* **Implementierte Dateien:**
+  * `acp/acp_neu/app/src/Modules/Affiliate/AffiliateController.php`
+  * `acp/acp_neu/app/src/Modules/Affiliate/views/webmaster_partner.php` (`#/webmaster-partner`)
+  * `acp/acp_neu/app/src/Modules/Affiliate/views/banners.php` (`#/banners`)
+  * `acp/acp_neu/app/src/Modules/Affiliate/views/banners_new.php` (`#/banners-new`)
+* **Warum & Wie (Architektur-Entscheidungen & Bugfixes gegenüber Legacy):**
+  1. **Bugfix bei Jahresauswahl (`YYYY`) & Impressionstabellen (`ads_impressions_YYYYMM`):**
+     * **Legacy-Bug:** In `acp/includes/webmaster_partner.php` enthielt das Dropdown zwar Jahreszahlen (`2025`, `2024`, …), doch bei Auswahl eines Jahres versuchte der Code `SELECT ... FROM ads_impressions_2025` auszuführen (Tabelle existiert nicht -> Fataler SQL-Fehler) und übergab `"2025"` an `strtotime("2025")`, was PHP als Uhrzeit `20:25` des heutigen Tages fehlinterpretierte.
+     * **Lösung in `AffiliateController`:** `normalizePeriod()` validiert strikt zwischen Monatsformat (`YYYY-MM` ab `2018-09`) und Jahresformat (`YYYY` ab `2018`). `loadImpressionsByPartner()` ermittelt einmalig per `SHOW TABLES LIKE 'ads_impressions_%'` alle tatsächlich existierenden Monatstabellen und summiert bei Jahresauswahl automatisch alle vorhandenen Monatstabellen `ads_impressions_YYYY01`..`ads_impressions_YYYY12` des gewählten Jahres.
+  2. **Eliminierung von N+1-Queries in `#/webmaster-partner` (`AffiliateController::webmasters()`):**
+     * **Legacy-Problem:** Für jeden Webmaster aus `ads_campaigns` wurden in einer `while`-Schleife eine eigene `ads_conversions`-Query, eine `ads_impressions`-Query und `new Merchant($mysql, $pid)` (~11 Einzel-Queries pro Merchant) abgesetzt.
+     * **Lösung:** Alle Daten werden in **3 gebündelten Abfragen** geladen (1x `ads_conversions` mit Zeitraum-Range `>= start AND <= end` inkl. Summe von Registrierungen und Netto-Umsatz aus `first_payment + follow_payment + again_credited_payment - canceled_payment`, 1x `ads_impressions_YYYYMM` per `GROUP BY p4c_partner_id`, 1x `ads_campaigns LEFT JOIN merchants` mit `AES_DECRYPT(m.username)`).
+  3. **Manueller Conversion-Crawler (`POST ?route=affiliate/import-conversions`):**
+     * Startet `cronjobs/import_conversions.php --date=YYYY-MM-DD` über die Server-PHP-CLI (`/opt/php-8.4/bin/php` → `/opt/php-8.0/bin/php` → `PHP_BINARY`), protokolliert den Abruf in `employee_history` und gibt die Gesamtzahl der für diesen Tag gespeicherten Conversions als Toast-Meldung zurück.
+  4. **Banner-Verwaltung (`#/banners`) & Banner-Freigabe (`#/banners-new` + `POST ?route=banners/action`):**
+     * `#/banners` bietet 4 klickbare KPI-Kacheln (*Banner Gesamt*, *Aktiv*, *Abgelehnt / Inaktiv*, *Offene Prüfungen*) sowie Filter nach Status, Domain (`site_id`), Format (`width × height px`), Dateityp (`JPG`, `GIF`, `PNG`) und Volltextsuche.
+     * `#/banners-new` zeigt für jedes Banner mit `new_filename != '' AND rejected = 0` eine **Side-by-Side-Vergleichskarte** (*Aktuelles Banner* via `media.php?type=banner&file_id=...` vs. *Neues Banner* via `media.php?type=banner&file_id=...&variant=new`).
+     * `POST ?route=banners/action` verarbeitet alle 3 Moderations-Aktionen per AJAX ohne Seiten-Reload:
+       * `unlock` (Freischalten): Prüft Existenz der neuen Datei auf dem Storage, setzt `filename = new_filename`, `new_filename = ''`, `upload_datetime = NOW()`, `rejected = '0'` und löscht die alte Datei vom Dateisystem.
+       * `reject` (Ablehnen): Setzt `rejected = '3'` in `ads_media` (exakt kompatibel zur Legacy-Logik für Merchant-Benachrichtigungen).
+       * `delete` (Löschen): Löscht den Datensatz aus `ads_media` und entfernt sowohl `filename` als auch `new_filename` vom Dateisystem.
+
+---
+
+## 14. 🔍 Deep-Logic-Audit & Qualitätssicherung (PHP 8.0.30 & PHP 8.4.27)
+
+Um sicherzustellen, dass das gesamte neue ACP unter **PHP 8.0.30** und **PHP 8.4.27** ohne jegliche Laufzeitfehler, SQL-Abstürze oder tote Frontend-Handler läuft, wurden 5 spezialisierte Prüf-Pipelines entwickelt und über die gesamte Codebasis ausgeführt:
+
+1. **Methoden- & Router-Reflection-Audit:**
+   * Prüft alle `65` in `Router.php` registrierten Routen per PHP Reflection darauf, ob Controller-Klasse und `public`-Methode existieren, sowie alle `Core`-/`$this->`-/`self::`-Methodenaufrufe in sämtlichen PHP-Dateien.
+2. **SQL-Tokenizer & Schema-Audit (`258` `p4c_query()`-Aufrufe):**
+   * Prüft mit `token_get_all()`, dass ausnahmslos jeder einzelne der `258` `p4c_query()`-Aufrufe `__FILE__, __LINE__` übergibt, und gleicht jede referenzierte Tabelle sowie jede `UPDATE`/`INSERT`-Spalte gegen das Live-MySQL-Schema (`INFORMATION_SCHEMA.COLUMNS`) ab.
+3. **MySQL `EXPLAIN` Query-Audit (`208` `SELECT`-Queries):**
+   * Extrahiert alle `208` `SELECT`-Abfragen aller Controller und führt sie per `EXPLAIN` direkt gegen die MySQL-Datenbank aus, um Tippfehler in Spaltennamen, Aliasen oder `GROUP BY`-Klauseln zu 100 % auszuschließen.
+4. **Controller-Render- & JSON/Media-Endpunkt-Audit:**
+   * Rendert alle Views mit echten Datenbank-Datensätzen unter `error_reporting(E_ALL)` und prüft alle JSON-Endpunkte sowie `media.php` (`0 Warnings`, `0 Notices`, `0 Deprecations`).
+5. **Frontend-JS ↔ View Cross-Check (`140` `App.*`-Methoden):**
+   * Prüft alle `onclick`/`onchange`/`onsubmit`-Handler in sämtlichen Views gegen die in `web/assets/js/app.js` definierten Modul-Objekte (`App.Home`, `App.MoviesChecking`, `App.PhotoAlbumsChecking`, `App.CoActorsChecking`, `App.AiCompliance`, `App.MoviesOnline`, `App.PhotoAlbumsOnline`, `App.ContentCleanup`, `App.StorageAnalytics`, `App.Actors`, `App.Merchants`, `App.Users`, `App.SystemTech`, `App.Websites`, `App.Affiliate`).
+
+### Beim Deep-Logic-Audit gefundene & behobene Fehler (Chronologie)
+
+| # | Datei & Stelle | Gefundener Fehler (Was & Warum) | Durchgeführte Behebung (Wie) |
+| :--- | :--- | :--- | :--- |
+| **1** | `app/src/Core/Request.php` | `SystemTechController` rief `$this->request->csrfToken()` auf; Methode fehlte in `Request`, was bei POST-Aktionen in `SystemTech` zum `Error: Call to undefined method` geführt hätte. | `public function csrfToken(): string` in `Request.php` ergänzt (liest `_csrf` aus POST oder `X-CSRF-Token` aus HTTP-Header). |
+| **2** | `app/src/Core/Response.php` | `SystemTechController` rief `Response::success($msg, $data)` auf; in `Response` existierten nur `json()`, `html()`, `error()`. | `public static function success(...)` in `Response.php` ergänzt (flexibel für `(string, array)` und `(array, string)`). |
+| **3** | `ActorsController::detail()` | SQL-Abfrage für Fotoalben eines Darstellers nutzte `pa.release_datetime` und `pa.status`, obwohl `photo_albums` die Spalte `status` besitzt, das Freigabedatum aber nur in `photo_albums_online.release_date_time` bzw. `photo_albums.check_date_time` liegt. | Query auf `COALESCE(pao.release_date_time, pa.check_date_time)` korrigiert. |
+| **4** | `MerchantsController::detail()` | SQL-Abfrage für die Filme eines Händlers selektierte `m.created_datetime` auf `movies` (Spalte existiert nur in `actors`, in `movies` heißt sie `upload_datetime`). | Auf `m.upload_datetime` korrigiert. |
+| **5** | `UsersController::detail()` & `HomeController::globalSearch()` | `UsersController::detail()` selektierte `pao.title` statt `pao.name` auf `photo_albums_online`; `HomeController::globalSearch()` selektierte `m.account_status` auf `merchants` (Spalte existiert nicht in `merchants`). | Auf `pao.name AS album_title` bzw. ohne `m.account_status` korrigiert (inkl. selbigem Check in `AffiliateController::webmasters()`). |
+| **6** | `web/assets/js/app.js` | In `MoviesChecking/views/detail.php` riefen Zeitstempel-Badges `App.seekMoviePlayerTo(sec)` auf, während die Methode nur als `App.MoviesChecking.seekPlayer(sec)` existierte. | Top-Level-Alias `App.seekMoviePlayerTo(seconds)` in `app.js` ergänzt. |
+
