@@ -118,6 +118,12 @@ acp/acp_neu/ (später: acp/)
 * **`App\Modules\PhotoAlbumsOnline` (`PhotoAlbumsOnlineController.php`):**
   * **`#/photo-albums-online` (`views/list.php`):** Gesamtübersicht aller veröffentlichten Fotoalben (`photo_albums_online`) inkl. 4 KPI-Kacheln, Speicherplatz-Neuberechnung (`POST ?route=photo-albums-online/recalc-size`), FSK16/FSK18-Cover-Lightbox, Live-BRAM-Badges, Aufruf-/Verkaufszahlen, Filterung, Sortierung und Paginierung.
   * **`#/photo-album-edit?id=...` (`views/edit.php`):** Vollständiges Bearbeitungs-Cockpit für veröffentlichte Fotoalben inkl. FSK16/FSK18-Großansicht, 18+ Mitwirkenden-Prüfung (`CoActorManager`), interaktivem Einzelfoto-Grid (`photo_albums_photos`) mit 1-Klick-Foto-Sperre & Galerie-Lightbox, Duplikat-Titel-Prüfung, SEO-Editor und synchronem Speichern in `photo_albums_online` + `photo_albums` inkl. `photo_album_checksum()` (`POST ?route=photo-albums-online/save`).
+* **`App\Modules\ContentCleanup` (`ContentCleanupController.php` & `views/index.php`):**
+  * **`#/content-cleanup` (`GET ?route=content-cleanup`):** 3-Tab-Cockpit für die 5-Regel-Bereinigungs-Simulation (`rule_1`..`rule_5`), die Lösch-Historie (`movies_deleted`) sowie den Cloud-Storage-Dateileichen-Scanner (`GET ?route=content-cleanup/orphan-scan`).
+  * **N+1-Query-Eliminierung:** Aggregiert `movies_access`, `movies_online` und `actors` in 3 gebündelten Batch-Abfragen statt einzelner Schleifen-Queries.
+* **`App\Modules\StorageAnalytics` (`StorageAnalyticsController.php` & `views/index.php`):**
+  * **`#/storage-analytics` (`GET ?route=storage-analytics` & `GET ?route=storage-analytics/scan`):** 3-Tab-Analyse-Cockpit für Cloud-Storage-Belegung, Dateiformat-Aufschlüsselung, 6-Monats-Streaming-/Download-Traffic (`movies_access` mit 1x Basis & 2x Praxis-Faktor) und Cloud-Provider-Kostenkalkulation (Backblaze B2, OVHcloud, Wasabi, Bunny.net).
+  * **7-Stufen-Sicherheitsbereinigung (`GET/POST ?route=storage-analytics/legacy-cleanup`):** Unterstützt die Einzel-Video-Vorschau (`action=preview`), die bestätigte Einzel-Löschung (`action=delete_single`) und die kontrollierte Stapel-Bereinigung (`action=delete_batch`) veralteter Mobil-Dateien (`m_*.mp4`, `m_*.webm`, `m_*.ogv`) mit Nachprüfung der Desktop-MP4-Hauptdatei und automatischem Not-Aus-Schutz.
 
 ---
 

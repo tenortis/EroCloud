@@ -3245,6 +3245,546 @@ const App = {
         App.toast('Netzwerkfehler beim Einreihen der Filme.', 'danger');
       }
     }
+  },
+
+  // ========================================================================
+  // 9. Content-Bereinigung & Dateileichen-Suche (#/content-cleanup)
+  // ========================================================================
+  ContentCleanup: {
+    currentPreviewRule: 'all',
+
+    filterPreview(rule, btnEl) {
+      this.currentPreviewRule = rule || 'all';
+      document.querySelectorAll('.cc-filter-pill').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      if (btnEl) {
+        btnEl.classList.add('active');
+      }
+      this.applyPreviewFilter();
+    },
+
+    applyPreviewFilter() {
+      const rule = this.currentPreviewRule || 'all';
+      const q = (document.getElementById('cc-preview-search')?.value || '').trim().toLowerCase();
+      document.querySelectorAll('.cc-preview-row').forEach(row => {
+        const rowRule = row.getAttribute('data-rule') || '';
+        const isImmediate = row.getAttribute('data-immediate') === '1';
+        const haystack = row.getAttribute('data-search') || '';
+        const matchesRule = (rule === 'all') || (rule === 'immediate' && isImmediate) || (rowRule === rule);
+        const matchesSearch = (q === '') || haystack.includes(q);
+        row.style.display = (matchesRule && matchesSearch) ? '' : 'none';
+      });
+    },
+
+    filterHistory(query) {
+      const q = String(query ?? document.getElementById('cc-history-search')?.value ?? '').trim().toLowerCase();
+      document.querySelectorAll('.cc-history-row').forEach(row => {
+        const haystack = row.getAttribute('data-search') || '';
+        row.style.display = (q === '' || haystack.includes(q)) ? '' : 'none';
+      });
+    },
+
+    async runOrphanScan() {
+      const initBox = document.getElementById('cc-orphan-init-box');
+      const loadingBox = document.getElementById('cc-orphan-loading');
+      const resultBox = document.getElementById('cc-orphan-result-box');
+      const localMsg = document.getElementById('cc-orphan-local-msg');
+      const tbody = document.getElementById('cc-tbody-orphans');
+
+      if (initBox) initBox.style.display = 'none';
+      if (resultBox) resultBox.style.display = 'none';
+      if (loadingBox) loadingBox.style.display = '';
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=content-cleanup/orphan-scan`, {
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          }
+        });
+        const data = await res.json();
+
+        if (loadingBox) loadingBox.style.display = 'none';
+
+        if (!res.ok || !data || (data.status !== 'success' && data.status !== 'ok')) {
+          if (initBox) initBox.style.display = '';
+          App.toast(data?.message || 'Fehler beim Dateileichen-Scan.', 'danger');
+          return;
+        }
+
+        if (resultBox) resultBox.style.display = '';
+
+        if (localMsg) {
+          if (data.is_local_missing && data.message) {
+            localMsg.style.display = '';
+            localMsg.innerHTML = `<i class="bi bi-info-circle-fill me-1"></i>${App.escapeHtml(data.message)}`;
+          } else {
+            localMsg.style.display = 'none';
+          }
+        }
+
+        const setTxt = (id, val) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = String(val ?? '');
+        };
+
+        setTxt('cc-orphan-stat-count', `${data.total_count || 0} Objekte`);
+        setTxt('cc-orphan-stat-size', data.total_size_formatted || '0 Bytes');
+        setTxt('cc-orphan-stat-time', `${data.duration_ms || 0} ms`);
+
+        const items = data.data || [];
+        if (tbody) {
+          if (!items.length) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-success fw-semibold">&#x2705; Hervorragend! Es wurden keine verwaisten Verzeichnisse oder Dateileichen im Cloud-Speicher gefunden.</td></tr>';
+          } else {
+            tbody.innerHTML = items.map(it => {
+              const searchStr = `${it.path || ''} ${it.type || ''} ${it.reason || ''}`.toLowerCase();
+              return `<tr class="cc-orphan-row" data-search="${App.escapeHtml(searchStr)}">
+                <td><code class="small">${App.escapeHtml(it.path)}</code></td>
+                <td><span class="badge bg-secondary">${App.escapeHtml(it.type)}</span></td>
+                <td>${App.escapeHtml(it.reason)}</td>
+                <td class="fw-bold text-danger font-monospace">${App.escapeHtml(it.size_formatted)}</td>
+              </tr>`;
+            }).join('');
+          }
+        }
+      } catch (err) {
+        if (loadingBox) loadingBox.style.display = 'none';
+        if (initBox) initBox.style.display = '';
+        App.toast('Netzwerkfehler beim Dateileichen-Scan: ' + err.message, 'danger');
+      }
+    },
+
+    filterOrphans(query) {
+      const q = String(query ?? '').trim().toLowerCase();
+      document.querySelectorAll('.cc-orphan-row').forEach(row => {
+        const haystack = row.getAttribute('data-search') || '';
+        row.style.display = (q === '' || haystack.includes(q)) ? '' : 'none';
+      });
+    }
+  },
+
+  // ========================================================================
+  // 10. Speicher & Traffic + Legacy m_* Bereinigung (#/storage-analytics)
+  // ========================================================================
+  StorageAnalytics: {
+    currentSkip: 0,
+    currentPreviewMovie: null,
+    batchAutoRunning: false,
+    batchStopRequested: false,
+    batchCursorMovieId: 0,
+    batchTotalCleanedMovies: 0,
+    batchTotalDeletedFiles: 0,
+    batchTotalFreedBytes: 0,
+    batchTotalScanned: 0,
+    batchTotalAlreadyClean: 0,
+    batchTotalSkipped: 0,
+
+    setText(id, val) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = String(val ?? '');
+    },
+
+    formatBytes(bytes) {
+      const b = Math.max(0, Number(bytes) || 0);
+      if (b >= 1099511627776) return (b / 1099511627776).toFixed(2).replace('.', ',') + ' TB';
+      if (b >= 1073741824) return (b / 1073741824).toFixed(2).replace('.', ',') + ' GB';
+      if (b >= 1048576) return (b / 1048576).toFixed(2).replace('.', ',') + ' MB';
+      if (b >= 1024) return (b / 1024).toFixed(2).replace('.', ',') + ' KB';
+      return b + ' Bytes';
+    },
+
+    async refreshAnalytics() {
+      const btn = document.getElementById('btn-sa-refresh');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Berechne live neu...';
+      }
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=storage-analytics/scan&force_refresh=1`, {
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          }
+        });
+        const data = await res.json();
+        if (res.ok && data && data.summary) {
+          App.toast('Speicher- & Traffic-Analyse erfolgreich live neu berechnet.', 'success');
+          App.handleRoute();
+        } else {
+          App.toast('Fehler bei der Neuberechnung.', 'danger');
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Jetzt live neu berechnen';
+          }
+        }
+      } catch (err) {
+        App.toast('Netzwerkfehler: ' + err.message, 'danger');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Jetzt live neu berechnen';
+        }
+      }
+    },
+
+    loadSinglePreview(resetSkip = true) {
+      if (resetSkip) {
+        this.currentSkip = 0;
+      }
+      this.fetchSinglePreview();
+    },
+
+    nextSinglePreview() {
+      const midInp = document.getElementById('sa-test-movie-id');
+      if (midInp) midInp.value = '';
+      this.currentSkip++;
+      this.fetchSinglePreview();
+    },
+
+    async fetchSinglePreview() {
+      const mid = parseInt(document.getElementById('sa-test-movie-id')?.value || '0', 10) || 0;
+      const merchId = parseInt(document.getElementById('sa-test-merchant-id')?.value || '0', 10) || 0;
+      const msgBox = document.getElementById('sa-cleanup-msg');
+      const resBox = document.getElementById('sa-cleanup-result-box');
+      const card = document.getElementById('sa-cleanup-preview-card');
+      const btnLoad = document.getElementById('btn-sa-load-preview');
+      const btnNext = document.getElementById('btn-sa-next-preview');
+
+      if (resBox) resBox.style.display = 'none';
+      if (card) card.style.display = 'none';
+      if (btnLoad) btnLoad.disabled = true;
+      if (msgBox) {
+        msgBox.style.display = '';
+        msgBox.className = 'alert alert-info small py-2 px-3 mb-3';
+        msgBox.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Prüfe Film-Verzeichnis im 7-Stufen-Sicherheitsmodus...';
+      }
+
+      try {
+        const url = new URL(`${App.basePath}/api.php`, window.location.origin);
+        url.searchParams.set('route', 'storage-analytics/legacy-cleanup');
+        url.searchParams.set('action', 'preview');
+        if (mid > 0) url.searchParams.set('movie_id', String(mid));
+        if (merchId > 0) url.searchParams.set('merchant_id', String(merchId));
+        url.searchParams.set('skip', String(this.currentSkip));
+
+        const res = await fetch(url.toString(), {
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          }
+        });
+        const data = await res.json();
+
+        if (btnLoad) btnLoad.disabled = false;
+
+        if (!res.ok || !data || !data.found || !data.movie) {
+          if (msgBox) {
+            msgBox.style.display = '';
+            msgBox.className = 'alert alert-warning small py-2 px-3 mb-3';
+            msgBox.textContent = data?.message || 'Es wurde kein passendes Test-Video mit m_*-Dateien gefunden.';
+          }
+          return;
+        }
+
+        if (msgBox) msgBox.style.display = 'none';
+        if (btnNext) btnNext.style.display = '';
+        this.renderSingleMoviePreview(data.movie);
+      } catch (err) {
+        if (btnLoad) btnLoad.disabled = false;
+        if (msgBox) {
+          msgBox.style.display = '';
+          msgBox.className = 'alert alert-danger small py-2 px-3 mb-3';
+          msgBox.textContent = 'Netzwerkfehler: ' + err.message;
+        }
+      }
+    },
+
+    renderSingleMoviePreview(m) {
+      this.currentPreviewMovie = m;
+      const card = document.getElementById('sa-cleanup-preview-card');
+      if (card) card.style.display = '';
+
+      this.setText('sa-prev-movie-id', `#${m.movie_id}`);
+      this.setText('sa-prev-title', m.title || '-');
+      this.setText('sa-prev-online-id', m.online_id > 0 ? `#${m.online_id}` : '-');
+      this.setText('sa-prev-db-id', `#${m.movie_id}`);
+      this.setText('sa-prev-merchant-id', `#${m.merchant_id}`);
+      this.setText('sa-prev-actor', m.actor_username || '-');
+      this.setText('sa-prev-file-id', m.file_id || '-');
+      this.setText('sa-prev-res', m.resolution || '-');
+      this.setText('sa-prev-len', m.playtime_string || '-');
+      this.setText('sa-prev-folder-path', m.folder_path || '-');
+
+      const protTbody = document.getElementById('sa-prev-protected-tbody');
+      if (protTbody) {
+        const protFiles = m.protected_files || [];
+        if (!protFiles.length) {
+          protTbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-2">Keine geschützten Dateien im Verzeichnis gefunden.</td></tr>';
+        } else {
+          protTbody.innerHTML = protFiles.map(pf => `
+            <tr>
+              <td><span class="badge bg-success">${App.escapeHtml(pf.role)}</span></td>
+              <td><code class="fw-bold text-success">${App.escapeHtml(pf.filename)}</code></td>
+              <td><code class="small text-muted">${App.escapeHtml(pf.full_path)}</code></td>
+              <td class="fw-semibold font-monospace">${App.escapeHtml(pf.size_formatted)}</td>
+            </tr>
+          `).join('');
+        }
+      }
+
+      const delFiles = m.deletable_files || [];
+      this.setText('sa-prev-del-count', delFiles.length);
+      this.setText('sa-prev-del-size', m.deletable_total_fmt || '0 Bytes');
+      this.setText('sa-btn-movie-id', m.movie_id);
+      this.setText('sa-btn-del-count', delFiles.length);
+
+      const delTbody = document.getElementById('sa-prev-deletable-tbody');
+      if (delTbody) {
+        if (!delFiles.length) {
+          delTbody.innerHTML = '<tr><td colspan="4" class="text-center text-success fw-semibold py-2">&#x2705; In diesem Verzeichnis befinden sich keine veralteten m_*-Dateien (mehr).</td></tr>';
+        } else {
+          delTbody.innerHTML = delFiles.map(df => `
+            <tr>
+              <td><code class="fw-bold text-danger">${App.escapeHtml(df.filename)}</code></td>
+              <td><span class="badge bg-danger">${App.escapeHtml(df.format_label)}</span></td>
+              <td><code class="small text-muted">${App.escapeHtml(df.full_path)}</code></td>
+              <td class="fw-bold text-danger font-monospace">${App.escapeHtml(df.size_formatted)}</td>
+            </tr>
+          `).join('');
+        }
+      }
+
+      const btnDel = document.getElementById('btn-sa-delete-single');
+      if (btnDel) {
+        btnDel.disabled = !m.can_delete_safely;
+      }
+    },
+
+    async deleteSingleMovie() {
+      const m = this.currentPreviewMovie;
+      if (!m || !m.movie_id || !m.file_id) {
+        App.toast('Kein gültiges Video in der Vorschau geladen.', 'warning');
+        return;
+      }
+
+      const btnDel = document.getElementById('btn-sa-delete-single');
+      const resBox = document.getElementById('sa-cleanup-result-box');
+      if (btnDel) btnDel.disabled = true;
+
+      try {
+        const fd = new FormData();
+        fd.append('_csrf', App.csrfToken);
+        fd.append('action', 'delete_single');
+        fd.append('movie_id', String(m.movie_id));
+        fd.append('confirm_file_id', String(m.file_id));
+
+        const res = await fetch(`${App.basePath}/api.php?route=storage-analytics/legacy-cleanup`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+
+        if (!res.ok || !data || data.error || !data.success) {
+          App.toast(data?.error || 'Fehler beim Löschen der m_*-Dateien.', 'danger');
+          if (btnDel) btnDel.disabled = false;
+          return;
+        }
+
+        if (resBox) {
+          resBox.style.display = '';
+          resBox.innerHTML = `
+            <strong>&#x2705; Erfolgreich bereinigt (Video #${data.movie_id}):</strong>
+            Es wurden <strong>${data.deleted_count} veraltete m_*-Dateien</strong> gelöscht und <strong>${App.escapeHtml(data.freed_formatted)}</strong> Speicherplatz freigegeben.<br>
+            <small>Nachprüfung: Desktop-Hauptvideo (<code>${App.escapeHtml(data.desktop_full_path)}</code>, ${App.escapeHtml(data.desktop_size_formatted)}) sowie ${data.thumbnails_count_after} Vorschaubilder sind zu 100 % intakt.</small>
+          `;
+        }
+
+        if (data.movie_after) {
+          this.renderSingleMoviePreview(data.movie_after);
+        }
+        App.toast(`Video #${data.movie_id} bereinigt (${data.freed_formatted} freigegeben).`, 'success');
+      } catch (err) {
+        App.toast('Netzwerkfehler: ' + err.message, 'danger');
+        if (btnDel) btnDel.disabled = false;
+      }
+    },
+
+    startBatch(batchLimit = 10, autoContinue = false) {
+      this.batchAutoRunning = !!autoContinue;
+      this.batchStopRequested = false;
+
+      const panel = document.getElementById('sa-batch-panel');
+      if (panel) panel.style.display = '';
+
+      const stopBtn = document.getElementById('btn-sa-batch-stop');
+      if (stopBtn) stopBtn.style.display = autoContinue ? '' : 'none';
+
+      document.querySelectorAll('.btn-sa-batch-run').forEach(b => { b.disabled = true; });
+      this.executeBatchStep(batchLimit, autoContinue);
+    },
+
+    stopBatch() {
+      this.batchStopRequested = true;
+      this.batchAutoRunning = false;
+      this.setText('sa-batch-status-text', '⏸ Stopp angefordert – aktuelles Paket wird noch sauber beendet...');
+    },
+
+    resetBatch() {
+      this.batchAutoRunning = false;
+      this.batchStopRequested = false;
+      this.batchCursorMovieId = 0;
+      this.batchTotalCleanedMovies = 0;
+      this.batchTotalDeletedFiles = 0;
+      this.batchTotalFreedBytes = 0;
+      this.batchTotalScanned = 0;
+      this.batchTotalAlreadyClean = 0;
+      this.batchTotalSkipped = 0;
+
+      this.setText('sa-batch-status-text', 'Bereit zur Stapel-Bereinigung...');
+      this.setText('sa-batch-cursor-label', 'Start (neueste zuerst)');
+      this.setText('sa-batch-cnt-movies', '0');
+      this.setText('sa-batch-cnt-files', '0');
+      this.setText('sa-batch-cnt-bytes', '0 Bytes');
+      this.setText('sa-batch-cnt-scanned', '0');
+      this.setText('sa-batch-cnt-clean', '0');
+      this.setText('sa-batch-cnt-skipped', '0');
+
+      const skipBox = document.getElementById('sa-batch-skip-box');
+      if (skipBox) skipBox.style.display = 'none';
+      const skipList = document.getElementById('sa-batch-skip-list');
+      if (skipList) skipList.innerHTML = '';
+      const logTbody = document.getElementById('sa-batch-log-tbody');
+      if (logTbody) logTbody.innerHTML = '';
+      const stopBtn = document.getElementById('btn-sa-batch-stop');
+      if (stopBtn) stopBtn.style.display = 'none';
+      document.querySelectorAll('.btn-sa-batch-run').forEach(b => { b.disabled = false; });
+    },
+
+    async executeBatchStep(batchLimit, autoContinue) {
+      const merchId = parseInt(document.getElementById('sa-test-merchant-id')?.value || '0', 10) || 0;
+      const stopBtn = document.getElementById('btn-sa-batch-stop');
+
+      this.setText(
+        'sa-batch-status-text',
+        `⏳ Prüfe & bereinige nächstes Paket (Limit: ${batchLimit} Videos${merchId > 0 ? ', Händler #' + merchId : ''})...`
+      );
+
+      try {
+        const fd = new FormData();
+        fd.append('_csrf', App.csrfToken);
+        fd.append('action', 'delete_batch');
+        fd.append('batch_limit', String(batchLimit));
+        if (merchId > 0) fd.append('merchant_id', String(merchId));
+        if (this.batchCursorMovieId > 0) fd.append('cursor_movie_id', String(this.batchCursorMovieId));
+
+        const res = await fetch(`${App.basePath}/api.php?route=storage-analytics/legacy-cleanup`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+
+        if (!res.ok || !data || data.error) {
+          this.setText('sa-batch-status-text', '❌ Fehler: ' + (data?.error || 'Unbekannter Fehler'));
+          document.querySelectorAll('.btn-sa-batch-run').forEach(b => { b.disabled = false; });
+          if (stopBtn) stopBtn.style.display = 'none';
+          return;
+        }
+
+        this.batchCursorMovieId = data.next_cursor_movie_id || this.batchCursorMovieId;
+        this.batchTotalCleanedMovies += (data.cleaned_movies_count || 0);
+        this.batchTotalDeletedFiles += (data.deleted_files_count || 0);
+        this.batchTotalFreedBytes += (data.freed_bytes || 0);
+        this.batchTotalScanned += (data.scanned_in_call || 0);
+        this.batchTotalAlreadyClean += (data.already_clean_count || 0);
+
+        this.setText('sa-batch-cursor-label', this.batchCursorMovieId > 0 ? `#${this.batchCursorMovieId} (verbleibend: ${data.remaining_db_rows || 0})` : 'Ende erreicht');
+        this.setText('sa-batch-cnt-movies', this.batchTotalCleanedMovies);
+        this.setText('sa-batch-cnt-files', this.batchTotalDeletedFiles);
+        this.setText('sa-batch-cnt-bytes', this.formatBytes(this.batchTotalFreedBytes));
+        this.setText('sa-batch-cnt-scanned', this.batchTotalScanned);
+        this.setText('sa-batch-cnt-clean', this.batchTotalAlreadyClean);
+
+        const skipped = data.skipped_movies || [];
+        if (skipped.length > 0) {
+          this.batchTotalSkipped += skipped.length;
+          this.setText('sa-batch-cnt-skipped', this.batchTotalSkipped);
+          const skipBox = document.getElementById('sa-batch-skip-box');
+          const skipList = document.getElementById('sa-batch-skip-list');
+          if (skipBox) skipBox.style.display = '';
+          if (skipList) {
+            skipped.forEach(sk => {
+              const li = document.createElement('li');
+              li.textContent = `Video #${sk.movie_id} (${sk.title}): ${sk.reason}`;
+              skipList.appendChild(li);
+            });
+          }
+        }
+
+        const cleaned = data.cleaned_movies || [];
+        const logTbody = document.getElementById('sa-batch-log-tbody');
+        if (logTbody && cleaned.length > 0) {
+          const rowsHtml = cleaned.map(cm => `
+            <tr>
+              <td><strong>#${cm.movie_id}</strong> ${cm.online_id > 0 ? `<small class="text-muted">(Online #${cm.online_id})</small>` : ''}</td>
+              <td>MID #${cm.merchant_id}<br><small class="text-muted">${App.escapeHtml(cm.actor)}</small></td>
+              <td><strong>${App.escapeHtml(cm.title)}</strong><br><code class="small text-muted">${App.escapeHtml(cm.folder_path)}</code></td>
+              <td><span class="badge bg-danger">${cm.deleted_count} Dateien</span><br><code class="small text-danger">${App.escapeHtml(cm.deleted_filenames_str)}</code></td>
+              <td class="fw-bold text-success font-monospace">${App.escapeHtml(cm.freed_formatted)}</td>
+              <td>
+                ${cm.desktop_verified_intact
+                  ? `<span class="badge bg-success">&#x2714; Intakt (${App.escapeHtml(cm.desktop_size_formatted)})</span>`
+                  : `<span class="badge bg-danger">&#x26A0; Nachprüfung fehlgeschlagen</span>`}
+              </td>
+            </tr>
+          `).join('');
+          logTbody.insertAdjacentHTML('afterbegin', rowsHtml);
+        }
+
+        if (data.emergency_stop) {
+          this.setText('sa-batch-status-text', '🛑 ' + (data.emergency_message || 'Sicherheits-Stopp ausgelöst!'));
+          this.batchAutoRunning = false;
+          document.querySelectorAll('.btn-sa-batch-run').forEach(b => { b.disabled = false; });
+          if (stopBtn) stopBtn.style.display = 'none';
+          return;
+        }
+
+        if (!data.has_more) {
+          this.setText(
+            'sa-batch-status-text',
+            `🎉 Stapel-Lauf vollständig abgeschlossen! (${this.batchTotalCleanedMovies} Videos bereinigt, ${this.formatBytes(this.batchTotalFreedBytes)} freigegeben)`
+          );
+          this.batchAutoRunning = false;
+          document.querySelectorAll('.btn-sa-batch-run').forEach(b => { b.disabled = false; });
+          if (stopBtn) stopBtn.style.display = 'none';
+          return;
+        }
+
+        if (autoContinue && this.batchAutoRunning && !this.batchStopRequested) {
+          setTimeout(() => this.executeBatchStep(batchLimit, true), 400);
+        } else {
+          this.setText(
+            'sa-batch-status-text',
+            `✔ Paket abgeschlossen (${data.cleaned_movies_count || 0} bereinigt, ${data.scanned_in_call || 0} geprüft). Bereit für nächstes Paket.`
+          );
+          document.querySelectorAll('.btn-sa-batch-run').forEach(b => { b.disabled = false; });
+          if (stopBtn) stopBtn.style.display = 'none';
+        }
+      } catch (err) {
+        this.setText('sa-batch-status-text', '❌ Netzwerkfehler: ' + err.message);
+        this.batchAutoRunning = false;
+        document.querySelectorAll('.btn-sa-batch-run').forEach(b => { b.disabled = false; });
+        if (stopBtn) stopBtn.style.display = 'none';
+      }
+    }
   }
 };
 

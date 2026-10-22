@@ -102,6 +102,8 @@ class Router
         $photoAlbumsOnlineCtrl   = 'App\\Modules\\PhotoAlbumsOnline\\PhotoAlbumsOnlineController';
         $coActorsCheckingCtrl    = 'App\\Modules\\CoActorsChecking\\CoActorsCheckingController';
         $aiComplianceCtrl        = 'App\\Modules\\AiCompliance\\AiComplianceController';
+        $contentCleanupCtrl      = 'App\\Modules\\ContentCleanup\\ContentCleanupController';
+        $storageAnalyticsCtrl    = 'App\\Modules\\StorageAnalytics\\StorageAnalyticsController';
         $previewCtrl             = 'App\\Modules\\Preview\\PreviewController';
 
         // 1. Startseite (Echtes Admin-Dashboard, Globale Schnellsuche, Notizen & Live-Counter)
@@ -145,8 +147,11 @@ class Router
         self::register('photo-albums-online/recalc-size', $photoAlbumsOnlineCtrl, 'recalcSize', 'content_online');
         self::register('photo-album-edit', $photoAlbumsOnlineCtrl, 'edit', 'content_online');
         self::register('photo-albums-online/save', $photoAlbumsOnlineCtrl, 'save', 'content_online');
-        self::register('content-cleanup', $previewCtrl, 'contentCleanup', 'content_online');
-        self::register('storage-analytics', $previewCtrl, 'storageAnalytics', 'content_online');
+        self::register('content-cleanup', $contentCleanupCtrl, 'index', 'content_online');
+        self::register('content-cleanup/orphan-scan', $contentCleanupCtrl, 'orphanScan', 'content_online');
+        self::register('storage-analytics', $storageAnalyticsCtrl, 'index', 'content_online');
+        self::register('storage-analytics/scan', $storageAnalyticsCtrl, 'scan', 'content_online');
+        self::register('storage-analytics/legacy-cleanup', $storageAnalyticsCtrl, 'legacyCleanup', 'content_online');
 
         // 4. Profile (actors)
         self::register('actors', $previewCtrl, 'actors', 'actors');

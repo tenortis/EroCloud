@@ -44,33 +44,6 @@ final class PreviewController
         ]);
     }
 
-    // 3. Content Online (content_online)
-    public function contentCleanup(): string
-    {
-        return $this->renderPlaceholder(
-            'bi-trash3',
-            'Content Online',
-            'Content-Bereinigung',
-            'Verwalte abgelaufene Entwürfe, gelöschte Medien und den Lebenszyklus archivierter Inhalte.',
-            'content-cleanup',
-            '/Content-Bereinigung',
-            'acp/includes/content_cleanup.php'
-        );
-    }
-
-    public function storageAnalytics(): string
-    {
-        return $this->renderPlaceholder(
-            'bi-hdd-network',
-            'Content Online',
-            'Speicher & Traffic',
-            'Auswertung der Cloud-Storage-Belegung (/var/www/web1/cloud_storage) sowie Streaming- und Download-Traffic.',
-            'storage-analytics',
-            '/Speicher-Analyse',
-            'acp/includes/storage_analytics.php'
-        );
-    }
-
     // 4. Profile (actors)
     public function actors(): string
     {
