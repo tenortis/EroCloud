@@ -95,8 +95,9 @@ class Router
 
     private static function registerDefaults(): void
     {
-        $homeCtrl    = 'App\\Modules\\Home\\HomeController';
-        $previewCtrl = 'App\\Modules\\Preview\\PreviewController';
+        $homeCtrl           = 'App\\Modules\\Home\\HomeController';
+        $moviesCheckingCtrl = 'App\\Modules\\MoviesChecking\\MoviesCheckingController';
+        $previewCtrl        = 'App\\Modules\\Preview\\PreviewController';
 
         // 1. Startseite (Echtes Admin-Dashboard, Globale Schnellsuche, Notizen & Live-Counter)
         self::register('startseite', $homeCtrl, 'view', '');
@@ -107,8 +108,14 @@ class Router
         self::register('home/sidebar-counts', $homeCtrl, 'sidebarCounts', '');
 
         // 2. Content prüfen (content_check)
-        self::register('movies-checking', $previewCtrl, 'moviesChecking', 'content_check');
-        self::register('movie-checking', $previewCtrl, 'movieChecking', 'content_check');
+        self::register('movies-checking', $moviesCheckingCtrl, 'list', 'content_check');
+        self::register('movie-checking', $moviesCheckingCtrl, 'detail', 'content_check');
+        self::register('movies-checking/approve', $moviesCheckingCtrl, 'approve', 'content_check');
+        self::register('movies-checking/reject', $moviesCheckingCtrl, 'reject', 'content_check');
+        self::register('movies-checking/co-actor-action', $moviesCheckingCtrl, 'coActorAction', 'content_check');
+        self::register('movies-checking/ai-action', $moviesCheckingCtrl, 'aiAction', 'content_check');
+        self::register('movies-checking/file-meta', $moviesCheckingCtrl, 'fileMeta', 'content_check');
+
         self::register('photo-albums-checking', $previewCtrl, 'photoAlbumsChecking', 'content_check');
         self::register('photo-album-checking', $previewCtrl, 'photoAlbumChecking', 'content_check');
         self::register('co-actors-checking', $previewCtrl, 'coActorsChecking', 'content_check');
@@ -151,11 +158,7 @@ class Router
         // 10. Punktesystem (point_system)
         self::register('pointssystem', $previewCtrl, 'pointssystem', 'point_system');
 
-        // 11. Chats (chats / all_messages)
-        self::register('all-chats', $previewCtrl, 'allChats', 'all_messages');
-        self::register('chat', $previewCtrl, 'chat', 'all_messages');
-
-        // 12. System & Technik (error_log)
+        // 11. System & Technik (error_log)
         self::register('system-settings', $previewCtrl, 'systemSettings', 'error_log');
         self::register('errors', $previewCtrl, 'errors', 'error_log');
     }

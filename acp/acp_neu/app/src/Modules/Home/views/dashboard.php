@@ -13,7 +13,6 @@ use App\Core\View;
 /** @var array<string, int> $counts */
 /** @var array<int, array<string, mixed>> $onlineUsers */
 /** @var array<int, array<string, mixed>> $onlineActors */
-/** @var array<int, array<string, mixed>> $erocallRequests */
 /** @var string $adminNotes */
 /** @var int $adminNotesEdit */
 /** @var string $adminNotesEditorName */
@@ -23,8 +22,7 @@ use App\Core\View;
 $countUsersOnline   = count($onlineUsers);
 $countActorsOnline  = count($onlineActors);
 $countOnlineTotal   = $countUsersOnline + $countActorsOnline;
-$countErocallOpen   = count($erocallRequests);
-$openTasksTotal     = (int)($counts['new_actors'] ?? 0) + $countErocallOpen + (int)($counts['new_banners'] ?? 0);
+$openTasksTotal     = (int)($counts['new_actors'] ?? 0) + (int)($counts['new_banners'] ?? 0);
 ?>
 
 <!-- Page Header & Admin Greeting -->
@@ -117,7 +115,7 @@ $openTasksTotal     = (int)($counts['new_actors'] ?? 0) + $countErocallOpen + (i
           <div class="kpi-val"><?= (int)$openTasksTotal ?></div>
           <div class="kpi-label">Offene Profil-/Banner-Checks</div>
           <small class="text-muted">
-            Neue Profile: <?= (int)($counts['new_actors'] ?? 0) ?> · 0900: <?= (int)$countErocallOpen ?> · Banner: <?= (int)($counts['new_banners'] ?? 0) ?>
+            Neue Profile: <?= (int)($counts['new_actors'] ?? 0) ?> · Neue Banner: <?= (int)($counts['new_banners'] ?? 0) ?>
           </small>
         </div>
       </div>
@@ -126,105 +124,61 @@ $openTasksTotal     = (int)($counts['new_actors'] ?? 0) + $countErocallOpen + (i
 </div>
 
 <!-- ==========================================================================
-     2. SCHNELLZUGRIFF & OFFENE 0900-RUFNUMMER-ANFRAGEN
+     2. SCHNELLZUGRIFF – CONTENT & COMPLIANCE
      ========================================================================== -->
-<div class="row g-4 mb-4">
-  <!-- Links: Schnellzugriff Prüf-Center -->
-  <div class="col-lg-7">
-    <div class="card-kkc h-100 mb-0">
-      <div class="card-kkc-header">
-        <div class="card-title">
-          <i class="bi bi-lightning-charge-fill ec-text-primary"></i>
-          <span>Schnellzugriff – Content &amp; Compliance</span>
-        </div>
-        <span class="badge-kkc badge-kkc-neutral">Direktwahl</span>
-      </div>
-      <div class="card-kkc-body">
-        <div class="row g-3">
-          <div class="col-sm-6">
-            <a href="#/movies-checking" class="action-tile text-decoration-none">
-              <div class="action-tile-icon ec-bg-primary-subtle ec-text-primary">
-                <i class="bi bi-film"></i>
-              </div>
-              <div>
-                <div class="fw-bold text-body">Filme prüfen (<?= (int)($counts['movies_checking'] ?? 0) ?>)</div>
-                <small class="text-muted">Neue Video-Uploads kontrollieren &amp; freigeben</small>
-              </div>
-            </a>
-          </div>
-          <div class="col-sm-6">
-            <a href="#/photo-albums-checking" class="action-tile text-decoration-none">
-              <div class="action-tile-icon ec-bg-primary-subtle ec-text-primary">
-                <i class="bi bi-images"></i>
-              </div>
-              <div>
-                <div class="fw-bold text-body">Fotoalben prüfen (<?= (int)($counts['photo_albums_checking'] ?? 0) ?>)</div>
-                <small class="text-muted">Hochgeladene Bilderserien &amp; Cover sichten</small>
-              </div>
-            </a>
-          </div>
-          <div class="col-sm-6">
-            <a href="#/co-actors-checking" class="action-tile text-decoration-none">
-              <div class="action-tile-icon ec-bg-primary-subtle ec-text-primary">
-                <i class="bi bi-person-badge"></i>
-              </div>
-              <div>
-                <div class="fw-bold text-body">Drehpartner &amp; ID-Check (<?= (int)($counts['co_actors_checking'] ?? 0) ?>)</div>
-                <small class="text-muted">Ausweise, Selfies &amp; Model-Releases verifizieren</small>
-              </div>
-            </a>
-          </div>
-          <div class="col-sm-6">
-            <a href="#/ai-compliance" class="action-tile text-decoration-none">
-              <div class="action-tile-icon ec-bg-primary-subtle ec-text-primary">
-                <i class="bi bi-cpu"></i>
-              </div>
-              <div>
-                <div class="fw-bold text-body">KI-Analyse &amp; BRAM</div>
-                <small class="text-muted">Whisper-Transkripte, Gesichtsabgleich &amp; Compliance</small>
-              </div>
-            </a>
-          </div>
-        </div>
-      </div>
+<div class="card-kkc mb-4">
+  <div class="card-kkc-header">
+    <div class="card-title">
+      <i class="bi bi-lightning-charge-fill ec-text-primary"></i>
+      <span>Schnellzugriff – Content &amp; Compliance</span>
     </div>
+    <span class="badge-kkc badge-kkc-neutral">Direktwahl</span>
   </div>
-
-  <!-- Rechts: Folgende Profile haben eine 0900-Rufnummer beantragt -->
-  <div class="col-lg-5">
-    <div class="card-kkc h-100 mb-0">
-      <div class="card-kkc-header">
-        <div class="card-title">
-          <i class="bi bi-telephone-inbound-fill ec-text-primary"></i>
-          <span>Beantragte 0900-Rufnummern</span>
-        </div>
-        <span class="badge-kkc <?= $countErocallOpen > 0 ? 'badge-kkc-warning' : 'badge-kkc-success' ?>">
-          <?= $countErocallOpen > 0 ? $countErocallOpen . ' offen' : 'Keine offenen Anfragen' ?>
-        </span>
-      </div>
-      <div class="card-kkc-body">
-        <?php if (empty($erocallRequests)): ?>
-        <div class="d-flex align-items-center gap-3 p-3 rounded border" style="background-color: var(--kkc-surface-hover); border-color: var(--kkc-border) !important;">
-          <i class="bi bi-check-circle-fill text-success fs-4"></i>
-          <div class="small text-muted">
-            Aktuell liegen keine offenen 0900-Rufnummer-Anfragen von Darsteller-Profilen vor.
+  <div class="card-kkc-body">
+    <div class="row g-3">
+      <div class="col-xl-3 col-sm-6">
+        <a href="#/movies-checking" class="action-tile text-decoration-none h-100">
+          <div class="action-tile-icon ec-bg-primary-subtle ec-text-primary">
+            <i class="bi bi-film"></i>
           </div>
-        </div>
-        <?php else: ?>
-        <p class="text-muted small mb-2">Folgende Profile haben eine 0900-Rufnummer beantragt:</p>
-        <div class="list-group list-group-flush border rounded" style="border-color: var(--kkc-border) !important;">
-          <?php foreach ($erocallRequests as $req): ?>
-          <a href="#/actor?id=<?= (int)$req['id'] ?>" class="list-group-item list-group-item-action d-flex align-items-center justify-content-between py-2 px-3">
-            <div class="d-flex align-items-center gap-2">
-              <i class="bi bi-person-circle ec-text-primary"></i>
-              <span class="fw-semibold"><?= View::e($req['username']) ?></span>
-              <span class="badge-kkc badge-kkc-neutral font-monospace">#<?= (int)$req['id'] ?></span>
-            </div>
-            <span class="small text-muted">Ziel: <?= View::e($req['dest_number']) ?> <i class="bi bi-chevron-right ms-1"></i></span>
-          </a>
-          <?php endforeach; ?>
-        </div>
-        <?php endif; ?>
+          <div>
+            <div class="fw-bold text-body">Filme prüfen (<?= (int)($counts['movies_checking'] ?? 0) ?>)</div>
+            <small class="text-muted">Neue Video-Uploads kontrollieren &amp; freigeben</small>
+          </div>
+        </a>
+      </div>
+      <div class="col-xl-3 col-sm-6">
+        <a href="#/photo-albums-checking" class="action-tile text-decoration-none h-100">
+          <div class="action-tile-icon ec-bg-primary-subtle ec-text-primary">
+            <i class="bi bi-images"></i>
+          </div>
+          <div>
+            <div class="fw-bold text-body">Fotoalben prüfen (<?= (int)($counts['photo_albums_checking'] ?? 0) ?>)</div>
+            <small class="text-muted">Hochgeladene Bilderserien &amp; Cover sichten</small>
+          </div>
+        </a>
+      </div>
+      <div class="col-xl-3 col-sm-6">
+        <a href="#/co-actors-checking" class="action-tile text-decoration-none h-100">
+          <div class="action-tile-icon ec-bg-primary-subtle ec-text-primary">
+            <i class="bi bi-person-badge"></i>
+          </div>
+          <div>
+            <div class="fw-bold text-body">Drehpartner &amp; ID-Check (<?= (int)($counts['co_actors_checking'] ?? 0) ?>)</div>
+            <small class="text-muted">Ausweise, Selfies &amp; Model-Releases verifizieren</small>
+          </div>
+        </a>
+      </div>
+      <div class="col-xl-3 col-sm-6">
+        <a href="#/ai-compliance" class="action-tile text-decoration-none h-100">
+          <div class="action-tile-icon ec-bg-primary-subtle ec-text-primary">
+            <i class="bi bi-cpu"></i>
+          </div>
+          <div>
+            <div class="fw-bold text-body">KI-Analyse &amp; BRAM</div>
+            <small class="text-muted">Whisper-Transkripte, Gesichtsabgleich &amp; Compliance</small>
+          </div>
+        </a>
       </div>
     </div>
   </div>

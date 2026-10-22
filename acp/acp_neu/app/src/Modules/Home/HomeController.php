@@ -14,7 +14,7 @@ use App\Core\View;
 
 /**
  * EroCloud ACP (v2.0) - HomeController
- * Lädt alle echten Admin-KPIs, Online-Listen, 0900-Anfragen, Notizen & Mitarbeiter-Historie für #/startseite.
+ * Lädt alle echten Admin-KPIs, Online-Listen, Notizen & Mitarbeiter-Historie für #/startseite.
  */
 class HomeController
 {
@@ -90,30 +90,7 @@ class HomeController
             }
         }
 
-        // 4. Offene 0900-Rufnummer-Anfragen (erocall)
-        $erocallRequests = [];
-        $rsErocall = p4c_query(
-            "SELECT `id`, `username`, `merchant_id`, `erocall_number_de_dest_landline`
-             FROM `actors`
-             WHERE `erocall_number_de_dest_landline` != '0'
-               AND `erocall_number_de_dest_landline` != ''
-               AND `erocall_number_de` = '0'
-             ORDER BY `id` DESC;",
-            __FILE__,
-            __LINE__
-        );
-        if ($rsErocall && p4c_num_rows($rsErocall) > 0) {
-            while ($ec = p4c_fetch_object($rsErocall)) {
-                $erocallRequests[] = [
-                    'id'          => abs((int)$ec->id),
-                    'username'    => self::decodeLegacyText((string)($ec->username ?? '')),
-                    'merchant_id' => abs((int)($ec->merchant_id ?? 0)),
-                    'dest_number' => self::decodeLegacyText((string)($ec->erocall_number_de_dest_landline ?? '')),
-                ];
-            }
-        }
-
-        // 5. Gemeinsame Admin-Notizen & Sperr-Status laden
+        // 4. Gemeinsame Admin-Notizen & Sperr-Status laden
         $adminNotesRaw  = is_object($settings) ? (string)$settings->get_var('admin_notes') : '';
         $adminNotesEdit = is_object($settings) ? abs((int)$settings->get_var('admin_notes_edit')) : 0;
         $adminNotes     = self::decodeLegacyText($adminNotesRaw);
@@ -127,7 +104,7 @@ class HomeController
             }
         }
 
-        // 6. Eigene Mitarbeiter-Notizen laden
+        // 5. Eigene Mitarbeiter-Notizen laden
         $employeeNotes = '';
         $rsEmp = p4c_query("SELECT `notes` FROM `employee` WHERE `id` = '" . $employeeId . "' LIMIT 1;", __FILE__, __LINE__);
         if ($rsEmp && p4c_num_rows($rsEmp) > 0) {
@@ -135,7 +112,7 @@ class HomeController
             $employeeNotes = self::decodeLegacyText((string)($empObj->notes ?? ''));
         }
 
-        // 7. Letzte 200 Aktionen aus employee_history laden
+        // 6. Letzte 200 Aktionen aus employee_history laden
         $historyItems = [];
         $rsHistory = p4c_query(
             "SELECT h.`id`, h.`employee_id`, h.`description`, h.`datetime`, h.`ip`, e.`username`
@@ -166,7 +143,6 @@ class HomeController
             'counts'               => $counts,
             'onlineUsers'          => $onlineUsers,
             'onlineActors'         => $onlineActors,
-            'erocallRequests'      => $erocallRequests,
             'adminNotes'           => $adminNotes,
             'adminNotesEdit'       => $adminNotesEdit,
             'adminNotesEditorName' => $adminNotesEditorName,

@@ -423,25 +423,8 @@ $sessionRemainingSeconds = 1800;
       </a>
       <?php endif; ?>
 
-      <?php if (acp_has_access('chats') || acp_has_access('all_messages')): ?>
-      <!-- 11. Chats -->
-      <a class="sidebar-link sidebar-submenu-toggle" data-bs-toggle="collapse" href="#submenu-chats" role="button" aria-expanded="false" aria-controls="submenu-chats">
-        <i class="bi bi-chat-dots-fill"></i>
-        <span class="text-nowrap">Chats</span>
-        <i class="bi bi-chevron-right chevron-icon"></i>
-      </a>
-      <div class="collapse sidebar-submenu" id="submenu-chats">
-        <?php if (acp_has_access('all_messages')): ?>
-        <a href="#/all-chats" class="sidebar-link" data-route="#/all-chats">
-          <i class="bi bi-chat-left-text-fill"></i>
-          <span class="text-nowrap">Alle Nachrichten</span>
-        </a>
-        <?php endif; ?>
-      </div>
-      <?php endif; ?>
-
       <?php if (acp_has_access('error_log')): ?>
-      <!-- 12. System & Technik -->
+      <!-- 11. System & Technik -->
       <div class="sidebar-heading mt-3">System &amp; Technik</div>
 
       <a href="#/system-settings" class="sidebar-link" data-route="#/system-settings">

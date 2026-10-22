@@ -45,33 +45,6 @@ final class PreviewController
     }
 
     // 2. Content prüfen (content_check)
-    public function moviesChecking(): string
-    {
-        return $this->renderPlaceholder(
-            'bi-film',
-            'Content prüfen',
-            'Filme prüfen',
-            'Prüfe neu hochgeladene und konvertierte Filme vor der Veröffentlichung in der EroCloud.',
-            'movies-checking',
-            '/Filme-pruefen',
-            'acp/includes/movies_checking.php'
-        );
-    }
-
-    public function movieChecking(): string
-    {
-        $id = abs((int)$this->request->get('id', 0));
-        return $this->renderPlaceholder(
-            'bi-play-btn-fill',
-            'Content prüfen',
-            'Film prüfen' . ($id > 0 ? ' (#' . $id . ')' : ''),
-            'Einzelprüfung eines hochgeladenen Films inkl. Video-Player, Szenenbildern, Kategorien und Freigabe.',
-            'movie-checking' . ($id > 0 ? '?id=' . $id : ''),
-            '/Film-pruefen/' . ($id > 0 ? $id : ''),
-            'acp/includes/movie_checking.php'
-        );
-    }
-
     public function photoAlbumsChecking(): string
     {
         return $this->renderPlaceholder(
@@ -253,7 +226,7 @@ final class PreviewController
             'bi-person-vcard-fill',
             'Profile',
             'Darsteller-Profil Details' . ($id > 0 ? ' (#' . $id . ')' : ''),
-            'Detailansicht und Bearbeitung eines Darsteller-Profils inkl. Profilbildern, Steckbrief, Status und 0900-Konfiguration.',
+            'Detailansicht und Bearbeitung eines Darsteller-Profils inkl. Profilbildern, Steckbrief und Status.',
             'actor' . ($id > 0 ? '?id=' . $id : ''),
             '/Actor/' . ($id > 0 ? $id : ''),
             'acp/includes/actor.php'
@@ -412,35 +385,7 @@ final class PreviewController
         );
     }
 
-    // 11. Chats (all_messages)
-    public function allChats(): string
-    {
-        return $this->renderPlaceholder(
-            'bi-chat-left-text-fill',
-            'Chats',
-            'Alle Nachrichten',
-            'Übersicht und Moderation der Messenger-Konversationen zwischen Nutzern und Darstellern.',
-            'all-chats',
-            '/alle-Nachrichten',
-            'acp/includes/all_chats.php'
-        );
-    }
-
-    public function chat(): string
-    {
-        $id = abs((int)$this->request->get('id', 0));
-        return $this->renderPlaceholder(
-            'bi-chat-dots-fill',
-            'Chats',
-            'Chat-Verlauf' . ($id > 0 ? ' (#' . $id . ')' : ''),
-            'Detailansicht eines einzelnen Messenger-Chatverlaufs.',
-            'chat' . ($id > 0 ? '?id=' . $id : ''),
-            '/Chat/' . ($id > 0 ? $id : ''),
-            'acp/includes/chat.php'
-        );
-    }
-
-    // 12. System & Technik (error_log)
+    // 11. System & Technik (error_log)
     public function systemSettings(): string
     {
         return $this->renderPlaceholder(
