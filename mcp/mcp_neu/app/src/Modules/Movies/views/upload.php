@@ -27,9 +27,21 @@ $categoryMaster  = (string)($movie['category_master'] ?? 'porn');
 $metaTitle       = (string)($movie['meta_title'] ?? '');
 $metaDescription = (string)($movie['meta_description'] ?? '');
 $seoUrl          = (string)($movie['seo_url'] ?? '');
+$filename        = trim((string)($movie['filename'] ?? ''));
+$playtimeString  = (string)($movie['playtime_string'] ?? '');
+$resolution      = (string)($movie['resolution'] ?? '');
+$released        = (int)($movie['released'] ?? 0);
+$notifyOnConvert = (int)($movie['notify_on_convert'] ?? 1);
+$hasUploadedFile = ($filename !== '');
 
-$amountSecondOptions = ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1.0', '1.1', '1.2', '1.3', '1.4', '1.5'];
-$downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 40, 45, 50];
+$amountSecondOptions = [];
+for ($i = 1; $i <= 300; $i++) {
+    $amountSecondOptions[] = number_format($i / 10, 1, '.', '');
+}
+if ($amountSecond !== '0.0' && $amountSecond !== '0' && !in_array($amountSecond, $amountSecondOptions, true)) {
+    $amountSecondOptions[] = $amountSecond;
+}
+$downloadPercentOptions = range(0, 150);
 ?>
 
 <!-- Kopfbereich -->
@@ -67,17 +79,17 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
       <div class="col-12 col-md-4">
         <div class="p-2 rounded-3 border <?= $step === 2 ? 'bg-primary bg-opacity-10 border-primary' : ($step > 2 ? 'bg-success bg-opacity-10 border-success' : 'bg-light') ?>">
           <div class="fw-bold small <?= $step === 2 ? 'text-primary' : ($step > 2 ? 'text-success' : 'text-secondary') ?>">
-            <i class="bi <?= $step > 2 ? 'bi-check-circle-fill' : 'bi-2-circle-fill' ?> me-1"></i> Schritt 2: Videodatei hochladen
+            <i class="bi <?= $step > 2 ? 'bi-check-circle-fill' : 'bi-2-circle-fill' ?> me-1"></i> Schritt 2: Video &amp; Vorschaubilder-Option
           </div>
-          <div class="text-muted" style="font-size: 0.75rem;">MP4, MOV, MKV, AVI u.a. (bis 2 GB)</div>
+          <div class="text-muted" style="font-size: 0.75rem;">Videodatei hochladen, Cover-Editor &amp; Freigabe wählen</div>
         </div>
       </div>
       <div class="col-12 col-md-4">
         <div class="p-2 rounded-3 border <?= $step === 3 ? 'bg-success bg-opacity-10 border-success' : 'bg-light' ?>">
           <div class="fw-bold small <?= $step === 3 ? 'text-success' : 'text-secondary' ?>">
-            <i class="bi <?= $step === 3 ? 'bi-check-circle-fill' : 'bi-3-circle-fill' ?> me-1"></i> Schritt 3: Konvertierung &amp; Abschluss
+            <i class="bi <?= $step === 3 ? 'bi-check-circle-fill' : 'bi-3-circle-fill' ?> me-1"></i> Schritt 3: Konvertierung &amp; Cover-Studio
           </div>
-          <div class="text-muted" style="font-size: 0.75rem;">Automatische Verarbeitung &amp; Freigabe</div>
+          <div class="text-muted" style="font-size: 0.75rem;">Automatische Szenen-Generierung &amp; Abschluss</div>
         </div>
       </div>
     </div>
@@ -111,9 +123,9 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
             <div class="row g-3">
               <div class="col-12">
                 <label class="form-label fw-semibold">Filmtitel <span class="text-danger">*</span></label>
-                <input type="text" name="title" class="form-control" maxlength="100" required
+                <input type="text" name="title" class="form-control" maxlength="65" required
                        value="<?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?>"
-                       placeholder="Mindestens 5 Zeichen (keine E-Mail-Adressen oder URLs)">
+                       placeholder="Maximal 65 Zeichen (keine E-Mail-Adressen oder URLs)">
               </div>
 
               <div class="col-12">
@@ -201,7 +213,7 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
                     <select name="amount_second" id="movie-amount-second" class="form-select" <?= $preview === 1 ? 'disabled' : '' ?>>
                       <?php foreach ($amountSecondOptions as $opt): ?>
                         <option value="<?= $opt ?>" <?= $amountSecond === $opt ? 'selected' : '' ?>>
-                          <?= str_replace('.', ',', $opt) ?> Coins / Sekunde
+                          <?= str_replace('.', ',', $opt) ?> Coins / Sekunde<?= $opt === '0.8' ? ' (Empfohlen)' : '' ?>
                         </option>
                       <?php endforeach; ?>
                     </select>
@@ -218,11 +230,17 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
                   </div>
 
                   <div class="col-12 col-md-6" id="movie-download-price-wrap" style="<?= $asDownload === 1 ? '' : 'opacity:0.5;' ?>">
-                    <label class="form-label fw-semibold">Download-Verkaufspreis (EUR)</label>
+                    <label class="form-label fw-semibold">Aufpreis für Komplett-Download (%)</label>
                     <select name="amount_download" id="movie-amount-download" class="form-select" <?= ($asDownload === 1 && $preview !== 1) ? '' : 'disabled' ?>>
-                      <?php foreach ($downloadEurOptions as $eur): ?>
-                        <option value="<?= $eur ?>" <?= $amountDownload === $eur ? 'selected' : '' ?>>
-                          <?= number_format($eur, 2, ',', '.') ?> € (ca. <?= $eur * 32 ?> Coins)
+                      <?php foreach ($downloadPercentOptions as $pct): ?>
+                        <option value="<?= $pct ?>" <?= $amountDownload === $pct ? 'selected' : '' ?>>
+                          <?php if ($pct === 0): ?>
+                            +0 % (genau so teuer wie Streaming)
+                          <?php elseif ($pct === 10): ?>
+                            +10 % (Empfohlen)
+                          <?php else: ?>
+                            +<?= $pct ?> %
+                          <?php endif; ?>
                         </option>
                       <?php endforeach; ?>
                     </select>
@@ -331,53 +349,192 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
   </form>
 
 <?php elseif ($step === 2): ?>
-  <!-- SCHRITT 2: Videodatei per XHR + Fortschrittsbalken hochladen -->
+  <!-- SCHRITT 2: 1. Videodatei hochladen -> 2. Hinweis auf Konvertierung & Cover-Studio -> 3. Entscheidung vor Freigabe -->
   <div class="row justify-content-center">
-    <div class="col-12 col-lg-8">
-      <div class="kkc-card">
+    <div class="col-12 col-xl-9">
+      <!-- Karte 2.1: Videodatei hochladen -->
+      <div class="kkc-card mb-4">
         <div class="kkc-card-header">
           <div>
-            <h6 class="mb-0 fw-bold"><i class="bi bi-cloud-arrow-up me-2 text-primary"></i>Videodatei hochladen</h6>
+            <h6 class="mb-0 fw-bold"><i class="bi bi-cloud-arrow-up me-2 text-primary"></i>1. Videodatei auf den Server übertragen</h6>
             <div class="small text-muted">Für Film: <strong><?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?></strong> (#<?= $movieId ?>)</div>
           </div>
-          <a href="#/movie-upload?step=1&movie_id=<?= $movieId ?>" class="btn btn-sm btn-outline-kkc" id="btn-back-step1">
-            <i class="bi bi-pencil me-1"></i> Basisdaten ändern
-          </a>
+          <div class="d-flex align-items-center gap-2">
+            <a href="#/movie-upload?step=1&movie_id=<?= $movieId ?>" class="btn btn-sm btn-outline-kkc" id="btn-back-step1">
+              <i class="bi bi-pencil me-1"></i> Basisdaten ändern
+            </a>
+            <?php if ($movieId > 0): ?>
+              <button type="button" class="btn btn-sm btn-outline-danger" id="btn-delete-movie-detail"
+                      data-movie-id="<?= $movieId ?>"
+                      data-movie-title="<?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?>">
+                <i class="bi bi-trash3 me-1"></i> Entwurf löschen
+              </button>
+            <?php endif; ?>
+          </div>
         </div>
-        <div class="kkc-card-body p-4 text-center">
-          <div class="p-4 rounded-3 border border-2 border-dashed bg-light mb-4">
-            <i class="bi bi-file-earmark-play text-primary display-4 d-block mb-2"></i>
-            <h5 class="fw-bold mb-1">Wähle deine Videodatei aus</h5>
-            <p class="text-muted small mb-3">
-              Unterstützte Formate: <strong>MP4, MOV, MKV, AVI, WMV, MPG, M4V, FLV</strong> &bull; Maximale Dateigröße: <strong>2,0 GB</strong>
-            </p>
-            <input type="file" id="movie-video-file-input" class="form-control mx-auto" style="max-width: 440px;"
-                   accept=".avi,.flv,.m4v,.mkv,.mov,.mp4,.mpg,.wmv">
-          </div>
-
-          <!-- Fortschrittsanzeige (wird beim Upload eingeblendet) -->
-          <div id="movie-upload-progress-wrap" class="d-none text-start mb-4 p-3 rounded-3 border bg-white shadow-sm">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <span class="fw-semibold small" id="movie-upload-status-text">Videodatei wird hochgeladen...</span>
-              <span class="badge bg-primary" id="movie-upload-percent-badge">0 %</span>
-            </div>
-            <div class="progress mb-2" style="height: 14px;">
-              <div id="movie-upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
-                   role="progressbar" style="width: 0%;"></div>
-            </div>
-            <div class="d-flex justify-content-between text-muted small">
-              <span id="movie-upload-bytes-info">0 MB / 0 MB</span>
-              <span>Bitte schließe dieses Browserfenster während der Übertragung nicht.</span>
+        <div class="kkc-card-body p-4">
+          <!-- Statusbox: Videodatei bereits erfolgreich übertragen -->
+          <div id="movie-file-uploaded-box" class="<?= $hasUploadedFile ? '' : 'd-none' ?> p-4 rounded-3 border border-success bg-success bg-opacity-10 mb-3">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+              <div class="d-flex align-items-center gap-3">
+                <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success text-white flex-shrink-0" style="width: 48px; height: 48px;">
+                  <i class="bi bi-check-lg fs-4"></i>
+                </div>
+                <div>
+                  <h6 class="fw-bold text-success mb-1">Deine Videodatei wurde erfolgreich hochgeladen!</h6>
+                  <div class="small text-dark">
+                    <span class="me-3"><i class="bi bi-file-earmark-play me-1"></i><strong id="uploaded-movie-filename"><?= htmlspecialchars($filename, ENT_QUOTES, 'UTF-8') ?></strong></span>
+                    <span class="me-3"><i class="bi bi-clock me-1"></i>Laufzeit: <strong id="uploaded-movie-playtime"><?= htmlspecialchars($playtimeString !== '' ? $playtimeString : '-', ENT_QUOTES, 'UTF-8') ?></strong> Min.</span>
+                    <span><i class="bi bi-aspect-ratio me-1"></i>Auflösung: <strong id="uploaded-movie-resolution"><?= htmlspecialchars($resolution !== '' ? $resolution : '-', ENT_QUOTES, 'UTF-8') ?></strong></span>
+                  </div>
+                </div>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-secondary bg-white" id="btn-replace-movie-file">
+                <i class="bi bi-arrow-repeat me-1"></i> Andere Videodatei wählen
+              </button>
             </div>
           </div>
 
-          <div class="d-flex justify-content-center gap-3">
-            <button type="button" class="btn btn-kkc-primary px-4" id="btn-start-movie-file-upload" data-movie-id="<?= $movieId ?>">
-              <i class="bi bi-cloud-upload me-2"></i> Upload jetzt starten
-            </button>
-            <button type="button" class="btn btn-outline-danger d-none" id="btn-cancel-movie-file-upload">
-              <i class="bi bi-x-circle me-1"></i> Upload abbrechen
-            </button>
+          <!-- Datei-Auswahlbox (wird ausgeblendet, sobald Datei übertragen wurde) -->
+          <div id="movie-file-select-wrap" class="<?= $hasUploadedFile ? 'd-none' : '' ?> text-center">
+            <div class="p-4 rounded-3 border border-2 border-dashed bg-light mb-3">
+              <i class="bi bi-file-earmark-play text-primary display-4 d-block mb-2"></i>
+              <h5 class="fw-bold mb-1">Wähle deine Videodatei aus</h5>
+              <p class="text-muted small mb-3">
+                Unterstützte Formate: <strong>MP4, MOV, MKV, AVI, WMV, MPG, M4V, FLV</strong> &bull; Maximale Dateigröße: <strong>2,0 GB</strong>
+              </p>
+              <input type="file" id="movie-video-file-input" class="form-control mx-auto" style="max-width: 440px;"
+                     accept=".avi,.flv,.m4v,.mkv,.mov,.mp4,.mpg,.wmv">
+            </div>
+
+            <!-- Fortschrittsanzeige (wird beim Upload eingeblendet) -->
+            <div id="movie-upload-progress-wrap" class="d-none text-start mb-3 p-3 rounded-3 border bg-white shadow-sm">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fw-semibold small" id="movie-upload-status-text">Videodatei wird hochgeladen...</span>
+                <span class="badge bg-primary" id="movie-upload-percent-badge">0 %</span>
+              </div>
+              <div class="progress mb-2" style="height: 14px;">
+                <div id="movie-upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                     role="progressbar" style="width: 0%;"></div>
+              </div>
+              <div class="d-flex justify-content-between text-muted small">
+                <span id="movie-upload-bytes-info">0 MB / 0 MB</span>
+                <span>Bitte schließe dieses Browserfenster während der Übertragung nicht.</span>
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-center flex-wrap gap-3">
+              <button type="button" class="btn btn-kkc-primary px-4" id="btn-start-movie-file-upload" data-movie-id="<?= $movieId ?>">
+                <i class="bi bi-cloud-upload me-2"></i> Videodatei jetzt hochladen
+              </button>
+              <button type="button" class="btn btn-outline-danger d-none" id="btn-cancel-movie-file-upload">
+                <i class="bi bi-x-circle me-1"></i> Upload abbrechen
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Karte 2.2: Erklärung Konvertierung, 10 Vorschaubilder & Cover-Editor + Entscheidung vor Einreichung -->
+      <div class="kkc-card mb-4" id="movie-step2-post-upload-card">
+        <div class="kkc-card-header">
+          <div class="d-flex align-items-center gap-2">
+            <h6 class="mb-0 fw-bold">
+              <i class="bi bi-stars me-2 text-primary"></i>2. Was passiert nach dem Upload? (Konvertierung &amp; Cover-Studio)
+            </h6>
+          </div>
+          <span id="movie-step2-decision-badge" class="badge <?= $hasUploadedFile ? 'bg-success' : 'bg-secondary bg-opacity-10 text-secondary border' ?>">
+            <?= $hasUploadedFile ? 'Bereit für deine Auswahl' : 'Wird nach dem Datei-Upload freigeschaltet' ?>
+          </span>
+        </div>
+        <div class="kkc-card-body p-4">
+          <p class="text-muted small mb-3">
+            Bevor du deinen Film endgültig zur Prüfung einreichst, solltest du wissen, welche Möglichkeiten dir direkt nach dem Upload zur Verfügung stehen:
+          </p>
+
+          <!-- 3 visuelle Info-Boxen zum Ablauf -->
+          <div class="row g-3 mb-4">
+            <div class="col-12 col-md-4">
+              <div class="p-3 rounded-3 border bg-light h-100">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <span class="badge bg-primary rounded-pill">1</span>
+                  <span class="fw-bold small text-dark"><i class="bi bi-gear-wide-connected me-1 text-primary"></i>HD-Konvertierung</span>
+                </div>
+                <p class="small text-muted mb-0">
+                  Dein hochgeladenes Video wird auf unseren Servern automatisch im Hintergrund für flüssiges HD-Streaming auf allen Geräten konvertiert.
+                </p>
+              </div>
+            </div>
+            <div class="col-12 col-md-4">
+              <div class="p-3 rounded-3 border bg-light h-100">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <span class="badge bg-primary rounded-pill">2</span>
+                  <span class="fw-bold small text-dark"><i class="bi bi-images me-1 text-primary"></i>10 Vorschaubilder</span>
+                </div>
+                <p class="small text-muted mb-0">
+                  Bei der Konvertierung generiert unser System automatisch <strong>10 verschiedene Vorschaubilder (Szenen)</strong> direkt aus deinem Film.
+                </p>
+              </div>
+            </div>
+            <div class="col-12 col-md-4">
+              <div class="p-3 rounded-3 border bg-primary bg-opacity-10 border-primary border-opacity-25 h-100">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <span class="badge bg-primary rounded-pill">3</span>
+                  <span class="fw-bold small text-primary"><i class="bi bi-magic me-1"></i>Moderner Cover-Editor</span>
+                </div>
+                <p class="small text-dark mb-0">
+                  Du kannst deine Wunsch-Szenen für <strong>FSK 16 &amp; FSK 18</strong> wählen, Live-Schnappschüsse aus dem Video machen und sie im <strong>Cover-Studio</strong> (Milchglas, Verpixeln, Sticker, Text &amp; Badges) bearbeiten!
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hinweis zur Pflicht-Auswahl & FSK 16 Jugendfreiheit (wird nach Datei-Upload aktiv) -->
+          <div id="movie-step2-decision-wrap" style="<?= $hasUploadedFile ? '' : 'opacity: 0.55; pointer-events: none;' ?>">
+            <div class="p-3 rounded-3 border border-2 border-primary bg-primary bg-opacity-10 mb-4">
+              <div class="d-flex align-items-start gap-3">
+                <i class="bi bi-shield-check fs-3 text-primary flex-shrink-0"></i>
+                <div>
+                  <h6 class="fw-bold text-dark mb-1">Wichtig vor der Freigabe: FSK 16 (jugendfrei) &amp; FSK 18 Cover festlegen</h6>
+                  <p class="small text-muted mb-0">
+                    Damit kein ungeprüftes Hardcore-Szenenbild versehentlich als öffentliches FSK 16 Vorschaubild erscheint, wird dein Film <strong>jetzt zunächst konvertiert</strong>. Sobald die 10 Szenenbilder bereitstehen (oder direkt über deinen eigenen Bild-Upload), wählst du dein <strong>FSK 16 &amp; FSK 18 Cover</strong> selbst aus, verpixelst bei Bedarf intime Stellen im <strong>Cover-Studio</strong> und reichst den Film danach mit einem Klick zur Prüfung ein.
+                  </p>
+                </div>
+              </div>
+              <input type="hidden" name="release_mode" class="js-release-mode-radio" value="later" checked>
+            </div>
+
+            <!-- E-Mail-Benachrichtigung bei abgeschlossener Konvertierung -->
+            <div class="p-3 rounded-3 border bg-white mb-4">
+              <div class="form-check form-switch mb-1">
+                <input class="form-check-input" type="checkbox" role="switch" id="movie-notify-on-convert"
+                       name="notify_on_convert" value="1" <?= $notifyOnConvert === 1 ? 'checked' : '' ?>>
+                <label class="form-check-label fw-bold text-dark" for="movie-notify-on-convert">
+                  <i class="bi bi-envelope-check text-primary me-1"></i> Benachrichtige mich per E-Mail, sobald mein Video fertig konvertiert ist und die 10 Vorschaubilder bereitstehen
+                </label>
+              </div>
+              <div class="text-muted small">
+                Du erhältst direkt nach Abschluss der HD-Konvertierung eine E-Mail mit einem persönlichen Direkt-Link zu deinem Film. Deine Auswahl wird automatisch für deine nächsten Video-Uploads gemerkt.
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 pt-2 border-top">
+              <div class="small text-muted" id="movie-step2-footer-hint">
+                <?php if ($hasUploadedFile): ?>
+                  <i class="bi bi-check-circle-fill text-success me-1"></i>Videodatei ist bereit – klicke auf „Weiter", um zur Cover-Auswahl &amp; Konvertierung zu gelangen.
+                <?php else: ?>
+                  <i class="bi bi-info-circle me-1 text-primary"></i>Bitte lade zuerst oben deine Videodatei hoch, um fortzufahren.
+                <?php endif; ?>
+              </div>
+              <button type="button"
+                      class="btn btn-kkc-primary btn-lg px-4"
+                      id="btn-complete-movie-step2"
+                      data-movie-id="<?= $movieId ?>"
+                      <?= $hasUploadedFile ? '' : 'disabled' ?>>
+                <i class="bi bi-magic me-2" id="btn-complete-movie-step2-icon"></i>
+                <span id="btn-complete-movie-step2-label">Weiter: Konvertierung starten &amp; Vorschaubilder gestalten</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -385,30 +542,58 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
   </div>
 
 <?php else: ?>
-  <!-- SCHRITT 3: Erfolgreicher Abschluss -->
+  <!-- SCHRITT 3: Erfolgreicher Abschluss (angepasst an die gewählte Freigabe-Option) -->
   <div class="row justify-content-center">
-    <div class="col-12 col-lg-7">
+    <div class="col-12 col-lg-8">
       <div class="kkc-card text-center p-4">
         <div class="kkc-card-body">
-          <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success bg-opacity-10 text-success mb-3"
-               style="width: 72px; height: 72px;">
-            <i class="bi bi-check2-all fs-1"></i>
-          </div>
-          <h4 class="fw-bold mb-2">Dein Film wurde erfolgreich hochgeladen!</h4>
-          <p class="text-muted mb-4">
-            Deine Videodatei befindet sich nun in der automatischen Konvertierungswarteschlange.
-            Sobald die Verarbeitung abgeschlossen ist, generiert das System automatisch Vorschaubilder und dein Film wird zur Freigabe geprüft.
-          </p>
+          <?php if ($released === 1): ?>
+            <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success bg-opacity-10 text-success mb-3"
+                 style="width: 72px; height: 72px;">
+              <i class="bi bi-send-check fs-1"></i>
+            </div>
+            <h4 class="fw-bold mb-2">Dein Film wurde erfolgreich hochgeladen &amp; zur Prüfung eingereicht!</h4>
+            <p class="text-muted mb-4">
+              Deine Videodatei befindet sich nun in der automatischen Konvertierungswarteschlange.
+              Sobald die Verarbeitung abgeschlossen ist, generiert das System automatisch die Vorschaubilder und dein Film wird von unserem Team geprüft.
+            </p>
+          <?php else: ?>
+            <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10 text-primary mb-3"
+                 style="width: 72px; height: 72px;">
+              <i class="bi bi-magic fs-1"></i>
+            </div>
+            <h4 class="fw-bold mb-2">Dein Film wird jetzt konvertiert &amp; 10 Vorschaubilder werden erstellt!</h4>
+            <p class="text-muted mb-3">
+              Deine Videodatei wurde erfolgreich übertragen und wird nun im Hintergrund verarbeitet.
+              <strong>Dein Film wurde wie gewünscht noch nicht zur Prüfung eingereicht</strong>, damit du zuerst deine Vorschaubilder gestalten kannst.
+            </p>
+            <?php if ($notifyOnConvert === 1): ?>
+              <div class="d-inline-flex align-items-center gap-2 px-3 py-2 rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-25 small fw-semibold mb-4">
+                <i class="bi bi-envelope-check-fill"></i>
+                Wir senden dir automatisch eine E-Mail mit Direkt-Link, sobald deine 10 Vorschaubilder bereitstehen.
+              </div>
+            <?php endif; ?>
+
+            <div class="p-3 rounded-3 border bg-light text-start mx-auto mb-4" style="max-width: 620px;">
+              <div class="fw-bold small text-primary mb-2"><i class="bi bi-list-check me-1"></i>Deine nächsten Schritte:</div>
+              <ol class="small text-muted mb-0 ps-3">
+                <li class="mb-1">Sobald die Konvertierung in wenigen Minuten abgeschlossen ist, stehen dir in den <strong>Film-Details</strong> alle <strong>10 automatisch generierten Szenen-Vorschaubilder</strong> zur Verfügung (eigene Cover kannst du dort auch sofort hochladen).</li>
+                <li class="mb-1">Bearbeite deine FSK 16 &amp; FSK 18 Cover nach Wunsch im <strong>Fullscreen Cover-Studio</strong> (Milchglas-Zensur, Verpixeln, Sticker, Text, Badges oder Live-Schnappschuss aus dem Video).</li>
+                <li>Klicke anschließend in den Film-Details auf <strong>„Film jetzt zur Prüfung einreichen"</strong>, um deinen Film freizugeben.</li>
+              </ol>
+            </div>
+          <?php endif; ?>
+
           <div class="d-flex justify-content-center flex-wrap gap-3">
             <?php if ($movieId > 0): ?>
-              <a href="#/movie?id=<?= $movieId ?>" class="btn btn-kkc-primary">
-                <i class="bi bi-pencil-square me-1"></i> Film-Details öffnen
+              <a href="#/movie?id=<?= $movieId ?>" class="btn btn-kkc-primary btn-lg">
+                <i class="bi bi-magic me-1"></i> Zu den Film-Details &amp; Cover-Studio öffnen
               </a>
             <?php endif; ?>
-            <a href="#/movie-upload" class="btn btn-outline-kkc">
+            <a href="#/movie-upload" class="btn btn-outline-kkc btn-lg">
               <i class="bi bi-plus-circle me-1"></i> Weiteren Film hochladen
             </a>
-            <a href="#/movies" class="btn btn-outline-secondary">
+            <a href="#/movies" class="btn btn-outline-secondary btn-lg">
               <i class="bi bi-collection-play me-1"></i> Zur Film-Übersicht
             </a>
           </div>

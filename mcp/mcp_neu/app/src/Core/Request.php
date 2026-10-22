@@ -38,4 +38,31 @@ class Request
     {
         return $_POST[$key] ?? $default;
     }
+
+    public function header(string $name, string $default = ''): string
+    {
+        $normalized = strtoupper(str_replace('-', '_', $name));
+        $serverKey  = 'HTTP_' . $normalized;
+
+        if (isset($_SERVER[$serverKey]) && $_SERVER[$serverKey] !== '') {
+            return (string)$_SERVER[$serverKey];
+        }
+
+        if (isset($_SERVER[$normalized]) && $_SERVER[$normalized] !== '') {
+            return (string)$_SERVER[$normalized];
+        }
+
+        if (function_exists('getallheaders')) {
+            $headers = getallheaders();
+            if (is_array($headers)) {
+                foreach ($headers as $k => $v) {
+                    if (strcasecmp((string)$k, $name) === 0 && $v !== '') {
+                        return (string)$v;
+                    }
+                }
+            }
+        }
+
+        return $default;
+    }
 }

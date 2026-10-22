@@ -213,6 +213,7 @@ $site = '<!DOCTYPE html>
                     $navAllChats = '';
                     $navPointssystem = '';
                     $navErrors = '';
+                    $navSystemSettings = '';
                     
                     
                     if (isset($_GET['mod']) AND $_GET['mod']=='home') {
@@ -318,6 +319,10 @@ $site = '<!DOCTYPE html>
                     } elseif (isset($_GET['mod']) AND $_GET['mod']=='webmaster_partner') {
                         $navWMPartner = 'class="active"';
                         $main = 'webmaster_partner.php'; 
+
+                    } elseif (isset($_GET['mod']) AND $_GET['mod']=='system_settings') {
+                        $navSystemSettings = 'class="active"';
+                        $main = 'system_settings.php'; 
                                                 
                     } else {
                         header('Location: '.ACP_URL.'/Startseite');
@@ -491,6 +496,10 @@ $site = '<!DOCTYPE html>
                     
                     if (in_array('all', $_SESSION['employee_access_area']) OR in_array('error_log', $_SESSION['employee_access_area'])) {
                         $site .= '
+                        <a '.$navSystemSettings.' href="'.ACP_URL.'/Einstellungen">
+                            <i class="material-symbols-outlined md-30">settings_applications</i>
+                            <span>Impressum &amp; E-Mail</span>
+                        </a>
                         <a '.$navErrors.' href="'.ACP_URL.'/Errors">
                             <i class="material-symbols-outlined md-30">error</i>
                             <span>Error-Log</span>

@@ -117,6 +117,7 @@ RewriteRule ^Webmaster/Partner$ index.php?mod=webmaster_partner&%{QUERY_STRING}
 
 
 RewriteRule ^Errors$ index.php?mod=errors&%{QUERY_STRING}
+RewriteRule ^Einstellungen$ index.php?mod=system_settings&%{QUERY_STRING}
 
 
 

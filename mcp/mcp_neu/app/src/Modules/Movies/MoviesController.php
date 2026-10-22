@@ -148,8 +148,8 @@ class MoviesController
                     $priceSummary = 'Kostenloser Trailer';
                 } else {
                     $priceSummary = number_format($amountSecond, 1, ',', '.') . ' Coins/Sek.';
-                    if ($asDownload && $amountDownload > 0) {
-                        $priceSummary .= ' · DL: ' . number_format((float)$amountDownload, 2, ',', '.') . ' €';
+                    if ($asDownload) {
+                        $priceSummary .= ' · DL: +' . $amountDownload . ' %';
                     }
                 }
 
@@ -391,6 +391,7 @@ class MoviesController
         $merchant          = new \Merchant($mysql, $merchantId);
         $isPublicAllowed   = $this->isPublicUploadAllowed($merchant, $merchantId);
         $defaultWebsite    = $isPublicAllowed ? 'public' : '';
+        $notifyDefault     = class_exists('EroCloudMailer') ? \EroCloudMailer::getMerchantNotifyPreference($merchantId) : 1;
 
         $draft = [
             'id'                  => 0,
@@ -408,6 +409,12 @@ class MoviesController
             'meta_title'          => '',
             'meta_description'    => '',
             'seo_url'             => '',
+            'filename'            => '',
+            'playtime_string'     => '',
+            'resolution'          => '',
+            'convert_status'      => 0,
+            'released'            => 0,
+            'notify_on_convert'   => $notifyDefault,
         ];
 
         // Falls eine movie_id übergeben wurde oder in der Session liegt, vorhandenen Entwurf laden
@@ -443,6 +450,12 @@ class MoviesController
                     'meta_title'          => self::decodeLegacyText((string)$dObj->meta_title),
                     'meta_description'    => self::decodeLegacyText((string)$dObj->meta_description),
                     'seo_url'             => (string)$dObj->seo_url,
+                    'filename'            => trim((string)($dObj->filename ?? '')),
+                    'playtime_string'     => (string)($dObj->playtime_string ?? ''),
+                    'resolution'          => (string)($dObj->resolution ?? ''),
+                    'convert_status'      => abs((int)($dObj->convert_status ?? 0)),
+                    'released'            => abs((int)($dObj->released ?? 0)),
+                    'notify_on_convert'   => isset($dObj->notify_on_convert) ? (abs((int)$dObj->notify_on_convert) === 1 ? 1 : 0) : $notifyDefault,
                 ];
             } elseif ($step === 2) {
                 $step    = 1;
@@ -607,10 +620,18 @@ class MoviesController
             return;
         }
 
-        $metaTitle = mb_substr($title, 0, 65, 'UTF-8');
-        $seoUrl    = function_exists('seo_url') ? (string)seo_url($title) : '';
-        $metaDesc  = trim(strip_tags((string)$this->request->post('meta_description', '')));
-        $metaDesc  = str_replace(["\n", "\r"], ' ', $metaDesc);
+        $rawMetaTitle = trim(strip_tags((string)$this->request->post('meta_title', '')));
+        $metaTitle    = $rawMetaTitle !== '' ? mb_substr($rawMetaTitle, 0, 65, 'UTF-8') : mb_substr($title, 0, 65, 'UTF-8');
+
+        $rawSeoUrl = trim(strip_tags((string)$this->request->post('seo_url', '')));
+        if ($rawSeoUrl !== '') {
+            $seoUrl = function_exists('seo_url') ? (string)seo_url($rawSeoUrl) : (string)preg_replace('/[^a-zA-Z0-9\-]/', '', $rawSeoUrl);
+        } else {
+            $seoUrl = function_exists('seo_url') ? (string)seo_url($title) : '';
+        }
+
+        $metaDesc = trim(strip_tags((string)$this->request->post('meta_description', '')));
+        $metaDesc = str_replace(["\n", "\r"], ' ', $metaDesc);
         if ($metaDesc === '') {
             $metaDesc = mb_substr(trim(strip_tags($description)), 0, 156, 'UTF-8');
         } else {
@@ -643,8 +664,9 @@ class MoviesController
                 WHERE `id` = '" . $movieId . "' AND `merchant_id` = '" . $merchantId . "'
                 LIMIT 1;", __FILE__, __LINE__);
         } else {
-            $fileId     = md5($merchantId . '_' . microtime(true));
-            $storageDir = defined('MOVIES_DEFAULT_DIR') ? MOVIES_DEFAULT_DIR : 'movies';
+            $fileId        = md5($merchantId . '_' . microtime(true));
+            $storageDir    = defined('MOVIES_DEFAULT_DIR') ? MOVIES_DEFAULT_DIR : 'movies';
+            $notifyDefault = class_exists('EroCloudMailer') ? \EroCloudMailer::getMerchantNotifyPreference($merchantId) : 1;
 
             p4c_query("INSERT INTO `movies` SET
                 `actor_id`            = '" . $actorId . "',
@@ -665,6 +687,7 @@ class MoviesController
                 `category_slave`      = '" . p4c_escape_string($categorySlave) . "',
                 `visible_for_website` = '" . p4c_escape_string($visibleWebsite) . "',
                 `preview`             = '" . ($isTrailer ? 1 : 0) . "',
+                `notify_on_convert`   = '" . $notifyDefault . "',
                 `admin_infos`         = '';", __FILE__, __LINE__);
 
             $movieId = abs((int)p4c_insert_id());
@@ -804,17 +827,101 @@ class MoviesController
             WHERE `id` = '" . $movieId . "' AND `merchant_id` = '" . $merchantId . "'
             LIMIT 1;", __FILE__, __LINE__);
 
-        unset($_SESSION['upload_movie']);
-
         if (function_exists('log_action')) {
             log_action("Videodatei hochgeladen für Film-ID {$movieId} ({$targetFileName})");
         }
 
         Response::json([
-            'status'   => 'ok',
-            'movie_id' => $movieId,
-            'redirect' => '#/movie-upload?step=3&movie_id=' . $movieId,
-            'message'  => 'Deine Videodatei wurde erfolgreich hochgeladen und wird nun konvertiert.',
+            'status'          => 'ok',
+            'movie_id'        => $movieId,
+            'filename'        => $targetFileName,
+            'playtime_string' => $playTime,
+            'resolution'      => $resolution,
+            'message'         => 'Deine Videodatei wurde erfolgreich hochgeladen! Wähle nun unten aus, wie du mit den Vorschaubildern und der Freigabe fortfahren möchtest.',
+        ]);
+    }
+
+    /**
+     * POST: Schließt Schritt 2 nach dem Video-Upload ab (movies/complete-upload)
+     * Entscheidet, ob die Creatorin erst die Konvertierung & Vorschaubild-Bearbeitung abwarten möchte
+     * oder den Film direkt mit Standard-Vorschaubildern zur Prüfung einreicht.
+     */
+    public function completeUpload(): void
+    {
+        if (!$this->request->isPost()) {
+            Response::error('Ungültige Anfrage-Methode.', 405);
+            return;
+        }
+
+        if (!$this->hasValidCsrf()) {
+            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte lade die Seite neu.', 403);
+            return;
+        }
+
+        $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
+        $movieId    = abs((int)$this->request->post('movie_id', $this->request->post('id', 0)));
+
+        if ($merchantId === 0 || $movieId === 0) {
+            Response::error('Ungültige Film-ID oder abgelaufene Sitzung.', 400);
+            return;
+        }
+
+        $rsMovie = p4c_query("SELECT `id`, `title`, `filename`, `released`
+            FROM `movies`
+            WHERE `id` = '" . $movieId . "'
+              AND `merchant_id` = '" . $merchantId . "'
+              AND `status` != 'deleted'
+            LIMIT 1;", __FILE__, __LINE__);
+
+        if (!$rsMovie || p4c_num_rows($rsMovie) === 0) {
+            Response::error('Der gewünschte Film wurde nicht gefunden.', 404);
+            return;
+        }
+
+        $movieObj = p4c_fetch_object($rsMovie);
+        if (trim((string)$movieObj->filename) === '') {
+            Response::error('Bitte lade zuerst deine Videodatei hoch, bevor du diesen Schritt abschließt.', 400);
+            return;
+        }
+
+        $releaseMode     = trim((string)$this->request->post('release_mode', 'later'));
+        $isDirect        = ($releaseMode === 'direct' || (string)$this->request->post('released', '') === '1');
+        $notifyOnConvert = abs((int)$this->request->post('notify_on_convert', 1)) === 1 ? 1 : 0;
+
+        if (class_exists('EroCloudMailer')) {
+            \EroCloudMailer::setMerchantNotifyPreference($merchantId, $notifyOnConvert);
+        }
+
+        if ($isDirect) {
+            p4c_query("UPDATE `movies` SET
+                `create_datetime`   = '" . date('Y-m-d H:i:s') . "',
+                `movie_checked`     = '0000-00-00 00:00:00',
+                `released`          = '1',
+                `notify_on_convert` = '" . $notifyOnConvert . "'
+                WHERE `id` = '" . $movieId . "' AND `merchant_id` = '" . $merchantId . "'
+                LIMIT 1;", __FILE__, __LINE__);
+
+            if (function_exists('log_action')) {
+                log_action("Film direkt nach Upload zur Prüfung eingereicht: ID {$movieId}");
+            }
+        } else {
+            p4c_query("UPDATE `movies` SET
+                `released`          = '0',
+                `notify_on_convert` = '" . $notifyOnConvert . "'
+                WHERE `id` = '" . $movieId . "' AND `merchant_id` = '" . $merchantId . "'
+                LIMIT 1;", __FILE__, __LINE__);
+        }
+
+        unset($_SESSION['upload_movie']);
+
+        Response::json([
+            'status'       => 'ok',
+            'movie_id'     => $movieId,
+            'release_mode' => $isDirect ? 'direct' : 'later',
+            'redirect'     => '#/movie-upload?step=3&movie_id=' . $movieId,
+            'message'      => $isDirect
+                ? 'Dein Film wurde zur Prüfung eingereicht und wird nach der Konvertierung veröffentlicht.'
+                : 'Super! Dein Film wird nun konvertiert. Sobald die 10 Vorschaubilder bereitstehen, kannst du sie im Cover-Studio bearbeiten.',
         ]);
     }
 
@@ -961,10 +1068,18 @@ class MoviesController
             $visibleWebsite = (string)$mObj->visible_for_website;
         }
 
-        $metaTitle = mb_substr($title, 0, 65, 'UTF-8');
-        $seoUrl    = function_exists('seo_url') ? (string)seo_url($title) : (string)$mObj->seo_url;
-        $metaDesc  = trim(strip_tags((string)$this->request->post('meta_description', '')));
-        $metaDesc  = str_replace(["\n", "\r"], ' ', $metaDesc);
+        $rawMetaTitle = trim(strip_tags((string)$this->request->post('meta_title', '')));
+        $metaTitle    = $rawMetaTitle !== '' ? mb_substr($rawMetaTitle, 0, 65, 'UTF-8') : mb_substr($title, 0, 65, 'UTF-8');
+
+        $rawSeoUrl = trim(strip_tags((string)$this->request->post('seo_url', '')));
+        if ($rawSeoUrl !== '') {
+            $seoUrl = function_exists('seo_url') ? (string)seo_url($rawSeoUrl) : (string)preg_replace('/[^a-zA-Z0-9\-]/', '', $rawSeoUrl);
+        } else {
+            $seoUrl = function_exists('seo_url') ? (string)seo_url($title) : (string)$mObj->seo_url;
+        }
+
+        $metaDesc = trim(strip_tags((string)$this->request->post('meta_description', '')));
+        $metaDesc = str_replace(["\n", "\r"], ' ', $metaDesc);
         if ($metaDesc === '') {
             $metaDesc = mb_substr(trim(strip_tags($description)), 0, 156, 'UTF-8');
         } else {

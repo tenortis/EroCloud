@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 /**
  * @author		Martin Zimmermann
@@ -14,6 +14,10 @@ include_once(MCP_DIR."/common.inc.php");
 header('Content-Type: text/html; charset=utf-8');
 
 #$_POST = utf8decodeArray($_POST);
+
+if (isset($_GET['ml']) && trim((string)$_GET['ml']) !== '' && class_exists('EroCloudMagicLink')) {
+    EroCloudMagicLink::handleRequest((string)$_GET['ml']);
+}
 
 if (isset($_GET['logout'])) {
     if (isset($_SESSION['merchant_id'])) {

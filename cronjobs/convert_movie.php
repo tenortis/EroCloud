@@ -208,12 +208,45 @@ if (isset($db_settings_ary['videothek_ffmpeg_on_off']) AND $db_settings_ary['vid
                                 print_r($output);
                                 print_r($return_thumb);
                                 
-                                /*
-                                // Wenn Film fertig Konvertiert wurde
-                                if (isset($db_settings_ary['videothek_email_bei_upload_on_off']) AND $db_settings_ary['videothek_email_bei_upload_on_off'] == 1) {
-                                    p4c_query("INSERT INTO `email_bei_upload` SET `movie_id` = '".abs($movie_ary->id)."', `amateur_id` = '".abs($movie_ary->merchant_id)."';", __FILE__, __LINE__);
+                                // E-Mail-Benachrichtigung (inkl. Auto-Login Direkt-Link) an Creator senden,
+                                // sofern für den Film/Creator gewünscht und noch nicht versendet.
+                                if (class_exists('EroCloudMailer')) {
+                                    EroCloudMailer::ensureNotificationColumns();
+                                    $notifyMovieId    = abs((int)$movie_ary->id);
+                                    $notifyMerchantId = abs((int)$movie_ary->merchant_id);
+                                    $notifyMovieFlag  = isset($movie_ary->notify_on_convert) ? abs((int)$movie_ary->notify_on_convert) : 1;
+                                    $alreadySent      = !empty($movie_ary->notify_sent_at) && (string)$movie_ary->notify_sent_at !== '0000-00-00 00:00:00';
+                                    $merchantPref     = EroCloudMailer::getMerchantNotifyPreference($notifyMerchantId);
+
+                                    if ($notifyMovieFlag === 1 && $merchantPref === 1 && !$alreadySent && $notifyMerchantId > 0) {
+                                        $notifyMerchant = new Merchant($mysql, $notifyMerchantId);
+                                        $creatorEmail   = trim((string)$notifyMerchant->email('aes_decrypt'));
+                                        $creatorName    = trim((string)$notifyMerchant->username('aes_decrypt'));
+
+                                        if ($creatorEmail !== '') {
+                                            $rawUploadDt = (!empty($movie_ary->create_datetime) && (string)$movie_ary->create_datetime !== '0000-00-00 00:00:00')
+                                                ? (string)$movie_ary->create_datetime
+                                                : ((!empty($movie_ary->convert_starttime) && (string)$movie_ary->convert_starttime !== '0000-00-00 00:00:00')
+                                                    ? (string)$movie_ary->convert_starttime
+                                                    : date('Y-m-d H:i:s'));
+
+                                            $mailer = new EroCloudMailer();
+                                            $mailOk = $mailer->sendMovieConvertedNotification([
+                                                'merchant_id'     => $notifyMerchantId,
+                                                'to_email'        => $creatorEmail,
+                                                'creator_name'    => $creatorName !== '' ? $creatorName : 'Creator',
+                                                'movie_id'        => $notifyMovieId,
+                                                'upload_datetime' => $rawUploadDt,
+                                                'playtime'        => (string)$post_playtime_str,
+                                                'resolution'      => (string)$post_resolution,
+                                            ]);
+
+                                            if ($mailOk) {
+                                                p4c_query("UPDATE `movies` SET `notify_sent_at` = '" . date('Y-m-d H:i:s') . "' WHERE `id` = '" . $notifyMovieId . "' LIMIT 1;", __FILE__, __LINE__);
+                                            }
+                                        }
+                                    }
                                 }
-                                */
                             
                                 // Lösche Original hochgeladenes File, falls es eine andere Dateiendung hatte
                                 if ($file_name_neu != $movie_ary->filename && file_exists($org_file)) {

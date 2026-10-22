@@ -73,8 +73,19 @@ $step3Done = ($movieChecked !== '0000-00-00 00:00:00' && $released === 1);
 $step3Warn = ($movieChecked === '0000-00-00 00:00:00' && $released === 2);
 $step4Done = $isOnline;
 
-$amountSecondOptions = ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1.0', '1.1', '1.2', '1.3', '1.4', '1.5'];
-$downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 40, 45, 50];
+// Prüfen, ob für FSK 16 bzw. FSK 18 bereits ein Vorschaubild aktiv ausgewählt oder als eigenes Cover hochgeladen wurde
+$fsk16StudioReady = ($fsk16 === 11 && $hasCustomFsk16) || ($convertStatus === 2 && $fsk16 >= 1 && $fsk16 <= 10);
+$fsk18StudioReady = ($fsk18 === 12 && $hasCustomFsk18) || ($convertStatus === 2 && $fsk18 >= 1 && $fsk18 <= 10);
+$studioDisabledHint = 'Studio erst verfügbar, wenn du ein Vorschaubild ausgewählt oder ein eigenes Bild hochgeladen hast.';
+
+$amountSecondOptions = [];
+for ($i = 1; $i <= 300; $i++) {
+    $amountSecondOptions[] = number_format($i / 10, 1, '.', '');
+}
+if ($amountSecond !== '0.0' && $amountSecond !== '0' && !in_array($amountSecond, $amountSecondOptions, true)) {
+    $amountSecondOptions[] = $amountSecond;
+}
+$downloadPercentOptions = range(0, 150);
 ?>
 
 <!-- Kopfbereich -->
@@ -107,7 +118,11 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
       </button>
     <?php endif; ?>
     <button type="submit" form="kkc-movie-edit-form" class="btn btn-kkc-primary" id="btn-save-movie-top">
-      <i class="bi bi-check2-circle me-1"></i> Änderungen speichern
+      <?php if ($released === 0): ?>
+        <i class="bi bi-send-check me-1"></i> Film jetzt zur Prüfung einreichen
+      <?php else: ?>
+        <i class="bi bi-check2-circle me-1"></i> Änderungen speichern
+      <?php endif; ?>
     </button>
   </div>
 </div>
@@ -189,6 +204,41 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
     </div>
   </div>
 </div>
+
+<!-- Hinweis-Banner falls der Film noch nicht zur Prüfung eingereicht wurde (released == 0) -->
+<?php if ($released === 0): ?>
+  <?php if ($convertStatus < 2): ?>
+    <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4 shadow-sm">
+      <div class="d-flex align-items-start gap-3">
+        <div class="spinner-border text-primary flex-shrink-0 mt-1" role="status" style="width: 1.5rem; height: 1.5rem;"></div>
+        <div>
+          <h6 class="fw-bold mb-1">Dein Video wird aktuell konvertiert &amp; 10 Vorschaubilder werden erstellt</h6>
+          <div class="small">
+            Sobald die Konvertierung abgeschlossen ist, stehen dir unten alle <strong>10 automatisch generierten Szenen-Vorschaubilder</strong> sowie unser <strong>Fullscreen Cover-Studio</strong> (Milchglas, Verpixeln, Sticker, Text &amp; Live-Schnappschuss) zur Verfügung. Anschließend reichst du den Film über <strong>„Film jetzt zur Prüfung einreichen"</strong> frei.
+          </div>
+        </div>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-primary bg-white flex-shrink-0" onclick="window.MCPApp && window.MCPApp.handleRoute()">
+        <i class="bi bi-arrow-clockwise me-1"></i> Status aktualisieren
+      </button>
+    </div>
+  <?php else: ?>
+    <div class="alert alert-warning d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4 shadow-sm">
+      <div class="d-flex align-items-start gap-3">
+        <i class="bi bi-magic fs-3 text-warning flex-shrink-0"></i>
+        <div>
+          <h6 class="fw-bold mb-1">Konvertierung abgeschlossen – Vorschaubilder bereit für das Cover-Studio!</h6>
+          <div class="small">
+            Dein Film ist fertig konvertiert und alle <strong>10 Szenen-Vorschaubilder</strong> stehen bereit. Wähle oder bearbeite jetzt links deine <strong>FSK 16 &amp; FSK 18 Cover</strong> im <strong>Cover-Studio</strong> und klicke danach auf <strong>„Film jetzt zur Prüfung einreichen"</strong>.
+          </div>
+        </div>
+      </div>
+      <button type="submit" form="kkc-movie-edit-form" class="btn btn-sm btn-kkc-primary flex-shrink-0">
+        <i class="bi bi-send-check me-1"></i> Film jetzt zur Prüfung einreichen
+      </button>
+    </div>
+  <?php endif; ?>
+<?php endif; ?>
 
 <!-- Ablehnungs-Hinweis falls released == 2 -->
 <?php if ($rejectionInfo !== null): ?>
@@ -272,6 +322,21 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
             Fahre mit der Maus über ein Bild für die <strong>Live-Lupe</strong> oder öffne das <strong>Fullscreen Cover-Studio</strong> (Milchglas, Verpixeln, Sticker, Licht &amp; Farbe, Badges, Text &amp; Logo).
           </p>
 
+          <!-- Wichtiger Hinweis, solange noch kein FSK 16 oder FSK 18 Cover ausgewählt/hochgeladen wurde -->
+          <div id="missing-covers-warning" class="alert alert-warning py-2 px-3 small mb-3 <?= ($fsk16StudioReady && $fsk18StudioReady) ? 'd-none' : '' ?>">
+            <div class="fw-bold mb-1">
+              <i class="bi bi-exclamation-triangle-fill me-1"></i>Bitte wähle noch dein FSK 16 und FSK 18 Cover aus:
+            </div>
+            <ul class="mb-0 ps-3" style="font-size: 0.78rem; line-height: 1.45;">
+              <li id="missing-fsk16-hint" class="<?= $fsk16StudioReady ? 'd-none' : '' ?>">
+                <strong>FSK 16 Cover (Jugendfrei-Pflicht):</strong> Wähle unten eines der generierten Szenenbilder (oder lade ein eigenes Bild hoch). <strong>Wichtig:</strong> Das FSK 16 Bild muss <strong>jugendfrei (verpixelt / Milchglas)</strong> sein – nutze dafür nach der Auswahl direkt das <strong>Cover-Studio</strong>!
+              </li>
+              <li id="missing-fsk18-hint" class="<?= $fsk18StudioReady ? 'd-none' : '' ?>">
+                <strong>FSK 18 Cover:</strong> Wähle unten eines der generierten Szenenbilder über den Button <strong>„FSK18"</strong> aus oder lade ein eigenes FSK 18 Cover hoch.
+              </li>
+            </ul>
+          </div>
+
           <!-- Aktuelle Auswahl nebeneinander -->
           <div class="row g-3 mb-4">
             <!-- Aktives FSK 16 Cover -->
@@ -280,33 +345,56 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
                 <div>
                   <div class="d-flex align-items-center justify-content-between mb-2">
                     <span class="badge bg-success">FSK 16 Cover</span>
-                    <span class="small text-muted fw-semibold" id="badge-fsk16-num">
-                      <?= $fsk16 === 11 ? 'Eigenes Bild (#11)' : ('Szene #' . $fsk16) ?>
+                    <span class="small <?= $fsk16StudioReady ? 'text-muted' : 'text-danger' ?> fw-semibold" id="badge-fsk16-num">
+                      <?php if (!$fsk16StudioReady): ?>
+                        Bitte auswählen
+                      <?php elseif ($fsk16 === 11): ?>
+                        Eigenes Bild (#11)
+                      <?php else: ?>
+                        Szene #<?= $fsk16 ?>
+                      <?php endif; ?>
                     </span>
                   </div>
-                  <div class="position-relative d-inline-block w-100 mb-2 cursor-pointer js-hover-zoom-thumb js-open-thumb-editor-modal"
+                  <div class="position-relative d-inline-block w-100 mb-2 js-hover-zoom-thumb js-open-thumb-editor-modal"
                        id="current-fsk16-wrap"
+                       style="<?= $fsk16StudioReady ? 'cursor: pointer;' : 'cursor: not-allowed;' ?>"
+                       title="<?= htmlspecialchars($fsk16StudioReady ? 'Klicken, um das FSK 16 Cover im Studio zu bearbeiten (Verpixeln / Milchglas)' : $studioDisabledHint, ENT_QUOTES, 'UTF-8') ?>"
+                       data-studio-ready="<?= $fsk16StudioReady ? '1' : '0' ?>"
                        data-movie-id="<?= $movieId ?>"
                        data-num="<?= $fsk16 ?>"
                        data-fsk="16"
                        data-target-fsk="16"
-                       data-thumb-url="<?= htmlspecialchars($currentFsk16ThumbUrl, ENT_QUOTES, 'UTF-8') ?>"
-                       data-zoom-src="<?= htmlspecialchars($currentFsk16ZoomUrl, ENT_QUOTES, 'UTF-8') ?>"
-                       data-editor-url="<?= htmlspecialchars($currentFsk16EditorUrl, ENT_QUOTES, 'UTF-8') ?>"
+                       data-thumb-url="<?= htmlspecialchars($fsk16StudioReady ? $currentFsk16ThumbUrl : '', ENT_QUOTES, 'UTF-8') ?>"
+                       data-zoom-src="<?= htmlspecialchars($fsk16StudioReady ? $currentFsk16ZoomUrl : '', ENT_QUOTES, 'UTF-8') ?>"
+                       data-editor-url="<?= htmlspecialchars($fsk16StudioReady ? $currentFsk16EditorUrl : '', ENT_QUOTES, 'UTF-8') ?>"
                        data-zoom-fsk="16"
                        data-zoom-title="Aktuelles FSK 16 Cover (Klick für FSK 16 Cover-Studio)">
+                    <div id="empty-fsk16-placeholder"
+                         class="d-flex flex-column align-items-center justify-content-center rounded border border-2 border-dashed bg-white p-2 text-center <?= $fsk16StudioReady ? 'd-none' : '' ?>"
+                         style="height: 115px;">
+                      <i class="bi bi-shield-exclamation text-success fs-4 mb-1"></i>
+                      <div class="fw-bold text-dark" style="font-size: 0.75rem;">Kein FSK 16 Cover gewählt</div>
+                      <div class="text-muted" style="font-size: 0.67rem; line-height: 1.2;">Unten Szene wählen &amp; verpixeln (jugendfrei!) oder eigenes Bild laden</div>
+                    </div>
                     <img id="current-fsk16-preview"
-                         src="<?= htmlspecialchars($currentFsk16ThumbUrl, ENT_QUOTES, 'UTF-8') ?>"
+                         src="<?= htmlspecialchars($fsk16StudioReady ? $currentFsk16ThumbUrl : '', ENT_QUOTES, 'UTF-8') ?>"
                          alt="FSK16"
-                         class="img-fluid rounded border w-100"
+                         class="img-fluid rounded border w-100 <?= $fsk16StudioReady ? '' : 'd-none' ?>"
                          style="height: 115px; object-fit: cover;">
-                    <span class="badge bg-dark bg-opacity-75 position-absolute bottom-0 end-0 m-1 small">
+                    <span id="badge-fsk16-studio-overlay"
+                          class="badge bg-dark bg-opacity-75 position-absolute bottom-0 end-0 m-1 small <?= $fsk16StudioReady ? '' : 'd-none' ?>">
                       <i class="bi bi-magic me-1"></i>FSK 16 Studio
                     </span>
                   </div>
                 </div>
                 <div class="d-grid gap-1">
-                  <button type="button" class="btn btn-sm btn-success fw-semibold js-open-active-fsk-editor" data-fsk="16">
+                  <button type="button"
+                          id="btn-open-studio-fsk16"
+                          class="btn btn-sm <?= $fsk16StudioReady ? 'btn-success' : 'btn-secondary opacity-50' ?> fw-semibold js-open-active-fsk-editor"
+                          style="<?= $fsk16StudioReady ? 'cursor: pointer;' : 'cursor: not-allowed;' ?>"
+                          title="<?= htmlspecialchars($fsk16StudioReady ? 'FSK 16 Cover im Studio bearbeiten (Verpixeln / Milchglas)' : $studioDisabledHint, ENT_QUOTES, 'UTF-8') ?>"
+                          data-studio-ready="<?= $fsk16StudioReady ? '1' : '0' ?>"
+                          data-fsk="16">
                     <i class="bi bi-shield-check me-1"></i> FSK 16 im Studio bearbeiten
                   </button>
                   <label class="btn btn-sm btn-outline-kkc mb-0">
@@ -334,33 +422,56 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
                 <div>
                   <div class="d-flex align-items-center justify-content-between mb-2">
                     <span class="badge bg-danger">FSK 18 Cover</span>
-                    <span class="small text-muted fw-semibold" id="badge-fsk18-num">
-                      <?= $fsk18 === 12 ? 'Eigenes Bild (#12)' : ('Szene #' . $fsk18) ?>
+                    <span class="small <?= $fsk18StudioReady ? 'text-muted' : 'text-danger' ?> fw-semibold" id="badge-fsk18-num">
+                      <?php if (!$fsk18StudioReady): ?>
+                        Bitte auswählen
+                      <?php elseif ($fsk18 === 12): ?>
+                        Eigenes Bild (#12)
+                      <?php else: ?>
+                        Szene #<?= $fsk18 ?>
+                      <?php endif; ?>
                     </span>
                   </div>
-                  <div class="position-relative d-inline-block w-100 mb-2 cursor-pointer js-hover-zoom-thumb js-open-thumb-editor-modal"
+                  <div class="position-relative d-inline-block w-100 mb-2 js-hover-zoom-thumb js-open-thumb-editor-modal"
                        id="current-fsk18-wrap"
+                       style="<?= $fsk18StudioReady ? 'cursor: pointer;' : 'cursor: not-allowed;' ?>"
+                       title="<?= htmlspecialchars($fsk18StudioReady ? 'Klicken, um das FSK 18 Cover im Studio zu bearbeiten' : $studioDisabledHint, ENT_QUOTES, 'UTF-8') ?>"
+                       data-studio-ready="<?= $fsk18StudioReady ? '1' : '0' ?>"
                        data-movie-id="<?= $movieId ?>"
                        data-num="<?= $fsk18 ?>"
                        data-fsk="18"
                        data-target-fsk="18"
-                       data-thumb-url="<?= htmlspecialchars($currentFsk18ThumbUrl, ENT_QUOTES, 'UTF-8') ?>"
-                       data-zoom-src="<?= htmlspecialchars($currentFsk18ZoomUrl, ENT_QUOTES, 'UTF-8') ?>"
-                       data-editor-url="<?= htmlspecialchars($currentFsk18EditorUrl, ENT_QUOTES, 'UTF-8') ?>"
+                       data-thumb-url="<?= htmlspecialchars($fsk18StudioReady ? $currentFsk18ThumbUrl : '', ENT_QUOTES, 'UTF-8') ?>"
+                       data-zoom-src="<?= htmlspecialchars($fsk18StudioReady ? $currentFsk18ZoomUrl : '', ENT_QUOTES, 'UTF-8') ?>"
+                       data-editor-url="<?= htmlspecialchars($fsk18StudioReady ? $currentFsk18EditorUrl : '', ENT_QUOTES, 'UTF-8') ?>"
                        data-zoom-fsk="18"
                        data-zoom-title="Aktuelles FSK 18 Cover (Klick für FSK 18 Cover-Studio)">
+                    <div id="empty-fsk18-placeholder"
+                         class="d-flex flex-column align-items-center justify-content-center rounded border border-2 border-dashed bg-white p-2 text-center <?= $fsk18StudioReady ? 'd-none' : '' ?>"
+                         style="height: 115px;">
+                      <i class="bi bi-image text-danger fs-4 mb-1"></i>
+                      <div class="fw-bold text-dark" style="font-size: 0.75rem;">Kein FSK 18 Cover gewählt</div>
+                      <div class="text-muted" style="font-size: 0.67rem; line-height: 1.2;">Unten eine Szene per „FSK18"-Button wählen oder eigenes Bild laden</div>
+                    </div>
                     <img id="current-fsk18-preview"
-                         src="<?= htmlspecialchars($currentFsk18ThumbUrl, ENT_QUOTES, 'UTF-8') ?>"
+                         src="<?= htmlspecialchars($fsk18StudioReady ? $currentFsk18ThumbUrl : '', ENT_QUOTES, 'UTF-8') ?>"
                          alt="FSK18"
-                         class="img-fluid rounded border w-100"
+                         class="img-fluid rounded border w-100 <?= $fsk18StudioReady ? '' : 'd-none' ?>"
                          style="height: 115px; object-fit: cover;">
-                    <span class="badge bg-dark bg-opacity-75 position-absolute bottom-0 end-0 m-1 small">
+                    <span id="badge-fsk18-studio-overlay"
+                          class="badge bg-dark bg-opacity-75 position-absolute bottom-0 end-0 m-1 small <?= $fsk18StudioReady ? '' : 'd-none' ?>">
                       <i class="bi bi-stars me-1"></i>FSK 18 Studio
                     </span>
                   </div>
                 </div>
                 <div class="d-grid gap-1">
-                  <button type="button" class="btn btn-sm btn-danger fw-semibold js-open-active-fsk-editor" data-fsk="18">
+                  <button type="button"
+                          id="btn-open-studio-fsk18"
+                          class="btn btn-sm <?= $fsk18StudioReady ? 'btn-danger' : 'btn-secondary opacity-50' ?> fw-semibold js-open-active-fsk-editor"
+                          style="<?= $fsk18StudioReady ? 'cursor: pointer;' : 'cursor: not-allowed;' ?>"
+                          title="<?= htmlspecialchars($fsk18StudioReady ? 'FSK 18 Cover im Studio bearbeiten' : $studioDisabledHint, ENT_QUOTES, 'UTF-8') ?>"
+                          data-studio-ready="<?= $fsk18StudioReady ? '1' : '0' ?>"
+                          data-fsk="18">
                     <i class="bi bi-fire me-1"></i> FSK 18 im Studio bearbeiten
                   </button>
                   <label class="btn btn-sm btn-outline-kkc mb-0">
@@ -641,7 +752,7 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
                   <select name="amount_second" id="movie-amount-second" class="form-select" <?= $preview === 1 ? 'disabled' : '' ?>>
                     <?php foreach ($amountSecondOptions as $opt): ?>
                       <option value="<?= $opt ?>" <?= $amountSecond === $opt ? 'selected' : '' ?>>
-                        <?= str_replace('.', ',', $opt) ?> Coins / Sekunde
+                        <?= str_replace('.', ',', $opt) ?> Coins / Sekunde<?= $opt === '0.8' ? ' (Empfohlen)' : '' ?>
                       </option>
                     <?php endforeach; ?>
                   </select>
@@ -668,13 +779,19 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
                   </div>
                 </div>
 
-                <!-- Download-Preis in EUR -->
+                <!-- Download-Aufpreis in Prozent -->
                 <div class="col-12 col-md-6" id="movie-download-price-wrap" style="<?= $asDownload === 1 ? '' : 'opacity:0.5;' ?>">
-                  <label class="form-label fw-semibold">Download-Verkaufspreis (EUR)</label>
+                  <label class="form-label fw-semibold">Aufpreis für Komplett-Download (%)</label>
                   <select name="amount_download" id="movie-amount-download" class="form-select" <?= ($asDownload === 1 && $preview !== 1) ? '' : 'disabled' ?>>
-                    <?php foreach ($downloadEurOptions as $eur): ?>
-                      <option value="<?= $eur ?>" <?= $amountDownload === $eur ? 'selected' : '' ?>>
-                        <?= number_format($eur, 2, ',', '.') ?> € (ca. <?= $eur * 32 ?> Coins)
+                    <?php foreach ($downloadPercentOptions as $pct): ?>
+                      <option value="<?= $pct ?>" <?= $amountDownload === $pct ? 'selected' : '' ?>>
+                        <?php if ($pct === 0): ?>
+                          +0 % (genau so teuer wie Streaming)
+                        <?php elseif ($pct === 10): ?>
+                          +10 % (Empfohlen)
+                        <?php else: ?>
+                          +<?= $pct ?> %
+                        <?php endif; ?>
                       </option>
                     <?php endforeach; ?>
                   </select>
@@ -773,12 +890,27 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
         </div>
       </div>
 
-      <!-- Speichern-Leiste unten -->
-      <div class="d-flex justify-content-end gap-2">
-        <a href="#/movies" class="btn btn-outline-kkc">Abbrechen</a>
-        <button type="submit" class="btn btn-kkc-primary px-4" id="btn-save-movie-bottom">
-          <i class="bi bi-check2-circle me-1"></i> Änderungen speichern
-        </button>
+      <!-- Speichern- & Löschen-Leiste unten -->
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <?php if ($canDelete): ?>
+            <button type="button" class="btn btn-outline-danger js-delete-movie-btn" id="btn-delete-movie-bottom"
+                    data-movie-id="<?= $movieId ?>"
+                    data-movie-title="<?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?>">
+              <i class="bi bi-trash3 me-1"></i> Film löschen
+            </button>
+          <?php endif; ?>
+        </div>
+        <div class="d-flex gap-2 ms-auto">
+          <a href="#/movies" class="btn btn-outline-kkc">Abbrechen</a>
+          <button type="submit" class="btn btn-kkc-primary px-4" id="btn-save-movie-bottom">
+            <?php if ($released === 0): ?>
+              <i class="bi bi-send-check me-1"></i> Film jetzt zur Prüfung einreichen
+            <?php else: ?>
+              <i class="bi bi-check2-circle me-1"></i> Änderungen speichern
+            <?php endif; ?>
+          </button>
+        </div>
       </div>
     </div>
   </div>

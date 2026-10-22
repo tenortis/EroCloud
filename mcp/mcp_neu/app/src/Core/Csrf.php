@@ -19,4 +19,12 @@ class Csrf
         }
         return (string)$_SESSION['mcp_csrf_token'];
     }
+
+    public static function validate(?string $token): bool
+    {
+        if ($token === null || $token === '' || empty($_SESSION['mcp_csrf_token'])) {
+            return false;
+        }
+        return hash_equals((string)$_SESSION['mcp_csrf_token'], $token);
+    }
 }

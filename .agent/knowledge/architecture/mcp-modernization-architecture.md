@@ -133,5 +133,15 @@ mcp_neu/ (später: mcp/)
 3. **Content-Übersichten (`#/movies` & `#/photo-albums`):**
    * **Obere 4 KPI-Kacheln:** *Gesamtanzahl*, *Online*, *In Prüfung / Konvertierung* sowie *Abgelehnt / Korrektur nötig* (**niemals** Provisionen oder Umsatzzahlen).
    * **Tabellen-Spalten:** Zeigen ausschließlich Verwaltungs- und Statusdaten (*Status*, *ID*, *FSK16/FSK18 Vorschaubilder*, *Titel & technische Details / Verkaufspreis*, *Darsteller*, *Online ab*, *Aktion*) – **ohne** Spalten für Verkäufe oder Provisionen.
+4. **Direkter Draht zu Martin (Testlauf-Feedback & Fehlermeldungen auf `#/startseite`):**
+   * Am unteren Ende der Startseite (`Home/views/dashboard.php`) befindet sich die persönliche Feedback- & Fehlermeldungs-Box mit **Martin Zimmermann** (*CEO & Entwickler*, Profilbild `assets/img/ceo-150x150.jpg`) inklusive explizitem **Testlauf-Hinweis** in persönlicher **Du-Form**.
+   * **Automatischer Kontext & Isolierung auf Shared-Domain (`erocloud.net`):**
+     * Da sich alle Partner die Domain `erocloud.net` teilen, nutzt jeder Partner einen eindeutigen `creator_key` (`ec_merchant_<merchant_id>`), sodass jede Creatorin im Verlauf (`home/feedback-history`) und beim Bestätigen (`home/feedback-mark-read`) ausschließlich ihre eigenen Meldungen und Antworten sieht.
+     * Beim Absenden (`home/feedback-send`) werden automatisch alle Partner- und Profil-Metadaten (`merchant_id`, Pay4Coins `partner_id`, `merchant_username`, entschlüsselter Realname & E-Mail, alle aktiven Darsteller-Profile `actors` mit `#ID` sowie verknüpfte Webseiten aus `sites`) als `meta` / `meta_json` übertragen.
+     * Zusätzlich wird automatisch das Ende des zentralen EroCloud-Error-Logs (`SOURCEDIR . '/log/.errorlog'`, max. 12 KB / 45 Zeilen) zusammen mit einem Diagnose-Header angehängt.
+   * **KKC-Integration (`#/feedback`):**
+     * Meldungen landen über `https://remote.erocms.net/feedback.php` (bzw. lokal per Direkt-Include) in derselben KKC-Tabelle `creator_feedback`.
+     * Im KKC (`#/feedback`) werden EroCloud-Meldungen mit einem **EroCloud MCP**-Badge und einer detaillierten Partner-/Darsteller-Leiste angezeigt; der Button *„KI-Prompt kopieren (MD)“* generiert automatisch einen auf `c:\xampp\htdocs\EroCloud` (`mcp/mcp_neu/`) zugeschnittenen Analyse-Prompt.
+
 
 

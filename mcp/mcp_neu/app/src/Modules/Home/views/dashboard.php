@@ -29,6 +29,20 @@ use App\Core\View;
 $mcpUrl       = defined('MCP_URL') ? MCP_URL : 'https://erocloud.net';
 $domainName   = defined('DOMAIN') ? DOMAIN : 'erocloud.net';
 $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
+
+$greetingName = $firstname !== ''
+    ? $firstname
+    : (!empty($actors[0]['username']) ? (string)$actors[0]['username'] : (string)($merchantUsername ?? ''));
+
+$actorNamesSummary = [];
+foreach ($actors as $actItem) {
+    if (!empty($actItem['username'])) {
+        $actorNamesSummary[] = (string)$actItem['username'];
+    }
+}
+$creatorContextLabel = !empty($actorNamesSummary)
+    ? implode(', ', array_slice($actorNamesSummary, 0, 2))
+    : ((string)($merchantUsername ?? '') !== '' ? (string)$merchantUsername : ('Account #' . (int)($merchantId ?? 0)));
 ?>
 
 <!-- Page Header & Personal Greeting -->
@@ -42,6 +56,9 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
     </p>
   </div>
 </div>
+
+<!-- Benachrichtigungs-Banner oben bei neuen Antworten von Martin aus der Entwicklung -->
+<div id="ec-feedback-top-alert-container" class="d-none mb-4"></div>
 
 <?php if ($needsRulesAccept): ?>
 <!-- Wichtiger Hinweis: Nutzungsrichtlinien noch nicht bestätigt -->
@@ -649,5 +666,200 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- =========================================================================
+     Persönliche Entwickler-Kontakt- & Fehlermeldungs-Box (Testlauf / Beta)
+     ========================================================================= -->
+<div class="card-kkc mt-4 mb-0 overflow-hidden" id="ec-creator-feedback-card">
+  <div class="card-kkc-body p-0">
+    <div class="row g-0">
+      <!-- Linke Spalte: Persönliches Profil (Martin Zimmermann) & Testlauf-Hinweis -->
+      <div class="col-lg-4 p-4 d-flex flex-column justify-content-between" style="background: rgba(66, 151, 215, 0.045); border-right: 1px solid var(--kkc-border);">
+        <div>
+          <!-- Testlauf-Badge -->
+          <div class="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill ec-bg-primary-subtle ec-text-primary fw-semibold small mb-3">
+            <i class="bi bi-stars"></i>
+            <span>Neuer Bereich im Testlauf &bull; Direkt-Draht</span>
+          </div>
+
+          <!-- Martin Zimmermann Avatar & Name (analog EroCMS) -->
+          <div class="d-flex align-items-center gap-3 mb-3 p-3 rounded-3 border" style="background-color: var(--kkc-card-bg); border-color: var(--kkc-border) !important;">
+            <div class="position-relative flex-shrink-0">
+              <img src="assets/img/ceo-150x150.jpg"
+                   onerror="this.onerror=null;this.src='https://erocms.net/images/ceo-150x150.jpg';"
+                   alt="Martin Zimmermann"
+                   class="rounded-circle border border-3 shadow-sm object-fit-cover"
+                   style="width: 72px; height: 72px; border-color: var(--kkc-card-bg) !important;">
+              <span class="position-absolute" style="bottom: -2px; right: -2px; font-size: 1.35rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));">👋</span>
+            </div>
+            <div>
+              <div class="fw-bold" style="font-size: 1.02rem; line-height: 1.2;">Martin Zimmermann</div>
+              <div class="ec-text-primary small fw-semibold mt-1">CEO &amp; Entwickler</div>
+              <div class="text-muted" style="font-size: 0.74rem;">Dein persönlicher Ansprechpartner</div>
+            </div>
+          </div>
+
+          <h5 class="fw-bold mb-2">
+            <?= $greetingName !== '' ? 'Hallo ' . View::e($greetingName) . ', ist dir etwas aufgefallen?' : 'Fehler entdeckt oder eine Idee?' ?>
+          </h5>
+          <p class="text-muted mb-3" style="font-size: 0.88rem; line-height: 1.55;">
+            Dieser neue EroCloud-Partnerbereich befindet sich aktuell noch im <strong>Testlauf</strong>. Wenn dir hier irgendwo ein Fehler auffällt, etwas noch nicht wie gewohnt funktioniert oder du dir eine Verbesserung wünschst, kannst du es mir hier direkt melden!
+          </p>
+        </div>
+
+        <div class="d-flex flex-column gap-2 pt-3 border-top small text-muted" style="border-color: var(--kkc-border) !important;">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-check-circle-fill text-success flex-shrink-0"></i>
+            <span>Landet automatisch direkt in meiner Entwicklungsumgebung</span>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-cpu-fill ec-text-primary flex-shrink-0"></i>
+            <span>Dein Account, deine Profile &amp; das zentrale Error-Log werden automatisch mitgesendet</span>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-reply-fill ec-text-primary flex-shrink-0"></i>
+            <span>Meine Antwort erhältst du direkt hier auf deiner Startseite</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rechte Spalte: Direkt-Meldeformular -->
+      <div class="col-lg-8 p-4">
+        <!-- Erfolgs-Ansicht nach dem Absenden -->
+        <div id="ec-feedback-success-box" class="d-none py-3 px-2">
+          <div class="p-4 rounded-4 bg-success bg-opacity-10 border border-success border-opacity-25">
+            <div class="d-flex align-items-start gap-3">
+              <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center flex-shrink-0 shadow-sm" style="width: 46px; height: 46px;">
+                <i class="bi bi-check-lg fs-4"></i>
+              </div>
+              <div class="flex-grow-1">
+                <h5 class="fw-bold text-success mb-1" id="ec-feedback-success-title">Vielen Dank für deine Nachricht!</h5>
+                <p class="mb-3 text-body" style="font-size: 0.95rem; line-height: 1.5;" id="ec-feedback-success-text">
+                  Deine Meldung ist direkt bei mir in der Entwicklung eingegangen.
+                </p>
+                <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-3 fw-semibold" id="ec-feedback-reset-btn">
+                  <i class="bi bi-plus-circle me-1"></i> Weitere Meldung oder Idee senden
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Eingabe-Formular -->
+        <form id="ec-creator-feedback-form" onsubmit="return false;">
+          <label class="form-label fw-semibold small text-uppercase text-muted mb-2">1. Worum geht es?</label>
+          <div class="row g-2 mb-3">
+            <div class="col-sm-4">
+              <input type="radio" class="btn-check" name="ec_feedback_category" id="ec_fb_cat_bug" value="bug" checked autocomplete="off">
+              <label class="ec-feedback-type-label type-bug rounded-3 p-2 px-3 w-100 d-flex align-items-center gap-2" for="ec_fb_cat_bug">
+                <i class="bi bi-bug-fill text-danger fs-5"></i>
+                <div class="lh-sm">
+                  <div class="fw-bold small">Fehler / Problem</div>
+                  <small class="text-muted" style="font-size: 0.72rem;">Etwas klappt nicht</small>
+                </div>
+              </label>
+            </div>
+            <div class="col-sm-4">
+              <input type="radio" class="btn-check" name="ec_feedback_category" id="ec_fb_cat_idea" value="idea" autocomplete="off">
+              <label class="ec-feedback-type-label type-idea rounded-3 p-2 px-3 w-100 d-flex align-items-center gap-2" for="ec_fb_cat_idea">
+                <i class="bi bi-lightbulb-fill text-warning fs-5"></i>
+                <div class="lh-sm">
+                  <div class="fw-bold small">Idee / Wunsch</div>
+                  <small class="text-muted" style="font-size: 0.72rem;">Verbesserungsvorschlag</small>
+                </div>
+              </label>
+            </div>
+            <div class="col-sm-4">
+              <input type="radio" class="btn-check" name="ec_feedback_category" id="ec_fb_cat_question" value="question" autocomplete="off">
+              <label class="ec-feedback-type-label type-question rounded-3 p-2 px-3 w-100 d-flex align-items-center gap-2" for="ec_fb_cat_question">
+                <i class="bi bi-chat-heart-fill ec-text-primary fs-5"></i>
+                <div class="lh-sm">
+                  <div class="fw-bold small">Frage / Feedback</div>
+                  <small class="text-muted" style="font-size: 0.72rem;">Rückmeldung zum Testlauf</small>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="ec-feedback-message" class="form-label fw-semibold small text-uppercase text-muted mb-1" id="ec-feedback-label">
+              2. Welches Problem oder welcher Fehler ist dir im neuen Bereich aufgefallen?
+            </label>
+            <textarea class="form-control rounded-3" id="ec-feedback-message" name="message" rows="3" placeholder="Beschreibe mir kurz, wo das Problem auftritt und was genau passiert (z. B. beim Film-Upload, in den Fotoalben, bei deinen Profilen...)" required style="font-size: 0.92rem;"></textarea>
+          </div>
+
+          <!-- 3. Dateianhänge (max. 3 Dateien: Screenshots / Fotos / PDF) -->
+          <div class="mb-3">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
+              <label class="form-label fw-semibold small text-uppercase text-muted mb-0">
+                3. Optional: Screenshots oder PDF anhängen <span class="fw-normal text-lowercase">(max. 3 Dateien)</span>
+              </label>
+              <span class="text-muted" style="font-size: 0.74rem;">
+                <i class="bi bi-clipboard-check me-1"></i>Tipp: Du kannst Screenshots auch direkt mit <kbd class="py-0 px-1">Strg+V</kbd> einfügen
+              </span>
+            </div>
+            <input type="file" id="ec-feedback-files" accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,image/jpeg,image/png,image/webp,image/gif,application/pdf" multiple class="d-none">
+            <div class="d-flex align-items-center flex-wrap gap-2">
+              <button type="button" id="ec-feedback-add-file-btn" class="btn btn-sm btn-outline-kkc rounded-3 px-3 py-1 d-inline-flex align-items-center gap-2">
+                <i class="bi bi-paperclip"></i>
+                <span>Fotos / PDF auswählen</span>
+                <span class="badge bg-secondary bg-opacity-25 text-body rounded-pill" id="ec-feedback-file-count-badge">0 / 3</span>
+              </button>
+              <span class="text-muted" style="font-size: 0.75rem;">Erlaubt: JPG, PNG, WEBP, GIF, PDF (max. 6 MB pro Datei)</span>
+            </div>
+            <div id="ec-feedback-file-list" class="d-flex flex-wrap gap-2 mt-2"></div>
+          </div>
+
+          <div id="ec-feedback-error-alert" class="alert alert-danger py-2 px-3 small d-none mb-3" role="alert"></div>
+
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <span class="text-muted" style="font-size: 0.78rem;">
+              <i class="bi bi-shield-check text-success me-1"></i>
+              Creator-Profil (<strong><?= View::e($creatorContextLabel) ?></strong>) &amp; zentrales Error-Log werden automatisch beigefügt.
+            </span>
+            <button type="submit" id="ec-feedback-submit-btn" class="btn btn-primary-kkc rounded-pill px-4 py-2 fw-semibold shadow-sm">
+              <i class="bi bi-send-fill me-2"></i>Nachricht absenden
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Verlauf der gesendeten Nachrichten & Rückmeldungen aus der Entwicklung -->
+    <div id="ec-creator-feedback-history-wrap" class="d-none border-top p-4" style="background: rgba(66, 151, 215, 0.025); border-color: var(--kkc-border) !important;">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-chat-left-quote-fill ec-text-primary fs-5"></i>
+          <h6 class="fw-bold mb-0">Deine gesendeten Nachrichten &amp; meine Rückmeldungen</h6>
+          <span id="ec-fb-history-unread-badge" class="badge rounded-pill bg-danger d-none">Neu</span>
+        </div>
+        <span class="text-muted small">Hier siehst du den aktuellen Status deiner Meldungen &amp; Ideen</span>
+      </div>
+
+      <!-- Aktive Meldungen & ungelesene Rückmeldungen (direkt sichtbar) -->
+      <div id="ec-creator-feedback-history-list" class="d-flex flex-column gap-3"></div>
+
+      <!-- Zugeklapptes Akkordeon für bereits als gelesen bestätigte Rückmeldungen -->
+      <div id="ec-creator-feedback-read-accordion-wrap" class="d-none">
+        <div id="ec-fb-read-accordion-toggle" class="rounded-3 px-3 py-2 d-flex align-items-center justify-content-between flex-wrap gap-2 shadow-sm ec-fb-read-accordion-toggle" role="button" tabindex="0" aria-expanded="false">
+          <div class="d-flex align-items-center gap-2">
+            <span class="rounded-circle bg-success bg-opacity-10 text-success d-inline-flex align-items-center justify-content-center" style="width: 28px; height: 28px;">
+              <i class="bi bi-check2-all"></i>
+            </span>
+            <span class="fw-semibold small text-body" id="ec-fb-read-accordion-title">Bereits gelesene Rückmeldungen</span>
+            <span id="ec-fb-read-count-badge" class="badge rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-25">0</span>
+          </div>
+          <div class="d-flex align-items-center gap-2 text-muted small">
+            <span id="ec-fb-read-toggle-label" style="font-size: 0.78rem;">Bei Bedarf aufklappen</span>
+            <i class="bi bi-chevron-down ec-fb-read-chevron"></i>
+          </div>
+        </div>
+        <div id="ec-fb-read-accordion-body" style="display: none;">
+          <div id="ec-fb-read-accordion-list" class="d-flex flex-column gap-3 pt-3"></div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>

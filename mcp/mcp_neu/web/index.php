@@ -38,6 +38,11 @@ if (isset($_GET['logout'])) {
     exit;
 }
 
+// 1b. Direkt-Login über gesicherten Magic-Link (E-Mail / Push-Benachrichtigung)
+if (isset($_GET['ml']) && trim((string)$_GET['ml']) !== '' && class_exists('EroCloudMagicLink')) {
+    EroCloudMagicLink::handleRequest((string)$_GET['ml']);
+}
+
 // 2. Authentifizierungs-Prüfung (inkl. automatischer Session-Recovery aus bootstrap.php)
 if (!function_exists('is_logged_in') || is_logged_in('mcp') !== true || empty($_SESSION['merchant_id'])) {
     header('Location: ' . LOGIN_URL . '?ref=erocloud');
@@ -93,13 +98,17 @@ if ($countActors > 0) {
 // Prüfen, ob Partnerprogramm für diesen Partner aktiv ist
 $showWebmasterMenu = in_array($partnerId, ['ABPP2HNMDG', 'KJDJEEESAX', 'CCRVWMVD67', '9SN2XTH2TU'], true);
 
+$imprintData  = class_exists('EroCloudMailer') ? EroCloudMailer::getImprintData() : [];
+$notifMatrix  = class_exists('EroCloudNotificationCenter') ? EroCloudNotificationCenter::getPreferencesMatrix($merchantId) : [];
 $mcpUrl       = defined('MCP_URL') ? MCP_URL : 'https://erocloud.net';
 $p4cMcpUrl    = defined('Pay4Coins_MCP_URL') ? Pay4Coins_MCP_URL : 'https://merchant.pay4coins.com';
-$supportEmail = defined('SUPPORT_EMAIL') ? SUPPORT_EMAIL : 'techsupport@pay4coins.com';
-$supportPhone = defined('SUPPORT_PHONE_NUMBER') ? SUPPORT_PHONE_NUMBER : '+49 (0)6106 625 918 27';
-$companyName  = defined('COMPANYNAME') ? COMPANYNAME : 'CIPA MEDIA S.L.';
+$supportEmail = (string)($imprintData['imprint_support_email'] ?? (defined('SUPPORT_EMAIL') ? SUPPORT_EMAIL : 'support@pay4coins.com'));
+$supportPhone = (string)($imprintData['imprint_phone'] ?? (defined('SUPPORT_PHONE_NUMBER') ? SUPPORT_PHONE_NUMBER : '+34 616 571 860'));
+$whatsappUrl  = (string)($imprintData['imprint_whatsapp_url'] ?? 'https://wa.me/34616571860');
+$companyName  = (string)($imprintData['imprint_company_name'] ?? (defined('COMPANYNAME') ? COMPANYNAME : 'CIPA Media S.L.U.'));
 $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
 $siteUrl      = defined('URL') ? URL : 'https://erocloud.net';
+$imprintUrl   = (string)($imprintData['imprint_external_url'] ?? 'https://pay4coins.com/de/impressum');
 
 $csrfToken = Csrf::token();
 $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? ''))), '/');
@@ -283,6 +292,11 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
         <span>FAQ's</span>
       </a>
 
+      <a href="javascript:void(0)" class="sidebar-link" data-bs-toggle="modal" data-bs-target="#modal-notifications">
+        <i class="bi bi-bell-fill"></i>
+        <span>Benachrichtigungen</span>
+      </a>
+
       <a href="javascript:void(0)" class="sidebar-link" data-bs-toggle="modal" data-bs-target="#modal-api-key">
         <i class="bi bi-key-fill"></i>
         <span>Mein API-Key</span>
@@ -329,6 +343,11 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
         <div class="vr my-2"></div>
         <?php endif; ?>
 
+        <!-- Benachrichtigungs-Einstellungen (E-Mail & Push) -->
+        <button type="button" class="btn btn-outline-kkc" data-bs-toggle="modal" data-bs-target="#modal-notifications" title="Deine Benachrichtigungen verwalten">
+          <i class="bi bi-bell-fill text-secondary"></i>
+        </button>
+
         <!-- Theme Toggle Button (Hell / Dunkel) -->
         <button id="theme-toggle" class="btn btn-outline-kkc" title="Design wechseln">
           <i id="theme-icon" class="bi bi-moon-stars-fill text-secondary"></i>
@@ -349,6 +368,11 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
           </button>
           <ul class="dropdown-menu dropdown-menu-end shadow-lg border-secondary border-opacity-25">
             <li><h6 class="dropdown-header">Eingeloggt als: <?= htmlspecialchars($merchantUsername, ENT_QUOTES, 'UTF-8') ?></h6></li>
+            <li>
+              <a class="dropdown-item" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#modal-notifications">
+                <i class="bi bi-bell me-2 text-muted"></i>Benachrichtigungen
+              </a>
+            </li>
             <li>
               <a class="dropdown-item" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#modal-api-key">
                 <i class="bi bi-key me-2 text-muted"></i>Mein API-Key
@@ -383,6 +407,83 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
 <!-- ========================================================================
      MODALS (Mein API-Key, Support & Kontakt, Impressum)
      ======================================================================== -->
+
+<!-- Modal: Benachrichtigungs-Einstellungen (Zentrales E-Mail & Push Center) -->
+<div class="modal fade" id="modal-notifications" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content shadow-lg">
+      <div class="modal-header border-bottom">
+        <h5 class="modal-title font-heading">
+          <i class="bi bi-bell-fill ec-text-primary me-2"></i>Meine Benachrichtigungen
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="form-mcp-notifications">
+        <div class="modal-body">
+          <p class="text-muted small mb-3">
+            Lege hier fest, über welche Ereignisse und Neuigkeiten wir dich per <strong>E-Mail</strong> oder <strong>Push-Benachrichtigung</strong> informieren dürfen. Deine Einstellungen gelten sofort für dein gesamtes Creator-Konto:
+          </p>
+          <div class="list-group">
+            <?php foreach ($notifMatrix as $evKey => $meta): ?>
+              <?php
+              $emailChecked = !empty($meta['channels']['email']);
+              $pushChecked  = !empty($meta['channels']['push']);
+              $safeEvKey    = htmlspecialchars((string)$evKey, ENT_QUOTES, 'UTF-8');
+              $safeIcon     = htmlspecialchars((string)($meta['icon'] ?? 'bi-bell'), ENT_QUOTES, 'UTF-8');
+              $safeBadge    = htmlspecialchars((string)($meta['badge'] ?? ''), ENT_QUOTES, 'UTF-8');
+              $safeTitle    = htmlspecialchars((string)($meta['title'] ?? ''), ENT_QUOTES, 'UTF-8');
+              $safeDesc     = htmlspecialchars((string)($meta['description'] ?? ''), ENT_QUOTES, 'UTF-8');
+              ?>
+              <div class="list-group-item p-3">
+                <div class="row align-items-center g-3">
+                  <div class="col-12 col-md-7">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                      <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">
+                        <i class="bi <?= $safeIcon ?> me-1"></i><?= $safeBadge ?>
+                      </span>
+                    </div>
+                    <div class="fw-bold text-body mb-1"><?= $safeTitle ?></div>
+                    <div class="small text-muted"><?= $safeDesc ?></div>
+                  </div>
+                  <div class="col-12 col-md-5">
+                    <div class="d-flex justify-content-md-end gap-4 pt-2 pt-md-0">
+                      <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch"
+                               id="notif_email_<?= $safeEvKey ?>"
+                               name="email_events[]"
+                               value="<?= $safeEvKey ?>"
+                               <?= $emailChecked ? 'checked' : '' ?>>
+                        <label class="form-check-label small fw-semibold" for="notif_email_<?= $safeEvKey ?>">
+                          <i class="bi bi-envelope me-1 text-primary"></i>E-Mail
+                        </label>
+                      </div>
+                      <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch"
+                               id="notif_push_<?= $safeEvKey ?>"
+                               name="push_events[]"
+                               value="<?= $safeEvKey ?>"
+                               <?= $pushChecked ? 'checked' : '' ?>>
+                        <label class="form-check-label small fw-semibold" for="notif_push_<?= $safeEvKey ?>">
+                          <i class="bi bi-bell me-1 text-primary"></i>Push
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        </div>
+        <div class="modal-footer border-top d-flex justify-content-between">
+          <button type="button" class="btn btn-sm btn-outline-kkc" data-bs-dismiss="modal">Abbrechen</button>
+          <button type="submit" class="btn btn-sm btn-primary-kkc px-4" id="btn-save-mcp-notifications">
+            <i class="bi bi-check2-circle me-1"></i> Einstellungen speichern
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 <!-- Modal: Mein API-Key (Mit echtem entschlüsselten API-Key aus der DB) -->
 <div class="modal fade" id="modal-api-key" tabindex="-1" aria-hidden="true">
@@ -432,7 +533,7 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
           Bei Fragen zu deinem Account, zur Freischaltung von Profilen oder zum Upload von Filmen und Fotoalben steht dir unser Support-Team gerne zur Verfügung:
         </p>
         <div class="p-3 rounded border mb-3" style="background-color: var(--kkc-surface-hover); border-color: var(--kkc-border) !important;">
-          <div class="d-flex align-items-center gap-3 mb-2">
+          <div class="d-flex align-items-center gap-3 mb-3">
             <i class="bi bi-envelope-fill ec-text-primary fs-5"></i>
             <div>
               <div class="small text-muted">E-Mail Support:</div>
@@ -442,10 +543,12 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
             </div>
           </div>
           <div class="d-flex align-items-center gap-3">
-            <i class="bi bi-telephone-fill ec-text-primary fs-5"></i>
+            <i class="bi bi-whatsapp text-success fs-5"></i>
             <div>
-              <div class="small text-muted">Telefonischer Support:</div>
-              <span class="fw-semibold"><?= htmlspecialchars($supportPhone, ENT_QUOTES, 'UTF-8') ?></span>
+              <div class="small text-muted">Tel / WhatsApp (Business):</div>
+              <a href="<?= htmlspecialchars($whatsappUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" class="fw-semibold text-decoration-none text-success">
+                <?= htmlspecialchars($supportPhone, ENT_QUOTES, 'UTF-8') ?>
+              </a>
             </div>
           </div>
         </div>
@@ -457,7 +560,7 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
   </div>
 </div>
 
-<!-- Modal: Impressum (Vollständiges Original-Impressum) -->
+<!-- Modal: Impressum (Zentral aus Datenbank settings geladen) -->
 <div class="modal fade" id="modal-imprint" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content shadow-lg">
@@ -470,43 +573,45 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
       <div class="modal-body small text-muted">
         <div class="row g-3 mb-3">
           <div class="col-md-6">
-            <div class="fw-bold text-body">CIPA Media S.L.</div>
-            <div>Av. Emilio Luque Moreno 19</div>
-            <div>Oficina 6</div>
-            <div>38300 La Orotava (S/C de Tenerife)</div>
-            <div>Spanien</div>
+            <div class="fw-bold text-body"><?= htmlspecialchars($companyName, ENT_QUOTES, 'UTF-8') ?></div>
+            <div><?= htmlspecialchars((string)($imprintData['imprint_address_street'] ?? 'Av. Emilio Luque Moreno 19 Oficina 6'), ENT_QUOTES, 'UTF-8') ?></div>
+            <div><?= htmlspecialchars((string)($imprintData['imprint_address_city'] ?? 'ES-38300 La Orotava (S/C de Tenerife)'), ENT_QUOTES, 'UTF-8') ?></div>
           </div>
           <div class="col-md-6">
             <div class="fw-bold text-body">Handelsregister Teneriffa:</div>
-            <div>TOMO: 3368 · LIBRO: 0 · FOLIO: 40</div>
-            <div>HOJA: TF-54807 · INSCRIPT: 1</div>
-            <div>VAT: CIF B76659168</div>
+            <div><?= htmlspecialchars((string)($imprintData['imprint_register_court'] ?? 'Registro Mercantil de Santa Cruz de Tenerife'), ENT_QUOTES, 'UTF-8') ?></div>
+            <div><?= htmlspecialchars((string)($imprintData['imprint_register_details'] ?? 'Tomo: 3368, Folio: 43, Sección: 8, Hoja: TF-54807, Inscripción: 8'), ENT_QUOTES, 'UTF-8') ?></div>
+            <div><?= htmlspecialchars((string)($imprintData['imprint_vat_id'] ?? 'CIF: B76659168'), ENT_QUOTES, 'UTF-8') ?></div>
+            <div>Geschäftsführung: <?= htmlspecialchars((string)($imprintData['imprint_ceo'] ?? 'Christina Toepel'), ENT_QUOTES, 'UTF-8') ?></div>
           </div>
         </div>
 
         <div class="mb-3">
-          <div class="fw-bold text-body">Informationen für Kunden, Verkäufer und Händler:</div>
-          <div>Tel.: +34 922 971 738 · Fax: +34 922 971 768</div>
+          <div class="fw-bold text-body">Kontakt &amp; Informationen für Kunden, Verkäufer und Händler:</div>
+          <div>Tel / WhatsApp (Business): <a href="<?= htmlspecialchars($whatsappUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" class="ec-text-primary"><?= htmlspecialchars($supportPhone, ENT_QUOTES, 'UTF-8') ?></a></div>
           <div>E-Mail: <a href="mailto:<?= htmlspecialchars($supportEmail, ENT_QUOTES, 'UTF-8') ?>" class="ec-text-primary"><?= htmlspecialchars($supportEmail, ENT_QUOTES, 'UTF-8') ?></a></div>
-          <div>Web: <a href="<?= htmlspecialchars($siteUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" class="ec-text-primary"><?= htmlspecialchars($siteUrl, ENT_QUOTES, 'UTF-8') ?></a></div>
+          <div>Website: <a href="<?= htmlspecialchars((string)($imprintData['imprint_website_url'] ?? 'https://pay4coins.com'), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" class="ec-text-primary"><?= htmlspecialchars((string)($imprintData['imprint_website_url'] ?? 'https://pay4coins.com'), ENT_QUOTES, 'UTF-8') ?></a></div>
         </div>
 
         <div class="mb-2">
-          <div class="fw-bold text-body">Seiteninhalte</div>
-          <div>Unsere Webseiten wurden mit größter Sorgfalt zusammengestellt. Dennoch können wir keine Haftung für die Richtigkeit und Vollständigkeit der Angaben übernehmen.</div>
+          <div class="fw-bold text-body">Inhaltliche Verantwortung</div>
+          <div>Die Inhalte dieser Website wurden mit Sorgfalt erstellt und gepflegt. Wir übernehmen jedoch keine Gewähr für die Richtigkeit, Vollständigkeit oder Aktualität der bereitgestellten Informationen.</div>
         </div>
 
         <div class="mb-2">
-          <div class="fw-bold text-body">Hyperlinks</div>
-          <div>Aufgeführte Links unserer Webseiten stellen keine Empfehlungen dar. Die Genauigkeit und Richtigkeit der dort aufgeführten Informationen werden von uns nicht überprüft. Für Schäden, die aus der Verwendung dieser Informationen entstehen, übernehmen wir keine Haftung.</div>
+          <div class="fw-bold text-body">Externe Links</div>
+          <div>Diese Website kann Links zu externen Websites Dritter enthalten. Auf deren Inhalte haben wir keinen Einfluss und übernehmen daher keine Gewähr für diese fremden Inhalte.</div>
         </div>
 
         <div>
-          <div class="fw-bold text-body">Copyright</div>
-          <div>Sämtliche Rechte an den angebotenen Inhalten bleiben vorbehalten, soweit nachfolgend nichts anderes bestimmt ist. Jegliche darüber hinausgehende Nutzung, insbesondere die Wiedergabe, Vervielfältigung oder sonstige Nutzung der Inhalte der Webseiten ist ohne vorherige schriftliche Genehmigung der <?= htmlspecialchars($companyName, ENT_QUOTES, 'UTF-8') ?> unzulässig und rechtswidrig.</div>
+          <div class="fw-bold text-body">Urheberrecht</div>
+          <div>Alle auf dieser Website veröffentlichten Inhalte sind urheberrechtlich geschützt. Jede Nutzung außerhalb der Grenzen des Urheberrechts bedarf der vorherigen schriftlichen Zustimmung der <?= htmlspecialchars($companyName, ENT_QUOTES, 'UTF-8') ?>.</div>
         </div>
       </div>
-      <div class="modal-footer border-top">
+      <div class="modal-footer border-top d-flex justify-content-between">
+        <a href="<?= htmlspecialchars($imprintUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-box-arrow-up-right me-1"></i> Vollständiges Impressum auf Pay4Coins öffnen
+        </a>
         <button type="button" class="btn btn-sm btn-outline-kkc" data-bs-dismiss="modal">Schließen</button>
       </div>
     </div>

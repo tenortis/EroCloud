@@ -31,15 +31,32 @@ define("DB_NAME_AMOREDEA", "usr_web2_1");
 define("DB_USER_AMOREDEA", "web2");
 define("DB_PASS_AMOREDEA", "4oksavCewfEcceg");
 
-// E-Mail Adressen
-define('SUPPORT_EMAIL','techsupport@pay4coins.com');
-define('TECHSUPPORT_EMAIL','techsupport@pay4coins.com');
+// E-Mail Adressen & globaler SMTP-Versand (PHPMailer)
+define('SUPPORT_EMAIL','support@pay4coins.com');
+define('TECHSUPPORT_EMAIL','support@pay4coins.com');
 
-// Telefon
-define('SUPPORT_PHONE_NUMBER','+49 (0)6106 625 918 27');
+define('MAIL_SMTP_HOST',        'mail.erocloud.net');
+define('MAIL_SMTP_PORT',        587);
+define('MAIL_SMTP_SECURE',      'tls'); // 'tls' (STARTTLS Port 587) oder 'ssl' (SMTPS Port 465)
+define('MAIL_SMTP_USER',        'noreply@erocloud.net');
+define('MAIL_SMTP_PASS',        'NebotgekMiHak!');
+define('MAIL_FROM_ADDRESS',     'noreply@erocloud.net');
+define('MAIL_FROM_NAME',        'EroCloud');
+// Kein abweichender Reply-To-Header bei noreply@erocloud.net System-Mails (Best Practice gegen Domain-Mismatch in Spamfiltern)
+define('MAIL_REPLY_TO_ADDRESS', '');
+define('MAIL_REPLY_TO_NAME',    '');
 
-// Domain
-define('COMPANYNAME','CIPA MEDIA S.L.');
+// E-Mail Test-/Sandbox-Modus:
+// Solange MAIL_SANDBOX_MODE === true ist, werden ALLE ausgehenden E-Mails ausnahmslos
+// an MAIL_SANDBOX_RECIPIENT umgeleitet (kein Creator erhält während der Testphase E-Mails!).
+define('MAIL_SANDBOX_MODE',      true);
+define('MAIL_SANDBOX_RECIPIENT', 'erocms@gmail.com');
+
+// Telefon / WhatsApp (Business)
+define('SUPPORT_PHONE_NUMBER','+34 616 571 860');
+
+// Domain & Betreiberfirma
+define('COMPANYNAME','CIPA Media S.L.U.');
 define('PROJECTNAME','EroCloud');
 
 $is_local = false;
@@ -78,7 +95,7 @@ if ($is_local) {
     define('ACP_DOMAIN','acp.erocloud.net');
     define('ACP_URL',   'https://acp.erocloud.net');
 }
-define('ACP_SESSION_DURATION', strtotime("-30 minutes")); // Nach diesen Minuten inaktivit�t, wird der Admin automatisch abgemeldet
+define('ACP_SESSION_DURATION', strtotime("-30 minutes")); // Nach diesen Minuten Inaktivität wird der Admin automatisch abgemeldet
 
 // MCP Domain (Merchant-Control-Panel)
 if ($is_local) {
@@ -88,7 +105,7 @@ if ($is_local) {
     define('MCP_DOMAIN','erocloud.net');
     define('MCP_URL',   'https://erocloud.net');
 }
-define('MCP_SESSION_DURATION', strtotime("-180 minutes")); // Nach diesen Minuten inaktivit�t, wird der Admin automatisch abgemeldet
+define('MCP_SESSION_DURATION', strtotime("-180 minutes")); // Nach diesen Minuten Inaktivität wird der Admin automatisch abgemeldet
 
 // API Domain
 if ($is_local) {
@@ -117,20 +134,20 @@ define('ACP_DIR', SOURCEDIR.'/acp');
 define('API_DIR', SOURCEDIR.'/api');
 define('MCP_DIR', SOURCEDIR.'/mcp');
 
-// Tempor�res Verzeichnis f�r z.B. Sessions
+// Temporäres Verzeichnis für z.B. Sessions
 define('TEMP_DIR', dirname(dirname(__FILE__)).'/tmp');
 
-// Pfad in welchem die Platten (Verzeichnise f�r die Filme) eingebunden sind
+// Pfad in welchem die Platten (Verzeichnisse für die Filme) eingebunden sind
 define('MOVIES_PATH', dirname(dirname(__FILE__)));
 // Verzeichnis in welches aktuell Filme geladen werden sollen
 define('MOVIES_DEFAULT_DIR', 'cloud_storage'); 
 
-// Pfad in welchem die Platten (Verzeichnise f�r die Filme) eingebunden sind
+// Pfad in welchem die Platten (Verzeichnisse für die Filme) eingebunden sind
 define('PHOTO_ALBUMS_PATH', dirname(dirname(__FILE__)));
 // Verzeichnis in welches aktuell Fotoalben geladen werden sollen
 define('PHOTO_ALBUMS_DEFAULT_DIR', 'cloud_storage/photo_albums');
 
-// Pfad in welchem die Banner (Verzeichnise f�r die Filme) eingebunden sind
+// Pfad in welchem die Banner (Verzeichnisse für die Filme) eingebunden sind
 define('ADS_PATH', dirname(dirname(__FILE__)));
 // Verzeichnis in welches aktuell Banner geladen werden sollen
 define('ADS_DEFAULT_DIR', 'cloud_storage/ads');
@@ -138,7 +155,7 @@ define('ADS_DEFAULT_DIR', 'cloud_storage/ads');
 define('FFMPEG_PATH', '/usr/bin');
 define('FFMPEG_SIMULTANEOUS_CONV', 2);
 
-// Pfad in welchem die Platten (Verzeichnise f�r die Dateien vom Merchant und Messenger) eingebunden sind
+// Pfad in welchem die Platten (Verzeichnisse für die Dateien vom Merchant und Messenger) eingebunden sind
 define('PROFILE_IMAGE_PATH', dirname(dirname(__FILE__)));
 // Verzeichnis in welches aktuell Profilbilder geladen werden sollen
 define('MERCHANT_DEFAULT_DIR', 'priv/merchant_files'); 
@@ -201,7 +218,7 @@ define("AMOREDEA_AES_KEY",   "QOW56PvA9mKUgksFcV014YZ78P3wbHM2");
 define("AMOREDEA_P4C_SHOPID", 50311);
 
 
-// F�r cURL
+// Für cURL
 $user_agents = array(
     'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36',
     'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36',

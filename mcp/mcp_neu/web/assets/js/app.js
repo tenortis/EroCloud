@@ -15,8 +15,52 @@ const App = {
     this.initTheme();
     this.initRouter();
     this.initApiKeyCopy();
+    this.initNotificationsModal();
     this.initGlobalTopbarSearch();
     this.initSessionKeepAlive();
+  },
+
+  initNotificationsModal() {
+    const form = document.getElementById('form-mcp-notifications');
+    if (!form) return;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('btn-save-mcp-notifications');
+      if (btn) btn.disabled = true;
+
+      try {
+        const formData = new FormData(form);
+        formData.append('_csrf', this.csrfToken);
+
+        const res = await fetch(`${this.basePath}/api.php?route=home/save-notifications`, {
+          method: 'POST',
+          headers: { 'X-CSRF-Token': this.csrfToken },
+          body: formData
+        });
+        const data = await res.json();
+
+        if (res.ok && data.status === 'ok') {
+          this.toast(data.message || 'Deine Benachrichtigungs-Einstellungen wurden gespeichert.', 'success');
+          const modalEl = document.getElementById('modal-notifications');
+          if (modalEl && window.bootstrap?.Modal) {
+            window.bootstrap.Modal.getInstance(modalEl)?.hide();
+          }
+          // Falls gerade Schritt 2 des Video-Uploads geöffnet ist, Schalter synchronisieren
+          const uploadSwitch = document.getElementById('movie-notify-on-convert');
+          const movieConvEmail = document.getElementById('notif_email_movie_converted');
+          if (uploadSwitch && movieConvEmail) {
+            uploadSwitch.checked = movieConvEmail.checked;
+          }
+        } else {
+          this.toast(data.message || 'Fehler beim Speichern der Einstellungen.', 'danger');
+        }
+      } catch (err) {
+        this.toast('Verbindungsfehler: ' + err.message, 'danger');
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    });
   },
 
   // ========================================================================
@@ -224,6 +268,7 @@ const App = {
     this.initThumbnailHoverZoom();
     this.initMoviesEvents();
     this.initPhotoAlbumsEvents();
+    this.initCreatorFeedbackEvents();
   },
 
   // Globale Schnellsuche in der Topbar: Filtert live auf #/movies oder #/photo-albums bzw. wechselt bei Enter zu #/movies
@@ -636,6 +681,7 @@ const App = {
 
     thumbs.forEach(thumb => {
       thumb.addEventListener('mouseenter', (ev) => {
+        if (thumb.getAttribute('data-studio-ready') === '0') return;
         const src = thumb.getAttribute('data-zoom-src');
         const fsk = thumb.getAttribute('data-zoom-fsk') || '16';
         const title = thumb.getAttribute('data-zoom-title') || '';
@@ -965,6 +1011,12 @@ const App = {
             this.toast(data.message || 'Film wurde gelöscht.', 'success');
             if (window.location.hash.startsWith('#/movie?')) {
               window.location.hash = '#/movies';
+            } else if (window.location.hash.startsWith('#/movie-upload')) {
+              if (window.location.hash === '#/movie-upload') {
+                this.handleRoute();
+              } else {
+                window.location.hash = '#/movie-upload';
+              }
             } else {
               this.handleRoute();
             }
@@ -1064,21 +1116,59 @@ const App = {
 
       const hiddenInput = document.getElementById(`input-preview-fsk${fskStr}`);
       const previewImg = document.getElementById(`current-fsk${fskStr}-preview`);
+      const emptyPlaceholder = document.getElementById(`empty-fsk${fskStr}-placeholder`);
       const previewWrap = document.getElementById(`current-fsk${fskStr}-wrap`);
       const badgeNum = document.getElementById(`badge-fsk${fskStr}-num`);
       const restoreBtn = document.getElementById(`btn-restore-custom-fsk${fskStr}`);
+      const studioBtn = document.getElementById(`btn-open-studio-fsk${fskStr}`);
+      const studioOverlayBadge = document.getElementById(`badge-fsk${fskStr}-studio-overlay`);
+      const missingHintEl = document.getElementById(`missing-fsk${fskStr}-hint`);
+      const missingWarningBox = document.getElementById('missing-covers-warning');
 
       if (hiddenInput) hiddenInput.value = numStr;
-      if (previewImg && url) previewImg.src = url;
+      if (emptyPlaceholder) emptyPlaceholder.classList.add('d-none');
+      if (previewImg && url) {
+        previewImg.src = url;
+        previewImg.classList.remove('d-none');
+      }
       if (badgeNum) {
         badgeNum.textContent = isCustom ? `Eigenes Bild (#${numStr})` : `Szene #${numStr}`;
+        badgeNum.classList.remove('text-danger');
+        badgeNum.classList.add('text-muted');
+      }
+      if (missingHintEl) {
+        missingHintEl.classList.add('d-none');
+      }
+      if (missingWarningBox) {
+        const hint16 = document.getElementById('missing-fsk16-hint');
+        const hint18 = document.getElementById('missing-fsk18-hint');
+        const done16 = !hint16 || hint16.classList.contains('d-none');
+        const done18 = !hint18 || hint18.classList.contains('d-none');
+        if (done16 && done18) {
+          missingWarningBox.classList.add('d-none');
+        }
       }
 
       if (previewWrap) {
         previewWrap.setAttribute('data-num', numStr);
+        previewWrap.setAttribute('data-studio-ready', '1');
+        previewWrap.style.cursor = 'pointer';
+        previewWrap.setAttribute('title', `Klicken, um das FSK ${fskStr} Cover im Studio zu bearbeiten`);
         if (url) previewWrap.setAttribute('data-thumb-url', url);
         if (zoomUrl || url) previewWrap.setAttribute('data-zoom-src', zoomUrl || url);
         if (editorUrl || zoomUrl || url) previewWrap.setAttribute('data-editor-url', editorUrl || zoomUrl || url);
+      }
+
+      if (studioOverlayBadge) {
+        studioOverlayBadge.classList.remove('d-none');
+      }
+
+      if (studioBtn) {
+        studioBtn.setAttribute('data-studio-ready', '1');
+        studioBtn.style.cursor = 'pointer';
+        studioBtn.setAttribute('title', `FSK ${fskStr} Cover im Studio bearbeiten`);
+        studioBtn.classList.remove('btn-secondary', 'opacity-50');
+        studioBtn.classList.add(fskStr === '16' ? 'btn-success' : 'btn-danger');
       }
 
       // Falls neues eigenes Bild hochgeladen oder aus dem Milchglas-Editor gespeichert wurde, Kachel #11/#12 aktualisieren
@@ -1160,7 +1250,11 @@ const App = {
 
         applyMovieThumbSelection(fsk, num, url, zoomUrl, editorUrl, false);
         const label = (num === '11' || num === '12') ? `Eigenes Bild (#${num})` : `Szene #${num}`;
-        this.toast(`${label} für FSK${fsk} ausgewählt. Bitte speichere anschließend deine Änderungen.`, 'info');
+        if (String(fsk) === '16' && num !== '11') {
+          this.toast(`${label} für FSK 16 ausgewählt. Wichtig: Falls intime Stellen sichtbar sind, bearbeite das Bild bitte im Cover-Studio (Verpixeln / Milchglas)!`, 'warning');
+        } else {
+          this.toast(`${label} für FSK ${fsk} ausgewählt. Bitte speichere anschließend deine Änderungen.`, 'info');
+        }
       });
     });
 
@@ -1220,6 +1314,29 @@ const App = {
     if (editForm) {
       editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+
+        const inpFsk16 = document.getElementById('input-preview-fsk16');
+        const inpFsk18 = document.getElementById('input-preview-fsk18');
+        const val16 = parseInt(inpFsk16 ? (inpFsk16.value || '0') : '0', 10);
+        const val18 = parseInt(inpFsk18 ? (inpFsk18.value || '0') : '0', 10);
+        const hasSceneThumbs = document.querySelectorAll('.js-select-movie-thumb').length > 0;
+
+        if (hasSceneThumbs && (val16 <= 0 || val18 <= 0)) {
+          const warnBox = document.getElementById('missing-covers-warning') || document.getElementById('current-fsk16-wrap');
+          if (warnBox) {
+            warnBox.classList.remove('d-none');
+            warnBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          if (val16 <= 0 && val18 <= 0) {
+            this.toast('Bitte wähle zuerst ein jugendfreies (ggf. verpixeltes) FSK 16 Cover sowie ein FSK 18 Cover aus.', 'warning');
+          } else if (val16 <= 0) {
+            this.toast('Bitte wähle noch ein FSK 16 Cover aus (Wichtig: muss jugendfrei / verpixelt sein!).', 'warning');
+          } else {
+            this.toast('Bitte wähle noch ein FSK 18 Cover aus.', 'warning');
+          }
+          return;
+        }
+
         const btns = document.querySelectorAll('#btn-save-movie-top, #btn-save-movie-bottom');
         btns.forEach(b => { b.disabled = true; });
 
@@ -1236,6 +1353,7 @@ const App = {
 
           if (res.ok && data.status === 'ok') {
             this.toast(data.message || 'Änderungen erfolgreich gespeichert.', 'success');
+            this.handleRoute();
           } else {
             this.toast(data.message || 'Fehler beim Speichern des Films.', 'danger');
           }
@@ -1282,10 +1400,60 @@ const App = {
       });
     }
 
-    // 9. Film-Upload Schritt 2: Videodatei mit Live-Fortschrittsbalken hochladen
+    // 9. Film-Upload Schritt 2: Videodatei mit Live-Fortschrittsbalken hochladen + Konvertierungs-/Cover-Editor-Auswahl
     const btnStartUpload = document.getElementById('btn-start-movie-file-upload');
     const btnCancelUpload = document.getElementById('btn-cancel-movie-file-upload');
     const videoFileInput = document.getElementById('movie-video-file-input');
+    const btnReplaceFile = document.getElementById('btn-replace-movie-file');
+    const fileUploadedBox = document.getElementById('movie-file-uploaded-box');
+    const fileSelectWrap = document.getElementById('movie-file-select-wrap');
+    const decisionWrap = document.getElementById('movie-step2-decision-wrap');
+    const decisionBadge = document.getElementById('movie-step2-decision-badge');
+    const footerHint = document.getElementById('movie-step2-footer-hint');
+    const btnCompleteStep2 = document.getElementById('btn-complete-movie-step2');
+    const btnCompleteStep2Label = document.getElementById('btn-complete-movie-step2-label');
+    const btnCompleteStep2Icon = document.getElementById('btn-complete-movie-step2-icon');
+    const postUploadCard = document.getElementById('movie-step2-post-upload-card');
+
+    if (btnReplaceFile && fileUploadedBox && fileSelectWrap) {
+      btnReplaceFile.addEventListener('click', () => {
+        fileSelectWrap.classList.remove('d-none');
+      });
+    }
+
+    // Auswahl-Karten für Freigabe-Modus (Erst Cover-Editor vs. Direkt einreichen)
+    const releaseRadios = document.querySelectorAll('.js-release-mode-radio');
+    const cardLater = document.getElementById('card-release-mode-later');
+    const cardDirect = document.getElementById('card-release-mode-direct');
+
+    const syncReleaseModeUi = () => {
+      const checkedRadio = document.querySelector('.js-release-mode-radio:checked');
+      const mode = checkedRadio ? checkedRadio.value : 'later';
+
+      if (cardLater && cardDirect) {
+        if (mode === 'direct') {
+          cardDirect.className = 'd-block p-3 rounded-3 border border-2 border-primary bg-primary bg-opacity-10 h-100 cursor-pointer js-release-mode-card';
+          cardLater.className = 'd-block p-3 rounded-3 border bg-white h-100 cursor-pointer js-release-mode-card';
+        } else {
+          cardLater.className = 'd-block p-3 rounded-3 border border-2 border-primary bg-primary bg-opacity-10 h-100 cursor-pointer js-release-mode-card';
+          cardDirect.className = 'd-block p-3 rounded-3 border bg-white h-100 cursor-pointer js-release-mode-card';
+        }
+      }
+
+      if (btnCompleteStep2Label && btnCompleteStep2Icon) {
+        if (mode === 'direct') {
+          btnCompleteStep2Icon.className = 'bi bi-send-check me-2';
+          btnCompleteStep2Label.textContent = 'Film jetzt direkt zur Prüfung einreichen & abschließen';
+        } else {
+          btnCompleteStep2Icon.className = 'bi bi-magic me-2';
+          btnCompleteStep2Label.textContent = 'Weiter: Konvertierung starten & später Vorschaubilder gestalten';
+        }
+      }
+    };
+
+    releaseRadios.forEach(r => {
+      r.addEventListener('change', syncReleaseModeUi);
+    });
 
     if (btnStartUpload && videoFileInput) {
       btnStartUpload.addEventListener('click', () => {
@@ -1309,6 +1477,9 @@ const App = {
         const statusText = document.getElementById('movie-upload-status-text');
 
         if (progressWrap) progressWrap.classList.remove('d-none');
+        if (progressBar) progressBar.style.width = '0%';
+        if (percentBadge) percentBadge.textContent = '0 %';
+        if (statusText) statusText.textContent = 'Videodatei wird hochgeladen...';
         btnStartUpload.disabled = true;
         videoFileInput.disabled = true;
         if (btnCancelUpload) btnCancelUpload.classList.remove('d-none');
@@ -1316,6 +1487,7 @@ const App = {
         const formData = new FormData();
         formData.append('movie_id', movieId);
         formData.append('video', file);
+        formData.append('released', '0');
         formData.append('_csrf', this.csrfToken);
 
         const xhr = new XMLHttpRequest();
@@ -1340,9 +1512,41 @@ const App = {
             const data = JSON.parse(xhr.responseText || '{}');
             if (xhr.status >= 200 && xhr.status < 300 && data.status === 'ok') {
               this.toast(data.message || 'Videodatei erfolgreich hochgeladen.', 'success');
-              if (data.redirect) {
-                window.location.hash = data.redirect;
+
+              // Erfolgsbox in Schritt 2 aktualisieren & Auswahl-Bereich freischalten
+              const fnEl = document.getElementById('uploaded-movie-filename');
+              const ptEl = document.getElementById('uploaded-movie-playtime');
+              const resEl = document.getElementById('uploaded-movie-resolution');
+              if (fnEl) fnEl.textContent = data.filename || file.name;
+              if (ptEl) ptEl.textContent = data.playtime_string || '-';
+              if (resEl) resEl.textContent = data.resolution || '-';
+
+              if (fileUploadedBox) fileUploadedBox.classList.remove('d-none');
+              if (fileSelectWrap) fileSelectWrap.classList.add('d-none');
+              if (progressWrap) progressWrap.classList.add('d-none');
+
+              if (decisionWrap) {
+                decisionWrap.style.opacity = '1';
+                decisionWrap.style.pointerEvents = '';
               }
+              if (decisionBadge) {
+                decisionBadge.className = 'badge bg-success';
+                decisionBadge.textContent = 'Bereit für deine Auswahl';
+              }
+              if (footerHint) {
+                footerHint.innerHTML = '<i class="bi bi-check-circle-fill text-success me-1"></i>Videodatei ist bereit – bitte bestätige deine Auswahl.';
+              }
+              if (btnCompleteStep2) {
+                btnCompleteStep2.disabled = false;
+              }
+              if (postUploadCard) {
+                postUploadCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+
+              btnStartUpload.disabled = false;
+              videoFileInput.disabled = false;
+              videoFileInput.value = '';
+              if (btnCancelUpload) btnCancelUpload.classList.add('d-none');
               return;
             }
             this.toast(data.message || 'Fehler beim Video-Upload.', 'danger');
@@ -1381,6 +1585,46 @@ const App = {
       btnCancelUpload.addEventListener('click', () => {
         if (this.activeMovieUploadXhr) {
           this.activeMovieUploadXhr.abort();
+        }
+      });
+    }
+
+    // 9b. Schritt 2 abschließen (Vorschaubilder später im Cover-Editor gestalten vs. Direkt zur Prüfung einreichen)
+    if (btnCompleteStep2) {
+      btnCompleteStep2.addEventListener('click', async () => {
+        const movieId = btnCompleteStep2.getAttribute('data-movie-id') || '0';
+        const checkedRadio = document.querySelector('.js-release-mode-radio:checked');
+        const releaseMode = checkedRadio ? checkedRadio.value : 'later';
+        const notifySwitch = document.getElementById('movie-notify-on-convert');
+        const notifyOnConvert = (!notifySwitch || notifySwitch.checked) ? '1' : '0';
+
+        btnCompleteStep2.disabled = true;
+        try {
+          const formData = new FormData();
+          formData.append('movie_id', movieId);
+          formData.append('release_mode', releaseMode);
+          formData.append('notify_on_convert', notifyOnConvert);
+          formData.append('_csrf', this.csrfToken);
+
+          const res = await fetch(`${this.basePath}/api.php?route=movies/complete-upload`, {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': this.csrfToken },
+            body: formData
+          });
+          const data = await res.json();
+
+          if (res.ok && data.status === 'ok') {
+            this.toast(data.message || 'Schritt 2 erfolgreich abgeschlossen.', 'success');
+            if (data.redirect) {
+              window.location.hash = data.redirect;
+            }
+          } else {
+            this.toast(data.message || 'Fehler beim Abschließen von Schritt 2.', 'danger');
+            btnCompleteStep2.disabled = false;
+          }
+        } catch (err) {
+          this.toast('Verbindungsfehler: ' + err.message, 'danger');
+          btnCompleteStep2.disabled = false;
         }
       });
     }
@@ -2643,7 +2887,7 @@ const App = {
         setTargetFskMode('16', true);
         if (was18 && !hasAnyEdits()) {
           const wrap16 = document.getElementById('current-fsk16-wrap');
-          if (wrap16) {
+          if (wrap16 && wrap16.getAttribute('data-studio-ready') !== '0') {
             loadSceneIntoCanvas(
               wrap16.getAttribute('data-num'),
               wrap16.getAttribute('data-thumb-url'),
@@ -2660,7 +2904,7 @@ const App = {
         setTargetFskMode('18', true);
         if (was16 && !hasAnyEdits()) {
           const wrap18 = document.getElementById('current-fsk18-wrap');
-          if (wrap18) {
+          if (wrap18 && wrap18.getAttribute('data-studio-ready') !== '0') {
             loadSceneIntoCanvas(
               wrap18.getAttribute('data-num'),
               wrap18.getAttribute('data-thumb-url'),
@@ -2783,6 +3027,10 @@ const App = {
     document.querySelectorAll('.js-open-thumb-editor-modal').forEach(el => {
       el.addEventListener('click', (ev) => {
         ev.preventDefault();
+        if (el.getAttribute('data-studio-ready') === '0') {
+          this.toast('Das Cover-Studio ist erst verfügbar, sobald ein Vorschaubild hochgeladen wurde oder die Video-Konvertierung abgeschlossen ist.', 'info');
+          return;
+        }
         const targetFsk = el.getAttribute('data-target-fsk') || el.getAttribute('data-fsk') || '16';
         openStudioWithScene(
           el.getAttribute('data-movie-id'),
@@ -2797,9 +3045,16 @@ const App = {
 
     document.querySelectorAll('.js-open-active-fsk-editor').forEach(btn => {
       btn.addEventListener('click', () => {
+        if (btn.getAttribute('data-studio-ready') === '0') {
+          this.toast('Das Cover-Studio ist erst verfügbar, sobald ein Vorschaubild hochgeladen wurde oder die Video-Konvertierung abgeschlossen ist.', 'info');
+          return;
+        }
         const fsk = btn.getAttribute('data-fsk') || '16';
         const wrap = document.getElementById(`current-fsk${fsk}-wrap`);
-        if (!wrap) return;
+        if (!wrap || wrap.getAttribute('data-studio-ready') === '0') {
+          this.toast('Das Cover-Studio ist erst verfügbar, sobald ein Vorschaubild hochgeladen wurde oder die Video-Konvertierung abgeschlossen ist.', 'info');
+          return;
+        }
         openStudioWithScene(
           wrap.getAttribute('data-movie-id'),
           wrap.getAttribute('data-num'),
@@ -3183,6 +3438,502 @@ const App = {
           this.toast('Verbindungsfehler: ' + err.message, 'danger');
           btnPublishAlbum.disabled = false;
         }
+      });
+    }
+  },
+
+  // ========================================================================
+  // 3d. Creator-Feedback & Testlauf-Meldungen (Direkter Draht zu Martin)
+  // ========================================================================
+  initCreatorFeedbackEvents() {
+    const formEl = document.getElementById('ec-creator-feedback-form');
+    if (!formEl) return;
+
+    const categoryRadios = Array.from(formEl.querySelectorAll('input[name="ec_feedback_category"]'));
+    const labelEl = document.getElementById('ec-feedback-label');
+    const messageEl = document.getElementById('ec-feedback-message');
+    const fileInput = document.getElementById('ec-feedback-files');
+    const addFileBtn = document.getElementById('ec-feedback-add-file-btn');
+    const fileCountBadge = document.getElementById('ec-feedback-file-count-badge');
+    const fileListEl = document.getElementById('ec-feedback-file-list');
+    const errorAlert = document.getElementById('ec-feedback-error-alert');
+    const submitBtn = document.getElementById('ec-feedback-submit-btn');
+    const successBox = document.getElementById('ec-feedback-success-box');
+    const successTitle = document.getElementById('ec-feedback-success-title');
+    const successText = document.getElementById('ec-feedback-success-text');
+    const resetBtn = document.getElementById('ec-feedback-reset-btn');
+
+    let selectedFiles = [];
+    const maxFiles = 3;
+    const maxFileSize = 6 * 1024 * 1024; // 6 MB
+    const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'pdf'];
+
+    const showError = (msg) => {
+      if (!errorAlert) return;
+      errorAlert.textContent = msg;
+      errorAlert.classList.remove('d-none');
+    };
+
+    const hideError = () => {
+      if (!errorAlert) return;
+      errorAlert.textContent = '';
+      errorAlert.classList.add('d-none');
+    };
+
+    // 1. Kategoriewechsel: Label & Platzhalter dynamisch anpassen
+    categoryRadios.forEach(radio => {
+      radio.addEventListener('change', () => {
+        if (!radio.checked || !labelEl || !messageEl) return;
+        const val = radio.value;
+        if (val === 'bug') {
+          labelEl.textContent = '2. Welches Problem oder welcher Fehler ist dir im neuen Bereich aufgefallen?';
+          messageEl.placeholder = 'Beschreibe mir kurz, wo das Problem auftritt und was genau passiert (z. B. beim Film-Upload, in den Fotoalben, bei deinen Profilen...)';
+        } else if (val === 'idea') {
+          labelEl.textContent = '2. Welche Funktion oder Verbesserung wünschst du dir?';
+          messageEl.placeholder = 'Erzähl mir von deiner Idee! Was würde dir die Arbeit im EroCloud-Partnerbereich noch einfacher machen?';
+        } else {
+          labelEl.textContent = '2. Deine Nachricht oder Frage an mich:';
+          messageEl.placeholder = 'Schreib mir einfach frei heraus, was dir zum neuen Partnerbereich auf dem Herzen liegt...';
+        }
+      });
+    });
+
+    // 2. Dateianhänge verwalten (Auswahl + Strg+V Zwischenablage)
+    const renderSelectedFiles = () => {
+      if (!fileListEl || !fileCountBadge || !addFileBtn) return;
+      fileListEl.innerHTML = '';
+      fileCountBadge.textContent = `${selectedFiles.length} / ${maxFiles}`;
+      addFileBtn.disabled = (selectedFiles.length >= maxFiles);
+
+      selectedFiles.forEach((file, idx) => {
+        const ext = (file.name.split('.').pop() || '').toLowerCase();
+        const isPdf = (ext === 'pdf' || file.type === 'application/pdf');
+        const iconClass = isPdf ? 'bi-file-earmark-pdf-fill text-danger' : 'bi-file-earmark-image-fill ec-text-primary';
+        const sizeKb = Math.max(1, Math.round(file.size / 1024));
+        const sizeLabel = sizeKb >= 1024 ? `${(sizeKb / 1024).toFixed(1)} MB` : `${sizeKb} KB`;
+
+        const chip = document.createElement('div');
+        chip.className = 'd-inline-flex align-items-center gap-2 px-2 py-1 rounded-3 border small shadow-sm';
+        chip.style.fontSize = '0.78rem';
+        chip.style.backgroundColor = 'var(--kkc-surface)';
+        chip.style.borderColor = 'var(--kkc-border-strong)';
+        chip.innerHTML = `
+          <i class="bi ${iconClass}"></i>
+          <span class="text-truncate fw-medium" style="max-width: 170px;" title="${this.escapeHtml(file.name)}">${this.escapeHtml(file.name)}</span>
+          <span class="text-muted">(${sizeLabel})</span>
+          <button type="button" class="btn btn-sm p-0 border-0 text-secondary ms-1 js-ec-fb-remove-file" data-idx="${idx}" title="Datei entfernen" style="line-height: 1;">
+            <i class="bi bi-x-circle-fill"></i>
+          </button>
+        `;
+        fileListEl.appendChild(chip);
+      });
+
+      fileListEl.querySelectorAll('.js-ec-fb-remove-file').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const rmIdx = parseInt(btn.getAttribute('data-idx') || '-1', 10);
+          if (rmIdx >= 0 && rmIdx < selectedFiles.length) {
+            selectedFiles.splice(rmIdx, 1);
+            renderSelectedFiles();
+          }
+        });
+      });
+    };
+
+    const addFilesToSelection = (fileList) => {
+      hideError();
+      for (let i = 0; i < fileList.length; i++) {
+        if (selectedFiles.length >= maxFiles) {
+          showError(`Du kannst maximal ${maxFiles} Dateien pro Nachricht anhängen.`);
+          break;
+        }
+        const f = fileList[i];
+        const ext = (f.name.split('.').pop() || '').toLowerCase();
+        if (!allowedExts.includes(ext)) {
+          showError(`Die Datei „${f.name}" hat kein unterstütztes Format (erlaubt: JPG, PNG, WEBP, GIF, PDF).`);
+          continue;
+        }
+        if (f.size > maxFileSize) {
+          showError(`Die Datei „${f.name}" ist größer als 6 MB.`);
+          continue;
+        }
+        selectedFiles.push(f);
+      }
+      renderSelectedFiles();
+    };
+
+    if (addFileBtn && fileInput) {
+      addFileBtn.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', () => {
+        if (fileInput.files && fileInput.files.length > 0) {
+          addFilesToSelection(fileInput.files);
+          fileInput.value = '';
+        }
+      });
+    }
+
+    // Strg+V Screenshot-Paste direkt im Formular
+    formEl.addEventListener('paste', (ev) => {
+      const items = ev.clipboardData?.items;
+      if (!items) return;
+      const pastedFiles = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === 'file') {
+          const blob = item.getAsFile();
+          if (blob) {
+            let ext = 'png';
+            if (blob.type === 'image/jpeg') ext = 'jpg';
+            else if (blob.type === 'image/webp') ext = 'webp';
+            else if (blob.type === 'image/gif') ext = 'gif';
+            else if (blob.type === 'application/pdf') ext = 'pdf';
+            const stamp = new Date().toISOString().slice(11, 19).replace(/:/g, '');
+            const namedFile = new File([blob], `screenshot-${stamp}.${ext}`, { type: blob.type });
+            pastedFiles.push(namedFile);
+          }
+        }
+      }
+      if (pastedFiles.length > 0) {
+        addFilesToSelection(pastedFiles);
+      }
+    });
+
+    // 3. Verlauf & Rückmeldungen laden und rendern
+    const renderFeedbackItemCard = (item, isUnreadReply) => {
+      const catBadgeMap = {
+        idea: '<span class="badge bg-warning bg-opacity-15 text-warning-emphasis border border-warning border-opacity-25"><i class="bi bi-lightbulb-fill text-warning me-1"></i>Idee / Wunsch</span>',
+        bug: '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25"><i class="bi bi-bug-fill me-1"></i>Fehler / Problem</span>',
+        question: '<span class="badge bg-primary bg-opacity-10 ec-text-primary border border-primary border-opacity-25"><i class="bi bi-chat-heart-fill me-1"></i>Frage / Feedback</span>'
+      };
+      const statusBadgeMap = {
+        new: '<span class="badge bg-secondary bg-opacity-10 text-secondary border"><i class="bi bi-send-check me-1"></i>Bei Martin eingegangen</span>',
+        in_progress: '<span class="badge bg-info bg-opacity-15 text-info-emphasis border border-info border-opacity-25"><i class="bi bi-gear-wide-connected me-1"></i>In Bearbeitung / Geplant</span>',
+        resolved: '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25"><i class="bi bi-check-circle-fill me-1"></i>Erledigt / Beantwortet</span>',
+        archived: '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25"><i class="bi bi-check2-all me-1"></i>Beantwortet</span>'
+      };
+
+      const catBadge = catBadgeMap[item.category] || catBadgeMap.bug;
+      const statusBadge = statusBadgeMap[item.status] || statusBadgeMap.new;
+      const hasReply = Boolean(item.admin_reply && String(item.admin_reply).trim() !== '');
+
+      let attachmentsHtml = '';
+      if (Array.isArray(item.attachments) && item.attachments.length > 0) {
+        const chips = item.attachments.map(att => {
+          const isPdf = (att.type === 'pdf');
+          const icon = isPdf ? 'bi-file-earmark-pdf-fill text-danger' : 'bi-image ec-text-primary';
+          return `<a href="${this.escapeHtml(att.url)}" target="_blank" rel="noopener" class="d-inline-flex align-items-center gap-1 px-2 py-1 rounded-2 border text-decoration-none small" style="font-size: 0.76rem; background-color: var(--kkc-surface); color: var(--kkc-text);">
+            <i class="bi ${icon}"></i>
+            <span class="text-truncate" style="max-width: 150px;">${this.escapeHtml(att.name || 'Anhang')}</span>
+          </a>`;
+        }).join('');
+        attachmentsHtml = `<div class="d-flex flex-wrap gap-1 mt-2">${chips}</div>`;
+      }
+
+      let replyBoxHtml = '';
+      if (hasReply) {
+        replyBoxHtml = `
+          <div class="mt-3 p-3 rounded-3 border ${isUnreadReply ? 'border-success bg-success bg-opacity-10 ec-fb-reply-highlight' : 'border-success border-opacity-25 bg-success bg-opacity-10'}">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+              <div class="d-flex align-items-center gap-2">
+                <img src="assets/img/ceo-150x150.jpg" onerror="this.onerror=null;this.src='https://erocms.net/images/ceo-150x150.jpg';" alt="Martin" class="rounded-circle object-fit-cover border border-2 border-white shadow-sm" style="width: 28px; height: 28px;">
+                <span class="fw-bold small text-success"><i class="bi bi-reply-fill me-1"></i>Antwort von Martin Zimmermann</span>
+                ${isUnreadReply ? '<span class="badge bg-success text-white rounded-pill">Neue Antwort</span>' : ''}
+              </div>
+              <span class="text-muted" style="font-size: 0.75rem;">${this.escapeHtml(item.replied_at_formatted || '')}</span>
+            </div>
+            <div class="text-body small" style="white-space: pre-line; line-height: 1.55;">${this.escapeHtml(item.admin_reply)}</div>
+            ${isUnreadReply ? `
+              <div class="mt-2 pt-2 border-top border-success border-opacity-25 d-flex justify-content-end">
+                <button type="button" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-semibold ec-fb-mark-read-btn" data-id="${parseInt(item.id, 10)}" style="font-size: 0.78rem;">
+                  <i class="bi bi-check2-circle me-1"></i>Gelesen &amp; verstanden – Danke!
+                </button>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }
+
+      return `
+        <div class="p-3 rounded-3 border shadow-sm ec-fb-history-item" data-item-id="${parseInt(item.id, 10)}" style="background-color: var(--kkc-surface); border-color: ${isUnreadReply ? '#10B981' : 'var(--kkc-border)'} !important;">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+            <div class="d-flex align-items-center flex-wrap gap-2">
+              ${catBadge}
+              ${statusBadge}
+            </div>
+            <span class="text-muted" style="font-size: 0.76rem;"><i class="bi bi-clock me-1"></i>Gesendet am ${this.escapeHtml(item.created_at_formatted || '')}</span>
+          </div>
+          <div class="text-body small" style="white-space: pre-line; line-height: 1.5;">${this.escapeHtml(item.message || '')}</div>
+          ${attachmentsHtml}
+          ${replyBoxHtml}
+        </div>
+      `;
+    };
+
+    const updateReadAccordionState = () => {
+      const readList = document.getElementById('ec-fb-read-accordion-list');
+      const readWrap = document.getElementById('ec-creator-feedback-read-accordion-wrap');
+      const activeList = document.getElementById('ec-creator-feedback-history-list');
+      const countBadge = document.getElementById('ec-fb-read-count-badge');
+      const titleEl = document.getElementById('ec-fb-read-accordion-title');
+
+      if (!readList || !readWrap || !activeList) return;
+      const readCount = readList.querySelectorAll('.ec-fb-history-item').length;
+      const activeCount = activeList.querySelectorAll('.ec-fb-history-item').length;
+
+      if (countBadge) countBadge.textContent = String(readCount);
+      if (titleEl) {
+        titleEl.textContent = readCount === 1
+          ? 'Bereits gelesene Rückmeldung'
+          : 'Bereits gelesene Rückmeldungen';
+      }
+
+      if (readCount > 0) {
+        readWrap.classList.remove('d-none');
+        readWrap.classList.toggle('mt-3', activeCount > 0);
+      } else {
+        readWrap.classList.add('d-none');
+        readWrap.classList.remove('mt-3');
+      }
+    };
+
+    // Akkordeon Auf-/Zuklappen
+    const readToggle = document.getElementById('ec-fb-read-accordion-toggle');
+    if (readToggle) {
+      readToggle.addEventListener('click', () => {
+        const bodyEl = document.getElementById('ec-fb-read-accordion-body');
+        const labelElToggle = document.getElementById('ec-fb-read-toggle-label');
+        if (!bodyEl) return;
+        const isOpen = (readToggle.getAttribute('aria-expanded') === 'true');
+        if (isOpen) {
+          readToggle.setAttribute('aria-expanded', 'false');
+          if (labelElToggle) labelElToggle.textContent = 'Bei Bedarf aufklappen';
+          bodyEl.style.display = 'none';
+        } else {
+          readToggle.setAttribute('aria-expanded', 'true');
+          if (labelElToggle) labelElToggle.textContent = 'Wieder zuklappen';
+          bodyEl.style.display = 'block';
+        }
+      });
+    }
+
+    const loadCreatorFeedbackHistory = async () => {
+      const historyWrap = document.getElementById('ec-creator-feedback-history-wrap');
+      const historyList = document.getElementById('ec-creator-feedback-history-list');
+      const readList = document.getElementById('ec-fb-read-accordion-list');
+      const unreadBadge = document.getElementById('ec-fb-history-unread-badge');
+      const topAlertContainer = document.getElementById('ec-feedback-top-alert-container');
+
+      if (!historyWrap || !historyList || !readList) return;
+
+      try {
+        const formData = new FormData();
+        formData.append('csrf_token', this.csrfToken);
+
+        const res = await fetch(`${this.basePath}/api.php?route=home/feedback-history`, {
+          method: 'POST',
+          body: formData
+        });
+        const resp = await res.json();
+        if (!resp || !resp.success || !Array.isArray(resp.items)) return;
+
+        if (resp.items.length === 0) {
+          historyWrap.classList.add('d-none');
+          if (topAlertContainer) topAlertContainer.innerHTML = '';
+          return;
+        }
+
+        const unreadCount = parseInt(resp.unread_count ?? resp.unread_replies ?? 0, 10);
+        if (unreadBadge) {
+          if (unreadCount > 0) {
+            unreadBadge.textContent = unreadCount === 1 ? '1 neue Antwort' : `${unreadCount} neue Antworten`;
+            unreadBadge.classList.remove('d-none');
+          } else {
+            unreadBadge.classList.add('d-none');
+          }
+        }
+
+        // Top-Benachrichtigungs-Banner ganz oben auf der Startseite anzeigen, wenn ungelesene Antwort vorliegt
+        if (topAlertContainer) {
+          if (unreadCount > 0) {
+            topAlertContainer.innerHTML = `
+              <div class="alert border-0 shadow-sm rounded-4 mb-4 p-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-3" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.14) 0%, rgba(2, 132, 199, 0.12) 100%); border-left: 4px solid #10B981 !important;">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="position-relative flex-shrink-0">
+                    <img src="assets/img/ceo-150x150.jpg" onerror="this.onerror=null;this.src='https://erocms.net/images/ceo-150x150.jpg';" alt="Martin Zimmermann" class="rounded-circle border border-2 border-white shadow-sm object-fit-cover" style="width: 46px; height: 46px;">
+                    <span class="position-absolute bottom-0 end-0 bg-success border border-white rounded-circle" style="width: 12px; height: 12px;"></span>
+                  </div>
+                  <div>
+                    <div class="fw-bold text-body">
+                      <span class="badge bg-success me-1">Neu</span>
+                      Du hast ${unreadCount === 1 ? 'eine persönliche Antwort' : `${unreadCount} persönliche Antworten`} von Martin Zimmermann erhalten!
+                    </div>
+                    <div class="text-muted small">Zu deiner Meldung aus dem EroCloud-Testlauf liegt eine Rückmeldung vor.</div>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-success rounded-pill px-3 py-2 fw-semibold shadow-sm" id="ec-jump-to-feedback-reply-btn">
+                  <i class="bi bi-chat-dots-fill me-1"></i>Antwort jetzt lesen
+                </button>
+              </div>
+            `;
+
+            const jumpBtn = document.getElementById('ec-jump-to-feedback-reply-btn');
+            if (jumpBtn) {
+              jumpBtn.addEventListener('click', () => {
+                historyWrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              });
+            }
+          } else {
+            topAlertContainer.innerHTML = '';
+          }
+        }
+
+        const activeHtmlParts = [];
+        const readHtmlParts = [];
+
+        resp.items.forEach(item => {
+          const hasReply = Boolean(item.has_reply || (item.admin_reply && String(item.admin_reply).trim() !== ''));
+          const isUnreadReply = hasReply && (typeof item.is_unread_reply !== 'undefined' ? Boolean(item.is_unread_reply) : !item.reply_read_at);
+          const cardHtml = renderFeedbackItemCard(item, isUnreadReply);
+
+          if (hasReply && !isUnreadReply) {
+            readHtmlParts.push(cardHtml);
+          } else {
+            activeHtmlParts.push(cardHtml);
+          }
+        });
+
+        historyList.innerHTML = activeHtmlParts.join('');
+        readList.innerHTML = readHtmlParts.join('');
+        updateReadAccordionState();
+        historyWrap.classList.remove('d-none');
+
+        // Klick-Handler für „Gelesen & verstanden – Danke!"
+        historyList.querySelectorAll('.ec-fb-mark-read-btn').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const fbId = parseInt(btn.getAttribute('data-id') || '0', 10);
+            if (!fbId) return;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Wird bestätigt...';
+
+            try {
+              const fd = new FormData();
+              fd.append('feedback_id', String(fbId));
+              fd.append('csrf_token', this.csrfToken);
+
+              const r = await fetch(`${this.basePath}/api.php?route=home/feedback-mark-read`, {
+                method: 'POST',
+                body: fd
+              });
+              const resMark = await r.json();
+              if (resMark && resMark.success) {
+                const itemCard = btn.closest('.ec-fb-history-item');
+                if (itemCard) {
+                  itemCard.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
+                  itemCard.style.opacity = '0';
+                  itemCard.style.transform = 'scale(0.98)';
+                  setTimeout(() => {
+                    loadCreatorFeedbackHistory().then(() => {
+                      const toggleEl = document.getElementById('ec-fb-read-accordion-toggle');
+                      if (toggleEl) {
+                        toggleEl.classList.remove('ec-fb-read-pulse');
+                        void toggleEl.offsetWidth;
+                        toggleEl.classList.add('ec-fb-read-pulse');
+                      }
+                    });
+                  }, 240);
+                } else {
+                  loadCreatorFeedbackHistory();
+                }
+              } else {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Gelesen & verstanden – Danke!';
+              }
+            } catch (_) {
+              btn.disabled = false;
+              btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Gelesen & verstanden – Danke!';
+            }
+          });
+        });
+      } catch (_) {
+        // Silent fail on history fetch
+      }
+    };
+
+    // Initial beim Laden der Startseite abrufen
+    loadCreatorFeedbackHistory();
+
+    // 4. Formular absenden
+    formEl.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideError();
+
+      const checkedCat = formEl.querySelector('input[name="ec_feedback_category"]:checked');
+      const category = checkedCat ? checkedCat.value : 'bug';
+      const msg = (messageEl ? messageEl.value : '').trim();
+
+      if (msg.length < 5) {
+        showError('Bitte schreibe mir noch ein paar Worte (mindestens 5 Zeichen), damit ich weiß, worum es geht.');
+        if (messageEl) messageEl.focus();
+        return;
+      }
+
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Wird direkt an Martin gesendet...';
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append('category', category);
+        formData.append('message', msg);
+        formData.append('page_context', window.location.hash || '#/startseite');
+        formData.append('csrf_token', this.csrfToken);
+
+        selectedFiles.forEach(file => {
+          formData.append('attachments[]', file, file.name);
+        });
+
+        const res = await fetch(`${this.basePath}/api.php?route=home/feedback-send`, {
+          method: 'POST',
+          body: formData
+        });
+        const resp = await res.json();
+
+        if (res.ok && resp && resp.success) {
+          formEl.classList.add('d-none');
+          if ((resp.title || resp.creator_title) && successTitle) {
+            successTitle.textContent = resp.title || resp.creator_title;
+          }
+          if (resp.message && successText) {
+            successText.textContent = resp.message;
+          }
+          if (successBox) {
+            successBox.classList.remove('d-none');
+          }
+          if (messageEl) {
+            messageEl.value = '';
+          }
+          selectedFiles = [];
+          renderSelectedFiles();
+          loadCreatorFeedbackHistory();
+        } else {
+          showError((resp && resp.message) ? resp.message : 'Deine Nachricht konnte leider nicht gesendet werden.');
+        }
+      } catch (_) {
+        showError('Der Feedback-Server ist momentan nicht erreichbar. Bitte versuche es gleich noch einmal.');
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i class="bi bi-send-fill me-2"></i>Nachricht absenden';
+        }
+      }
+    });
+
+    // 5. Weitere Nachricht senden (Reset-Button)
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        if (successBox) successBox.classList.add('d-none');
+        formEl.classList.remove('d-none');
+        if (messageEl) messageEl.focus();
       });
     }
   },

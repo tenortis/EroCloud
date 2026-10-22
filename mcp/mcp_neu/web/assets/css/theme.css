@@ -1220,3 +1220,90 @@ code, kbd, samp, pre, .font-monospace {
   flex-wrap: wrap;
   gap: 0.75rem;
 }
+
+/* ==========================================================================
+   14. Creator-Feedback & Testlauf-Meldungen (Direkter Draht zu Martin)
+   ========================================================================== */
+.ec-feedback-type-label {
+  border-color: var(--kkc-border-strong) !important;
+  background-color: var(--kkc-surface);
+  color: var(--kkc-text-muted);
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.ec-feedback-type-label:hover {
+  border-color: var(--kkc-primary) !important;
+  color: var(--kkc-text);
+  transform: translateY(-1px);
+}
+
+.btn-check:checked + .ec-feedback-type-label.type-bug {
+  border-color: #EF4444 !important;
+  background-color: rgba(239, 68, 68, 0.08);
+  color: #DC2626;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.14);
+}
+[data-bs-theme="dark"] .btn-check:checked + .ec-feedback-type-label.type-bug {
+  background-color: rgba(239, 68, 68, 0.16);
+  color: #F87171;
+}
+
+.btn-check:checked + .ec-feedback-type-label.type-idea {
+  border-color: #F59E0B !important;
+  background-color: rgba(245, 158, 11, 0.10);
+  color: #B45309;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15);
+}
+[data-bs-theme="dark"] .btn-check:checked + .ec-feedback-type-label.type-idea {
+  background-color: rgba(245, 158, 11, 0.16);
+  color: #FBBF24;
+}
+
+.btn-check:checked + .ec-feedback-type-label.type-question {
+  border-color: #0284C7 !important;
+  background-color: rgba(2, 132, 199, 0.09);
+  color: #0369A1;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.14);
+}
+[data-bs-theme="dark"] .btn-check:checked + .ec-feedback-type-label.type-question {
+  background-color: rgba(56, 189, 248, 0.16);
+  color: #38BDF8;
+}
+
+@keyframes ecReplyPulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45); }
+  70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.ec-fb-reply-highlight {
+  animation: ecReplyPulse 1.8s infinite;
+}
+
+@keyframes ecReadAccordionPulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55); border-color: #10B981 !important; }
+  60% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); border-color: #10B981 !important; }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.ec-fb-read-pulse {
+  animation: ecReadAccordionPulse 1.1s ease-out;
+}
+
+.ec-fb-read-accordion-toggle {
+  background-color: var(--kkc-surface);
+  border: 1px dashed var(--kkc-border-strong) !important;
+  color: var(--kkc-text);
+  transition: all 0.2s ease;
+}
+
+.ec-fb-read-accordion-toggle:hover {
+  background-color: var(--kkc-surface-hover);
+  border-color: var(--kkc-primary) !important;
+}
+
+.ec-fb-read-accordion-toggle[aria-expanded="true"] .ec-fb-read-chevron {
+  transform: rotate(180deg);
+}
+

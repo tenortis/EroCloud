@@ -21,13 +21,22 @@ class Router
 
     public static function dispatch(Request $request): void
     {
+        $route = $request->route();
+
+        // Öffentlicher 1-Klick-Abmelde-Endpunkt für System-E-Mails (ohne Login-Zwang, inkl. RFC 8058 One-Click POST)
+        if ($route === 'email-unsubscribe' && class_exists('EroCloudMailer')) {
+            $token         = (string)$request->get('token', $request->post('token', ''));
+            $action        = (string)$request->get('action', $request->post('action', 'unsubscribe'));
+            $isOneClickPost = ($request->isPost() && isset($_POST['List-Unsubscribe']));
+            \EroCloudMailer::handleUnsubscribeRequest($token, $action, $isOneClickPost);
+            return;
+        }
+
         // Authentifizierungs-Prüfung für alle API-Aufrufe
         if (!function_exists('is_logged_in') || is_logged_in('mcp') !== true) {
             Response::error('Deine Sitzung ist abgelaufen. Bitte melde dich erneut über Pay4Coins an.', 401);
             return;
         }
-
-        $route = $request->route();
 
         // Leichtgewichtiger Session-Keep-Alive Heartbeat
         if ($route === 'ping') {
@@ -84,15 +93,20 @@ class Router
         $photoAlbumsCtrl = 'App\\Modules\\PhotoAlbums\\PhotoAlbumsController';
         $previewCtrl     = 'App\\Modules\\Preview\\PreviewController';
 
-        // 1. Startseite (Echtes Partner-Dashboard & Richtlinien-Bestätigung)
+        // 1. Startseite (Echtes Partner-Dashboard, Richtlinien-Bestätigung & Entwickler-Feedback)
         self::register('startseite', $homeCtrl, 'view');
         self::register('home', $homeCtrl, 'view');
         self::register('home/accept-rules', $homeCtrl, 'acceptRules');
+        self::register('home/save-notifications', $homeCtrl, 'saveNotifications');
+        self::register('home/feedback-send', $homeCtrl, 'sendFeedback');
+        self::register('home/feedback-history', $homeCtrl, 'feedbackHistory');
+        self::register('home/feedback-mark-read', $homeCtrl, 'markFeedbackRead');
 
         // 2. Content hochladen (Filme & Foto-Alben in 3 Schritten)
         self::register('movie-upload', $moviesCtrl, 'upload');
         self::register('movies/save-step1', $moviesCtrl, 'saveStep1');
         self::register('movies/upload-file', $moviesCtrl, 'uploadFile');
+        self::register('movies/complete-upload', $moviesCtrl, 'completeUpload');
 
         self::register('photo-album-upload', $photoAlbumsCtrl, 'upload');
         self::register('photo-albums/save-step1', $photoAlbumsCtrl, 'saveStep1');
