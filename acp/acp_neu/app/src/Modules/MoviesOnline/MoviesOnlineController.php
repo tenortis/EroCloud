@@ -957,6 +957,12 @@ final class MoviesOnlineController
         $movieStatus = trim((string)$this->request->post('movie_status', 'active'));
         if (!in_array($movieStatus, ['active', 'blocked', 'deleted'], true)) {
             $errors[] = 'Ungültiger Film-Status ausgewählt.';
+        } elseif (
+            $movieStatus === 'deleted'
+            && (string)($_SESSION['employee_rule'] ?? '') !== 'write'
+            && (string)($m->status ?? '') !== 'deleted'
+        ) {
+            $errors[] = 'Du besitzt keine Schreib-/Löschberechtigung (Administrator-Status), um Filme auf den Status „Gelöscht“ zu setzen.';
         }
 
         $adminInfos = trim(strip_tags((string)$this->request->post('admin_infos', '')));

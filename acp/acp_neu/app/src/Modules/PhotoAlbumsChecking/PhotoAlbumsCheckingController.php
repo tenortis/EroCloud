@@ -978,6 +978,7 @@ final class PhotoAlbumsCheckingController
         $albumIdHash = (string)$a->album_id;
         $title       = self::decodeText((string)($a->title ?? ''));
         $now         = date('Y-m-d H:i:s');
+        $employeeId  = abs((int)($_SESSION['employee_id'] ?? 0));
 
         p4c_query(
             "INSERT INTO `rejection_reason_photo_album_history` SET
@@ -990,7 +991,12 @@ final class PhotoAlbumsCheckingController
         );
 
         p4c_query(
-            "UPDATE `photo_albums` SET `released` = '2' WHERE `id` = '" . $albumDbId . "' LIMIT 1;",
+            "UPDATE `photo_albums` SET
+                `released`              = '2',
+                `last_updated_by`       = '" . $employeeId . "',
+                `last_updated_datetime` = '" . $now . "'
+             WHERE `id` = '" . $albumDbId . "'
+             LIMIT 1;",
             __FILE__,
             __LINE__
         );

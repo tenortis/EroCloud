@@ -494,10 +494,12 @@ foreach ($categoriesByType as $grpItems) {
               <!-- Album-Status -->
               <div class="col-md-5">
                 <label class="form-label small fw-bold mb-1">Album-Status *</label>
-                <select name="status" id="pao-status-select" class="form-select form-select-sm" onchange="const w = document.getElementById('pao-delete-warning'); if(w) w.classList.toggle('d-none', this.value !== 'deleted');">
+                <select name="album_status" id="pao-status-select" class="form-select form-select-sm" onchange="const w = document.getElementById('pao-delete-warning'); if(w) w.classList.toggle('d-none', this.value !== 'deleted');">
                   <option value="active" <?= $album['status'] === 'active' ? 'selected' : '' ?>>Aktiv (Online)</option>
                   <option value="blocked" <?= $album['status'] === 'blocked' ? 'selected' : '' ?>>Gesperrt</option>
-                  <option value="deleted" <?= $album['status'] === 'deleted' ? 'selected' : '' ?>>Löschen (Physisch entfernen)</option>
+                  <?php if ((string)($employeeRule ?? '') === 'write' || $album['status'] === 'deleted'): ?>
+                    <option value="deleted" <?= $album['status'] === 'deleted' ? 'selected' : '' ?>>Löschen (Physisch entfernen)</option>
+                  <?php endif; ?>
                 </select>
               </div>
 

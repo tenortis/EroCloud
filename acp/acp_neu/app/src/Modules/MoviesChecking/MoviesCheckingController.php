@@ -984,15 +984,17 @@ final class MoviesCheckingController
             return;
         }
 
-        $m      = p4c_fetch_object($rsMovie);
-        $fileId = (string)$m->file_id;
-        $title  = self::decodeText((string)($m->title ?? ''));
-        $now    = date('Y-m-d H:i:s');
+        $m          = p4c_fetch_object($rsMovie);
+        $fileId     = (string)$m->file_id;
+        $title      = self::decodeText((string)($m->title ?? ''));
+        $now        = date('Y-m-d H:i:s');
+        $employeeId = abs((int)($_SESSION['employee_id'] ?? 0));
 
         p4c_query(
             "INSERT INTO `rejection_reason_movie_history`
-             (`id_name`, `movie_file_id`, `text`, `datetime`)
+             (`employee_id`, `id_name`, `movie_file_id`, `text`, `datetime`)
              VALUES (
+                '" . $employeeId . "',
                 '" . p4c_escape_string($reasonCode) . "',
                 '" . p4c_escape_string($fileId) . "',
                 '" . p4c_escape_string($reasonText) . "',
@@ -1003,7 +1005,12 @@ final class MoviesCheckingController
         );
 
         p4c_query(
-            "UPDATE `movies` SET `released` = '2' WHERE `id` = '" . $movieId . "' LIMIT 1;",
+            "UPDATE `movies` SET
+                `released`              = '2',
+                `last_updated_by`       = '" . $employeeId . "',
+                `last_updated_datetime` = '" . $now . "'
+             WHERE `id` = '" . $movieId . "'
+             LIMIT 1;",
             __FILE__,
             __LINE__
         );

@@ -661,6 +661,7 @@ final class PhotoAlbumsOnlineController
             'rejectionHistory' => $rejectionHistory,
             'performersData'   => $performersData,
             'bramReport'       => $bramReport,
+            'employeeRule'     => (string)($_SESSION['employee_rule'] ?? ''),
         ]);
     }
 
@@ -805,9 +806,15 @@ final class PhotoAlbumsOnlineController
             : strtolower((string)preg_replace('/[^a-zA-Z0-9-]+/', '-', $seoUrlRaw !== '' ? $seoUrlRaw : $title));
 
         // 6. Status & Admin-Infos
-        $albumStatus = trim((string)$this->request->post('album_status', 'active'));
+        $albumStatus = trim((string)$this->request->post('album_status', $this->request->post('status', 'active')));
         if (!in_array($albumStatus, ['active', 'blocked', 'deleted'], true)) {
             $errors[] = 'Ungültiger Album-Status ausgewählt.';
+        } elseif (
+            $albumStatus === 'deleted'
+            && (string)($_SESSION['employee_rule'] ?? '') !== 'write'
+            && (string)($ao->status ?? '') !== 'deleted'
+        ) {
+            $errors[] = 'Du besitzt keine Schreib-/Löschberechtigung (Administrator-Status), um Fotoalben auf den Status „Gelöscht“ zu setzen.';
         }
         $adminInfos = trim(strip_tags((string)$this->request->post('admin_infos', '')));
 

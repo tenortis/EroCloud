@@ -733,6 +733,7 @@ final class ActorsController
             'actorAlbums'       => $actorAlbums,
             'prevId'            => $prevId,
             'nextId'            => $nextId,
+            'employeeRule'      => (string)($_SESSION['employee_rule'] ?? ''),
         ]);
     }
 
@@ -763,7 +764,8 @@ final class ActorsController
             return;
         }
 
-        $defs = self::getFieldDefinitions();
+        $existingRow = \p4c_fetch_object($rsExists);
+        $defs        = self::getFieldDefinitions();
 
         // 1. Benutzernamen bereinigen & auf Duplikate prüfen (exakt wie in acp/includes/actor.php)
         $rawUsername  = trim((string)$this->request->post('username', ''));
@@ -794,6 +796,14 @@ final class ActorsController
         $status = trim((string)$this->request->post('actor_status', 'inactive'));
         if (!in_array($status, ['active', 'inactive', 'blocked', 'deleted'], true)) {
             $status = 'inactive';
+        }
+        if (
+            $status === 'deleted'
+            && (string)($_SESSION['employee_rule'] ?? '') !== 'write'
+            && (string)($existingRow->status ?? '') !== 'deleted'
+        ) {
+            Response::error('Du besitzt keine Schreib-/Löschberechtigung (Administrator-Status), um ein Darsteller-Profil samt Filmen und Fotoalben als „Gelöscht“ zu markieren.', 403);
+            return;
         }
 
         $isDisplayedAs = trim((string)$this->request->post('is_displayed_as', 'only_upload_actor'));
@@ -1075,6 +1085,10 @@ final class ActorsController
         }
         if (!Csrf::validate($this->request->csrfToken())) {
             Response::error('Dein Sicherheits-Token (CSRF) ist abgelaufen.', 403);
+            return;
+        }
+        if ((string)($_SESSION['employee_rule'] ?? '') !== 'write') {
+            Response::error('Du besitzt keine Schreibberechtigung (Administrator-Status), um ein Darsteller-Profil einem anderen Partner (Merchant) zuzuordnen.', 403);
             return;
         }
 

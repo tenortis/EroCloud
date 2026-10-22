@@ -491,8 +491,10 @@ $statusBadge = match ($actor['status']) {
                                             'active'   => ['label' => 'Aktiv (Online)', 'cls' => 'border-success bg-success bg-opacity-10 text-success'],
                                             'inactive' => ['label' => 'Inaktiv', 'cls' => 'border-secondary bg-light text-secondary'],
                                             'blocked'  => ['label' => 'Gesperrt', 'cls' => 'border-danger bg-danger bg-opacity-10 text-danger'],
-                                            'deleted'  => ['label' => 'Gelöscht', 'cls' => 'border-dark bg-dark bg-opacity-10 text-dark'],
                                         ];
+                                        if ((string)($employeeRule ?? '') === 'write' || $actor['status'] === 'deleted') {
+                                            $statusOptions['deleted'] = ['label' => 'Gelöscht', 'cls' => 'border-dark bg-dark bg-opacity-10 text-dark'];
+                                        }
                                         foreach ($statusOptions as $stKey => $stMeta):
                                         ?>
                                             <div class="col-6">
@@ -712,6 +714,11 @@ $statusBadge = match ($actor['status']) {
                                 Dieses Darsteller-Profil wird aktuell von <strong>MID #<?= (int)$pendingReassign['old_merchant_id'] ?></strong> an
                                 <strong>MID #<?= (int)$pendingReassign['new_merchant_id'] ?> (<?= View::e((string)$pendingReassign['new_username']) ?>)</strong> übertragen
                                 (beauftragt am <?= View::e((string)$pendingReassign['order_from']) ?>). Der Server-Cronjob (<code>cronjobs/actor_reassign.php</code>) übernimmt die Datei-Verschiebung alle 5 Minuten automatisch.
+                            </div>
+                        <?php elseif ((string)($employeeRule ?? '') !== 'write'): ?>
+                            <div class="alert alert-secondary small mb-0">
+                                <i class="bi bi-shield-lock me-1"></i>
+                                Die Übertragung eines Darsteller-Profils an einen anderen Partner (Merchant) ist nur für Administratoren mit Schreibberechtigung freigeschaltet.
                             </div>
                         <?php else: ?>
                             <div class="row g-2 align-items-end">
