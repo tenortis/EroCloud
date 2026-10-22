@@ -254,15 +254,21 @@ final class PhotoAlbumsController
             ORDER BY `id` ASC;", __FILE__, __LINE__);
 
         if ($rsPhotos) {
+            $photoIdx = 0;
             while ($p = p4c_fetch_object($rsPhotos)) {
+                $photoIdx++;
                 $pFileId  = (string)$p->file_id;
                 $photos[] = [
-                    'id'        => abs((int)$p->id),
-                    'file_id'   => $pFileId,
-                    'filename'  => (string)$p->filename,
-                    'rejected'  => abs((int)($p->rejected ?? 0)),
-                    'thumb_url' => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=200',
-                    'zoom_url'  => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=900',
+                    'id'         => abs((int)$p->id),
+                    'index'      => $photoIdx,
+                    'num'        => 'photo_' . $pFileId,
+                    'label'      => 'Foto #' . $photoIdx,
+                    'file_id'    => $pFileId,
+                    'filename'   => (string)$p->filename,
+                    'rejected'   => abs((int)($p->rejected ?? 0)),
+                    'thumb_url'  => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=200',
+                    'zoom_url'   => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=900',
+                    'editor_url' => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=1024',
                 ];
             }
         }
@@ -272,31 +278,36 @@ final class PhotoAlbumsController
             : date('Y-m-d\TH:i', strtotime('+90 minutes'));
 
         $actors = $this->loadActiveMerchantActors($merchantId, $actorId);
+        $nowTs  = time();
 
         $albumData = [
-            'id'                 => $albumDbId,
-            'album_id'           => $albumIdHash,
-            'title'              => self::decodeLegacyText((string)$aObj->title),
-            'description'        => self::decodeLegacyText((string)$aObj->description),
-            'actor_id'           => $actorId,
-            'online_at'          => $onlineAt,
-            'online_at_display'  => ($aObj->online_at !== '0000-00-00 00:00:00' && !empty($aObj->online_at))
+            'id'                      => $albumDbId,
+            'album_id'                => $albumIdHash,
+            'title'                   => self::decodeLegacyText((string)$aObj->title),
+            'description'             => self::decodeLegacyText((string)$aObj->description),
+            'actor_id'                => $actorId,
+            'online_at'               => $onlineAt,
+            'online_at_display'       => ($aObj->online_at !== '0000-00-00 00:00:00' && !empty($aObj->online_at))
                 ? date('d.m.Y H:i', strtotime((string)$aObj->online_at))
                 : '-',
-            'can_edit_online_at' => (((string)$aObj->album_checked === '0000-00-00 00:00:00' && !$isAlbumOnline) || strtotime((string)$aObj->online_at) > time()),
-            'amount_download'    => abs((int)$aObj->amount_download), // in Cent (0, 100, 200 ... 5000)
-            'number_of_photos'   => count($photos),
-            'has_fsk16'          => trim((string)$aObj->preview_image_fsk16) !== '',
-            'has_fsk18'          => trim((string)$aObj->preview_image_fsk18) !== '',
-            'poster_fsk16_url'   => $apiUrl . '/PhotoAlbumPoster/FSK16/' . rawurlencode($albumIdHash) . '?w=240&cs=' . rawurlencode($checksum) . '&t=' . time(),
-            'poster_fsk18_url'   => $apiUrl . '/PhotoAlbumPoster/FSK18/' . rawurlencode($albumIdHash) . '?w=240&cs=' . rawurlencode($checksum) . '&t=' . time(),
-            'album_checked'      => (string)$aObj->album_checked,
-            'released'           => (int)$aObj->released,
-            'is_online'          => $isAlbumOnline,
-            'can_delete'         => ((string)$aObj->album_checked === '0000-00-00 00:00:00' && (int)$aObj->released !== 1 && !$isAlbumOnline),
-            'meta_title'         => self::decodeLegacyText((string)$aObj->meta_title),
-            'meta_description'   => self::decodeLegacyText((string)$aObj->meta_description),
-            'seo_url'            => (string)$aObj->seo_url,
+            'can_edit_online_at'      => (((string)$aObj->album_checked === '0000-00-00 00:00:00' && !$isAlbumOnline) || strtotime((string)$aObj->online_at) > time()),
+            'amount_download'         => abs((int)$aObj->amount_download), // in Cent (0, 100, 200 ... 5000)
+            'number_of_photos'        => count($photos),
+            'has_fsk16'               => trim((string)$aObj->preview_image_fsk16) !== '',
+            'has_fsk18'               => trim((string)$aObj->preview_image_fsk18) !== '',
+            'poster_fsk16_url'        => $apiUrl . '/PhotoAlbumPoster/FSK16/' . rawurlencode($albumIdHash) . '?w=240&cs=' . rawurlencode($checksum) . '&t=' . $nowTs,
+            'poster_fsk16_zoom_url'   => $apiUrl . '/PhotoAlbumPoster/FSK16/' . rawurlencode($albumIdHash) . '?w=640&cs=' . rawurlencode($checksum) . '&t=' . $nowTs,
+            'poster_fsk16_editor_url' => $apiUrl . '/PhotoAlbumPoster/FSK16/' . rawurlencode($albumIdHash) . '?w=1024&cs=' . rawurlencode($checksum) . '&t=' . $nowTs,
+            'poster_fsk18_url'        => $apiUrl . '/PhotoAlbumPoster/FSK18/' . rawurlencode($albumIdHash) . '?w=240&cs=' . rawurlencode($checksum) . '&t=' . $nowTs,
+            'poster_fsk18_zoom_url'   => $apiUrl . '/PhotoAlbumPoster/FSK18/' . rawurlencode($albumIdHash) . '?w=640&cs=' . rawurlencode($checksum) . '&t=' . $nowTs,
+            'poster_fsk18_editor_url' => $apiUrl . '/PhotoAlbumPoster/FSK18/' . rawurlencode($albumIdHash) . '?w=1024&cs=' . rawurlencode($checksum) . '&t=' . $nowTs,
+            'album_checked'           => (string)$aObj->album_checked,
+            'released'                => (int)$aObj->released,
+            'is_online'               => $isAlbumOnline,
+            'can_delete'              => ((string)$aObj->album_checked === '0000-00-00 00:00:00' && (int)$aObj->released !== 1 && !$isAlbumOnline),
+            'meta_title'              => self::decodeLegacyText((string)$aObj->meta_title),
+            'meta_description'        => self::decodeLegacyText((string)$aObj->meta_description),
+            'seo_url'                 => (string)$aObj->seo_url,
         ];
 
         return View::render('PhotoAlbums', 'detail', [
@@ -331,20 +342,24 @@ final class PhotoAlbumsController
         $mcpUrl = defined('MCP_URL') ? MCP_URL : 'https://erocloud.net';
 
         $draft = [
-            'id'               => 0,
-            'album_id'         => '',
-            'title'            => '',
-            'description'      => '',
-            'actor_id'         => 0,
-            'online_at'        => date('Y-m-d\TH:i', strtotime('+90 minutes')),
-            'amount_download'  => 500, // Standard: 5,00 EUR (500 Cent)
-            'has_fsk16'        => false,
-            'has_fsk18'        => false,
-            'poster_fsk16_url' => '',
-            'poster_fsk18_url' => '',
-            'meta_title'       => '',
-            'meta_description' => '',
-            'seo_url'          => '',
+            'id'                      => 0,
+            'album_id'                => '',
+            'title'                   => '',
+            'description'             => '',
+            'actor_id'                => 0,
+            'online_at'               => date('Y-m-d\TH:i', strtotime('+90 minutes')),
+            'amount_download'         => 500, // Standard: 5,00 EUR (500 Cent)
+            'has_fsk16'               => false,
+            'has_fsk18'               => false,
+            'poster_fsk16_url'        => '',
+            'poster_fsk16_zoom_url'   => '',
+            'poster_fsk16_editor_url' => '',
+            'poster_fsk18_url'        => '',
+            'poster_fsk18_zoom_url'   => '',
+            'poster_fsk18_editor_url' => '',
+            'meta_title'              => '',
+            'meta_description'        => '',
+            'seo_url'                 => '',
         ];
         $photos = [];
 
@@ -360,24 +375,29 @@ final class PhotoAlbumsController
                 $dObj        = p4c_fetch_object($rsDraft);
                 $albumIdHash = (string)$dObj->album_id;
                 $checksum    = (string)($dObj->checksum ?? '');
+                $nowTs       = time();
 
                 $draft = [
-                    'id'               => abs((int)$dObj->id),
-                    'album_id'         => $albumIdHash,
-                    'title'            => self::decodeLegacyText((string)$dObj->title),
-                    'description'      => self::decodeLegacyText((string)$dObj->description),
-                    'actor_id'         => abs((int)$dObj->actor_id),
-                    'online_at'        => ($dObj->online_at !== '0000-00-00 00:00:00' && !empty($dObj->online_at))
+                    'id'                      => abs((int)$dObj->id),
+                    'album_id'                => $albumIdHash,
+                    'title'                   => self::decodeLegacyText((string)$dObj->title),
+                    'description'             => self::decodeLegacyText((string)$dObj->description),
+                    'actor_id'                => abs((int)$dObj->actor_id),
+                    'online_at'               => ($dObj->online_at !== '0000-00-00 00:00:00' && !empty($dObj->online_at))
                         ? date('Y-m-d\TH:i', strtotime((string)$dObj->online_at))
                         : date('Y-m-d\TH:i', strtotime('+90 minutes')),
-                    'amount_download'  => abs((int)$dObj->amount_download),
-                    'has_fsk16'        => trim((string)$dObj->preview_image_fsk16) !== '',
-                    'has_fsk18'        => trim((string)$dObj->preview_image_fsk18) !== '',
-                    'poster_fsk16_url' => $apiUrl . '/PhotoAlbumPoster/FSK16/' . rawurlencode($albumIdHash) . '?w=240&cs=' . rawurlencode($checksum) . '&t=' . time(),
-                    'poster_fsk18_url' => $apiUrl . '/PhotoAlbumPoster/FSK18/' . rawurlencode($albumIdHash) . '?w=240&cs=' . rawurlencode($checksum) . '&t=' . time(),
-                    'meta_title'       => self::decodeLegacyText((string)$dObj->meta_title),
-                    'meta_description' => self::decodeLegacyText((string)$dObj->meta_description),
-                    'seo_url'          => (string)$dObj->seo_url,
+                    'amount_download'         => abs((int)$dObj->amount_download),
+                    'has_fsk16'               => trim((string)$dObj->preview_image_fsk16) !== '',
+                    'has_fsk18'               => trim((string)$dObj->preview_image_fsk18) !== '',
+                    'poster_fsk16_url'        => $apiUrl . '/PhotoAlbumPoster/FSK16/' . rawurlencode($albumIdHash) . '?w=240&cs=' . rawurlencode($checksum) . '&t=' . $nowTs,
+                    'poster_fsk16_zoom_url'   => $apiUrl . '/PhotoAlbumPoster/FSK16/' . rawurlencode($albumIdHash) . '?w=640&cs=' . rawurlencode($checksum) . '&t=' . $nowTs,
+                    'poster_fsk16_editor_url' => $apiUrl . '/PhotoAlbumPoster/FSK16/' . rawurlencode($albumIdHash) . '?w=1024&cs=' . rawurlencode($checksum) . '&t=' . $nowTs,
+                    'poster_fsk18_url'        => $apiUrl . '/PhotoAlbumPoster/FSK18/' . rawurlencode($albumIdHash) . '?w=240&cs=' . rawurlencode($checksum) . '&t=' . $nowTs,
+                    'poster_fsk18_zoom_url'   => $apiUrl . '/PhotoAlbumPoster/FSK18/' . rawurlencode($albumIdHash) . '?w=640&cs=' . rawurlencode($checksum) . '&t=' . $nowTs,
+                    'poster_fsk18_editor_url' => $apiUrl . '/PhotoAlbumPoster/FSK18/' . rawurlencode($albumIdHash) . '?w=1024&cs=' . rawurlencode($checksum) . '&t=' . $nowTs,
+                    'meta_title'              => self::decodeLegacyText((string)$dObj->meta_title),
+                    'meta_description'        => self::decodeLegacyText((string)$dObj->meta_description),
+                    'seo_url'                 => (string)$dObj->seo_url,
                 ];
 
                 $rsPhotos = p4c_query("SELECT *
@@ -387,15 +407,21 @@ final class PhotoAlbumsController
                     ORDER BY `id` ASC;", __FILE__, __LINE__);
 
                 if ($rsPhotos) {
+                    $photoIdx = 0;
                     while ($p = p4c_fetch_object($rsPhotos)) {
+                        $photoIdx++;
                         $pFileId  = (string)$p->file_id;
                         $photos[] = [
-                            'id'        => abs((int)$p->id),
-                            'file_id'   => $pFileId,
-                            'filename'  => (string)$p->filename,
-                            'rejected'  => abs((int)($p->rejected ?? 0)),
-                            'thumb_url' => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=200',
-                            'zoom_url'  => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=900',
+                            'id'         => abs((int)$p->id),
+                            'index'      => $photoIdx,
+                            'num'        => 'photo_' . $pFileId,
+                            'label'      => 'Foto #' . $photoIdx,
+                            'file_id'    => $pFileId,
+                            'filename'   => (string)$p->filename,
+                            'rejected'   => abs((int)($p->rejected ?? 0)),
+                            'thumb_url'  => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=200',
+                            'zoom_url'   => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=900',
+                            'editor_url' => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=1024',
                         ];
                     }
                 }
@@ -709,14 +735,27 @@ final class PhotoAlbumsController
             p4c_query("UPDATE `photo_albums` SET `checksum` = '" . p4c_escape_string($checksum) . "' WHERE `id` = '" . $albumDbId . "';", __FILE__, __LINE__);
         }
 
-        $apiUrl     = defined('API_URL') ? API_URL : 'https://api.erocloud.net';
-        $previewUrl = $apiUrl . '/PhotoAlbumPoster/FSK' . $fsk . '/' . rawurlencode((string)$aObj->album_id) . '?w=240&cs=' . rawurlencode($checksum) . '&t=' . time();
+        $apiUrl      = defined('API_URL') ? API_URL : 'https://api.erocloud.net';
+        $albumIdHash = (string)$aObj->album_id;
+        $nowTs       = time();
+        $previewUrl  = $apiUrl . '/PhotoAlbumPoster/FSK' . $fsk . '/' . rawurlencode($albumIdHash) . '?w=240&cs=' . rawurlencode($checksum) . '&t=' . $nowTs;
+        $zoomUrl     = $apiUrl . '/PhotoAlbumPoster/FSK' . $fsk . '/' . rawurlencode($albumIdHash) . '?w=640&cs=' . rawurlencode($checksum) . '&t=' . $nowTs;
+        $editorUrl   = $apiUrl . '/PhotoAlbumPoster/FSK' . $fsk . '/' . rawurlencode($albumIdHash) . '?w=1024&cs=' . rawurlencode($checksum) . '&t=' . $nowTs;
+
+        $hasFsk16    = ($fsk === '16') ? true : (trim((string)$aObj->preview_image_fsk16) !== '');
+        $hasFsk18    = ($fsk === '18') ? true : (trim((string)$aObj->preview_image_fsk18) !== '');
+        $totalPhotos = abs((int)$aObj->number_of_photos);
 
         Response::json([
-            'status'      => 'ok',
-            'message'     => 'Das FSK' . $fsk . '-Coverbild wurde erfolgreich aktualisiert.',
-            'fsk'         => $fsk,
-            'preview_url' => $previewUrl,
+            'status'       => 'ok',
+            'message'      => 'Das FSK' . $fsk . '-Coverbild wurde erfolgreich aktualisiert.',
+            'fsk'          => $fsk,
+            'preview_url'  => $previewUrl,
+            'zoom_url'     => $zoomUrl,
+            'editor_url'   => $editorUrl,
+            'has_fsk16'    => $hasFsk16,
+            'has_fsk18'    => $hasFsk18,
+            'total_photos' => $totalPhotos,
         ]);
     }
 
@@ -796,10 +835,12 @@ final class PhotoAlbumsController
                     `upload_datetime` = '" . date('Y-m-d H:i:s') . "';", __FILE__, __LINE__);
 
                 $uploadedPhotos[] = [
-                    'file_id'   => $photoFileId,
-                    'filename'  => $newFileName,
-                    'thumb_url' => $mcpUrl . '/AlbumPhoto/' . rawurlencode($photoFileId) . '?w=200',
-                    'zoom_url'  => $mcpUrl . '/AlbumPhoto/' . rawurlencode($photoFileId) . '?w=900',
+                    'num'        => 'photo_' . $photoFileId,
+                    'file_id'    => $photoFileId,
+                    'filename'   => $newFileName,
+                    'thumb_url'  => $mcpUrl . '/AlbumPhoto/' . rawurlencode($photoFileId) . '?w=200',
+                    'zoom_url'   => $mcpUrl . '/AlbumPhoto/' . rawurlencode($photoFileId) . '?w=900',
+                    'editor_url' => $mcpUrl . '/AlbumPhoto/' . rawurlencode($photoFileId) . '?w=1024',
                 ];
             }
         }

@@ -327,10 +327,22 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
 
     <!-- Topbar -->
     <header class="app-topbar">
-      <!-- Schnellsuche -->
-      <div class="topbar-search position-relative d-none d-sm-block">
+      <!-- Schnellsuche (Filme & Fotoalben mit Live-Dropdown) -->
+      <div class="topbar-search position-relative d-none d-sm-block" id="global-search-wrapper">
         <i class="bi bi-search search-icon"></i>
-        <input type="text" id="global-search-input" class="form-control" placeholder="Schnellsuche nach Filmen, Fotoalben oder Profilen...">
+        <input type="text"
+               id="global-search-input"
+               class="form-control pe-4"
+               placeholder="Schnellsuche nach Filmen &amp; Fotoalben (#ID, Titel, Darsteller)..."
+               autocomplete="off"
+               aria-label="Schnellsuche nach Filmen und Fotoalben">
+        <button type="button"
+                id="global-search-clear"
+                class="btn btn-sm btn-link text-muted position-absolute top-50 end-0 translate-middle-y me-1 p-0 px-1 d-none"
+                title="Suche zurücksetzen">
+          <i class="bi bi-x-circle-fill"></i>
+        </button>
+        <div id="global-search-dropdown" class="ec-global-search-dropdown d-none" role="listbox" aria-label="Suchergebnisse"></div>
       </div>
 
       <!-- Quick-Actions & Partner-Menü -->

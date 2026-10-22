@@ -191,6 +191,9 @@ const App = {
     if (!contentArea) return;
 
     this.hideThumbZoomPopover();
+    if (typeof this.hideGlobalSearchDropdown === 'function') {
+      this.hideGlobalSearchDropdown();
+    }
 
     contentArea.innerHTML = `
       <div class="d-flex align-items-center justify-content-center p-5">
@@ -271,27 +274,345 @@ const App = {
     this.initCreatorFeedbackEvents();
   },
 
-  // Globale Schnellsuche in der Topbar: Filtert live auf #/movies oder #/photo-albums bzw. wechselt bei Enter zu #/movies
+  hideGlobalSearchDropdown() {
+    const dropdown = document.getElementById('global-search-dropdown');
+    if (dropdown) {
+      dropdown.classList.add('d-none');
+    }
+  },
+
+  // Globale Schnellsuche in der Topbar: Durchsucht Filme & Fotoalben live mit eindeutiger Typ-Kennzeichnung
   initGlobalTopbarSearch() {
+    const wrapper = document.getElementById('global-search-wrapper');
     const globalInput = document.getElementById('global-search-input');
-    if (!globalInput) return;
+    const clearBtn = document.getElementById('global-search-clear');
+    const dropdown = document.getElementById('global-search-dropdown');
+    if (!globalInput || !dropdown) return;
+
+    let searchTimer = null;
+    let abortCtrl = null;
+    let lastData = null;
+    let activeFilter = 'all'; // 'all' | 'movie' | 'photo_album'
+    let activeIdx = -1;
+
+    const getFilteredItems = () => {
+      if (!lastData || !Array.isArray(lastData.items)) return [];
+      if (activeFilter === 'movie') {
+        return lastData.items.filter(i => i.type === 'movie');
+      }
+      if (activeFilter === 'photo_album') {
+        return lastData.items.filter(i => i.type === 'photo_album');
+      }
+      return lastData.items;
+    };
+
+    const updateActiveHighlight = () => {
+      const rows = Array.from(dropdown.querySelectorAll('.ec-search-item'));
+      rows.forEach((row, idx) => {
+        const isCurrent = idx === activeIdx;
+        row.classList.toggle('is-active', isCurrent);
+        if (isCurrent) {
+          row.scrollIntoView({ block: 'nearest' });
+        }
+      });
+    };
+
+    const renderDropdown = () => {
+      if (!lastData) return;
+
+      const counts = lastData.counts || { total: 0, movies: 0, albums: 0 };
+      const filtered = getFilteredItems();
+
+      let listHtml = '';
+      if (filtered.length === 0) {
+        const filterName = activeFilter === 'movie'
+          ? 'Filme'
+          : (activeFilter === 'photo_album' ? 'Fotoalben' : 'Filme oder Fotoalben');
+        listHtml = `
+          <div class="p-4 text-center text-muted small">
+            <i class="bi bi-search d-block fs-4 mb-1 opacity-50"></i>
+            Keine passenden ${filterName} für „<strong>${this.escapeHtml(lastData.query || '')}</strong>“ gefunden.
+          </div>
+        `;
+      } else {
+        listHtml = filtered.map((item, idx) => {
+          const isMovie = item.type === 'movie';
+          const typeBadge = isMovie
+            ? `<span class="ec-search-type-badge is-movie" title="Das ist ein Film"><i class="bi bi-film"></i> Film</span>`
+            : `<span class="ec-search-type-badge is-album" title="Das ist ein Fotoalbum"><i class="bi bi-images"></i> Fotoalbum</span>`;
+
+          const fallbackIcon = isMovie ? 'bi-film' : 'bi-images';
+          const metaIcon = isMovie ? 'bi-clock' : 'bi-camera';
+          const metaHtml = item.meta_info
+            ? `<span>&bull;</span><span><i class="bi ${metaIcon} me-1"></i>${this.escapeHtml(item.meta_info)}</span>`
+            : '';
+
+          return `
+            <a href="${this.escapeHtml(item.route)}"
+               class="ec-search-item ${idx === activeIdx ? 'is-active' : ''}"
+               data-search-idx="${idx}"
+               data-target-route="${this.escapeHtml(item.route)}">
+              <div class="ec-search-thumb">
+                <img src="${this.escapeHtml(item.poster_url)}"
+                     alt=""
+                     loading="lazy"
+                     onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.classList.remove('d-none');">
+                <i class="bi ${fallbackIcon} text-muted d-none"></i>
+              </div>
+              <div class="flex-grow-1 min-w-0">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  ${typeBadge}
+                  <span class="font-monospace fw-semibold text-muted flex-shrink-0" style="font-size: 0.75rem;">#${ parseInt(item.id, 10) }</span>
+                  <span class="fw-semibold text-truncate" style="font-size: 0.85rem;">${this.escapeHtml(item.title)}</span>
+                </div>
+                <div class="d-flex align-items-center flex-wrap gap-2 text-muted" style="font-size: 0.73rem;">
+                  <span><i class="bi bi-person-circle me-1"></i>${this.escapeHtml(item.actor_name || '-')}</span>
+                  ${metaHtml}
+                </div>
+              </div>
+              <span class="badge-kkc ${this.escapeHtml(item.status_badge || 'badge-kkc-neutral')} flex-shrink-0" style="font-size: 0.68rem;">
+                <i class="bi ${this.escapeHtml(item.status_icon || 'bi-circle')}"></i>
+                ${this.escapeHtml(item.status_label || '')}
+              </span>
+            </a>
+          `;
+        }).join('');
+      }
+
+      let footerHtml = '';
+      if (counts.movies > 0 || counts.albums > 0) {
+        footerHtml = `
+          <div class="ec-global-search-footer">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+              ${counts.movies > 0 ? `
+                <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 ec-text-primary fw-semibold js-global-search-jump" data-jump-route="#/movies">
+                  <i class="bi bi-film me-1"></i>Alle ${counts.movies} ${counts.movies === 1 ? 'Film' : 'Filme'} in der Übersicht filtern
+                </button>
+              ` : ''}
+              ${counts.albums > 0 ? `
+                <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 fw-semibold js-global-search-jump" style="color: #7C3AED;" data-jump-route="#/photo-albums">
+                  <i class="bi bi-images me-1"></i>Alle ${counts.albums} ${counts.albums === 1 ? 'Fotoalbum' : 'Fotoalben'} in der Übersicht filtern
+                </button>
+              ` : ''}
+            </div>
+            <span class="text-muted ms-auto d-none d-md-inline" style="font-size: 0.68rem;">
+              <kbd class="bg-transparent text-muted border px-1">↑</kbd> <kbd class="bg-transparent text-muted border px-1">↓</kbd> &amp; <kbd class="bg-transparent text-muted border px-1">Enter</kbd>
+            </span>
+          </div>
+        `;
+      }
+
+      dropdown.innerHTML = `
+        <div class="ec-global-search-header">
+          <div class="d-flex align-items-center gap-1 flex-wrap">
+            <button type="button" class="ec-search-filter-pill ${activeFilter === 'all' ? 'active' : ''}" data-search-filter="all">
+              Alle (${counts.total})
+            </button>
+            <button type="button" class="ec-search-filter-pill ${activeFilter === 'movie' ? 'active' : ''}" data-search-filter="movie">
+              <i class="bi bi-film"></i> Filme (${counts.movies})
+            </button>
+            <button type="button" class="ec-search-filter-pill ${activeFilter === 'photo_album' ? 'active' : ''}" data-search-filter="photo_album">
+              <i class="bi bi-images"></i> Fotoalben (${counts.albums})
+            </button>
+          </div>
+          <span class="text-muted d-none d-sm-inline" style="font-size: 0.68rem;">ESC schließen</span>
+        </div>
+        <div class="ec-global-search-list">
+          ${listHtml}
+        </div>
+        ${footerHtml}
+      `;
+
+      dropdown.classList.remove('d-none');
+
+      // Filter-Pills im Dropdown-Header
+      dropdown.querySelectorAll('[data-search-filter]').forEach(btn => {
+        btn.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          activeFilter = btn.getAttribute('data-search-filter') || 'all';
+          activeIdx = -1;
+          renderDropdown();
+          globalInput.focus();
+        });
+      });
+
+      // Klick auf einen Treffer
+      dropdown.querySelectorAll('.ec-search-item').forEach(link => {
+        link.addEventListener('click', (ev) => {
+          const targetRoute = link.getAttribute('data-target-route') || '';
+          this.hideGlobalSearchDropdown();
+          if (targetRoute && window.location.hash === targetRoute) {
+            ev.preventDefault();
+            this.handleRoute();
+          }
+        });
+      });
+
+      // Fußzeilen-Buttons: In #/movies oder #/photo-albums komplett filtern
+      dropdown.querySelectorAll('.js-global-search-jump').forEach(btn => {
+        btn.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          const jumpRoute = btn.getAttribute('data-jump-route') || '#/movies';
+          const q = globalInput.value.trim();
+          this.hideGlobalSearchDropdown();
+
+          const currentBase = '#' + (window.location.hash.replace(/^#/, '').split('?')[0] || '/startseite');
+          const smartSearch = document.getElementById('smart-search-input');
+          if (currentBase === jumpRoute && smartSearch) {
+            smartSearch.value = q;
+            smartSearch.dispatchEvent(new Event('input', { bubbles: true }));
+          } else {
+            this.pendingGlobalSearch = q;
+            window.location.hash = jumpRoute;
+          }
+        });
+      });
+    };
+
+    const runSearch = async (query) => {
+      if (abortCtrl) {
+        abortCtrl.abort();
+      }
+      abortCtrl = new AbortController();
+
+      try {
+        const res = await fetch(`${this.basePath}/api.php?route=home/global-search&q=${encodeURIComponent(query)}`, {
+          method: 'GET',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          signal: abortCtrl.signal
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && data.status === 'ok') {
+          lastData = data;
+          activeIdx = -1;
+          renderDropdown();
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          // Stiller Fallback bei Netzwerkunterbrechung
+        }
+      }
+    };
 
     globalInput.addEventListener('input', () => {
+      const val = globalInput.value.trim();
+      if (clearBtn) {
+        clearBtn.classList.toggle('d-none', val === '');
+      }
+
+      // Falls gerade die Film- oder Fotoalben-Tabelle offen ist, lokal mitsaubern/mitfiltern
       const smartSearch = document.getElementById('smart-search-input');
       if (smartSearch) {
         smartSearch.value = globalInput.value;
         smartSearch.dispatchEvent(new Event('input', { bubbles: true }));
       }
+
+      if (searchTimer) {
+        clearTimeout(searchTimer);
+      }
+
+      if (val === '') {
+        lastData = null;
+        this.hideGlobalSearchDropdown();
+        return;
+      }
+
+      if (dropdown.classList.contains('d-none')) {
+        dropdown.innerHTML = `
+          <div class="p-3 text-center text-muted small">
+            <span class="spinner-border spinner-border-sm ec-text-primary me-2" role="status"></span>
+            Suche nach Filmen &amp; Fotoalben...
+          </div>
+        `;
+        dropdown.classList.remove('d-none');
+      }
+
+      searchTimer = setTimeout(() => {
+        runSearch(val);
+      }, 150);
+    });
+
+    globalInput.addEventListener('focus', () => {
+      const val = globalInput.value.trim();
+      if (val !== '') {
+        if (lastData && lastData.query === val) {
+          dropdown.classList.remove('d-none');
+        } else {
+          runSearch(val);
+        }
+      }
     });
 
     globalInput.addEventListener('keydown', (e) => {
+      const filtered = getFilteredItems();
+
+      if (e.key === 'Escape') {
+        this.hideGlobalSearchDropdown();
+        return;
+      }
+
+      if (e.key === 'ArrowDown') {
+        if (!dropdown.classList.contains('d-none') && filtered.length > 0) {
+          e.preventDefault();
+          activeIdx = (activeIdx + 1) % filtered.length;
+          updateActiveHighlight();
+        }
+        return;
+      }
+
+      if (e.key === 'ArrowUp') {
+        if (!dropdown.classList.contains('d-none') && filtered.length > 0) {
+          e.preventDefault();
+          activeIdx = activeIdx <= 0 ? filtered.length - 1 : activeIdx - 1;
+          updateActiveHighlight();
+        }
+        return;
+      }
+
       if (e.key === 'Enter') {
         e.preventDefault();
+        if (!dropdown.classList.contains('d-none') && filtered.length > 0) {
+          const chosen = filtered[activeIdx >= 0 ? activeIdx : 0];
+          if (chosen && chosen.route) {
+            this.hideGlobalSearchDropdown();
+            if (window.location.hash === chosen.route) {
+              this.handleRoute();
+            } else {
+              window.location.hash = chosen.route;
+            }
+            return;
+          }
+        }
         const smartSearch = document.getElementById('smart-search-input');
         if (!smartSearch && globalInput.value.trim() !== '') {
           this.pendingGlobalSearch = globalInput.value.trim();
+          this.hideGlobalSearchDropdown();
           window.location.hash = '#/movies';
         }
+      }
+    });
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        globalInput.value = '';
+        clearBtn.classList.add('d-none');
+        lastData = null;
+        this.hideGlobalSearchDropdown();
+        const smartSearch = document.getElementById('smart-search-input');
+        if (smartSearch) {
+          smartSearch.value = '';
+          smartSearch.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        globalInput.focus();
+      });
+    }
+
+    document.addEventListener('click', (e) => {
+      if (wrapper && !wrapper.contains(e.target)) {
+        this.hideGlobalSearchDropdown();
       }
     });
   },
@@ -338,6 +659,9 @@ const App = {
       searchInput.value = this.pendingGlobalSearch;
       state.query = this.pendingGlobalSearch.toLowerCase();
       this.pendingGlobalSearch = '';
+      if (searchClearBtn) {
+        searchClearBtn.classList.remove('d-none');
+      }
     }
 
     const syncStatusUI = () => {

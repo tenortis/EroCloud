@@ -907,6 +907,363 @@ class HomeController
     }
 
     /**
+     * Globale Topbar-Schnellsuche über alle Filme und Fotoalben des Partners (JSON-Antwort).
+     * Kennzeichnet jeden Treffer eindeutig als 'movie' (Film) oder 'photo_album' (Fotoalbum).
+     */
+    public function globalSearch(): void
+    {
+        $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
+        if ($merchantId <= 0) {
+            Response::error('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.', 401);
+            return;
+        }
+
+        $rawQuery = trim((string)$this->request->get('q', $this->request->post('q', '')));
+        if ($rawQuery === '') {
+            Response::json([
+                'status' => 'ok',
+                'query'  => '',
+                'counts' => [
+                    'total'  => 0,
+                    'movies' => 0,
+                    'albums' => 0,
+                ],
+                'items'  => [],
+            ]);
+            return;
+        }
+
+        $queryLower = mb_strtolower($rawQuery, 'UTF-8');
+        $idQuery    = ltrim($queryLower, '#');
+        $tokens     = array_values(array_filter(preg_split('/\s+/u', $queryLower) ?: [], static fn(string $t): bool => $t !== ''));
+
+        $apiUrl = defined('API_URL') ? API_URL : 'https://api.erocloud.net';
+
+        // 1. Nicht gelöschte Darsteller-Profile des Partners laden
+        $actorsMap = [];
+        $rsActors  = p4c_query("SELECT `id`, `username`
+            FROM `actors`
+            WHERE `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted';", __FILE__, __LINE__);
+        if ($rsActors && p4c_num_rows($rsActors) > 0) {
+            while ($aObj = p4c_fetch_object($rsActors)) {
+                $actorsMap[abs((int)$aObj->id)] = trim(self::decodeLegacyText((string)$aObj->username));
+            }
+        }
+
+        // 2. Online-Status aller Fotoalben des Partners vorladen
+        $onlineAlbumHashes = [];
+        $rsOnlineAlbums    = p4c_query("SELECT `album_id`
+            FROM `photo_albums_online`
+            WHERE `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
+        if ($rsOnlineAlbums && p4c_num_rows($rsOnlineAlbums) > 0) {
+            while ($onObj = p4c_fetch_object($rsOnlineAlbums)) {
+                $onlineAlbumHashes[(string)$onObj->album_id] = true;
+            }
+        }
+
+        $matchedMovies = [];
+        $matchedAlbums = [];
+
+        // 3. Filme durchsuchen
+        $rsMovies = p4c_query("SELECT
+                `id`, `convert_status`, `file_id`, `checksum`, `filename`, `title`,
+                `movie_checked`, `released`, `actor_id`, `online_at`, `playtime_string`, `resolution`
+            FROM `movies`
+            WHERE `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted'
+            ORDER BY `id` DESC;", __FILE__, __LINE__);
+
+        if ($rsMovies && p4c_num_rows($rsMovies) > 0) {
+            while ($m = p4c_fetch_object($rsMovies)) {
+                $actorId = abs((int)$m->actor_id);
+                if ($actorId > 0 && !isset($actorsMap[$actorId])) {
+                    continue;
+                }
+
+                $movieId    = abs((int)$m->id);
+                $fileId     = (string)$m->file_id;
+                $checksum   = (string)($m->checksum ?? '');
+                $filename   = trim((string)$m->filename);
+                $convStatus = (int)$m->convert_status;
+                $checked    = (string)$m->movie_checked;
+                $released   = (int)$m->released;
+                $actorName  = $actorsMap[$actorId] ?? '-';
+                $rawTitle   = trim(self::decodeLegacyText((string)$m->title));
+                $title      = $rawTitle !== '' ? $rawTitle : ('Unbenannter Film #' . $movieId);
+
+                $statusKey   = 'pending';
+                $statusLabel = 'In Bearbeitung';
+                $statusBadge = 'badge-kkc-neutral';
+                $statusIcon  = 'bi-clock';
+                $editRoute   = '#/movie?id=' . $movieId;
+
+                if ($filename === '') {
+                    $statusKey   = 'pending';
+                    $statusLabel = 'Filmdatei hochladen';
+                    $statusBadge = 'badge-kkc-warning';
+                    $statusIcon  = 'bi-cloud-arrow-up-fill';
+                    $editRoute   = '#/movie-upload?step=2&movie_id=' . $movieId;
+                } elseif ($convStatus <= 1) {
+                    $statusKey   = 'pending';
+                    $statusLabel = 'Wird konvertiert';
+                    $statusBadge = 'badge-kkc-info';
+                    $statusIcon  = 'bi-gear-wide-connected';
+                } elseif ($checked !== '0000-00-00 00:00:00' && $checked !== '') {
+                    $statusKey   = 'online';
+                    $statusLabel = 'Online';
+                    $statusBadge = 'badge-kkc-success';
+                    $statusIcon  = 'bi-check-circle-fill';
+                } elseif ($checked === '0000-00-00 00:00:00' && $released === 1) {
+                    $statusKey   = 'pending';
+                    $statusLabel = 'Wird geprüft';
+                    $statusBadge = 'badge-kkc-warning';
+                    $statusIcon  = 'bi-hourglass-split';
+                } elseif ($checked === '0000-00-00 00:00:00' && $released === 2) {
+                    $statusKey   = 'rejected';
+                    $statusLabel = 'Abgelehnt';
+                    $statusBadge = 'badge-kkc-danger';
+                    $statusIcon  = 'bi-x-circle-fill';
+                } elseif ($convStatus === 2) {
+                    $statusKey   = 'pending';
+                    $statusLabel = 'Jetzt veröffentlichen';
+                    $statusBadge = 'badge-kkc-warning';
+                    $statusIcon  = 'bi-exclamation-circle-fill';
+                }
+
+                $onlineAtFormatted = ($m->online_at !== '0000-00-00 00:00:00' && !empty($m->online_at))
+                    ? date('d.m.Y H:i', (int)strtotime((string)$m->online_at))
+                    : '-';
+
+                $titleLower = mb_strtolower($title, 'UTF-8');
+                $actorLower = mb_strtolower($actorName, 'UTF-8');
+                $codeLower  = mb_strtolower($fileId, 'UTF-8');
+                $searchable = '#' . $movieId . ' ' . $movieId . ' ' . $codeLower . ' ' . $titleLower . ' '
+                    . $actorLower . ' ' . mb_strtolower($statusLabel, 'UTF-8') . ' ' . $onlineAtFormatted . ' film filme video';
+
+                $allMatched = true;
+                foreach ($tokens as $token) {
+                    $cleanToken = ltrim($token, '#');
+                    if (
+                        mb_strpos($searchable, $token) === false
+                        && ($cleanToken === '' || mb_strpos($searchable, $cleanToken) === false)
+                    ) {
+                        $allMatched = false;
+                        break;
+                    }
+                }
+                if (!$allMatched) {
+                    continue;
+                }
+
+                $score = 30;
+                if ((string)$movieId === $idQuery || $codeLower === $queryLower) {
+                    $score = 100;
+                } elseif ($idQuery !== '' && ctype_digit($idQuery) && str_starts_with((string)$movieId, $idQuery)) {
+                    $score = 85;
+                } elseif (str_starts_with($titleLower, $queryLower)) {
+                    $score = 75;
+                } elseif (mb_strpos($titleLower, $queryLower) !== false) {
+                    $score = 60;
+                } elseif (mb_strpos($actorLower, $queryLower) !== false) {
+                    $score = 45;
+                }
+
+                $playtime   = trim((string)($m->playtime_string ?? ''));
+                $resolution = trim((string)($m->resolution ?? ''));
+                $metaParts  = [];
+                if ($playtime !== '') {
+                    $metaParts[] = $playtime;
+                }
+                if ($resolution !== '') {
+                    $metaParts[] = $resolution;
+                }
+
+                $matchedMovies[] = [
+                    'type'         => 'movie',
+                    'type_label'   => 'Film',
+                    'id'           => $movieId,
+                    'code'         => $fileId,
+                    'title'        => $title,
+                    'actor_id'     => $actorId,
+                    'actor_name'   => $actorName,
+                    'poster_url'   => $apiUrl . '/PlayerPoster/FSK16/' . rawurlencode($fileId) . '?w=120&cs=' . rawurlencode($checksum),
+                    'meta_info'    => implode(' · ', $metaParts),
+                    'online_at'    => $onlineAtFormatted,
+                    'status_key'   => $statusKey,
+                    'status_label' => $statusLabel,
+                    'status_badge' => $statusBadge,
+                    'status_icon'  => $statusIcon,
+                    'route'        => $editRoute,
+                    'score'        => $score,
+                ];
+            }
+        }
+
+        // 4. Fotoalben durchsuchen
+        $rsAlbums = p4c_query("SELECT
+                `id`, `album_id`, `checksum`, `number_of_photos`, `title`,
+                `preview_image_fsk16`, `preview_image_fsk18`, `album_checked`, `released`, `actor_id`, `online_at`
+            FROM `photo_albums`
+            WHERE `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted'
+            ORDER BY `id` DESC;", __FILE__, __LINE__);
+
+        if ($rsAlbums && p4c_num_rows($rsAlbums) > 0) {
+            while ($a = p4c_fetch_object($rsAlbums)) {
+                $actorId = abs((int)$a->actor_id);
+                if ($actorId > 0 && !isset($actorsMap[$actorId])) {
+                    continue;
+                }
+
+                $albumDbId   = abs((int)$a->id);
+                $albumIdHash = (string)$a->album_id;
+                $checksum    = (string)($a->checksum ?? '');
+                $numPhotos   = abs((int)$a->number_of_photos);
+                $hasFsk16    = trim((string)$a->preview_image_fsk16) !== '';
+                $hasFsk18    = trim((string)$a->preview_image_fsk18) !== '';
+                $isComplete  = ($numPhotos >= 4 && $hasFsk16 && $hasFsk18);
+                $isOnline    = isset($onlineAlbumHashes[$albumIdHash]);
+                $checked     = (string)$a->album_checked;
+                $released    = (int)$a->released;
+                $actorName   = $actorsMap[$actorId] ?? '-';
+                $rawTitle    = trim(self::decodeLegacyText((string)$a->title));
+                $title       = $rawTitle !== '' ? $rawTitle : ('Unbenanntes Foto-Album #' . $albumDbId);
+
+                $statusKey   = 'pending';
+                $statusLabel = 'Wartet auf Freigabe';
+                $statusBadge = 'badge-kkc-warning';
+                $statusIcon  = 'bi-hourglass-split';
+                $editRoute   = '#/photo-album?id=' . $albumDbId;
+
+                if (!$isComplete) {
+                    $statusKey   = 'pending';
+                    $statusLabel = 'Fotos fehlen';
+                    $statusBadge = 'badge-kkc-neutral';
+                    $statusIcon  = 'bi-cloud-arrow-up';
+                    $editRoute   = '#/photo-album-upload?step=2&album_id=' . $albumDbId;
+                } elseif ($checked === '0000-00-00 00:00:00' && $released === 0) {
+                    $statusKey   = 'pending';
+                    $statusLabel = 'Entwurf';
+                    $statusBadge = 'badge-kkc-neutral';
+                    $statusIcon  = 'bi-pencil-square';
+                } elseif ($checked === '0000-00-00 00:00:00' && $released === 1) {
+                    $statusKey   = 'pending';
+                    $statusLabel = 'In Prüfung';
+                    $statusBadge = 'badge-kkc-warning';
+                    $statusIcon  = 'bi-hourglass-split';
+                } elseif ($checked === '0000-00-00 00:00:00' && $released === 2) {
+                    $statusKey   = 'rejected';
+                    $statusLabel = 'Korrektur nötig';
+                    $statusBadge = 'badge-kkc-danger';
+                    $statusIcon  = 'bi-exclamation-triangle-fill';
+                } elseif ($checked !== '0000-00-00 00:00:00' && $released === 0) {
+                    $statusKey   = 'rejected';
+                    $statusLabel = 'Gesperrt / Abgelehnt';
+                    $statusBadge = 'badge-kkc-danger';
+                    $statusIcon  = 'bi-slash-circle';
+                } elseif ($checked !== '0000-00-00 00:00:00' && $released === 1 && !$isOnline) {
+                    $statusKey   = 'pending';
+                    $statusLabel = 'Geplant';
+                    $statusBadge = 'badge-kkc-info';
+                    $statusIcon  = 'bi-calendar-event';
+                } elseif ($checked !== '0000-00-00 00:00:00' && $released === 1 && $isOnline) {
+                    $statusKey   = 'online';
+                    $statusLabel = 'Online & aktiv';
+                    $statusBadge = 'badge-kkc-success';
+                    $statusIcon  = 'bi-check-circle-fill';
+                }
+
+                $onlineAtFormatted = ($a->online_at !== '0000-00-00 00:00:00' && !empty($a->online_at))
+                    ? date('d.m.Y H:i', (int)strtotime((string)$a->online_at))
+                    : '-';
+
+                $titleLower = mb_strtolower($title, 'UTF-8');
+                $actorLower = mb_strtolower($actorName, 'UTF-8');
+                $codeLower  = mb_strtolower($albumIdHash, 'UTF-8');
+                $searchable = '#' . $albumDbId . ' ' . $albumDbId . ' ' . $codeLower . ' ' . $titleLower . ' '
+                    . $actorLower . ' ' . mb_strtolower($statusLabel, 'UTF-8') . ' ' . $onlineAtFormatted . ' fotoalbum foto-album fotoalben fotos bilder';
+
+                $allMatched = true;
+                foreach ($tokens as $token) {
+                    $cleanToken = ltrim($token, '#');
+                    if (
+                        mb_strpos($searchable, $token) === false
+                        && ($cleanToken === '' || mb_strpos($searchable, $cleanToken) === false)
+                    ) {
+                        $allMatched = false;
+                        break;
+                    }
+                }
+                if (!$allMatched) {
+                    continue;
+                }
+
+                $score = 30;
+                if ((string)$albumDbId === $idQuery || $codeLower === $queryLower) {
+                    $score = 100;
+                } elseif ($idQuery !== '' && ctype_digit($idQuery) && str_starts_with((string)$albumDbId, $idQuery)) {
+                    $score = 85;
+                } elseif (str_starts_with($titleLower, $queryLower)) {
+                    $score = 75;
+                } elseif (mb_strpos($titleLower, $queryLower) !== false) {
+                    $score = 60;
+                } elseif (mb_strpos($actorLower, $queryLower) !== false) {
+                    $score = 45;
+                }
+
+                $matchedAlbums[] = [
+                    'type'         => 'photo_album',
+                    'type_label'   => 'Fotoalbum',
+                    'id'           => $albumDbId,
+                    'code'         => $albumIdHash,
+                    'title'        => $title,
+                    'actor_id'     => $actorId,
+                    'actor_name'   => $actorName,
+                    'poster_url'   => $apiUrl . '/PhotoAlbumPoster/FSK16/' . rawurlencode($albumIdHash) . '?w=120&cs=' . rawurlencode($checksum),
+                    'meta_info'    => $numPhotos . ' ' . ($numPhotos === 1 ? 'Foto' : 'Fotos'),
+                    'online_at'    => $onlineAtFormatted,
+                    'status_key'   => $statusKey,
+                    'status_label' => $statusLabel,
+                    'status_badge' => $statusBadge,
+                    'status_icon'  => $statusIcon,
+                    'route'        => $editRoute,
+                    'score'        => $score,
+                ];
+            }
+        }
+
+        $sortFn = static function (array $a, array $b): int {
+            $scoreCmp = ((int)$b['score']) <=> ((int)$a['score']);
+            if ($scoreCmp !== 0) {
+                return $scoreCmp;
+            }
+            return ((int)$b['id']) <=> ((int)$a['id']);
+        };
+
+        usort($matchedMovies, $sortFn);
+        usort($matchedAlbums, $sortFn);
+
+        $totalMovies = count($matchedMovies);
+        $totalAlbums = count($matchedAlbums);
+
+        // Jeweils bis zu 20 Top-Filme und 20 Top-Fotoalben zusammenführen, damit beide Filter-Tabs im Dropdown versorgt sind
+        $combined = array_merge(
+            array_slice($matchedMovies, 0, 20),
+            array_slice($matchedAlbums, 0, 20)
+        );
+        usort($combined, $sortFn);
+
+        Response::json([
+            'status' => 'ok',
+            'query'  => $rawQuery,
+            'counts' => [
+                'total'  => $totalMovies + $totalAlbums,
+                'movies' => $totalMovies,
+                'albums' => $totalAlbums,
+            ],
+            'items'  => $combined,
+        ]);
+    }
+
+    /**
      * Stellt sicher, dass für den Partner eine Standardgruppe existiert (analog mcp/includes/home.php)
      */
     private function ensureDefaultGroup(int $merchantId): void

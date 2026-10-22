@@ -93,9 +93,10 @@ class Router
         $photoAlbumsCtrl = 'App\\Modules\\PhotoAlbums\\PhotoAlbumsController';
         $previewCtrl     = 'App\\Modules\\Preview\\PreviewController';
 
-        // 1. Startseite (Echtes Partner-Dashboard, Richtlinien-Bestätigung & Entwickler-Feedback)
+        // 1. Startseite (Echtes Partner-Dashboard, Richtlinien-Bestätigung, Globale Schnellsuche & Entwickler-Feedback)
         self::register('startseite', $homeCtrl, 'view');
         self::register('home', $homeCtrl, 'view');
+        self::register('home/global-search', $homeCtrl, 'globalSearch');
         self::register('home/accept-rules', $homeCtrl, 'acceptRules');
         self::register('home/save-notifications', $homeCtrl, 'saveNotifications');
         self::register('home/feedback-send', $homeCtrl, 'sendFeedback');

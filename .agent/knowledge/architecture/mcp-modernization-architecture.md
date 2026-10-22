@@ -144,6 +144,13 @@ mcp_neu/ (später: mcp/)
    * **KKC-Integration (`#/feedback`):**
      * Meldungen landen über `https://remote.erocms.net/feedback.php` (bzw. lokal per Direkt-Include) in derselben KKC-Tabelle `creator_feedback`.
      * Im KKC (`#/feedback`) werden EroCloud-Meldungen mit einem **EroCloud MCP**-Badge und einer detaillierten Partner-/Darsteller-Leiste angezeigt; der Button *„KI-Prompt kopieren (MD)“* generiert automatisch einen auf `c:\xampp\htdocs\EroCloud` (`mcp/mcp_neu/`) zugeschnittenen Analyse-Prompt.
+5. **Globale Top-Bar-Schnellsuche (`#global-search-input` / `home/global-search`):**
+   * Die Schnellsuche in der oberen Top-Bar durchsucht von jeder Ansicht aus live sowohl **Filme** (`movies`) als auch **Fotoalben** (`photo_albums`) des eingeloggten Partners nach `#ID`, Titel, Darstellername, Datei-/Album-Code oder Status.
+   * **Eindeutige Typ-Kennzeichnung:** Jeder Treffer im Live-Dropdown (`#global-search-dropdown`) trägt ein farblich und per Icon klar unterscheidbares Typ-Badge:
+     * **Film:** Blaues Badge `<i class="bi bi-film"></i> Film` + `#ID`, Vorschaubild, Filmtitel, Darsteller, Spielzeit/Auflösung und Status.
+     * **Fotoalbum:** Violettes Badge `<i class="bi bi-images"></i> Fotoalbum` + `#ID`, Coverbild, Albumtitel, Darsteller, Fotoanzahl und Status.
+   * Zusätzlich bietet der Dropdown-Kopf Schnellfilter-Pills (`Alle`, `Filme`, `Fotoalben`) sowie Fußzeilen-Buttons zum direkten Filtern in `#/movies` bzw. `#/photo-albums`.
+
 
 
 

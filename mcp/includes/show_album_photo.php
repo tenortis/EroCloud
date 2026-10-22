@@ -83,8 +83,8 @@ function to_thumb($bild, $size = 0) {
         return;
     }
 
-    if ($size == 0 || $size > 900) {
-        $size = 800;
+    if ($size == 0 || $size > 1280) {
+        $size = 1024;
     }
 
     if ($size >= $breite) {
@@ -176,7 +176,7 @@ if (!is_file($filename) || filesize($filename) == 0) {
         $width = abs((int)$_GET['w']);
     }
     
-    if ($width > 900) {$width = 900;}
+    if ($width > 1280) {$width = 1280;}
     if ($width < 50) {$width = 50;}
    
     if (isset($headers['If-Modified-Since']) && (strtotime($headers['If-Modified-Since']) == filemtime($filename))) {

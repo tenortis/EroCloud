@@ -18,11 +18,15 @@ $description     = (string)($album['description'] ?? '');
 $actorId         = (int)($album['actor_id'] ?? 0);
 $onlineAt        = (string)($album['online_at'] ?? date('Y-m-d\TH:i', strtotime('+90 minutes')));
 $amountDownload  = (int)($album['amount_download'] ?? 500);
-$hasFsk16        = !empty($album['has_fsk16']);
-$hasFsk18        = !empty($album['has_fsk18']);
-$posterFsk16Url  = (string)($album['poster_fsk16_url'] ?? '');
-$posterFsk18Url  = (string)($album['poster_fsk18_url'] ?? '');
-$metaTitle       = (string)($album['meta_title'] ?? '');
+$hasFsk16             = !empty($album['has_fsk16']);
+$hasFsk18             = !empty($album['has_fsk18']);
+$posterFsk16Url       = (string)($album['poster_fsk16_url'] ?? '');
+$posterFsk16ZoomUrl   = (string)($album['poster_fsk16_zoom_url'] ?? $posterFsk16Url);
+$posterFsk16EditorUrl = (string)($album['poster_fsk16_editor_url'] ?? $posterFsk16Url);
+$posterFsk18Url       = (string)($album['poster_fsk18_url'] ?? '');
+$posterFsk18ZoomUrl   = (string)($album['poster_fsk18_zoom_url'] ?? $posterFsk18Url);
+$posterFsk18EditorUrl = (string)($album['poster_fsk18_editor_url'] ?? $posterFsk18Url);
+$metaTitle            = (string)($album['meta_title'] ?? '');
 $metaDescription = (string)($album['meta_description'] ?? '');
 $seoUrl          = (string)($album['seo_url'] ?? '');
 
@@ -197,10 +201,13 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
   <!-- SCHRITT 2: Coverbilder (FSK16 & FSK18) + Albumfotos hochladen -->
   <div class="row g-4">
     <div class="col-12 col-xl-5">
-      <div class="kkc-card mb-4">
+      <div class="kkc-card mb-4" id="photo-album-covers-card"
+           data-album-id="<?= $albumDbId ?>"
+           data-has-fsk16="<?= $hasFsk16 ? '1' : '0' ?>"
+           data-has-fsk18="<?= $hasFsk18 ? '1' : '0' ?>">
         <div class="kkc-card-header">
           <div>
-            <h6 class="mb-0 fw-bold"><i class="bi bi-card-image me-2 text-primary"></i>1. Coverbilder hochladen</h6>
+            <h6 class="mb-0 fw-bold"><i class="bi bi-card-image me-2 text-primary"></i>1. Coverbilder &amp; Cover-Studio</h6>
             <div class="small text-muted">Für Album: <strong><?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?></strong></div>
           </div>
           <a href="#/photo-album-upload?step=1&album_id=<?= $albumDbId ?>" class="btn btn-sm btn-outline-kkc">
@@ -208,43 +215,139 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
           </a>
         </div>
         <div class="kkc-card-body">
-          <p class="text-muted small mb-3">
-            Bitte lade sowohl ein jugendfreies <strong>FSK16-Coverbild</strong> als auch ein <strong>FSK18-Coverbild</strong> hoch (JPG oder PNG, max. 6 MB).
-          </p>
+          <!-- Hinweis bei noch fehlendem FSK16/FSK18 Cover -->
+          <div id="fsk16-missing-warning" class="alert alert-warning d-flex align-items-start gap-2 py-2 px-3 mb-3 small <?= ($hasFsk16 && $hasFsk18) ? 'd-none' : '' ?>">
+            <i class="bi bi-shield-exclamation text-warning fs-5 mt-1"></i>
+            <div>
+              <strong>Tipp für dein FSK 16 &amp; FSK 18 Cover:</strong>
+              Lade rechts zuerst deine Album-Fotos hoch und klicke dann bei einem Foto auf <strong>FSK16</strong> oder <strong>FSK18</strong>, um es direkt im <strong>Vollbild Cover-Studio</strong> zu bearbeiten (Verpixeln, Milchglas, Badges, Texte) – oder lade direkt ein fertiges Bild hoch.
+            </div>
+          </div>
+
           <div class="row g-3">
+            <!-- FSK 16 Cover -->
             <div class="col-12 col-sm-6">
-              <div class="p-3 border rounded-3 bg-light text-center h-100">
-                <span class="badge bg-success mb-2">FSK 16 Cover (jugendfrei)</span>
-                <img id="album-cover-fsk16-img"
-                     src="<?= htmlspecialchars($posterFsk16Url, ENT_QUOTES, 'UTF-8') ?>"
-                     alt="FSK 16 Cover"
-                     class="img-fluid rounded border mb-3 bg-white d-block mx-auto"
-                     style="height: 145px; width: 100%; object-fit: cover;">
-                <label class="btn btn-sm btn-outline-kkc w-100 mb-0">
-                  <i class="bi bi-upload me-1"></i> FSK16 Cover wählen
-                  <input type="file" class="d-none js-album-cover-upload"
-                         data-album-id="<?= $albumDbId ?>"
-                         data-fsk="16"
-                         accept=".jpg,.jpeg,.png">
-                </label>
+              <div class="p-2 border rounded-3 bg-light text-center h-100 d-flex flex-column justify-content-between" id="card-fsk16-box">
+                <div>
+                  <div class="d-flex justify-content-between align-items-center mb-2 px-1">
+                    <span class="badge bg-success">FSK 16 (Jugendfrei)</span>
+                    <span class="badge <?= $hasFsk16 ? 'bg-primary' : 'bg-warning text-dark' ?>" id="badge-fsk16-source">
+                      <?= $hasFsk16 ? 'Eigenes Cover' : 'Fehlt noch' ?>
+                    </span>
+                  </div>
+
+                  <div class="position-relative mb-2 <?= $hasFsk16 ? '' : 'd-none' ?>" id="preview-fsk16-img-wrap">
+                    <img id="preview-fsk16-img"
+                         src="<?= htmlspecialchars($posterFsk16Url, ENT_QUOTES, 'UTF-8') ?>"
+                         alt="FSK 16 Cover"
+                         class="img-fluid rounded border bg-white js-hover-zoom-thumb js-open-thumb-editor-modal"
+                         data-zoom-src="<?= htmlspecialchars($posterFsk16ZoomUrl, ENT_QUOTES, 'UTF-8') ?>"
+                         data-zoom-title="Aktuelles FSK 16 Album-Cover (Jugendfrei)"
+                         data-scene="cover_16"
+                         data-label="FSK16 Cover"
+                         data-editor-url="<?= htmlspecialchars($posterFsk16EditorUrl, ENT_QUOTES, 'UTF-8') ?>"
+                         data-target-fsk="16"
+                         data-default-tab="censor"
+                         style="height: 145px; width: 100%; object-fit: cover; cursor: pointer;">
+                  </div>
+
+                  <div id="empty-fsk16-placeholder"
+                       class="rounded border border-2 border-warning border-dashed bg-warning bg-opacity-10 d-flex flex-column align-items-center justify-content-center p-2 mb-2 js-open-active-fsk-editor <?= $hasFsk16 ? 'd-none' : '' ?>"
+                       data-target-fsk="16"
+                       data-scene="cover_16"
+                       data-label="FSK16 Cover"
+                       data-editor-url="<?= htmlspecialchars($posterFsk16EditorUrl, ENT_QUOTES, 'UTF-8') ?>"
+                       data-studio-ready="<?= $hasFsk16 ? '1' : '0' ?>"
+                       style="height: 145px; cursor: pointer;"
+                       title="Klicken, um ein FSK 16 Cover im Studio zu erstellen">
+                    <i class="bi bi-shield-exclamation fs-2 text-warning mb-1"></i>
+                    <span class="fw-bold small text-dark">Kein FSK 16 Cover</span>
+                    <span class="text-muted" style="font-size: 0.7rem;">Im Studio gestalten oder Bild hochladen</span>
+                  </div>
+                </div>
+
+                <div class="d-grid gap-1">
+                  <button type="button"
+                          class="btn btn-xs btn-kkc-primary w-100 py-1 js-open-active-fsk-editor"
+                          id="btn-open-studio-fsk16"
+                          data-target-fsk="16"
+                          data-scene="cover_16"
+                          data-label="FSK16 Cover"
+                          data-editor-url="<?= htmlspecialchars($posterFsk16EditorUrl, ENT_QUOTES, 'UTF-8') ?>"
+                          data-studio-ready="<?= $hasFsk16 ? '1' : '0' ?>">
+                    <i class="bi bi-magic me-1"></i> FSK 16 im Studio gestalten
+                  </button>
+                  <label class="btn btn-xs btn-outline-secondary w-100 py-1 mb-0" style="font-size: 0.72rem;">
+                    <i class="bi bi-upload me-1"></i> Fertiges Bild direkt hochladen
+                    <input type="file" class="d-none js-album-cover-upload"
+                           data-album-id="<?= $albumDbId ?>"
+                           data-fsk="16"
+                           accept=".jpg,.jpeg,.png">
+                  </label>
+                </div>
               </div>
             </div>
 
+            <!-- FSK 18 Cover -->
             <div class="col-12 col-sm-6">
-              <div class="p-3 border rounded-3 bg-light text-center h-100">
-                <span class="badge bg-danger mb-2">FSK 18 Cover (Hardcore)</span>
-                <img id="album-cover-fsk18-img"
-                     src="<?= htmlspecialchars($posterFsk18Url, ENT_QUOTES, 'UTF-8') ?>"
-                     alt="FSK 18 Cover"
-                     class="img-fluid rounded border mb-3 bg-white d-block mx-auto"
-                     style="height: 145px; width: 100%; object-fit: cover;">
-                <label class="btn btn-sm btn-outline-kkc w-100 mb-0">
-                  <i class="bi bi-upload me-1"></i> FSK18 Cover wählen
-                  <input type="file" class="d-none js-album-cover-upload"
-                         data-album-id="<?= $albumDbId ?>"
-                         data-fsk="18"
-                         accept=".jpg,.jpeg,.png">
-                </label>
+              <div class="p-2 border rounded-3 bg-light text-center h-100 d-flex flex-column justify-content-between" id="card-fsk18-box">
+                <div>
+                  <div class="d-flex justify-content-between align-items-center mb-2 px-1">
+                    <span class="badge bg-danger">FSK 18 (Unzensiert)</span>
+                    <span class="badge <?= $hasFsk18 ? 'bg-primary' : 'bg-warning text-dark' ?>" id="badge-fsk18-source">
+                      <?= $hasFsk18 ? 'Eigenes Cover' : 'Fehlt noch' ?>
+                    </span>
+                  </div>
+
+                  <div class="position-relative mb-2 <?= $hasFsk18 ? '' : 'd-none' ?>" id="preview-fsk18-img-wrap">
+                    <img id="preview-fsk18-img"
+                         src="<?= htmlspecialchars($posterFsk18Url, ENT_QUOTES, 'UTF-8') ?>"
+                         alt="FSK 18 Cover"
+                         class="img-fluid rounded border bg-white js-hover-zoom-thumb js-open-thumb-editor-modal"
+                         data-zoom-src="<?= htmlspecialchars($posterFsk18ZoomUrl, ENT_QUOTES, 'UTF-8') ?>"
+                         data-zoom-title="Aktuelles FSK 18 Album-Cover (Hardcore)"
+                         data-scene="cover_18"
+                         data-label="FSK18 Cover"
+                         data-editor-url="<?= htmlspecialchars($posterFsk18EditorUrl, ENT_QUOTES, 'UTF-8') ?>"
+                         data-target-fsk="18"
+                         data-default-tab="adjust"
+                         style="height: 145px; width: 100%; object-fit: cover; cursor: pointer;">
+                  </div>
+
+                  <div id="empty-fsk18-placeholder"
+                       class="rounded border border-2 border-danger border-dashed bg-danger bg-opacity-10 d-flex flex-column align-items-center justify-content-center p-2 mb-2 js-open-active-fsk-editor <?= $hasFsk18 ? 'd-none' : '' ?>"
+                       data-target-fsk="18"
+                       data-scene="cover_18"
+                       data-label="FSK18 Cover"
+                       data-editor-url="<?= htmlspecialchars($posterFsk18EditorUrl, ENT_QUOTES, 'UTF-8') ?>"
+                       data-studio-ready="<?= $hasFsk18 ? '1' : '0' ?>"
+                       style="height: 145px; cursor: pointer;"
+                       title="Klicken, um ein FSK 18 Cover im Studio zu erstellen">
+                    <i class="bi bi-fire fs-2 text-danger mb-1"></i>
+                    <span class="fw-bold small text-dark">Kein FSK 18 Cover</span>
+                    <span class="text-muted" style="font-size: 0.7rem;">Im Studio gestalten oder Bild hochladen</span>
+                  </div>
+                </div>
+
+                <div class="d-grid gap-1">
+                  <button type="button"
+                          class="btn btn-xs btn-outline-kkc w-100 py-1 js-open-active-fsk-editor"
+                          id="btn-open-studio-fsk18"
+                          data-target-fsk="18"
+                          data-scene="cover_18"
+                          data-label="FSK18 Cover"
+                          data-editor-url="<?= htmlspecialchars($posterFsk18EditorUrl, ENT_QUOTES, 'UTF-8') ?>"
+                          data-studio-ready="<?= $hasFsk18 ? '1' : '0' ?>">
+                    <i class="bi bi-sliders me-1"></i> FSK 18 im Studio gestalten
+                  </button>
+                  <label class="btn btn-xs btn-outline-secondary w-100 py-1 mb-0" style="font-size: 0.72rem;">
+                    <i class="bi bi-upload me-1"></i> Fertiges Bild direkt hochladen
+                    <input type="file" class="d-none js-album-cover-upload"
+                           data-album-id="<?= $albumDbId ?>"
+                           data-fsk="18"
+                           accept=".jpg,.jpeg,.png">
+                  </label>
+                </div>
               </div>
             </div>
           </div>
@@ -259,6 +362,7 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
             <h6 class="mb-0 fw-bold">
               <i class="bi bi-grid-3x3-gap me-2 text-primary"></i>2. Fotos des Albums (<span id="album-photos-grid-count"><?= count($photos) ?></span> / mind. 4)
             </h6>
+            <div class="small text-muted">Klicke bei einem Foto auf <strong>FSK16</strong> oder <strong>FSK18</strong>, um es im Cover-Studio als Cover zu gestalten</div>
           </div>
           <label class="btn btn-sm btn-kkc-primary mb-0">
             <i class="bi bi-cloud-arrow-up me-1"></i> Fotos auswählen &amp; hochladen
@@ -281,24 +385,65 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
                 Du kannst mehrere Dateien gleichzeitig markieren.
               </div>
             <?php else: ?>
-              <?php foreach ($photos as $ph): ?>
-                <div class="col-6 col-sm-4 col-md-3 js-album-photo-card" data-file-id="<?= htmlspecialchars((string)$ph['file_id'], ENT_QUOTES, 'UTF-8') ?>">
-                  <div class="position-relative border rounded-3 overflow-hidden bg-light shadow-sm">
-                    <a href="#" class="js-zoom-album-photo d-block"
-                       data-zoom-url="<?= htmlspecialchars((string)$ph['zoom_url'], ENT_QUOTES, 'UTF-8') ?>">
-                      <img src="<?= htmlspecialchars((string)$ph['thumb_url'], ENT_QUOTES, 'UTF-8') ?>"
-                           alt="Album Foto"
-                           class="img-fluid w-100"
-                           style="height: 110px; object-fit: cover;"
-                           loading="lazy">
-                    </a>
-                    <button type="button"
-                            class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 py-0 px-1 js-delete-album-photo-btn"
-                            data-album-id="<?= $albumDbId ?>"
-                            data-file-id="<?= htmlspecialchars((string)$ph['file_id'], ENT_QUOTES, 'UTF-8') ?>"
-                            title="Dieses Foto löschen">
-                      <i class="bi bi-trash3"></i>
-                    </button>
+              <?php foreach ($photos as $idx => $ph): ?>
+                <?php
+                  $phNum       = (string)($ph['num'] ?? ('photo_' . ($ph['file_id'] ?? $idx)));
+                  $phLabel     = (string)($ph['label'] ?? ('Foto #' . ($idx + 1)));
+                  $phThumbUrl  = (string)($ph['thumb_url'] ?? '');
+                  $phZoomUrl   = (string)($ph['zoom_url'] ?? $phThumbUrl);
+                  $phEditorUrl = (string)($ph['editor_url'] ?? $phZoomUrl);
+                  $phFileId    = (string)($ph['file_id'] ?? '');
+                ?>
+                <div class="col-6 col-sm-4 col-md-3 js-album-photo-card"
+                     data-file-id="<?= htmlspecialchars($phFileId, ENT_QUOTES, 'UTF-8') ?>"
+                     data-scene-num="<?= htmlspecialchars($phNum, ENT_QUOTES, 'UTF-8') ?>">
+                  <div class="border rounded-3 overflow-hidden bg-light shadow-sm h-100 d-flex flex-column justify-content-between">
+                    <div class="position-relative">
+                      <span class="badge bg-dark bg-opacity-75 position-absolute top-0 start-0 m-1 js-album-photo-num-badge" style="font-size: 0.65rem; pointer-events: none;">
+                        #<?= (int)($idx + 1) ?>
+                      </span>
+                      <a href="#" class="js-zoom-album-photo d-block"
+                         data-zoom-url="<?= htmlspecialchars($phZoomUrl, ENT_QUOTES, 'UTF-8') ?>">
+                        <img src="<?= htmlspecialchars($phThumbUrl, ENT_QUOTES, 'UTF-8') ?>"
+                             alt="<?= htmlspecialchars($phLabel, ENT_QUOTES, 'UTF-8') ?>"
+                             class="img-fluid w-100 js-hover-zoom-thumb"
+                             data-zoom-src="<?= htmlspecialchars($phZoomUrl, ENT_QUOTES, 'UTF-8') ?>"
+                             data-zoom-title="<?= htmlspecialchars($phLabel, ENT_QUOTES, 'UTF-8') ?>"
+                             style="height: 110px; object-fit: cover;"
+                             loading="lazy">
+                      </a>
+                      <button type="button"
+                              class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 py-0 px-1 js-delete-album-photo-btn"
+                              data-album-id="<?= $albumDbId ?>"
+                              data-file-id="<?= htmlspecialchars($phFileId, ENT_QUOTES, 'UTF-8') ?>"
+                              title="Dieses Foto löschen">
+                        <i class="bi bi-trash3"></i>
+                      </button>
+                    </div>
+                    <div class="p-1 bg-white border-top d-flex gap-1">
+                      <button type="button"
+                              class="btn btn-xs btn-outline-success flex-fill py-0 px-1 js-open-thumb-editor-modal"
+                              data-scene="<?= htmlspecialchars($phNum, ENT_QUOTES, 'UTF-8') ?>"
+                              data-label="<?= htmlspecialchars($phLabel, ENT_QUOTES, 'UTF-8') ?>"
+                              data-editor-url="<?= htmlspecialchars($phEditorUrl, ENT_QUOTES, 'UTF-8') ?>"
+                              data-target-fsk="16"
+                              data-default-tab="censor"
+                              style="font-size: 0.68rem;"
+                              title="Dieses Foto im Cover-Studio als FSK 16 Cover bearbeiten &amp; verpixeln">
+                        <i class="bi bi-magic"></i> FSK16
+                      </button>
+                      <button type="button"
+                              class="btn btn-xs btn-outline-danger flex-fill py-0 px-1 js-open-thumb-editor-modal"
+                              data-scene="<?= htmlspecialchars($phNum, ENT_QUOTES, 'UTF-8') ?>"
+                              data-label="<?= htmlspecialchars($phLabel, ENT_QUOTES, 'UTF-8') ?>"
+                              data-editor-url="<?= htmlspecialchars($phEditorUrl, ENT_QUOTES, 'UTF-8') ?>"
+                              data-target-fsk="18"
+                              data-default-tab="adjust"
+                              style="font-size: 0.68rem;"
+                              title="Dieses Foto im Cover-Studio als FSK 18 Cover bearbeiten">
+                        <i class="bi bi-sliders"></i> FSK18
+                      </button>
+                    </div>
                   </div>
                 </div>
               <?php endforeach; ?>
@@ -329,6 +474,24 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
       </div>
     </div>
   </div>
+
+  <?= \App\Core\View::renderCoverStudioModal([
+      'studioContext'     => 'photo-album',
+      'entityId'          => $albumDbId,
+      'fsk16HasCover'     => $hasFsk16,
+      'fsk16ThumbUrl'     => $posterFsk16Url,
+      'fsk16EditorUrl'    => $posterFsk16EditorUrl,
+      'fsk16CustomNum'    => 'cover_16',
+      'fsk18HasCover'     => $hasFsk18,
+      'fsk18ThumbUrl'     => $posterFsk18Url,
+      'fsk18EditorUrl'    => $posterFsk18EditorUrl,
+      'fsk18CustomNum'    => 'cover_18',
+      'filmstripTitle'    => 'Deine Album-Fotos als Vorlage:',
+      'filmstripItems'    => $photos,
+      'allowSceneSelect'  => false,
+      'saveButtonLabel16' => 'Als FSK 16 Cover speichern',
+      'saveButtonLabel18' => 'Als FSK 18 Cover speichern',
+  ]) ?>
 
 <?php else: ?>
   <!-- SCHRITT 3: Erfolgreicher Abschluss -->
