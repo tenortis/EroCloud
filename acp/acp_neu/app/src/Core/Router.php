@@ -105,6 +105,7 @@ class Router
         $contentCleanupCtrl      = 'App\\Modules\\ContentCleanup\\ContentCleanupController';
         $storageAnalyticsCtrl    = 'App\\Modules\\StorageAnalytics\\StorageAnalyticsController';
         $actorsCtrl              = 'App\\Modules\\Actors\\ActorsController';
+        $websitesCtrl            = 'App\\Modules\\Websites\\WebsitesController';
         $merchantsCtrl           = 'App\\Modules\\Merchants\\MerchantsController';
         $usersCtrl               = 'App\\Modules\\Users\\UsersController';
         $systemTechCtrl          = 'App\\Modules\\SystemTech\\SystemTechController';
@@ -165,8 +166,9 @@ class Router
         self::register('actors/reassign-merchant', $actorsCtrl, 'reassignMerchant', 'actors');
 
         // 5. Webseiten (websites)
-        self::register('sites', $previewCtrl, 'sites', 'websites');
-        self::register('site', $previewCtrl, 'site', 'websites');
+        self::register('sites', $websitesCtrl, 'list', 'websites');
+        self::register('site', $websitesCtrl, 'detail', 'websites');
+        self::register('sites/sync-p4c', $websitesCtrl, 'syncFromP4c', 'websites');
 
         // 6. Partnerprogramm (affiliate_program)
         self::register('webmaster-partner', $previewCtrl, 'webmasterPartner', 'affiliate_program');

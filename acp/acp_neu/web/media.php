@@ -376,6 +376,73 @@ if ($type === 'actor_avatar') {
 }
 
 // ============================================================================
+// 2a-ter. WERBEBANNER AUS ADS_MEDIA (type=banner)
+// ============================================================================
+if ($type === 'banner') {
+    $bannerFileId = isset($_GET['file_id']) ? preg_replace('/[^a-zA-Z0-9_-]/', '', (string)$_GET['file_id']) : '';
+    $variant      = isset($_GET['variant']) ? trim((string)$_GET['variant']) : 'current';
+
+    if ($bannerFileId === '') {
+        @session_write_close();
+        p4c_close(DB_HOST);
+        acp_media_output_svg_placeholder('Kein Banner', 'Ungültige Banner-ID', 468, 60);
+    }
+
+    $rsBan = p4c_query(
+        "SELECT `id`, `file_id`, `storage_location`, `site_id`, `type`, `width`, `height`, `filename`, `new_filename`
+         FROM `ads_media`
+         WHERE `file_id` = '" . p4c_escape_string($bannerFileId) . "'
+         LIMIT 1;",
+        __FILE__,
+        __LINE__
+    );
+    @session_write_close();
+
+    if (!$rsBan || p4c_num_rows($rsBan) === 0) {
+        p4c_close(DB_HOST);
+        acp_media_output_svg_placeholder('Banner fehlt', $bannerFileId, 468, 60);
+    }
+
+    $bObj = p4c_fetch_object($rsBan);
+    p4c_close(DB_HOST);
+
+    $bw  = max(120, min(900, abs((int)($bObj->width ?: 468))));
+    $bh  = max(60, min(400, abs((int)($bObj->height ?: 60))));
+    $fn  = ($variant === 'new' && trim((string)$bObj->new_filename) !== '')
+        ? trim((string)$bObj->new_filename)
+        : trim((string)$bObj->filename);
+    if ($fn === '' && trim((string)$bObj->new_filename) !== '') {
+        $fn = trim((string)$bObj->new_filename);
+    }
+
+    $storageLoc = trim((string)($bObj->storage_location ?: (defined('ADS_DEFAULT_DIR') ? ADS_DEFAULT_DIR : 'cloud_storage/ads')));
+    $baseDir    = defined('ADS_PATH') ? rtrim((string)ADS_PATH, '/\\') : rtrim((string)SOURCEDIR, '/\\');
+    $candidate  = $baseDir . '/' . ltrim($storageLoc, '/\\') . '/' . abs((int)$bObj->site_id) . '/' . basename($fn);
+
+    if ($fn === '' || !is_file($candidate) || filesize($candidate) === 0) {
+        acp_media_output_svg_placeholder(
+            strtoupper((string)($bObj->type ?: 'BANNER')) . ' ' . abs((int)$bObj->width) . 'x' . abs((int)$bObj->height),
+            'Site #' . abs((int)$bObj->site_id) . ' • ' . $bannerFileId,
+            $bw,
+            $bh
+        );
+    }
+
+    $ext  = strtolower((string)pathinfo($candidate, PATHINFO_EXTENSION));
+    $mime = match ($ext) {
+        'gif'   => 'image/gif',
+        'png'   => 'image/png',
+        'webp'  => 'image/webp',
+        default => 'image/jpeg',
+    };
+    header('Content-Type: ' . $mime);
+    header('Cache-Control: private, max-age=600');
+    header('Content-Length: ' . (string)filesize($candidate));
+    readfile($candidate);
+    exit;
+}
+
+// ============================================================================
 // 2b. FOTOALBUM COVER-POSTER (type=album_poster) & EINZELFOTO (type=album_photo)
 // ============================================================================
 if ($type === 'album_poster' || $type === 'album_photo') {

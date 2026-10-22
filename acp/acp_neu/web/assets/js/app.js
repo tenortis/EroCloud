@@ -4494,6 +4494,117 @@ const App = {
         App.toast('Netzwerkfehler: ' + err.message, 'danger');
       }
     }
+  },
+
+  // ===========================================================================
+  // 14. MODUL: WEBSEITEN & PARTNER-SHOPS (#/sites & #/site?id=...)
+  // ===========================================================================
+  Websites: {
+    applyFilters(page = 1) {
+      const q       = (document.getElementById('sites-filter-q')?.value || '').trim();
+      const status  = document.getElementById('sites-filter-status')?.value || 'all';
+      const eroads  = document.getElementById('sites-filter-eroads')?.value || 'all';
+      const shopSys = document.getElementById('sites-filter-shopsys')?.value || 'all';
+      const banners = document.getElementById('sites-filter-banners')?.value || 'all';
+      const sort    = document.getElementById('sites-filter-sort')?.value || 'id_desc';
+      const limit   = parseInt(document.getElementById('sites-filter-limit')?.value || '50', 10) || 50;
+
+      const params = new URLSearchParams();
+      if (page > 1) params.set('page', String(page));
+      if (status !== 'all') params.set('status', status);
+      if (eroads !== 'all') params.set('eroads', eroads);
+      if (shopSys !== 'all') params.set('shop_system', shopSys);
+      if (banners !== 'all') params.set('banners', banners);
+      if (sort !== 'id_desc') params.set('sort', sort);
+      if (limit !== 50) params.set('limit', String(limit));
+      if (q !== '') params.set('q', q);
+
+      const qs = params.toString();
+      const targetHash = `#/sites${qs ? '?' + qs : ''}`;
+      if (window.location.hash === targetHash) {
+        App.handleRoute();
+      } else {
+        window.location.hash = targetHash;
+      }
+      return false;
+    },
+
+    quickFilter(status, eroads, shopSys, banners) {
+      const stEl  = document.getElementById('sites-filter-status');
+      const erEl  = document.getElementById('sites-filter-eroads');
+      const sysEl = document.getElementById('sites-filter-shopsys');
+      const banEl = document.getElementById('sites-filter-banners');
+      if (stEl) stEl.value = status;
+      if (erEl) erEl.value = eroads;
+      if (sysEl) sysEl.value = shopSys;
+      if (banEl) banEl.value = banners;
+      this.applyFilters(1);
+    },
+
+    resetFilters() {
+      const qEl   = document.getElementById('sites-filter-q');
+      const stEl  = document.getElementById('sites-filter-status');
+      const erEl  = document.getElementById('sites-filter-eroads');
+      const sysEl = document.getElementById('sites-filter-shopsys');
+      const banEl = document.getElementById('sites-filter-banners');
+      const srtEl = document.getElementById('sites-filter-sort');
+      const limEl = document.getElementById('sites-filter-limit');
+
+      if (qEl) qEl.value = '';
+      if (stEl) stEl.value = 'all';
+      if (erEl) erEl.value = 'all';
+      if (sysEl) sysEl.value = 'all';
+      if (banEl) banEl.value = 'all';
+      if (srtEl) srtEl.value = 'id_desc';
+      if (limEl) limEl.value = '50';
+
+      if (window.location.hash === '#/sites') {
+        App.handleRoute();
+      } else {
+        window.location.hash = '#/sites';
+      }
+    },
+
+    async syncFromP4c(btnEl) {
+      if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Synchronisiere mit Pay4Coins...';
+      }
+
+      const fd = new FormData();
+      fd.append('_csrf', App.csrfToken);
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=sites/sync-p4c`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.status !== 'ok') {
+          App.toast(data.message || 'Synchronisation mit Pay4Coins fehlgeschlagen.', 'danger');
+          if (btnEl) {
+            btnEl.disabled = false;
+            btnEl.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Mit Pay4Coins synchronisieren';
+          }
+          return;
+        }
+
+        App.resetLogoutCountdown();
+        App.toast(data.message || 'Webseiten erfolgreich mit Pay4Coins synchronisiert.', 'success');
+        App.handleRoute();
+      } catch (err) {
+        App.toast('Netzwerkfehler bei Pay4Coins-Synchronisation: ' + err.message, 'danger');
+        if (btnEl) {
+          btnEl.disabled = false;
+          btnEl.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Mit Pay4Coins synchronisieren';
+        }
+      }
+    }
   }
 };
 
