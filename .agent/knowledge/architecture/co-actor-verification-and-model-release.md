@@ -49,6 +49,7 @@ Bevor ein Film (und künftig auch ein Fotoalbum) in der EroCloud veröffentlicht
 | **Film-Darsteller-Sektion** | [`mcp/mcp_neu/app/views/movies/_performer_section.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/app/views/movies/_performer_section.php) | Interaktives Formular-Partial im Film-Upload (`upload_step1.php`) und Film-Editor (`edit.php`) mit den 3 großen Auswahl-Kacheln (`solo_self`, `group`, `others_only`), Live-Statusprüfung und Direkt-Verifizierung per Modal. |
 | **Film-Controller** | [`mcp/mcp_neu/app/src/Modules/Movies/MoviesController.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/app/src/Modules/Movies/MoviesController.php) | Lädt die Darsteller-Daten für Upload (`uploadStep1`) & Bearbeitung (`edit`) und führt in `saveStep1()` sowie `update()` die verbindliche Server-Validierung (`validateContentPerformers`) und Speicherung (`saveContentPerformers`) aus. |
 | **MCP Router & Sidebar** | [`mcp/mcp_neu/web/api.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/web/api.php) & [`mcp/mcp_neu/app/views/layouts/main.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/app/views/layouts/main.php) | Registriert die Routen `co-actors`, `co-actors/save`, `co-actors/get`, `co-actors/delete`, `co-actors/regenerate-token`, `co-actors/legacy-upload` und bindet den Menüpunkt **„Drehpartner & ID-Check“** unter *Profile* in der linken Sidebar ein. |
+| **ACP Zentrale Prüf-Übersicht** | [`acp/includes/co_actors_checking.php`](file:///c:/xampp/htdocs/EroCloud/acp/includes/co_actors_checking.php) | Eigener Menüpunkt im ACP unter *Content Prüfen* $\rightarrow$ **„Drehpartner & ID-Check (X)“** (`/Drehpartner-pruefen`). Zeigt alle offenen (`under_review`), verifizierten (`verified`), abgelehnten (`rejected`) und ausstehenden (`pending_performer`) Darsteller & Account-Inhaber aller Partner inkl. Volltextsuche, verknüpfter Filme, Fotos, PDF-Zertifikat und Direkt-Freigabe/Ablehnung. |
 | **ACP Film-Prüfung & Editor** | [`acp/includes/movie_checking.php`](file:///c:/xampp/htdocs/EroCloud/acp/includes/movie_checking.php) & [`acp/includes/movie_edit.php`](file:///c:/xampp/htdocs/EroCloud/acp/includes/movie_edit.php) | Zeigt dem Administrator bei der Filmprüfung (`/Film-pruefen/{id}`) und im Film-Editor (`/Film-bearbeiten/{id}`) die Box **„Darsteller-Verifizierung & Einverständniserklärungen (ID-Check)“** mit allen Fotos, Ausweisdaten, PDF-Zertifikat, Einzel-Freigabe/Ablehnung und blockiert die Film-Veröffentlichung bei abgelehnten oder unvollständigen Darstellern. |
 
 ---
@@ -214,9 +215,15 @@ Beim Klick auf *„Weiter zu Schritt 2“* (`MoviesController::saveStep1`) sowie
 
 ## 7. 🛡️ Workflow 3: Admin-Prüfung & Freigabe-Schutz im ACP
 
-Im Admin Control Panel (`acp/`) ist die Darsteller-Prüfung direkt in die bestehende Videoprüfung ([`acp/includes/movie_checking.php`](file:///c:/xampp/htdocs/EroCloud/acp/includes/movie_checking.php)) sowie die Videobearbeitung ([`acp/includes/movie_edit.php`](file:///c:/xampp/htdocs/EroCloud/acp/includes/movie_edit.php)) integriert.
+Im Admin Control Panel (`acp/`) ist die Darsteller-Prüfung an **zwei Stellen** verfügbar:
 
-### 7.1 Die ACP-Prüfbox (`CoActorManager::renderAcpMoviePerformersBox`)
+### 7.0 Zentrale Prüf-Übersicht im ACP-Menü (`/Drehpartner-pruefen` $\rightarrow$ [`acp/includes/co_actors_checking.php`](file:///c:/xampp/htdocs/EroCloud/acp/includes/co_actors_checking.php))
+Unter **„Content Prüfen“ $\rightarrow$ „Drehpartner & ID-Check (X)“** in der linken ACP-Navigation ([`acp/index.php`](file:///c:/xampp/htdocs/EroCloud/acp/index.php)) findest du die zentrale Übersicht aller Darsteller- & „Ich“-Verifizierungen über alle Partner hinweg:
+* **Live-Zähler im Menü:** Zeigt in Klammern sofort die Anzahl aller neu eingereichten Verifizierungen (`checked_status = 'under_review'`), auch wenn der Partner noch gar keinen Film zur Prüfung eingereicht hat.
+* **Status-Tabs & Volltextsuche:** Schneller Wechsel zwischen *Zur Prüfung offen*, *Verifiziert (OK)*, *Abgelehnt*, *Wartet auf QR-Scan* und *Alle anzeigen* sowie Filterung nach Rolle (*Nur Account-Inhaber („Ich“)* vs. *Nur weitere Drehpartner*) und Suche nach Klarnamen, Creator-Namen, Ausweisnummer oder Partner-ID.
+* **Komplett-Ansicht pro Zeile:** Zeigt Partner-Link, entschlüsselte Ausweisdaten, alle 5 anklickbaren Vorschau-Thumbnails (`KI-Gesicht`, `ID-Shot`, `Ausweis V.`, `Ausweis R.`, `Unterschrift`), den Button **`📄 Einverständnis-Zertifikat / PDF`**, alle **verknüpften Filme** (mit Direktlink zu `/Film-pruefen/{id}` bzw. `/Film-bearbeiten/{id}`) sowie die Buttons zum **Bestätigen**, **Ablehnen** (mit Begründung) oder **Zurücksetzen**.
+
+### 7.1 Die ACP-Prüfbox direkt im Film (`CoActorManager::renderAcpMoviePerformersBox`)
 Oberhalb der Metadaten rendert `renderAcpMoviePerformersBox($movieId, $merchantId)` eine übersichtliche Prüf-Kachel:
 * **Kopfzeile:** Zeigt den vom Partner gewählten Modus (*„Nur Account-Inhaber (Solo)“*, *„Account-Inhaber + Drehpartner“* oder *„Nur andere Darsteller“*) sowie den Gesamtstatus (*Alle Dokumente vollständig* vs. *Prüfung offen / Unvollständig*).
 * **Detailzeile pro beteiligter Person (`content_co_actors`):**

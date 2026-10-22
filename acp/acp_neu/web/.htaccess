@@ -1,0 +1,30 @@
+# EroCloud ACP Webroot Configuration
+Options -Indexes
+
+<IfModule mod_dir.c>
+    DirectoryIndex index.php
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+<IfModule mod_mime.c>
+    AddType font/woff woff
+    AddType font/woff2 woff2
+    AddType image/svg+xml svg svgz
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Clean URLs auf die SPA-Shell (index.php) leiten
+    RewriteRule ^Startseite$ index.php [L,QSA]
+
+    # Falls keine physische Datei oder Ordner existiert -> index.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [L,QSA]
+</IfModule>

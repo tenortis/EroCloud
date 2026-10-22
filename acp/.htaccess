@@ -65,6 +65,9 @@ Options -Indexes
 
 RewriteEngine On
 
+# Unterstützung für Schreibweise /ACP_Neu auf Case-Sensitive Linux-Systemen
+RewriteRule ^(?!acp_neu(?:/|$))(?i:acp_neu)(/.*)?$ acp_neu$1 [R=302,L]
+
 RewriteRule ^erocloud_logo.png$ images/erocloud_logo.png
 RewriteRule ^favicon/(.*)$ images/favicons/$1
 
@@ -75,6 +78,7 @@ RewriteRule ^Ajax/(.*)$ includes/ajax/$1?%{QUERY_STRING}
 RewriteRule ^Startseite$ index.php?mod=home&%{QUERY_STRING}
 
 RewriteRule ^Filme-pruefen index.php?mod=movies_checking&%{QUERY_STRING}
+RewriteRule ^Drehpartner-pruefen index.php?mod=co_actors_checking&%{QUERY_STRING}
 RewriteRule ^gesperrte-Filme index.php?mod=movies_blocked&%{QUERY_STRING}
 RewriteRule ^Film-pruefen/(.*)$ index.php?mod=movie_checking&id=$1&%{QUERY_STRING}
 

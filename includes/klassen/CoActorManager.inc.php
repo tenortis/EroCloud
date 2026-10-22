@@ -41,6 +41,14 @@ class CoActorManager
     ];
 
     /**
+     * Alias für ensureSchema() zur Abwärtskompatibilität.
+     */
+    public static function ensureTablesExist(): void
+    {
+        self::ensureSchema();
+    }
+
+    /**
      * Stellt sicher, dass alle Tabellen (`co_actors`, `content_co_actors`) und Spalten in `movies` & `photo_albums` existieren.
      */
     public static function ensureSchema(): void
@@ -449,7 +457,7 @@ class CoActorManager
      * @param object $obj
      * @return array<string, mixed>
      */
-    private static function formatCoActorRow(object $obj): array
+    public static function formatCoActorRow(object $obj): array
     {
         $id         = abs((int)$obj->id);
         $merchantId = abs((int)$obj->merchant_id);

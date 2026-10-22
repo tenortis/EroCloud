@@ -164,8 +164,13 @@ $site = '<!DOCTYPE html>
 
                     $rs_photo_albums_checking = p4c_query("SELECT COUNT(*) AS `cnt` FROM `photo_albums` WHERE `album_checked`='000-00-00 00:00:00' AND `released`='1';", __FILE__, __LINE__);
                     $count_photo_albums_checking = p4c_fetch_object($rs_photo_albums_checking)->cnt;
+
+                    require_once(SOURCEDIR . '/includes/klassen/CoActorManager.inc.php');
+                    CoActorManager::ensureSchema();
+                    $rs_co_actors_checking = p4c_query("SELECT COUNT(*) AS `cnt` FROM `co_actors` WHERE `status` != 'deleted' AND `checked_status`='under_review';", __FILE__, __LINE__);
+                    $count_co_actors_checking = $rs_co_actors_checking ? (int)p4c_fetch_object($rs_co_actors_checking)->cnt : 0;
                     
-                    $count_content_checking = $count_movies_checking + $count_photo_albums_checking;
+                    $count_content_checking = $count_movies_checking + $count_photo_albums_checking + $count_co_actors_checking;
 
                     $rs_movies_online = p4c_query("SELECT COUNT(*) AS `cnt` FROM `movies_online`;", __FILE__, __LINE__);
                     $count_movies_online = p4c_fetch_object($rs_movies_online)->cnt;
@@ -205,6 +210,7 @@ $site = '<!DOCTYPE html>
                     $navContentCleanup = '';
                     $navStorageAnalytics = '';
                     $navAiCompliance = '';
+                    $navCoActorsChecking = '';
                     $navMoviesDrafts = '';
                     $navWMPartner = '';
                     $navBanners = '';
@@ -282,6 +288,9 @@ $site = '<!DOCTYPE html>
                     } elseif (isset($_GET['mod']) AND $_GET['mod']=='ai_compliance') {
                         $navAiCompliance = 'class="active"';
                         $main = 'ai_compliance.php';
+                    } elseif (isset($_GET['mod']) AND $_GET['mod']=='co_actors_checking') {
+                        $navCoActorsChecking = 'class="active"';
+                        $main = 'co_actors_checking.php';
                         
                     } elseif (isset($_GET['mod']) AND $_GET['mod']=='photo_albums_checking') {
                         $navFotoalben = 'class="active"';
@@ -352,6 +361,11 @@ $site = '<!DOCTYPE html>
                             <a '.$navFotoalben.' href="'.ACP_URL.'/Fotoalben-pruefen">
                                 <i class="material-symbols-outlined md-30">add_photo_alternate</i>
                                 <span>Fotoalben pr&uuml;fen ('.$count_photo_albums_checking.')</span>
+                            </a>
+
+                            <a '.$navCoActorsChecking.' href="'.ACP_URL.'/Drehpartner-pruefen">
+                                <i class="material-symbols-outlined md-30">badge</i>
+                                <span>Drehpartner &amp; ID-Check ('.$count_co_actors_checking.')</span>
                             </a>
                             
                             <a '.$navMoviesBlocked.' href="'.ACP_URL.'/gesperrte-Filme">
@@ -551,7 +565,7 @@ $site = '<!DOCTYPE html>
         }
                 
                 
-        if (isset($_GET['mod']) AND ($_GET['mod'] == 'movies_blocked' OR $_GET['mod'] == 'movies_checking' OR $_GET['mod'] == 'movie_checking' OR $_GET['mod'] == 'photo_albums_checking' OR $_GET['mod'] == 'photo_album_checking' OR $_GET['mod'] == 'ai_compliance')) {
+        if (isset($_GET['mod']) AND ($_GET['mod'] == 'movies_blocked' OR $_GET['mod'] == 'movies_checking' OR $_GET['mod'] == 'movie_checking' OR $_GET['mod'] == 'photo_albums_checking' OR $_GET['mod'] == 'photo_album_checking' OR $_GET['mod'] == 'ai_compliance' OR $_GET['mod'] == 'co_actors_checking')) {
             $site .= '
             <script>
                 jQuery(document).ready(function() {
