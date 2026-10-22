@@ -252,7 +252,33 @@ acp/acp_neu/ (später: acp/)
 
 ---
 
-## 14. 🔍 Deep-Logic-Audit & Qualitätssicherung (PHP 8.0.30 & PHP 8.4.27)
+## 14. 🛡️ Modul „Mitarbeiter, Administratoren & Moderatoren“ (`Employees`)
+
+* **Implementierte Dateien:**
+  * `acp/acp_neu/app/src/Modules/Employees/EmployeesController.php`
+  * `acp/acp_neu/app/src/Modules/Employees/views/list.php` (`#/employees`)
+  * `acp/acp_neu/app/src/Modules/Employees/views/detail.php` (`#/employee?id=...` & `#/employee?id=0`)
+* **Warum & Wie (Architektur-Entscheidungen & Sicherheitslogik):**
+  1. **Gesamtübersicht (`#/employees`) ohne N+1-Queries:**
+     * Bietet 4 KPI-Kacheln (*ACP Team-Accounts*, *Berechtigungs-Umfang `all` vs. Bereichs-Rollen*, *Geprüfte & freigegebene Inhalte*, *Team-Aktivität aus `employee_history`*) sowie Filter nach System-Rolle (`write` / `read`), Zugriffs-Bereich (`access_area`), Sortierung und Volltextsuche.
+     * Alle Leistungs- und Aktivitätszähler pro Mitarbeiter (`employee_history`, `movies.released_from`, `photo_albums.released_from`, `co_actors.checked_by_employee`) werden in gebündelten `GROUP BY`-Abfragen vorab geladen.
+  2. **Anlegen (`#/employee?id=0`) & Bearbeiten (`#/employee?id=...`) im 3-Tab-Cockpit:**
+     * **Tab 1 – Zugangsdaten, Rolle & Berechtigungs-Matrix:**
+       * Prüft den Benutzernamen strikt auf 2–25 alphanumerische Zeichen (`A-Za-z0-9`) und Eindeutigkeit (`UNIQUE username`), passend zur Login-Filterung.
+       * Integrierter **Krypto-Passwort-Generator** (`window.crypto.getRandomValues`) mit Sichtbarkeits-Toggle und 1-Klick-Zwischenablage; Passwort-Hashing erfolgt über `hash_password()` (`sha512($pass.$salt) . ':' . $salt`).
+       * Unterscheidet klar zwischen **Administrator (`rule = 'write'`)** (inkl. endgültigem Löschen `deleted` und Team-Verwaltung) und **Moderator / Prüfer (`rule = 'read'`)** (Moderations- & Prüfrechte).
+       * **4 Schnell-Vorlagen (1-Klick Role Presets):** *Super-Admin (Vollzugriff)*, *Senior-Moderator (Prüfung & Löschrecht)*, *Content-Moderator / Prüfer (Standard)* und *Support, Profile & User-Betreuung*.
+       * **Granulare ACP-Bereichs-Matrix (`access_area`):** Master-Switch für Vollzugriff (`all`) sowie 11 einzeln schaltbare Bereichs-Kacheln (`content_check`, `content_online`, `actors`, `merchants`, `users`, `websites`, `affiliate_program`, `webcams`, `point_system`, `error_log`, `employees`).
+     * **Tab 2 – Geprüfte Inhalte:** Zeigt die zuletzt von diesem Mitarbeiter geprüften/bearbeiteten Filme (`movies`), Fotoalben (`photo_albums`) und 18+ Ausweise (`co_actors`).
+     * **Tab 3 – Login- & Aktivitäts-Historie (`employee_history`):** Zeigt die letzten 300 Aktionen inkl. IP-Adresse, Kategorie-Badge, Echtzeit-Suchfilter und Bereinigungs-Funktion (`POST ?route=employees/clear-history`).
+  3. **Selbstschutz- & Live-Session-Synchronisation:**
+     * Ein eingeloggter Administrator kann seinen eigenen Account weder löschen (`POST ?route=employees/delete`) noch sich selbst die Schreibberechtigung (`write`) oder den Zugriff auf die Mitarbeiterverwaltung (`employees` / `all`) entziehen.
+     * Ebenso wird das Löschen des letzten verbleibenden Administrators (`rule = 'write'`) im System verhindert.
+     * Werden am eigenen Account Benutzername oder Berechtigungen geändert, aktualisiert `EmployeesController::save()` sofort `$_SESSION` sowie das HMAC-signierte Auth-Cookie (`acp_neu_sync_auth_cookie()`).
+
+---
+
+## 15. 🔍 Deep-Logic-Audit & Qualitätssicherung (PHP 8.0.30 & PHP 8.4.27)
 
 Um sicherzustellen, dass das gesamte neue ACP unter **PHP 8.0.30** und **PHP 8.4.27** ohne jegliche Laufzeitfehler, SQL-Abstürze oder tote Frontend-Handler läuft, wurden 5 spezialisierte Prüf-Pipelines entwickelt und über die gesamte Codebasis ausgeführt:
 
