@@ -7,6 +7,7 @@ if (!defined('SAFE_INC')) {
     die("Hacking attempt...");
 }
 
+use App\Core\Csrf;
 use App\Core\Request;
 use App\Core\Response;
 use App\Core\View;
@@ -109,13 +110,31 @@ class HomeController
             }
         }
 
-        // 4. Filme des Partners laden & KPIs berechnen
+        // 4. Online-Status für Filme und Fotoalben vorladen
+        $onlineMovieFileIds = [];
+        $rsOnlineMovies = p4c_query("SELECT `file_id` FROM `movies_online` WHERE `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
+        if ($rsOnlineMovies && p4c_num_rows($rsOnlineMovies) > 0) {
+            while ($om = p4c_fetch_object($rsOnlineMovies)) {
+                $onlineMovieFileIds[(string)$om->file_id] = true;
+            }
+        }
+
+        $onlineAlbumHashes = [];
+        $rsOnlineAlbums = p4c_query("SELECT `album_id` FROM `photo_albums_online` WHERE `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
+        if ($rsOnlineAlbums && p4c_num_rows($rsOnlineAlbums) > 0) {
+            while ($oa = p4c_fetch_object($rsOnlineAlbums)) {
+                $onlineAlbumHashes[(string)$oa->album_id] = true;
+            }
+        }
+
+        // 5. Filme des Partners laden & KPIs berechnen
         $moviesTotal    = 0;
         $moviesOnline   = 0;
         $moviesPending  = 0;
+        $moviesRejected = 0;
         $recentContents = [];
 
-        $rsMovies = p4c_query("SELECT `id`, `convert_status`, `file_id`, `filename`, `title`, `movie_checked`, `released`, `actor_id`, `online_at`
+        $rsMovies = p4c_query("SELECT `id`, `status`, `convert_status`, `file_id`, `filename`, `title`, `movie_checked`, `released`, `actor_id`, `online_at`
             FROM `movies`
             WHERE `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted'
             ORDER BY `id` DESC;", __FILE__, __LINE__);
@@ -137,10 +156,14 @@ class HomeController
                     }
                 }
 
+                $mStatus      = (string)($m->status ?? 'active');
+                $fileId       = (string)$m->file_id;
+                $isOnline     = isset($onlineMovieFileIds[$fileId]);
                 $checked      = (string)$m->movie_checked;
                 $released     = abs((int)$m->released);
                 $convStatus   = (int)$m->convert_status;
                 $filename     = trim((string)$m->filename);
+                $editRoute    = '#/movie?id=' . $movieId;
 
                 $statusLabel = 'In Bearbeitung';
                 $statusBadge = 'badge-kkc-neutral';
@@ -150,26 +173,55 @@ class HomeController
                     $statusLabel = 'Datei fehlt';
                     $statusBadge = 'badge-kkc-warning';
                     $statusIcon  = 'bi-cloud-arrow-up';
+                    $editRoute   = '#/movie-upload?step=2&movie_id=' . $movieId;
                     $moviesPending++;
+                } elseif ($convStatus === 3) {
+                    $statusLabel = 'Konvertierungsfehler';
+                    $statusBadge = 'badge-kkc-danger';
+                    $statusIcon  = 'bi-exclamation-octagon-fill';
+                    $moviesRejected++;
                 } elseif ($convStatus <= 1) {
                     $statusLabel = 'Wird konvertiert';
                     $statusBadge = 'badge-kkc-info';
                     $statusIcon  = 'bi-gear-wide-connected';
                     $moviesPending++;
-                } elseif ($checked !== '0000-00-00 00:00:00' && $checked !== '') {
-                    $statusLabel = 'Online';
-                    $statusBadge = 'badge-kkc-success';
-                    $statusIcon  = 'bi-check-circle-fill';
-                    $moviesOnline++;
+                } elseif ($released === 2) {
+                    $statusLabel = 'Abgelehnt';
+                    $statusBadge = 'badge-kkc-danger';
+                    $statusIcon  = 'bi-x-circle-fill';
+                    $moviesRejected++;
+                } elseif ($mStatus === 'blocked') {
+                    $statusLabel = 'Gesperrt';
+                    $statusBadge = 'badge-kkc-danger';
+                    $statusIcon  = 'bi-slash-circle-fill';
+                    $moviesRejected++;
+                } elseif ($checked !== '0000-00-00 00:00:00' && $checked !== '' && $released === 1) {
+                    if ($isOnline) {
+                        $statusLabel = 'Online';
+                        $statusBadge = 'badge-kkc-success';
+                        $statusIcon  = 'bi-check-circle-fill';
+                        $moviesOnline++;
+                    } elseif ($mStatus === 'inactive') {
+                        $statusLabel = 'Pausiert';
+                        $statusBadge = 'badge-kkc-neutral';
+                        $statusIcon  = 'bi-pause-circle-fill';
+                        $moviesPending++;
+                    } else {
+                        $statusLabel = 'Geplant';
+                        $statusBadge = 'badge-kkc-info';
+                        $statusIcon  = 'bi-calendar-event';
+                        $moviesPending++;
+                    }
+                } elseif ($checked !== '0000-00-00 00:00:00' && $checked !== '' && $released === 0) {
+                    $statusLabel = 'Gesperrt / Offline';
+                    $statusBadge = 'badge-kkc-danger';
+                    $statusIcon  = 'bi-slash-circle';
+                    $moviesRejected++;
                 } elseif ($checked === '0000-00-00 00:00:00' && $released === 1) {
                     $statusLabel = 'Wird geprüft';
                     $statusBadge = 'badge-kkc-warning';
                     $statusIcon  = 'bi-hourglass-split';
                     $moviesPending++;
-                } elseif ($checked === '0000-00-00 00:00:00' && $released === 2) {
-                    $statusLabel = 'Abgelehnt';
-                    $statusBadge = 'badge-kkc-danger';
-                    $statusIcon  = 'bi-x-circle-fill';
                 } elseif ($convStatus === 2) {
                     $statusLabel = 'Bereit zur Freigabe';
                     $statusBadge = 'badge-kkc-warning';
@@ -177,29 +229,31 @@ class HomeController
                     $moviesPending++;
                 }
 
+                $cleanTitle = trim(self::decodeLegacyText((string)$m->title));
                 if (count($recentContents) < 6) {
                     $recentContents[] = [
-                        'id'           => abs((int)$m->id),
-                        'title'        => trim((string)$m->title) !== '' ? (string)$m->title : 'Unbenannter Film #' . abs((int)$m->id),
+                        'id'           => $movieId,
+                        'title'        => $cleanTitle !== '' ? $cleanTitle : 'Unbenannter Film #' . $movieId,
                         'actor_id'     => $actorId,
                         'actor_name'   => $actorMap[$actorId] ?? '-',
                         'type'         => 'movie',
                         'status_label' => $statusLabel,
                         'status_badge' => $statusBadge,
                         'status_icon'  => $statusIcon,
-                        'route'        => '#/movie?id=' . abs((int)$m->id),
+                        'route'        => $editRoute,
                     ];
                 }
             }
         }
 
-        // 5. Fotoalben des Partners laden & KPIs berechnen
-        $albumsTotal   = 0;
-        $albumsOnline  = 0;
-        $albumsPending = 0;
-        $photosTotal   = 0;
+        // 6. Fotoalben des Partners laden & KPIs berechnen
+        $albumsTotal    = 0;
+        $albumsOnline   = 0;
+        $albumsPending  = 0;
+        $albumsRejected = 0;
+        $photosTotal    = 0;
 
-        $rsAlbums = p4c_query("SELECT `id`, `album_id`, `number_of_photos`, `title`, `album_checked`, `released`, `actor_id`
+        $rsAlbums = p4c_query("SELECT `id`, `status`, `album_id`, `number_of_photos`, `title`, `preview_image_fsk16`, `preview_image_fsk18`, `album_checked`, `released`, `actor_id`
             FROM `photo_albums`
             WHERE `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted'
             ORDER BY `id` DESC;", __FILE__, __LINE__);
@@ -219,11 +273,17 @@ class HomeController
                     $actors[$actorId]['albums_count']++;
                 }
 
-                $checked  = (string)$a->album_checked;
-                $released = abs((int)$a->released);
-                if ($checked !== '0000-00-00 00:00:00' && $checked !== '') {
+                $aStatus     = (string)($a->status ?? 'active');
+                $albumIdHash = (string)$a->album_id;
+                $isOnline    = isset($onlineAlbumHashes[$albumIdHash]);
+                $checked     = (string)$a->album_checked;
+                $released    = abs((int)$a->released);
+
+                if ($released === 2 || $aStatus === 'blocked' || ($checked !== '0000-00-00 00:00:00' && $checked !== '' && $released === 0)) {
+                    $albumsRejected++;
+                } elseif ($checked !== '0000-00-00 00:00:00' && $checked !== '' && $released === 1 && $isOnline) {
                     $albumsOnline++;
-                } elseif ($released !== 2) {
+                } else {
                     $albumsPending++;
                 }
             }
@@ -258,9 +318,11 @@ class HomeController
             'moviesTotal'               => $moviesTotal,
             'moviesOnline'              => $moviesOnline,
             'moviesPending'             => $moviesPending,
+            'moviesRejected'            => $moviesRejected,
             'albumsTotal'               => $albumsTotal,
             'albumsOnline'              => $albumsOnline,
             'albumsPending'             => $albumsPending,
+            'albumsRejected'            => $albumsRejected,
             'photosTotal'               => $photosTotal,
             'contentPending'            => $contentPending,
             'recentContents'            => $recentContents,
@@ -679,6 +741,184 @@ class HomeController
     }
 
     /**
+     * Sendet eine direkte Antwort des EroCloud-Partners im Nachrichtenverlauf eines bestehenden Tickets
+     */
+    public function replyFeedback(): void
+    {
+        global $mysql;
+
+        if (!$this->request->isPost()) {
+            Response::json(['success' => false, 'message' => 'Ungültige Anfrage-Methode.'], 405);
+        }
+
+        $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
+        if ($merchantId <= 0) {
+            Response::json(['success' => false, 'message' => 'Nicht autorisiert.'], 401);
+        }
+
+        $feedbackId = abs((int)$this->request->post('feedback_id', 0));
+        $rawMessage = trim(strip_tags(html_entity_decode((string)$this->request->post('message', ''), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+
+        if ($feedbackId <= 0 || mb_strlen($rawMessage, 'UTF-8') < 2) {
+            Response::json([
+                'success' => false,
+                'message' => 'Bitte gib eine kurze Antwort-Nachricht ein.',
+            ]);
+        }
+
+        if (mb_strlen($rawMessage, 'UTF-8') > 10000) {
+            $rawMessage = mb_substr($rawMessage, 0, 10000, 'UTF-8');
+        }
+
+        // Dateianhänge (max. 3) prüfen
+        $validatedAttachments = [];
+        $maxAttachments       = 3;
+        $maxFileSize          = 6 * 1024 * 1024;
+        $allowedMimeMap       = [
+            'image/jpeg'      => 'jpg',
+            'image/png'       => 'png',
+            'image/webp'      => 'webp',
+            'image/gif'       => 'gif',
+            'application/pdf' => 'pdf',
+        ];
+
+        if (!empty($_FILES['attachments']) && is_array($_FILES['attachments']['tmp_name'])) {
+            $fileCount = count($_FILES['attachments']['tmp_name']);
+            if ($fileCount > $maxAttachments) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Es können maximal 3 Dateien angehängt werden.',
+                ]);
+            }
+
+            $finfo = function_exists('finfo_open') ? @finfo_open(FILEINFO_MIME_TYPE) : false;
+
+            for ($i = 0; $i < $fileCount; $i++) {
+                $errCode = (int)($_FILES['attachments']['error'][$i] ?? UPLOAD_ERR_NO_FILE);
+                if ($errCode === UPLOAD_ERR_NO_FILE) {
+                    continue;
+                }
+                $origName = (string)($_FILES['attachments']['name'][$i] ?? ('anhang-' . ($i + 1)));
+                $tmpPath  = (string)($_FILES['attachments']['tmp_name'][$i] ?? '');
+                $fileSize = (int)($_FILES['attachments']['size'][$i] ?? 0);
+
+                if ($errCode !== UPLOAD_ERR_OK || $tmpPath === '' || !is_uploaded_file($tmpPath) || $fileSize <= 0 || $fileSize > $maxFileSize) {
+                    if ($finfo && PHP_VERSION_ID < 80100) {
+                        @finfo_close($finfo);
+                    }
+                    Response::json([
+                        'success' => false,
+                        'message' => 'Die Datei "' . htmlspecialchars($origName, ENT_QUOTES, 'UTF-8') . '" ist zu groß (max. 6 MB) oder ungültig.',
+                    ]);
+                }
+
+                $realMime = '';
+                if ($finfo !== false) {
+                    $realMime = (string)@finfo_file($finfo, $tmpPath);
+                } elseif (function_exists('mime_content_type')) {
+                    $realMime = (string)@mime_content_type($tmpPath);
+                }
+
+                if (!isset($allowedMimeMap[$realMime])) {
+                    if ($finfo && PHP_VERSION_ID < 80100) {
+                        @finfo_close($finfo);
+                    }
+                    Response::json([
+                        'success' => false,
+                        'message' => 'Format nicht erlaubt (nur JPG, PNG, WEBP, GIF, PDF).',
+                    ]);
+                }
+
+                $rawBytes = (string)@file_get_contents($tmpPath);
+                if ($rawBytes === '' || strlen($rawBytes) !== $fileSize) {
+                    continue;
+                }
+
+                if (preg_match('/(<\?php|<\?=|<script\b|__HALT_COMPILER|phar:\/\/)/i', $rawBytes)) {
+                    if ($finfo && PHP_VERSION_ID < 80100) {
+                        @finfo_close($finfo);
+                    }
+                    Response::json([
+                        'success' => false,
+                        'message' => 'Datei wurde aus Sicherheitsgründen blockiert.',
+                    ]);
+                }
+
+                $safeExt = $allowedMimeMap[$realMime];
+                if ($safeExt === 'pdf') {
+                    if (strncmp($rawBytes, '%PDF-1.', 7) !== 0 && strncmp($rawBytes, '%PDF-2.', 7) !== 0) {
+                        continue;
+                    }
+                } else {
+                    $imgInfo = @getimagesize($tmpPath);
+                    if (!is_array($imgInfo) || empty($imgInfo[0]) || empty($imgInfo[1])) {
+                        continue;
+                    }
+                }
+
+                $cleanBase = preg_replace('/[^a-zA-Z0-9_\-\.]/', '_', (string)pathinfo($origName, PATHINFO_FILENAME));
+                $cleanBase = trim((string)preg_replace('/_+/', '_', (string)$cleanBase), '_.');
+                if ($cleanBase === '') {
+                    $cleanBase = 'anhang_' . ($i + 1);
+                }
+                $safeOriginalName = substr($cleanBase, 0, 80) . '.' . $safeExt;
+
+                $validatedAttachments[] = [
+                    'name'        => $safeOriginalName,
+                    'mime'        => $realMime,
+                    'ext'         => $safeExt,
+                    'size'        => $fileSize,
+                    'data_base64' => base64_encode($rawBytes),
+                ];
+            }
+
+            if ($finfo && PHP_VERSION_ID < 80100) {
+                @finfo_close($finfo);
+            }
+        }
+
+        $merchant         = new Merchant($mysql, $merchantId);
+        $merchantUsername = trim((string)$merchant->username('aes_decrypt'));
+        $firstname        = trim((string)$merchant->firstname('aes_decrypt'));
+        $surname          = trim((string)$merchant->surname('aes_decrypt'));
+        $realName         = trim($firstname . ' ' . $surname);
+        $creatorName      = $merchantUsername !== '' ? $merchantUsername : ($realName !== '' ? $realName : ('Partner #' . $merchantId));
+
+        @session_write_close();
+
+        $now        = time();
+        $domain     = 'erocloud.net';
+        $creatorKey = 'ec_merchant_' . $merchantId;
+        $secret     = 'erocms_creator_feedback_v1_secret_2026';
+        $signature  = hash_hmac('sha256', 'creator_reply|' . $domain . '|' . $feedbackId . '|' . $now, $secret);
+
+        $payload = [
+            'action'       => 'creator_reply',
+            'feedback_id'  => $feedbackId,
+            'domain'       => $domain,
+            'creator_key'  => $creatorKey,
+            'creator_name' => $creatorName,
+            'message'      => $rawMessage,
+            'attachments'  => $validatedAttachments,
+            'timestamp'    => $now,
+            'signature'    => $signature,
+        ];
+
+        $apiResult = $this->callFeedbackApi($payload, $signature, !empty($validatedAttachments) ? 25 : 10);
+        if (!empty($apiResult['success'])) {
+            Response::json(array_merge($apiResult, [
+                'success' => true,
+                'message' => 'Deine Antwort wurde direkt im Ticket-Verlauf gesendet!',
+            ]));
+        }
+
+        Response::json([
+            'success' => false,
+            'message' => $apiResult['message'] ?? 'Deine Antwort konnte leider nicht übertragen werden.',
+        ]);
+    }
+
+    /**
      * Erstellt den technischen Diagnose-Block inklusive Auszug aus dem zentralen Error-Log (/log/.errorlog)
      */
     private function buildErrorLogDiagnostic(
@@ -822,6 +1062,11 @@ class HomeController
             Response::error('Ungültige Anfrage-Methode.', 405);
         }
 
+        $csrfToken = (string)$this->request->post('_csrf', $this->request->post('csrf_token', $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
+        if (!Csrf::validate($csrfToken)) {
+            Response::error('Ungültiges Sicherheits-Token. Bitte lade die Seite neu.', 403);
+        }
+
         $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
         if ($merchantId <= 0) {
             Response::error('Nicht angemeldet.', 401);
@@ -833,7 +1078,7 @@ class HomeController
         }
 
         p4c_query("UPDATE `merchants` SET `accept_content_rules` = '" . date('Y-m-d H:i:s') . "'
-            WHERE `id` = '" . $merchantId . "' AND `accept_content_rules` = '0000-00-00 00:00:00' LIMIT 1;", __FILE__, __LINE__);
+            WHERE `id` = '" . $merchantId . "' AND (`accept_content_rules` = '0000-00-00 00:00:00' OR `accept_content_rules` = '' OR `accept_content_rules` IS NULL) LIMIT 1;", __FILE__, __LINE__);
 
         log_action('Nutzungsrichtlinien für Content akzeptiert.');
 
@@ -850,6 +1095,12 @@ class HomeController
     {
         if (!$this->request->isPost()) {
             Response::error('Ungültige Anfrage-Methode.', 405);
+            return;
+        }
+
+        $csrfToken = (string)$this->request->post('_csrf', $this->request->post('csrf_token', $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
+        if (!Csrf::validate($csrfToken)) {
+            Response::error('Ungültiges Sicherheits-Token. Bitte lade die Seite neu.', 403);
             return;
         }
 
@@ -967,7 +1218,17 @@ class HomeController
             }
         }
 
-        // 2. Online-Status aller Fotoalben des Partners vorladen
+        // 2. Online-Status aller Filme und Fotoalben des Partners vorladen
+        $onlineMovieFileIds = [];
+        $rsOnlineMovies     = p4c_query("SELECT `file_id`
+            FROM `movies_online`
+            WHERE `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
+        if ($rsOnlineMovies && p4c_num_rows($rsOnlineMovies) > 0) {
+            while ($omObj = p4c_fetch_object($rsOnlineMovies)) {
+                $onlineMovieFileIds[(string)$omObj->file_id] = true;
+            }
+        }
+
         $onlineAlbumHashes = [];
         $rsOnlineAlbums    = p4c_query("SELECT `album_id`
             FROM `photo_albums_online`
@@ -983,7 +1244,7 @@ class HomeController
 
         // 3. Filme durchsuchen
         $rsMovies = p4c_query("SELECT
-                `id`, `convert_status`, `file_id`, `checksum`, `filename`, `title`,
+                `id`, `status`, `convert_status`, `file_id`, `checksum`, `filename`, `title`,
                 `movie_checked`, `released`, `actor_id`, `online_at`, `playtime_string`, `resolution`
             FROM `movies`
             WHERE `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted'
@@ -997,7 +1258,9 @@ class HomeController
                 }
 
                 $movieId    = abs((int)$m->id);
+                $mStatus    = (string)($m->status ?? 'active');
                 $fileId     = (string)$m->file_id;
+                $isOnline   = isset($onlineMovieFileIds[$fileId]);
                 $checksum   = (string)($m->checksum ?? '');
                 $filename   = trim((string)$m->filename);
                 $convStatus = (int)$m->convert_status;
@@ -1019,26 +1282,53 @@ class HomeController
                     $statusBadge = 'badge-kkc-warning';
                     $statusIcon  = 'bi-cloud-arrow-up-fill';
                     $editRoute   = '#/movie-upload?step=2&movie_id=' . $movieId;
+                } elseif ($convStatus === 3) {
+                    $statusKey   = 'rejected';
+                    $statusLabel = 'Konvertierungsfehler';
+                    $statusBadge = 'badge-kkc-danger';
+                    $statusIcon  = 'bi-exclamation-octagon-fill';
                 } elseif ($convStatus <= 1) {
                     $statusKey   = 'pending';
                     $statusLabel = 'Wird konvertiert';
                     $statusBadge = 'badge-kkc-info';
                     $statusIcon  = 'bi-gear-wide-connected';
-                } elseif ($checked !== '0000-00-00 00:00:00' && $checked !== '') {
-                    $statusKey   = 'online';
-                    $statusLabel = 'Online';
-                    $statusBadge = 'badge-kkc-success';
-                    $statusIcon  = 'bi-check-circle-fill';
+                } elseif ($released === 2) {
+                    $statusKey   = 'rejected';
+                    $statusLabel = 'Abgelehnt';
+                    $statusBadge = 'badge-kkc-danger';
+                    $statusIcon  = 'bi-x-circle-fill';
+                } elseif ($mStatus === 'blocked') {
+                    $statusKey   = 'rejected';
+                    $statusLabel = 'Gesperrt';
+                    $statusBadge = 'badge-kkc-danger';
+                    $statusIcon  = 'bi-slash-circle-fill';
+                } elseif ($checked !== '0000-00-00 00:00:00' && $checked !== '' && $released === 1) {
+                    if ($isOnline) {
+                        $statusKey   = 'online';
+                        $statusLabel = 'Online';
+                        $statusBadge = 'badge-kkc-success';
+                        $statusIcon  = 'bi-check-circle-fill';
+                    } elseif ($mStatus === 'inactive') {
+                        $statusKey   = 'pending';
+                        $statusLabel = 'Pausiert';
+                        $statusBadge = 'badge-kkc-neutral';
+                        $statusIcon  = 'bi-pause-circle-fill';
+                    } else {
+                        $statusKey   = 'pending';
+                        $statusLabel = 'Geplant';
+                        $statusBadge = 'badge-kkc-info';
+                        $statusIcon  = 'bi-calendar-event';
+                    }
+                } elseif ($checked !== '0000-00-00 00:00:00' && $checked !== '' && $released === 0) {
+                    $statusKey   = 'rejected';
+                    $statusLabel = 'Gesperrt / Offline';
+                    $statusBadge = 'badge-kkc-danger';
+                    $statusIcon  = 'bi-slash-circle';
                 } elseif ($checked === '0000-00-00 00:00:00' && $released === 1) {
                     $statusKey   = 'pending';
                     $statusLabel = 'Wird geprüft';
                     $statusBadge = 'badge-kkc-warning';
                     $statusIcon  = 'bi-hourglass-split';
-                } elseif ($checked === '0000-00-00 00:00:00' && $released === 2) {
-                    $statusKey   = 'rejected';
-                    $statusLabel = 'Abgelehnt';
-                    $statusBadge = 'badge-kkc-danger';
-                    $statusIcon  = 'bi-x-circle-fill';
                 } elseif ($convStatus === 2) {
                     $statusKey   = 'pending';
                     $statusLabel = 'Jetzt veröffentlichen';
@@ -1119,7 +1409,7 @@ class HomeController
 
         // 4. Fotoalben durchsuchen
         $rsAlbums = p4c_query("SELECT
-                `id`, `album_id`, `checksum`, `number_of_photos`, `title`,
+                `id`, `status`, `album_id`, `checksum`, `number_of_photos`, `title`,
                 `preview_image_fsk16`, `preview_image_fsk18`, `album_checked`, `released`, `actor_id`, `online_at`
             FROM `photo_albums`
             WHERE `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted'
@@ -1133,6 +1423,7 @@ class HomeController
                 }
 
                 $albumDbId   = abs((int)$a->id);
+                $aStatus     = (string)($a->status ?? 'active');
                 $albumIdHash = (string)$a->album_id;
                 $checksum    = (string)($a->checksum ?? '');
                 $numPhotos   = abs((int)$a->number_of_photos);
@@ -1152,7 +1443,17 @@ class HomeController
                 $statusIcon  = 'bi-hourglass-split';
                 $editRoute   = '#/photo-album?id=' . $albumDbId;
 
-                if (!$isComplete) {
+                if ($released === 2) {
+                    $statusKey   = 'rejected';
+                    $statusLabel = 'Korrektur nötig';
+                    $statusBadge = 'badge-kkc-danger';
+                    $statusIcon  = 'bi-exclamation-triangle-fill';
+                } elseif ($aStatus === 'blocked') {
+                    $statusKey   = 'rejected';
+                    $statusLabel = 'Gesperrt';
+                    $statusBadge = 'badge-kkc-danger';
+                    $statusIcon  = 'bi-slash-circle-fill';
+                } elseif (!$isComplete) {
                     $statusKey   = 'pending';
                     $statusLabel = 'Fotos fehlen';
                     $statusBadge = 'badge-kkc-neutral';
@@ -1168,11 +1469,6 @@ class HomeController
                     $statusLabel = 'In Prüfung';
                     $statusBadge = 'badge-kkc-warning';
                     $statusIcon  = 'bi-hourglass-split';
-                } elseif ($checked === '0000-00-00 00:00:00' && $released === 2) {
-                    $statusKey   = 'rejected';
-                    $statusLabel = 'Korrektur nötig';
-                    $statusBadge = 'badge-kkc-danger';
-                    $statusIcon  = 'bi-exclamation-triangle-fill';
                 } elseif ($checked !== '0000-00-00 00:00:00' && $released === 0) {
                     $statusKey   = 'rejected';
                     $statusLabel = 'Gesperrt / Abgelehnt';

@@ -4324,8 +4324,82 @@ const App = {
       }
     });
 
-    // 3. Verlauf & Rückmeldungen laden und rendern
+    // 3. Verlauf, Ticket-Konversation & Rückmeldungen laden und rendern
+    const replyFilesByTicket = {};
+
+    const renderReplyFileChips = (ticketId) => {
+      const listEl = document.getElementById(`ec-fb-reply-files-${ticketId}`);
+      const badgeEl = document.getElementById(`ec-fb-reply-file-badge-${ticketId}`);
+      const addBtn = document.getElementById(`ec-fb-reply-add-file-btn-${ticketId}`);
+      const files = replyFilesByTicket[ticketId] || [];
+      if (badgeEl) badgeEl.textContent = `${files.length} / ${maxFiles}`;
+      if (addBtn) addBtn.disabled = files.length >= maxFiles;
+      if (!listEl) return;
+
+      listEl.innerHTML = '';
+      files.forEach((f, idx) => {
+        const isPdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+        const chip = document.createElement('div');
+        chip.className = 'd-inline-flex align-items-center gap-1 px-2 py-1 rounded-2 border small';
+        chip.style.fontSize = '0.73rem';
+        chip.style.backgroundColor = 'var(--kkc-surface)';
+        chip.innerHTML = `
+          <i class="bi ${isPdf ? 'bi-file-earmark-pdf-fill text-danger' : 'bi-image ec-text-primary'}"></i>
+          <span class="text-truncate fw-medium" style="max-width: 130px;">${this.escapeHtml(f.name)}</span>
+          <button type="button" class="btn btn-sm p-0 border-0 text-danger ms-1 js-ec-fb-rm-reply-file" data-ticket-id="${ticketId}" data-idx="${idx}" style="line-height:1;">
+            <i class="bi bi-x-circle-fill"></i>
+          </button>
+        `;
+        chip.querySelector('.js-ec-fb-rm-reply-file')?.addEventListener('click', () => {
+          if (replyFilesByTicket[ticketId]) {
+            replyFilesByTicket[ticketId].splice(idx, 1);
+            renderReplyFileChips(ticketId);
+          }
+        });
+        listEl.appendChild(chip);
+      });
+    };
+
+    const addReplyFiles = (ticketId, fileListObj) => {
+      const errEl = document.getElementById(`ec-fb-reply-error-${ticketId}`);
+      if (errEl) {
+        errEl.classList.add('d-none');
+        errEl.textContent = '';
+      }
+      if (!replyFilesByTicket[ticketId]) replyFilesByTicket[ticketId] = [];
+      const arr = replyFilesByTicket[ticketId];
+
+      for (let i = 0; i < fileListObj.length; i++) {
+        if (arr.length >= maxFiles) {
+          if (errEl) {
+            errEl.textContent = `Maximal ${maxFiles} Dateien pro Antwort möglich.`;
+            errEl.classList.remove('d-none');
+          }
+          break;
+        }
+        const f = fileListObj[i];
+        const ext = (f.name.split('.').pop() || '').toLowerCase();
+        if (!allowedExts.includes(ext)) {
+          if (errEl) {
+            errEl.textContent = 'Format nicht erlaubt (nur JPG, PNG, WEBP, GIF, PDF).';
+            errEl.classList.remove('d-none');
+          }
+          continue;
+        }
+        if (f.size > maxFileSize) {
+          if (errEl) {
+            errEl.textContent = 'Datei ist größer als 6 MB.';
+            errEl.classList.remove('d-none');
+          }
+          continue;
+        }
+        if (f.size > 0) arr.push(f);
+      }
+      renderReplyFileChips(ticketId);
+    };
+
     const renderFeedbackItemCard = (item, isUnreadReply) => {
+      const ticketId = parseInt(item.id, 10);
       const catBadgeMap = {
         idea: '<span class="badge bg-warning bg-opacity-15 text-warning-emphasis border border-warning border-opacity-25"><i class="bi bi-lightbulb-fill text-warning me-1"></i>Idee / Wunsch</span>',
         bug: '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25"><i class="bi bi-bug-fill me-1"></i>Fehler / Problem</span>',
@@ -4334,63 +4408,130 @@ const App = {
       const statusBadgeMap = {
         new: '<span class="badge bg-secondary bg-opacity-10 text-secondary border"><i class="bi bi-send-check me-1"></i>Bei Martin eingegangen</span>',
         in_progress: '<span class="badge bg-info bg-opacity-15 text-info-emphasis border border-info border-opacity-25"><i class="bi bi-gear-wide-connected me-1"></i>In Bearbeitung / Geplant</span>',
-        resolved: '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25"><i class="bi bi-check-circle-fill me-1"></i>Erledigt / Beantwortet</span>',
-        archived: '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25"><i class="bi bi-check2-all me-1"></i>Beantwortet</span>'
+        planned: '<span class="badge bg-info bg-opacity-15 text-info-emphasis border border-info border-opacity-25"><i class="bi bi-rocket-takeoff-fill me-1"></i>Für Update geplant</span>',
+        resolved: '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25"><i class="bi bi-check-circle-fill me-1"></i>Erledigt / Abgeschlossen</span>',
+        archived: '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25"><i class="bi bi-check2-all me-1"></i>Abgeschlossen</span>'
       };
 
       const catBadge = catBadgeMap[item.category] || catBadgeMap.bug;
       const statusBadge = statusBadgeMap[item.status] || statusBadgeMap.new;
-      const hasReply = Boolean(item.admin_reply && String(item.admin_reply).trim() !== '');
+      const hasReply = Boolean(item.has_reply || (item.admin_reply && String(item.admin_reply).trim() !== ''));
+      const canReply = typeof item.can_reply !== 'undefined' ? Boolean(item.can_reply) : (item.status !== 'resolved' && item.status !== 'archived');
+      const thread = Array.isArray(item.messages) && item.messages.length > 0 ? item.messages : null;
+      const msgCount = thread ? thread.length : (hasReply ? 2 : 1);
 
-      let attachmentsHtml = '';
-      if (Array.isArray(item.attachments) && item.attachments.length > 0) {
-        const chips = item.attachments.map(att => {
-          const isPdf = (att.type === 'pdf');
-          const icon = isPdf ? 'bi-file-earmark-pdf-fill text-danger' : 'bi-image ec-text-primary';
-          return `<a href="${this.escapeHtml(att.url)}" target="_blank" rel="noopener" class="d-inline-flex align-items-center gap-1 px-2 py-1 rounded-2 border text-decoration-none small" style="font-size: 0.76rem; background-color: var(--kkc-surface); color: var(--kkc-text);">
-            <i class="bi ${icon}"></i>
-            <span class="text-truncate" style="max-width: 150px;">${this.escapeHtml(att.name || 'Anhang')}</span>
-          </a>`;
+      let threadHtml = '';
+      if (thread) {
+        threadHtml = thread.map((m, mIdx) => {
+          const isAdmin = m.sender === 'admin';
+          const mTime = String(m.created_at_formatted || '');
+          const mAtts = Array.isArray(m.attachments) ? m.attachments : [];
+
+          if (isAdmin) {
+            return `
+              <div class="p-3 rounded-3 border ${isUnreadReply ? 'border-success bg-success bg-opacity-10 ec-fb-reply-highlight' : 'border-success border-opacity-25 bg-success bg-opacity-10'}">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
+                  <div class="d-flex align-items-center gap-2">
+                    <img src="assets/img/ceo-150x150.jpg" onerror="this.onerror=null;this.src='https://erocms.net/images/ceo-150x150.jpg';" alt="Martin" class="rounded-circle object-fit-cover border border-2 border-white shadow-sm" style="width: 26px; height: 26px;">
+                    <span class="fw-bold small text-success"><i class="bi bi-reply-fill me-1"></i>Antwort von Martin Zimmermann</span>
+                    ${isUnreadReply && mIdx === thread.length - 1 ? '<span class="badge bg-success text-white rounded-pill">Neue Antwort</span>' : ''}
+                  </div>
+                  <span class="text-muted" style="font-size: 0.74rem;">${this.escapeHtml(mTime)}${mTime ? ' Uhr' : ''}</span>
+                </div>
+                <div class="text-body small mt-1" style="white-space: pre-line; line-height: 1.55;">${this.escapeHtml(m.message || '')}</div>
+              </div>
+            `;
+          }
+
+          return `
+            <div class="p-2 px-3 rounded-3 border-start border-3 ${mIdx === 0 ? 'border-secondary-subtle' : 'border-primary'}" style="background-color: var(--kkc-surface-hover, rgba(148,163,184,0.08));">
+              <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
+                <span class="text-muted fw-semibold" style="font-size: 0.71rem; text-transform: uppercase;">
+                  ${mIdx === 0 ? 'Deine ursprüngliche Meldung:' : 'Deine Antwort:'}
+                  ${mAtts.length > 0 ? `<span class="badge bg-secondary bg-opacity-25 text-body ms-1"><i class="bi bi-paperclip me-1"></i>${mAtts.length}</span>` : ''}
+                </span>
+                ${mIdx > 0 && mTime ? `<span class="text-muted" style="font-size: 0.72rem;">${this.escapeHtml(mTime)} Uhr</span>` : ''}
+              </div>
+              <div class="text-body small" style="white-space: pre-line; line-height: 1.5;">${this.escapeHtml(m.message || '')}</div>
+            </div>
+          `;
         }).join('');
-        attachmentsHtml = `<div class="d-flex flex-wrap gap-1 mt-2">${chips}</div>`;
+      } else {
+        threadHtml = `<div class="text-body small" style="white-space: pre-line; line-height: 1.5;">${this.escapeHtml(item.message || '')}</div>`;
       }
 
-      let replyBoxHtml = '';
-      if (hasReply) {
-        replyBoxHtml = `
-          <div class="mt-3 p-3 rounded-3 border ${isUnreadReply ? 'border-success bg-success bg-opacity-10 ec-fb-reply-highlight' : 'border-success border-opacity-25 bg-success bg-opacity-10'}">
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
-              <div class="d-flex align-items-center gap-2">
-                <img src="assets/img/ceo-150x150.jpg" onerror="this.onerror=null;this.src='https://erocms.net/images/ceo-150x150.jpg';" alt="Martin" class="rounded-circle object-fit-cover border border-2 border-white shadow-sm" style="width: 28px; height: 28px;">
-                <span class="fw-bold small text-success"><i class="bi bi-reply-fill me-1"></i>Antwort von Martin Zimmermann</span>
-                ${isUnreadReply ? '<span class="badge bg-success text-white rounded-pill">Neue Antwort</span>' : ''}
-              </div>
-              <span class="text-muted" style="font-size: 0.75rem;">${this.escapeHtml(item.replied_at_formatted || '')}</span>
-            </div>
-            <div class="text-body small" style="white-space: pre-line; line-height: 1.55;">${this.escapeHtml(item.admin_reply)}</div>
+      const actionFooterHtml = `
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-2 pt-2 border-top" style="border-color: var(--kkc-border) !important;">
+          <div>
             ${isUnreadReply ? `
-              <div class="mt-2 pt-2 border-top border-success border-opacity-25 d-flex justify-content-end">
-                <button type="button" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-semibold ec-fb-mark-read-btn" data-id="${parseInt(item.id, 10)}" style="font-size: 0.78rem;">
-                  <i class="bi bi-check2-circle me-1"></i>Gelesen &amp; verstanden – Danke!
+              <button type="button" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-semibold ec-fb-mark-read-btn" data-id="${ticketId}" style="font-size: 0.78rem;">
+                <i class="bi bi-check2-circle me-1"></i>Gelesen &amp; verstanden – Danke!
+              </button>
+            ` : (hasReply ? `
+              <span class="text-success small fw-semibold" style="font-size: 0.76rem;">
+                <i class="bi bi-check2-all me-1"></i>Von dir gelesen${item.reply_read_formatted ? ` am ${this.escapeHtml(item.reply_read_formatted)} Uhr` : ''}
+              </span>
+            ` : `
+              <span class="text-muted small" style="font-size: 0.75rem;">
+                <i class="bi bi-hourglass-split me-1"></i>Sobald Martin geantwortet hat, wirst du hier benachrichtigt.
+              </span>
+            `)}
+          </div>
+          <div>
+            ${canReply ? `
+              <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1 fw-semibold ec-fb-toggle-reply-btn" data-id="${ticketId}" style="font-size: 0.78rem;">
+                <i class="bi bi-reply-fill me-1"></i>Direkt antworten
+              </button>
+            ` : `
+              <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-2 py-1" style="font-size: 0.72rem;">
+                <i class="bi bi-check2-circle me-1"></i>Ticket abgeschlossen
+              </span>
+            `}
+          </div>
+        </div>
+        ${canReply ? `
+          <div class="mt-2 pt-2 border-top ec-fb-inline-reply-box d-none" id="ec-fb-inline-reply-box-${ticketId}" data-id="${ticketId}" style="border-color: var(--kkc-border) !important;">
+            <label class="form-label small fw-semibold ec-text-primary mb-1" style="font-size: 0.76rem;">
+              <i class="bi bi-chat-dots-fill me-1"></i>Deine Antwort zu Ticket #${ticketId}:
+            </label>
+            <textarea class="form-control form-control-sm rounded-3 mb-2" id="ec-fb-reply-text-${ticketId}" rows="2" placeholder="Schreibe hier deine Rückfrage oder Ergänzung... (Screenshots auch per Strg+V möglich)" style="font-size: 0.85rem;"></textarea>
+            <div id="ec-fb-reply-error-${ticketId}" class="alert alert-danger py-1 px-2 small d-none mb-2"></div>
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+              <div class="d-flex align-items-center flex-wrap gap-2">
+                <input type="file" id="ec-fb-reply-file-input-${ticketId}" class="d-none ec-fb-reply-file-input" data-id="${ticketId}" accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,image/jpeg,image/png,image/webp,image/gif,application/pdf" multiple>
+                <button type="button" id="ec-fb-reply-add-file-btn-${ticketId}" class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-1 d-inline-flex align-items-center gap-1 ec-fb-reply-add-file-btn" data-id="${ticketId}" style="font-size: 0.74rem;">
+                  <i class="bi bi-paperclip"></i>
+                  <span>Screenshot / Datei</span>
+                  <span class="badge bg-secondary bg-opacity-25 text-body rounded-pill" id="ec-fb-reply-file-badge-${ticketId}">0 / 3</span>
+                </button>
+                <div id="ec-fb-reply-files-${ticketId}" class="d-flex flex-wrap gap-1"></div>
+              </div>
+              <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1 ec-fb-cancel-reply-btn" data-id="${ticketId}" style="font-size: 0.76rem;">Abbrechen</button>
+                <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 py-1 fw-semibold ec-fb-send-reply-btn" data-id="${ticketId}" style="font-size: 0.78rem;">
+                  <i class="bi bi-send-fill me-1"></i>Antwort senden
                 </button>
               </div>
-            ` : ''}
+            </div>
           </div>
-        `;
-      }
+        ` : ''}
+      `;
 
       return `
-        <div class="p-3 rounded-3 border shadow-sm ec-fb-history-item" data-item-id="${parseInt(item.id, 10)}" style="background-color: var(--kkc-surface); border-color: ${isUnreadReply ? '#10B981' : 'var(--kkc-border)'} !important;">
+        <div class="p-3 rounded-3 border shadow-sm ec-fb-history-item" data-item-id="${ticketId}" style="background-color: var(--kkc-surface); border-color: ${isUnreadReply ? '#10B981' : 'var(--kkc-border)'} !important;">
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
             <div class="d-flex align-items-center flex-wrap gap-2">
+              <span class="badge bg-secondary bg-opacity-10 text-secondary border font-monospace">#${ticketId}</span>
               ${catBadge}
               ${statusBadge}
+              ${msgCount > 1 ? `<span class="badge bg-primary bg-opacity-10 ec-text-primary border border-primary border-opacity-25"><i class="bi bi-chat-dots me-1"></i>${msgCount} Nachrichten</span>` : ''}
             </div>
-            <span class="text-muted" style="font-size: 0.76rem;"><i class="bi bi-clock me-1"></i>Gesendet am ${this.escapeHtml(item.created_at_formatted || '')}</span>
+            <span class="text-muted" style="font-size: 0.76rem;"><i class="bi bi-clock me-1"></i>Erstellt am ${this.escapeHtml(item.created_at_formatted || '')} Uhr</span>
           </div>
-          <div class="text-body small" style="white-space: pre-line; line-height: 1.5;">${this.escapeHtml(item.message || '')}</div>
-          ${attachmentsHtml}
-          ${replyBoxHtml}
+          <div class="d-flex flex-column gap-2">
+            ${threadHtml}
+          </div>
+          ${actionFooterHtml}
         </div>
       `;
     };
@@ -4519,9 +4660,11 @@ const App = {
         resp.items.forEach(item => {
           const hasReply = Boolean(item.has_reply || (item.admin_reply && String(item.admin_reply).trim() !== ''));
           const isUnreadReply = hasReply && (typeof item.is_unread_reply !== 'undefined' ? Boolean(item.is_unread_reply) : !item.reply_read_at);
+          const lastSender = String(item.last_sender || (hasReply ? 'admin' : 'creator'));
+          const isReadArchived = (item.status === 'resolved' && !isUnreadReply) || (hasReply && !isUnreadReply && lastSender === 'admin');
           const cardHtml = renderFeedbackItemCard(item, isUnreadReply);
 
-          if (hasReply && !isUnreadReply) {
+          if (isReadArchived) {
             readHtmlParts.push(cardHtml);
           } else {
             activeHtmlParts.push(cardHtml);
@@ -4532,6 +4675,129 @@ const App = {
         readList.innerHTML = readHtmlParts.join('');
         updateReadAccordionState();
         historyWrap.classList.remove('d-none');
+
+        // Klick-Handler für „Direkt antworten" / „Abbrechen"
+        historyWrap.querySelectorAll('.ec-fb-toggle-reply-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const fbId = parseInt(btn.getAttribute('data-id') || '0', 10);
+            const box = document.getElementById(`ec-fb-inline-reply-box-${fbId}`);
+            if (!box) return;
+            box.classList.toggle('d-none');
+            if (!box.classList.contains('d-none')) {
+              document.getElementById(`ec-fb-reply-text-${fbId}`)?.focus();
+            }
+          });
+        });
+
+        historyWrap.querySelectorAll('.ec-fb-cancel-reply-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const fbId = parseInt(btn.getAttribute('data-id') || '0', 10);
+            document.getElementById(`ec-fb-inline-reply-box-${fbId}`)?.classList.add('d-none');
+          });
+        });
+
+        // Datei-Auswahl & Paste in der Antwortbox
+        historyWrap.querySelectorAll('.ec-fb-reply-add-file-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const fbId = parseInt(btn.getAttribute('data-id') || '0', 10);
+            document.getElementById(`ec-fb-reply-file-input-${fbId}`)?.click();
+          });
+        });
+
+        historyWrap.querySelectorAll('.ec-fb-reply-file-input').forEach(inp => {
+          inp.addEventListener('change', () => {
+            const fbId = parseInt(inp.getAttribute('data-id') || '0', 10);
+            if (inp.files && inp.files.length > 0) {
+              addReplyFiles(fbId, inp.files);
+              inp.value = '';
+            }
+          });
+        });
+
+        historyWrap.querySelectorAll('.ec-fb-inline-reply-box').forEach(box => {
+          box.addEventListener('paste', (ev) => {
+            const fbId = parseInt(box.getAttribute('data-id') || '0', 10);
+            const items = ev.clipboardData?.items;
+            if (!fbId || !items) return;
+            const pasted = [];
+            for (let i = 0; i < items.length; i++) {
+              const it = items[i];
+              if (it.kind === 'file') {
+                const blob = it.getAsFile();
+                if (blob) {
+                  let ext = 'png';
+                  if (blob.type === 'image/jpeg') ext = 'jpg';
+                  else if (blob.type === 'image/webp') ext = 'webp';
+                  else if (blob.type === 'image/gif') ext = 'gif';
+                  else if (blob.type === 'application/pdf') ext = 'pdf';
+                  const stamp = new Date().toISOString().slice(11, 19).replace(/:/g, '');
+                  pasted.push(new File([blob], `screenshot-${stamp}.${ext}`, { type: blob.type }));
+                }
+              }
+            }
+            if (pasted.length > 0) addReplyFiles(fbId, pasted);
+          });
+        });
+
+        // Ticket-Antwort absenden
+        historyWrap.querySelectorAll('.ec-fb-send-reply-btn').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const fbId = parseInt(btn.getAttribute('data-id') || '0', 10);
+            if (!fbId) return;
+            const txtEl = document.getElementById(`ec-fb-reply-text-${fbId}`);
+            const errEl = document.getElementById(`ec-fb-reply-error-${fbId}`);
+            const msg = (txtEl?.value || '').trim();
+            if (errEl) {
+              errEl.classList.add('d-none');
+              errEl.textContent = '';
+            }
+            if (msg.length < 2) {
+              if (errEl) {
+                errEl.textContent = 'Bitte gib eine kurze Antwort-Nachricht ein.';
+                errEl.classList.remove('d-none');
+              }
+              txtEl?.focus();
+              return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Wird gesendet...';
+
+            try {
+              const fd = new FormData();
+              fd.append('feedback_id', String(fbId));
+              fd.append('message', msg);
+              fd.append('csrf_token', this.csrfToken);
+              const files = replyFilesByTicket[fbId] || [];
+              files.forEach(f => fd.append('attachments[]', f));
+
+              const r = await fetch(`${this.basePath}/api.php?route=home/feedback-reply`, {
+                method: 'POST',
+                body: fd
+              });
+              const resReply = await r.json();
+              if (resReply && resReply.success) {
+                replyFilesByTicket[fbId] = [];
+                this.toast(resReply.message || 'Deine Antwort wurde gesendet!', 'success');
+                loadCreatorFeedbackHistory();
+              } else {
+                if (errEl) {
+                  errEl.textContent = resReply?.message || 'Fehler beim Senden der Antwort.';
+                  errEl.classList.remove('d-none');
+                }
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-send-fill me-1"></i>Antwort senden';
+              }
+            } catch (_) {
+              if (errEl) {
+                errEl.textContent = 'Netzwerkfehler beim Senden der Antwort.';
+                errEl.classList.remove('d-none');
+              }
+              btn.disabled = false;
+              btn.innerHTML = '<i class="bi bi-send-fill me-1"></i>Antwort senden';
+            }
+          });
+        });
 
         // Klick-Handler für „Gelesen & verstanden – Danke!"
         historyList.querySelectorAll('.ec-fb-mark-read-btn').forEach(btn => {

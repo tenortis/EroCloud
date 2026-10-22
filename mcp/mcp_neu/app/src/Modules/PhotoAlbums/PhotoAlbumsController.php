@@ -72,7 +72,7 @@ final class PhotoAlbumsController
         $rsAlbums = p4c_query("SELECT
                 `id`, `album_id`, `actor_id`, `checksum`, `number_of_photos`,
                 `preview_image_fsk16`, `preview_image_fsk18`, `album_checked`,
-                `released`, `online_at`, `amount_download`, `title`
+                `released`, `online_at`, `amount_download`, `title`, `status`
             FROM `photo_albums`
             WHERE `merchant_id` = '" . $merchantId . "'
               AND `status` != 'deleted'
@@ -89,6 +89,7 @@ final class PhotoAlbumsController
                 $hasFsk18    = trim((string)$a->preview_image_fsk18) !== '';
                 $isComplete  = ($numPhotos >= 4 && $hasFsk16 && $hasFsk18);
                 $isOnline    = isset($onlineAlbumHashes[$albumIdHash]);
+                $albumStatus = (string)($a->status ?? 'active');
 
                 // Status-Logik analog zu legacy ajax/photo_albums.php
                 $statusKey   = 'pending';
@@ -97,12 +98,33 @@ final class PhotoAlbumsController
                 $statusIcon  = 'bi-hourglass-split';
                 $editRoute   = '#/photo-album?id=' . $albumDbId;
 
-                if (!$isComplete) {
+                if ((int)$a->released === 2) {
+                    $statusKey   = 'rejected';
+                    $statusLabel = 'Korrektur erforderlich';
+                    $statusBadge = 'danger';
+                    $statusIcon  = 'bi-exclamation-triangle-fill';
+                    if (!$isComplete) {
+                        $editRoute = '#/photo-album-upload?step=2&album_id=' . $albumDbId;
+                    }
+                    $countRejected++;
+                } elseif ($albumStatus === 'blocked') {
+                    $statusKey   = 'blocked';
+                    $statusLabel = 'Vom Support gesperrt';
+                    $statusBadge = 'danger';
+                    $statusIcon  = 'bi-slash-circle';
+                    $countRejected++;
+                } elseif (!$isComplete) {
                     $statusKey   = 'incomplete';
                     $statusLabel = 'Fotos fehlen (mind. 4 + Cover)';
                     $statusBadge = 'secondary';
                     $statusIcon  = 'bi-cloud-arrow-up';
                     $editRoute   = '#/photo-album-upload?step=2&album_id=' . $albumDbId;
+                    $countPending++;
+                } elseif ($albumStatus === 'inactive') {
+                    $statusKey   = 'pending';
+                    $statusLabel = 'Pausiert (Darsteller inaktiv)';
+                    $statusBadge = 'secondary';
+                    $statusIcon  = 'bi-pause-circle';
                     $countPending++;
                 } elseif ((string)$a->album_checked === '0000-00-00 00:00:00' && (int)$a->released === 0) {
                     $statusKey   = 'pending';
@@ -116,12 +138,6 @@ final class PhotoAlbumsController
                     $statusBadge = 'warning';
                     $statusIcon  = 'bi-hourglass-split';
                     $countPending++;
-                } elseif ((string)$a->album_checked === '0000-00-00 00:00:00' && (int)$a->released === 2) {
-                    $statusKey   = 'rejected';
-                    $statusLabel = 'Korrektur erforderlich';
-                    $statusBadge = 'danger';
-                    $statusIcon  = 'bi-exclamation-triangle-fill';
-                    $countRejected++;
                 } elseif ((string)$a->album_checked !== '0000-00-00 00:00:00' && (int)$a->released === 0) {
                     $statusKey   = 'blocked';
                     $statusLabel = 'Gesperrt / Abgelehnt';
@@ -232,30 +248,13 @@ final class PhotoAlbumsController
         $rsOnline      = p4c_query("SELECT `id` FROM `photo_albums_online` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "' AND `merchant_id` = '" . $merchantId . "' LIMIT 1;", __FILE__, __LINE__);
         $isAlbumOnline = ($rsOnline && p4c_num_rows($rsOnline) > 0);
 
-        // Ablehnungsgrund laden, falls released == 2
-        $rejectionInfo = null;
-        if ((string)$aObj->album_checked === '0000-00-00 00:00:00' && (int)$aObj->released === 2) {
-            $rsRejHist = p4c_query("SELECT * FROM `rejection_reason_photo_album_history` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "' ORDER BY `datetime` DESC LIMIT 1;", __FILE__, __LINE__);
-            if ($rsRejHist && p4c_num_rows($rsRejHist) > 0) {
-                $rejHistObj = p4c_fetch_object($rsRejHist);
-                $shortTitle = '';
-                if (!empty($rejHistObj->id_name) && (string)$rejHistObj->id_name !== 'free_text') {
-                    $rsRejShort = p4c_query("SELECT `de_short` FROM `rejection_reason_photo_album` WHERE `id_name` = '" . p4c_escape_string((string)$rejHistObj->id_name) . "' LIMIT 1;", __FILE__, __LINE__);
-                    if ($rsRejShort && p4c_num_rows($rsRejShort) > 0) {
-                        $shortObj   = p4c_fetch_object($rsRejShort);
-                        $shortTitle = self::decodeLegacyText((string)$shortObj->de_short);
-                    }
-                }
-                $rejectionInfo = [
-                    'reason' => $shortTitle,
-                    'text'   => self::decodeLegacyText((string)($rejHistObj->text ?? '')),
-                ];
-            }
-        }
+        // Ablehnungsgrund laden, falls released == 2 oder status == 'blocked'
+        $rejectionInfo = $this->loadAlbumRejectionInfo($albumIdHash, (int)$aObj->released, (string)($aObj->status ?? 'active'));
 
         // Alle Fotos des Albums laden
-        $photos   = [];
-        $rsPhotos = p4c_query("SELECT *
+        $photos        = [];
+        $rejectedCount = 0;
+        $rsPhotos      = p4c_query("SELECT *
             FROM `photo_albums_photos`
             WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "'
               AND `merchant_id` = '" . $merchantId . "'
@@ -265,7 +264,11 @@ final class PhotoAlbumsController
             $photoIdx = 0;
             while ($p = p4c_fetch_object($rsPhotos)) {
                 $photoIdx++;
-                $pFileId  = (string)$p->file_id;
+                $pFileId    = (string)$p->file_id;
+                $isRejected = abs((int)($p->rejected ?? 0));
+                if ($isRejected === 1) {
+                    $rejectedCount++;
+                }
                 $photos[] = [
                     'id'         => abs((int)$p->id),
                     'index'      => $photoIdx,
@@ -273,12 +276,19 @@ final class PhotoAlbumsController
                     'label'      => 'Foto #' . $photoIdx,
                     'file_id'    => $pFileId,
                     'filename'   => (string)$p->filename,
-                    'rejected'   => abs((int)($p->rejected ?? 0)),
+                    'rejected'   => $isRejected,
                     'thumb_url'  => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=200',
                     'zoom_url'   => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=900',
                     'editor_url' => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=1024',
                 ];
             }
+        }
+
+        if ($rejectedCount > 0 && $rejectionInfo === null) {
+            $rejectionInfo = [
+                'reason' => 'Einzelne Fotos im Album wurden abgelehnt',
+                'text'   => 'Mindestens ein Foto in diesem Album entspricht nicht den Inhaltsrichtlinien und wurde rot markiert. Bitte lösche die rot markierten Fotos und reiche das Album erneut zur Prüfung ein.',
+            ];
         }
 
         $onlineAt = ($aObj->online_at !== '0000-00-00 00:00:00' && !empty($aObj->online_at))
@@ -311,6 +321,7 @@ final class PhotoAlbumsController
             'poster_fsk18_editor_url' => $apiUrl . '/PhotoAlbumPoster/FSK18/' . rawurlencode($albumIdHash) . '?w=1024&cs=' . rawurlencode($checksum) . '&t=' . $nowTs,
             'album_checked'           => (string)$aObj->album_checked,
             'released'                => (int)$aObj->released,
+            'status'                  => (string)($aObj->status ?? 'active'),
             'is_online'               => $isAlbumOnline,
             'can_delete'              => ((string)$aObj->album_checked === '0000-00-00 00:00:00' && (int)$aObj->released !== 1 && !$isAlbumOnline),
             'meta_title'              => self::decodeLegacyText((string)$aObj->meta_title),
@@ -370,7 +381,8 @@ final class PhotoAlbumsController
             'meta_description'        => '',
             'seo_url'                 => '',
         ];
-        $photos = [];
+        $photos        = [];
+        $rejectionInfo = null;
 
         if ($albumDbId > 0) {
             $rsDraft = p4c_query("SELECT *
@@ -385,6 +397,8 @@ final class PhotoAlbumsController
                 $albumIdHash = (string)$dObj->album_id;
                 $checksum    = (string)($dObj->checksum ?? '');
                 $nowTs       = time();
+
+                $rejectionInfo = $this->loadAlbumRejectionInfo($albumIdHash, (int)$dObj->released, (string)($dObj->status ?? 'active'));
 
                 $draft = [
                     'id'                      => abs((int)$dObj->id),
@@ -409,7 +423,8 @@ final class PhotoAlbumsController
                     'seo_url'                 => (string)$dObj->seo_url,
                 ];
 
-                $rsPhotos = p4c_query("SELECT *
+                $rejectedCount = 0;
+                $rsPhotos      = p4c_query("SELECT *
                     FROM `photo_albums_photos`
                     WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "'
                       AND `merchant_id` = '" . $merchantId . "'
@@ -419,7 +434,11 @@ final class PhotoAlbumsController
                     $photoIdx = 0;
                     while ($p = p4c_fetch_object($rsPhotos)) {
                         $photoIdx++;
-                        $pFileId  = (string)$p->file_id;
+                        $pFileId    = (string)$p->file_id;
+                        $isRejected = abs((int)($p->rejected ?? 0));
+                        if ($isRejected === 1) {
+                            $rejectedCount++;
+                        }
                         $photos[] = [
                             'id'         => abs((int)$p->id),
                             'index'      => $photoIdx,
@@ -427,12 +446,19 @@ final class PhotoAlbumsController
                             'label'      => 'Foto #' . $photoIdx,
                             'file_id'    => $pFileId,
                             'filename'   => (string)$p->filename,
-                            'rejected'   => abs((int)($p->rejected ?? 0)),
+                            'rejected'   => $isRejected,
                             'thumb_url'  => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=200',
                             'zoom_url'   => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=900',
                             'editor_url' => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=1024',
                         ];
                     }
+                }
+
+                if ($rejectedCount > 0 && $rejectionInfo === null) {
+                    $rejectionInfo = [
+                        'reason' => 'Einzelne Fotos im Album wurden abgelehnt',
+                        'text'   => 'Mindestens ein Foto in diesem Album entspricht nicht den Inhaltsrichtlinien und wurde rot markiert. Bitte lösche die rot markierten Fotos und lade bei Bedarf neue Fotos hoch.',
+                    ];
                 }
             } elseif ($step === 2) {
                 $step      = 1;
@@ -450,10 +476,11 @@ final class PhotoAlbumsController
         }
 
         return View::render('PhotoAlbums', 'upload', [
-            'step'   => $step,
-            'album'  => $draft,
-            'photos' => $photos,
-            'actors' => $actors,
+            'step'          => $step,
+            'album'         => $draft,
+            'photos'        => $photos,
+            'actors'        => $actors,
+            'rejectionInfo' => $rejectionInfo,
         ]);
     }
 
@@ -468,7 +495,7 @@ final class PhotoAlbumsController
         $merchantId = $this->requireMerchantId();
 
         $existingId      = abs((int)$this->request->post('album_id', 0));
-        $title           = trim((string)$this->request->post('title', ''));
+        $title           = self::cleanAlbumTitle(trim((string)$this->request->post('title', '')));
         $description     = trim((string)$this->request->post('description', ''));
         $actorId         = abs((int)$this->request->post('actor_id', 0));
         $onlineAtRaw     = trim((string)$this->request->post('online_at', ''));
@@ -476,6 +503,13 @@ final class PhotoAlbumsController
         $metaTitle       = trim((string)$this->request->post('meta_title', ''));
         $metaDescription = trim((string)$this->request->post('meta_description', ''));
         $seoUrl          = trim((string)$this->request->post('seo_url', ''));
+
+        if ($existingId > 0) {
+            $rsCheck = p4c_query("SELECT `id` FROM `photo_albums` WHERE `id` = '" . $existingId . "' AND `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted' LIMIT 1;", __FILE__, __LINE__);
+            if (!$rsCheck || p4c_num_rows($rsCheck) === 0) {
+                $existingId = 0;
+            }
+        }
 
         $this->validateAlbumInput(
             $merchantId,
@@ -487,7 +521,8 @@ final class PhotoAlbumsController
             $amountDownload,
             $metaTitle,
             $metaDescription,
-            $seoUrl
+            $seoUrl,
+            $existingId
         );
 
         $onlineAtSql = date('Y-m-d H:i:s', strtotime($onlineAtRaw));
@@ -506,13 +541,6 @@ final class PhotoAlbumsController
         }
         if ($seoUrl === '' && function_exists('seo_url')) {
             $seoUrl = (string)seo_url($title);
-        }
-
-        if ($existingId > 0) {
-            $rsCheck = p4c_query("SELECT `id` FROM `photo_albums` WHERE `id` = '" . $existingId . "' AND `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted' LIMIT 1;", __FILE__, __LINE__);
-            if (!$rsCheck || p4c_num_rows($rsCheck) === 0) {
-                $existingId = 0;
-            }
         }
 
         if ($existingId === 0) {
@@ -599,7 +627,7 @@ final class PhotoAlbumsController
         $isAlbumOnline = ($rsOnline && p4c_num_rows($rsOnline) > 0);
         $canEditOnline = (((string)$aObj->album_checked === '0000-00-00 00:00:00' && !$isAlbumOnline) || strtotime((string)$aObj->online_at) > time());
 
-        $title           = trim((string)$this->request->post('title', ''));
+        $title           = self::cleanAlbumTitle(trim((string)$this->request->post('title', '')));
         $description     = trim((string)$this->request->post('description', ''));
         $actorId         = abs((int)$this->request->post('actor_id', 0));
         $onlineAtRaw     = trim((string)$this->request->post('online_at', ''));
@@ -618,7 +646,8 @@ final class PhotoAlbumsController
             $amountDownload,
             $metaTitle,
             $metaDescription,
-            $seoUrl
+            $seoUrl,
+            $albumDbId
         );
 
         $onlineAtSql = $canEditOnline && $onlineAtRaw !== ''
@@ -640,6 +669,12 @@ final class PhotoAlbumsController
             $seoUrl = (string)seo_url($title);
         }
 
+        // Nur dann auf released = 1 (In Prüfung) setzen, wenn mind. 4 Fotos sowie FSK16 & FSK18 Cover vorhanden sind
+        $totalPhotos = $this->recalculatePhotoCount($albumDbId, $albumIdHash, $merchantId, $mysql);
+        $hasFsk16    = trim((string)$aObj->preview_image_fsk16) !== '';
+        $hasFsk18    = trim((string)$aObj->preview_image_fsk18) !== '';
+        $newReleased = ($totalPhotos >= 4 && $hasFsk16 && $hasFsk18) ? '1' : '0';
+
         p4c_query("UPDATE `photo_albums` SET
             `actor_id`         = '" . $actorId . "',
             `title`            = '" . p4c_escape_string($title) . "',
@@ -650,7 +685,7 @@ final class PhotoAlbumsController
             `online_at`        = '" . p4c_escape_string($onlineAtSql) . "',
             `amount_download`  = '" . $amountDownload . "',
             `album_checked`    = '0000-00-00 00:00:00',
-            `released`         = '1'
+            `released`         = '" . $newReleased . "'
             WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
 
         if (function_exists('photo_album_checksum') && class_exists('PhotoAlbum')) {
@@ -735,7 +770,18 @@ final class PhotoAlbumsController
         }
         @chmod($destFile, 0777);
 
-        p4c_query("UPDATE `photo_albums` SET `" . $oldCol . "` = '" . p4c_escape_string($newFilename) . "' WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
+        $hasFsk16    = ($fsk === '16') ? true : (trim((string)$aObj->preview_image_fsk16) !== '');
+        $hasFsk18    = ($fsk === '18') ? true : (trim((string)$aObj->preview_image_fsk18) !== '');
+        $totalPhotos = abs((int)$aObj->number_of_photos);
+
+        // Falls das Album bereits eingereicht/geprüft war, bei Cover-Änderung erneut zur Prüfung markieren
+        $extraUpdateSql = '';
+        if ((int)$aObj->released !== 0 || (string)$aObj->album_checked !== '0000-00-00 00:00:00') {
+            $nextRel        = ($hasFsk16 && $hasFsk18 && $totalPhotos >= 4) ? '1' : '0';
+            $extraUpdateSql = ", `album_checked` = '0000-00-00 00:00:00', `released` = '" . $nextRel . "'";
+        }
+
+        p4c_query("UPDATE `photo_albums` SET `" . $oldCol . "` = '" . p4c_escape_string($newFilename) . "'" . $extraUpdateSql . " WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
 
         $checksum = (string)($aObj->checksum ?? '');
         if (function_exists('photo_album_checksum') && class_exists('PhotoAlbum')) {
@@ -750,10 +796,6 @@ final class PhotoAlbumsController
         $previewUrl  = $apiUrl . '/PhotoAlbumPoster/FSK' . $fsk . '/' . rawurlencode($albumIdHash) . '?w=240&cs=' . rawurlencode($checksum) . '&t=' . $nowTs;
         $zoomUrl     = $apiUrl . '/PhotoAlbumPoster/FSK' . $fsk . '/' . rawurlencode($albumIdHash) . '?w=640&cs=' . rawurlencode($checksum) . '&t=' . $nowTs;
         $editorUrl   = $apiUrl . '/PhotoAlbumPoster/FSK' . $fsk . '/' . rawurlencode($albumIdHash) . '?w=1024&cs=' . rawurlencode($checksum) . '&t=' . $nowTs;
-
-        $hasFsk16    = ($fsk === '16') ? true : (trim((string)$aObj->preview_image_fsk16) !== '');
-        $hasFsk18    = ($fsk === '18') ? true : (trim((string)$aObj->preview_image_fsk18) !== '');
-        $totalPhotos = abs((int)$aObj->number_of_photos);
 
         Response::json([
             'status'       => 'ok',
@@ -829,7 +871,7 @@ final class PhotoAlbumsController
                 continue;
             }
 
-            $newFileName = 'IMG_' . date('Ymd_His') . '_' . ($i + 1) . '.' . $ext;
+            $newFileName = 'IMG_' . date('Ymd_His') . '_' . mt_rand(100, 999) . '_' . ($i + 1) . '.' . $ext;
             $destPath    = $imagesDir . '/' . $newFileName;
 
             if (@move_uploaded_file($tmpName, $destPath)) {
@@ -847,6 +889,7 @@ final class PhotoAlbumsController
                     'num'        => 'photo_' . $photoFileId,
                     'file_id'    => $photoFileId,
                     'filename'   => $newFileName,
+                    'rejected'   => 0,
                     'thumb_url'  => $mcpUrl . '/AlbumPhoto/' . rawurlencode($photoFileId) . '?w=200',
                     'zoom_url'   => $mcpUrl . '/AlbumPhoto/' . rawurlencode($photoFileId) . '?w=900',
                     'editor_url' => $mcpUrl . '/AlbumPhoto/' . rawurlencode($photoFileId) . '?w=1024',
@@ -859,6 +902,14 @@ final class PhotoAlbumsController
         }
 
         $totalPhotos = $this->recalculatePhotoCount($albumDbId, $albumIdHash, $merchantId, $mysql);
+
+        // Falls das Album bereits eingereicht/geprüft war, bei neuen Fotos erneut zur Prüfung markieren
+        if ((int)$aObj->released !== 0 || (string)$aObj->album_checked !== '0000-00-00 00:00:00') {
+            $hasFsk16 = trim((string)$aObj->preview_image_fsk16) !== '';
+            $hasFsk18 = trim((string)$aObj->preview_image_fsk18) !== '';
+            $nextRel  = ($hasFsk16 && $hasFsk18 && $totalPhotos >= 4) ? '1' : '0';
+            p4c_query("UPDATE `photo_albums` SET `album_checked` = '0000-00-00 00:00:00', `released` = '" . $nextRel . "' WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
+        }
 
         Response::json([
             'status'       => 'ok',
@@ -898,12 +949,13 @@ final class PhotoAlbumsController
         }
         $pObj = p4c_fetch_object($rsPhoto);
 
-        // Wenn das Album bereits geprüft oder online ist, müssen mindestens 4 Fotos im Album verbleiben
+        // Wenn das Album bereits geprüft/eingereicht ist und das Foto NICHT abgelehnt wurde, müssen mind. 4 Fotos verbleiben
         $rsCount    = p4c_query("SELECT COUNT(*) AS `cnt` FROM `photo_albums_photos` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
         $cntRow     = $rsCount ? p4c_fetch_object($rsCount) : null;
         $currentCnt = $cntRow ? abs((int)$cntRow->cnt) : 0;
 
-        if ((int)$aObj->released === 1 && $currentCnt <= 4) {
+        $isPhotoRejected = abs((int)($pObj->rejected ?? 0)) === 1;
+        if ((int)$aObj->released === 1 && !$isPhotoRejected && $currentCnt <= 4) {
             Response::error('Ein freigegebenes Foto-Album muss mindestens 4 Fotos enthalten. Bitte lade zuerst ein neues Foto hoch, bevor du dieses löschst.', 400);
         }
 
@@ -918,6 +970,13 @@ final class PhotoAlbumsController
         p4c_query("DELETE FROM `photo_albums_photos` WHERE `id` = '" . abs((int)$pObj->id) . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
 
         $totalPhotos = $this->recalculatePhotoCount($albumDbId, $albumIdHash, $merchantId, $mysql);
+
+        if ((int)$aObj->released !== 0 || (string)$aObj->album_checked !== '0000-00-00 00:00:00') {
+            $hasFsk16 = trim((string)$aObj->preview_image_fsk16) !== '';
+            $hasFsk18 = trim((string)$aObj->preview_image_fsk18) !== '';
+            $nextRel  = ($hasFsk16 && $hasFsk18 && $totalPhotos >= 4) ? '1' : '0';
+            p4c_query("UPDATE `photo_albums` SET `album_checked` = '0000-00-00 00:00:00', `released` = '" . $nextRel . "' WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
+        }
 
         Response::json([
             'status'       => 'ok',
@@ -958,6 +1017,12 @@ final class PhotoAlbumsController
         }
         if ($totalPhotos < 4) {
             Response::error('Ein Foto-Album muss mindestens 4 Fotos enthalten. Bitte lade noch weitere Fotos hoch.', 400);
+        }
+
+        $rsRejPhotos = p4c_query("SELECT COUNT(*) AS `cnt` FROM `photo_albums_photos` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "' AND `merchant_id` = '" . $merchantId . "' AND `rejected` = '1';", __FILE__, __LINE__);
+        $rejPhotoRow = $rsRejPhotos ? p4c_fetch_object($rsRejPhotos) : null;
+        if ($rejPhotoRow && abs((int)$rejPhotoRow->cnt) > 0) {
+            Response::error('Bitte lösche zuerst die rot markierten (abgelehnten) Fotos aus dem Album, bevor du es erneut zur Prüfung einreichst.', 400);
         }
 
         p4c_query("UPDATE `photo_albums` SET
@@ -1008,7 +1073,29 @@ final class PhotoAlbumsController
             Response::error('Bereits geprüfte oder veröffentlichte Foto-Alben können aus Sicherheitsgründen nicht direkt gelöscht werden. Bitte wende dich bei Bedarf an den Support.', 400);
         }
 
-        p4c_query("UPDATE `photo_albums` SET `status` = 'deleted', `deleted_datetime` = '0000-00-00 00:00:00' WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
+        // Physische Dateien des Entwurfs aufräumen
+        $albumsBasePath = defined('PHOTO_ALBUMS_PATH') ? PHOTO_ALBUMS_PATH : (dirname(__DIR__, 5) . '/priv');
+        $storageDir     = (string)$aObj->storage_location !== '' ? (string)$aObj->storage_location : (defined('PHOTO_ALBUMS_DEFAULT_DIR') ? PHOTO_ALBUMS_DEFAULT_DIR : 'photo_albums');
+        $albumDir       = rtrim($albumsBasePath, '/\\') . '/' . $storageDir . '/' . $merchantId . '/' . $albumDbId;
+        if (is_dir($albumDir)) {
+            $imagesDir = $albumDir . '/images';
+            if (is_dir($imagesDir)) {
+                foreach ((array)@glob($imagesDir . '/*') as $f) {
+                    if (is_string($f) && is_file($f)) {
+                        @unlink($f);
+                    }
+                }
+                @rmdir($imagesDir);
+            }
+            foreach ((array)@glob($albumDir . '/*') as $f) {
+                if (is_string($f) && is_file($f)) {
+                    @unlink($f);
+                }
+            }
+            @rmdir($albumDir);
+        }
+
+        p4c_query("UPDATE `photo_albums` SET `status` = 'deleted', `deleted_datetime` = '" . date('Y-m-d H:i:s') . "' WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
         p4c_query("DELETE FROM `photo_albums_photos` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "' AND `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
 
         if (function_exists('log_action')) {
@@ -1047,6 +1134,61 @@ final class PhotoAlbumsController
     }
 
     /**
+     * Lädt den letzten Ablehnungsgrund für ein Foto-Album aus der Historie.
+     *
+     * @return array<string, string>|null
+     */
+    private function loadAlbumRejectionInfo(string $albumIdHash, int $released, string $status): ?array
+    {
+        if ($released !== 2 && $status !== 'blocked') {
+            return null;
+        }
+
+        $rsRejHist = p4c_query("SELECT * FROM `rejection_reason_photo_album_history` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "' ORDER BY `datetime` DESC LIMIT 1;", __FILE__, __LINE__);
+        if ($rsRejHist && p4c_num_rows($rsRejHist) > 0) {
+            $rejHistObj = p4c_fetch_object($rsRejHist);
+            $shortTitle = '';
+            if (!empty($rejHistObj->id_name) && (string)$rejHistObj->id_name !== 'free_text') {
+                $rsRejShort = p4c_query("SELECT `de_short` FROM `rejection_reason_photo_album` WHERE `id_name` = '" . p4c_escape_string((string)$rejHistObj->id_name) . "' LIMIT 1;", __FILE__, __LINE__);
+                if ($rsRejShort && p4c_num_rows($rsRejShort) > 0) {
+                    $shortObj   = p4c_fetch_object($rsRejShort);
+                    $shortTitle = self::decodeLegacyText((string)$shortObj->de_short);
+                }
+            }
+            return [
+                'reason' => $shortTitle,
+                'text'   => self::decodeLegacyText((string)($rejHistObj->text ?? '')),
+            ];
+        }
+
+        if ($status === 'blocked') {
+            return [
+                'reason' => 'Foto-Album gesperrt',
+                'text'   => 'Dieses Foto-Album wurde durch den Support gesperrt. Bitte wende dich bei Rückfragen an den Support.',
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * Bereinigt den Albumtitel analog zu Legacy-Regeln (entfernt unzulässige Sonderzeichen, ersetzt € durch EUR).
+     */
+    private static function cleanAlbumTitle(string $title): string
+    {
+        global $replace_title_ary;
+
+        $cleaned = trim($title);
+        if (isset($replace_title_ary) && is_array($replace_title_ary)) {
+            $cleaned = str_replace($replace_title_ary, '', $cleaned);
+        } else {
+            $cleaned = str_replace(['*', '#', '+', '~', '<', '>', '|', '{', '}', '[', ']', '^', '°', '§', '$', '%', '&', '/', '=', '`', '´', '"', "'"], '', $cleaned);
+        }
+        $cleaned = str_replace('€', 'EUR', $cleaned);
+        return trim((string)preg_replace('/\s{2,}/', ' ', $cleaned));
+    }
+
+    /**
      * Validiert die Eingabedaten für ein Foto-Album.
      */
     private function validateAlbumInput(
@@ -1059,17 +1201,29 @@ final class PhotoAlbumsController
         int $amountDownload,
         string $metaTitle,
         string $metaDescription,
-        string $seoUrl
+        string $seoUrl,
+        int $excludeAlbumId = 0
     ): void {
         $lenTitle = function_exists('mb_strlen') ? mb_strlen($title, 'UTF-8') : strlen($title);
-        if ($lenTitle < 5 || $lenTitle > 100) {
-            Response::error('Bitte gib einen Albumtitel zwischen 5 und 100 Zeichen ein.', 400);
+        if ($lenTitle < 5 || $lenTitle > 65) {
+            Response::error('Bitte gib einen Albumtitel zwischen 5 und 65 Zeichen ein.', 400);
         }
         if (function_exists('email_in_string') && email_in_string($title)) {
             Response::error('Der Albumtitel darf keine E-Mail-Adresse enthalten.', 400);
         }
         if (function_exists('url_in_string') && url_in_string($title)) {
             Response::error('Der Albumtitel darf keine Internetadresse (URL) enthalten.', 400);
+        }
+
+        // Prüfung auf doppelten Albumtitel beim selben Partner (analog ACP photo_album_checking.php)
+        $rsDup = p4c_query("SELECT `id` FROM `photo_albums`
+            WHERE `merchant_id` = '" . $merchantId . "'
+              AND `title` = '" . p4c_escape_string($title) . "'
+              AND `status` != 'deleted'
+              AND `id` != '" . abs($excludeAlbumId) . "'
+            LIMIT 1;", __FILE__, __LINE__);
+        if ($rsDup && p4c_num_rows($rsDup) > 0) {
+            Response::error('Du verwendest diesen Albumtitel bereits bei einem anderen Foto-Album. Bitte wähle einen eindeutigen Titel.', 400);
         }
 
         $lenDesc = function_exists('mb_strlen') ? mb_strlen($description, 'UTF-8') : strlen($description);

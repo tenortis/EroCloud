@@ -58,14 +58,23 @@ class MoviesController
             }
         }
 
-        // 2. Alle nicht gelöschten Filme des Partners laden (ohne Umsatz-/Verkaufszahlen)
+        // 2. Online-Status aller Filme des Partners vorladen
+        $onlineMovieFileIds = [];
+        $rsOnlineMovies = p4c_query("SELECT `file_id` FROM `movies_online` WHERE `merchant_id` = '" . $merchantId . "';", __FILE__, __LINE__);
+        if ($rsOnlineMovies && p4c_num_rows($rsOnlineMovies) > 0) {
+            while ($omObj = p4c_fetch_object($rsOnlineMovies)) {
+                $onlineMovieFileIds[(string)$omObj->file_id] = true;
+            }
+        }
+
+        // 3. Alle nicht gelöschten Filme des Partners laden (ohne Umsatz-/Verkaufszahlen)
         $movies        = [];
         $countOnline   = 0;
         $countPending  = 0;
         $countRejected = 0;
 
         $rsMovies = p4c_query("SELECT
-                `id`, `convert_status`, `file_id`, `checksum`, `filename`, `title`,
+                `id`, `status`, `convert_status`, `file_id`, `checksum`, `filename`, `title`,
                 `movie_checked`, `released`, `actor_id`, `online_at`, `playtime_string`, `resolution`,
                 `amount_second`, `as_download`, `amount_download`, `preview`,
                 `preview_image_fsk16`, `preview_image_fsk18`
@@ -83,7 +92,9 @@ class MoviesController
                 }
 
                 $movieId    = abs((int)$m->id);
+                $mStatus    = (string)($m->status ?? 'active');
                 $fileId     = (string)$m->file_id;
+                $isOnline   = isset($onlineMovieFileIds[$fileId]);
                 $checksum   = (string)$m->checksum;
                 $filename   = trim((string)$m->filename);
                 $convStatus = (int)$m->convert_status;
@@ -103,30 +114,62 @@ class MoviesController
                     $statusIcon  = 'bi-cloud-arrow-up-fill';
                     $editRoute   = '#/movie-upload?step=2&movie_id=' . $movieId;
                     $countPending++;
+                } elseif ($convStatus === 3) {
+                    $statusKey   = 'rejected';
+                    $statusLabel = 'Konvertierungsfehler';
+                    $statusBadge = 'badge-kkc-danger';
+                    $statusIcon  = 'bi-exclamation-octagon-fill';
+                    $countRejected++;
                 } elseif ($convStatus <= 1) {
                     $statusKey   = 'pending';
                     $statusLabel = 'Wird konvertiert';
                     $statusBadge = 'badge-kkc-info';
                     $statusIcon  = 'bi-gear-wide-connected';
                     $countPending++;
-                } elseif ($checked !== '0000-00-00 00:00:00' && $checked !== '') {
-                    $statusKey   = 'online';
-                    $statusLabel = 'Online';
-                    $statusBadge = 'badge-kkc-success';
-                    $statusIcon  = 'bi-check-circle-fill';
-                    $countOnline++;
+                } elseif ($released === 2) {
+                    $statusKey   = 'rejected';
+                    $statusLabel = 'Abgelehnt';
+                    $statusBadge = 'badge-kkc-danger';
+                    $statusIcon  = 'bi-x-circle-fill';
+                    $countRejected++;
+                } elseif ($mStatus === 'blocked') {
+                    $statusKey   = 'rejected';
+                    $statusLabel = 'Gesperrt';
+                    $statusBadge = 'badge-kkc-danger';
+                    $statusIcon  = 'bi-slash-circle-fill';
+                    $countRejected++;
+                } elseif ($checked !== '0000-00-00 00:00:00' && $checked !== '' && $released === 1) {
+                    if ($isOnline) {
+                        $statusKey   = 'online';
+                        $statusLabel = 'Online';
+                        $statusBadge = 'badge-kkc-success';
+                        $statusIcon  = 'bi-check-circle-fill';
+                        $countOnline++;
+                    } elseif ($mStatus === 'inactive') {
+                        $statusKey   = 'pending';
+                        $statusLabel = 'Pausiert';
+                        $statusBadge = 'badge-kkc-neutral';
+                        $statusIcon  = 'bi-pause-circle-fill';
+                        $countPending++;
+                    } else {
+                        $statusKey   = 'pending';
+                        $statusLabel = 'Geplant';
+                        $statusBadge = 'badge-kkc-info';
+                        $statusIcon  = 'bi-calendar-event';
+                        $countPending++;
+                    }
+                } elseif ($checked !== '0000-00-00 00:00:00' && $checked !== '' && $released === 0) {
+                    $statusKey   = 'rejected';
+                    $statusLabel = 'Gesperrt / Offline';
+                    $statusBadge = 'badge-kkc-danger';
+                    $statusIcon  = 'bi-slash-circle';
+                    $countRejected++;
                 } elseif ($checked === '0000-00-00 00:00:00' && $released === 1) {
                     $statusKey   = 'pending';
                     $statusLabel = 'Wird geprüft';
                     $statusBadge = 'badge-kkc-warning';
                     $statusIcon  = 'bi-hourglass-split';
                     $countPending++;
-                } elseif ($checked === '0000-00-00 00:00:00' && $released === 2) {
-                    $statusKey   = 'rejected';
-                    $statusLabel = 'Abgelehnt';
-                    $statusBadge = 'badge-kkc-danger';
-                    $statusIcon  = 'bi-x-circle-fill';
-                    $countRejected++;
                 } elseif ($convStatus === 2) {
                     $statusKey   = 'pending';
                     $statusLabel = 'Jetzt veröffentlichen';
@@ -252,9 +295,9 @@ class MoviesController
         $rsOnline      = p4c_query("SELECT `id` FROM `movies_online` WHERE `file_id` = '" . p4c_escape_string($fileId) . "' AND `merchant_id` = '" . $merchantId . "' LIMIT 1;", __FILE__, __LINE__);
         $isMovieOnline = ($rsOnline && p4c_num_rows($rsOnline) > 0);
 
-        // Ablehnungsgrund laden, falls released == 2
+        // Ablehnungsgrund laden, falls released == 2 (oder Film manuell gesperrt wurde)
         $rejectionInfo = null;
-        if ((string)$mObj->movie_checked === '0000-00-00 00:00:00' && (int)$mObj->released === 2) {
+        if ((int)$mObj->released === 2 || (string)($mObj->status ?? 'active') === 'blocked') {
             $rsRejHist = p4c_query("SELECT * FROM `rejection_reason_movie_history` WHERE `movie_file_id` = '" . p4c_escape_string($fileId) . "' ORDER BY `datetime` DESC LIMIT 1;", __FILE__, __LINE__);
             if ($rsRejHist && p4c_num_rows($rsRejHist) > 0) {
                 $rejHistObj = p4c_fetch_object($rsRejHist);
@@ -269,6 +312,11 @@ class MoviesController
                 $rejectionInfo = [
                     'reason' => $shortTitle,
                     'text'   => self::decodeLegacyText((string)($rejHistObj->text ?? '')),
+                ];
+            } elseif ((int)$mObj->released === 2) {
+                $rejectionInfo = [
+                    'reason' => 'Prüfungshinweis',
+                    'text'   => 'Bitte überprüfe Titel, Beschreibung, Kategorien sowie deine FSK16- und FSK18-Vorschaubilder und reiche den Film erneut ein.',
                 ];
             }
         }
@@ -352,8 +400,9 @@ class MoviesController
             'custom_fsk18_url'        => $mcpUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=12&w=186&t=' . $nowCacheBust,
             'custom_fsk18_zoom_url'   => $mcpUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=12&w=640&t=' . $nowCacheBust,
             'custom_fsk18_editor_url' => $mcpUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=12&w=1024&t=' . $nowCacheBust,
-            'player_poster_url'   => $mcpUrl . '/PlayerPoster/' . rawurlencode($fileId) . '&w=1280&h=720',
+            'player_poster_url'   => $mcpUrl . '/PlayerPoster/' . rawurlencode($fileId) . '?w=1280&h=720',
             'player_video_url'    => $mcpUrl . '/Player/' . rawurlencode($fileId),
+            'status'              => (string)($mObj->status ?? 'active'),
             'convert_status'      => (int)$mObj->convert_status,
             'movie_checked'       => (string)$mObj->movie_checked,
             'released'            => (int)$mObj->released,
@@ -367,13 +416,24 @@ class MoviesController
             'seo_url'             => (string)$mObj->seo_url,
         ];
 
+        $conversionQueueInfo = null;
+        if ((int)$mObj->convert_status < 2) {
+            $conversionQueueInfo = $this->calculateConversionQueueInfo(
+                $movieId,
+                (int)$mObj->convert_status,
+                (int)round((float)$mObj->playtime_seconds),
+                (string)($mObj->convert_starttime ?? '0000-00-00 00:00:00')
+            );
+        }
+
         return View::render('Movies', 'detail', [
-            'movie'           => $movieData,
-            'availableThumbs' => $availableThumbs,
-            'categoryGroups'  => $categoryGroups,
-            'actors'          => $actors,
-            'websites'        => $websites,
-            'rejectionInfo'   => $rejectionInfo,
+            'movie'               => $movieData,
+            'availableThumbs'     => $availableThumbs,
+            'categoryGroups'      => $categoryGroups,
+            'actors'              => $actors,
+            'websites'            => $websites,
+            'rejectionInfo'       => $rejectionInfo,
+            'conversionQueueInfo' => $conversionQueueInfo,
         ]);
     }
 
@@ -459,9 +519,11 @@ class MoviesController
                     'meta_description'    => self::decodeLegacyText((string)$dObj->meta_description),
                     'seo_url'             => (string)$dObj->seo_url,
                     'filename'            => trim((string)($dObj->filename ?? '')),
+                    'playtime_seconds'    => (int)round((float)($dObj->playtime_seconds ?? 0)),
                     'playtime_string'     => (string)($dObj->playtime_string ?? ''),
                     'resolution'          => (string)($dObj->resolution ?? ''),
                     'convert_status'      => abs((int)($dObj->convert_status ?? 0)),
+                    'convert_starttime'   => (string)($dObj->convert_starttime ?? '0000-00-00 00:00:00'),
                     'released'            => abs((int)($dObj->released ?? 0)),
                     'notify_on_convert'   => isset($dObj->notify_on_convert) ? (abs((int)$dObj->notify_on_convert) === 1 ? 1 : 0) : $notifyDefault,
                 ];
@@ -473,6 +535,16 @@ class MoviesController
 
         if ($step === 3) {
             unset($_SESSION['upload_movie']);
+        }
+
+        $conversionQueueInfo = null;
+        if ($step === 3 && (int)$draft['id'] > 0 && (int)$draft['convert_status'] < 2) {
+            $conversionQueueInfo = $this->calculateConversionQueueInfo(
+                (int)$draft['id'],
+                (int)$draft['convert_status'],
+                (int)($draft['playtime_seconds'] ?? 0),
+                (string)($draft['convert_starttime'] ?? '0000-00-00 00:00:00')
+            );
         }
 
         $actors   = $this->loadActiveMerchantActors($merchantId, (int)$draft['actor_id']);
@@ -496,11 +568,12 @@ class MoviesController
         );
 
         return View::render('Movies', 'upload', [
-            'step'           => $step,
-            'movie'          => $draft,
-            'actors'         => $actors,
-            'websites'       => $websites,
-            'categoryGroups' => $categoryGroups,
+            'step'                => $step,
+            'movie'               => $draft,
+            'actors'              => $actors,
+            'websites'            => $websites,
+            'categoryGroups'      => $categoryGroups,
+            'conversionQueueInfo' => $conversionQueueInfo,
         ]);
     }
 
@@ -743,7 +816,7 @@ class MoviesController
             FROM `movies`
             WHERE `id` = '" . $movieId . "'
               AND `merchant_id` = '" . $merchantId . "'
-              AND (`filename` = '' OR `convert_status` = '0')
+              AND (`filename` = '' OR `convert_status` IN ('0', '3'))
             LIMIT 1;", __FILE__, __LINE__);
 
         if (!$rsMovie || p4c_num_rows($rsMovie) === 0) {
@@ -826,11 +899,14 @@ class MoviesController
         }
 
         p4c_query("UPDATE `movies` SET
-            `filename`         = '" . p4c_escape_string($targetFileName) . "',
-            `playtime_string`  = '" . p4c_escape_string($playTime) . "',
-            `playtime_seconds` = '" . p4c_escape_string((string)$playTimeSec) . "',
-            `resolution`       = '" . p4c_escape_string($resolution) . "',
-            `amount_own`       = '" . abs($amountOwn) . "'
+            `filename`          = '" . p4c_escape_string($targetFileName) . "',
+            `playtime_string`   = '" . p4c_escape_string($playTime) . "',
+            `playtime_seconds`  = '" . p4c_escape_string((string)$playTimeSec) . "',
+            `resolution`        = '" . p4c_escape_string($resolution) . "',
+            `amount_own`        = '" . abs($amountOwn) . "',
+            `convert_status`    = '0',
+            `convert_starttime` = '0000-00-00 00:00:00',
+            `convert_endtime`   = '0000-00-00 00:00:00'
             {$releaseSql}
             WHERE `id` = '" . $movieId . "' AND `merchant_id` = '" . $merchantId . "'
             LIMIT 1;", __FILE__, __LINE__);
@@ -1072,9 +1148,25 @@ class MoviesController
 
         $merchant       = new \Merchant($mysql, $merchantId);
         $visibleWebsite = trim(strip_tags((string)$this->request->post('visible_for_website', (string)$mObj->visible_for_website)));
+        if ($visibleWebsite === 'public') {
+            if (!$this->isPublicUploadAllowed($merchant, $merchantId, (string)$mObj->visible_for_website)) {
+                $visibleWebsite = '';
+            }
+        } elseif ($visibleWebsite !== '') {
+            $rsSite = p4c_query("SELECT `id` FROM `sites`
+                WHERE `partner_id` = '" . p4c_escape_string((string)$merchant->partner_id()) . "'
+                  AND `domain` = '" . p4c_escape_string($visibleWebsite) . "'
+                  AND `status` = '1'
+                LIMIT 1;", __FILE__, __LINE__);
+            if (!$rsSite || p4c_num_rows($rsSite) === 0) {
+                $visibleWebsite = '';
+            }
+        }
         if ($visibleWebsite === '') {
             $visibleWebsite = (string)$mObj->visible_for_website;
         }
+
+        $amountOwn = $isTrailer ? 0 : (int)round((float)$mObj->playtime_seconds * (float)$amountSecond);
 
         $rawMetaTitle = trim(strip_tags((string)$this->request->post('meta_title', '')));
         $metaTitle    = $rawMetaTitle !== '' ? mb_substr($rawMetaTitle, 0, 65, 'UTF-8') : mb_substr($title, 0, 65, 'UTF-8');
@@ -1105,7 +1197,7 @@ class MoviesController
             'seo_url'          => $seoUrl,
             'online_at'        => $onlineAt,
             'amount_second'    => $amountSecond,
-            'amount_own'       => $mObj->amount_own,
+            'amount_own'       => $amountOwn,
             'amount_webmaster' => $mObj->amount_webmaster,
             'as_download'      => $asDownload,
             'amount_download'  => $amountDownload,
@@ -1129,6 +1221,7 @@ class MoviesController
             `seo_url`             = '" . p4c_escape_string($seoUrl) . "',
             `online_at`           = '" . p4c_escape_string($onlineAt) . "',
             `amount_second`       = '" . abs((float)$amountSecond) . "',
+            `amount_own`          = '" . abs($amountOwn) . "',
             `as_download`         = '" . $asDownload . "',
             `amount_download`     = '" . $amountDownload . "',
             `category_master`     = '" . p4c_escape_string($categoryMaster) . "',
@@ -1264,11 +1357,17 @@ class MoviesController
         ];
         $checksum = function_exists('movie_checksum') ? (string)movie_checksum($checksumData) : md5(json_encode($checksumData));
 
+        // Nur wenn der Film bereits veröffentlicht oder zur Prüfung eingereicht war, erneut in die Prüfung einreihen.
+        // Ein noch unveröffentlichter Entwurf (released == 0) bleibt im Entwurfsmodus, bis der Creator aktiv auf "Einreichen" klickt.
+        $wasSubmittedOrChecked = ((int)$mObj->released === 1 || ((string)$mObj->movie_checked !== '0000-00-00 00:00:00' && (string)$mObj->movie_checked !== ''));
+        $recheckSql = $wasSubmittedOrChecked
+            ? ", `movie_checked` = '0000-00-00 00:00:00', `released` = '1'"
+            : '';
+
         p4c_query("UPDATE `movies` SET
             `" . $colName . "` = '" . $imgId . "',
-            `checksum`      = '" . p4c_escape_string($checksum) . "',
-            `movie_checked` = '0000-00-00 00:00:00',
-            `released`      = '1'
+            `checksum`      = '" . p4c_escape_string($checksum) . "'
+            {$recheckSql}
             WHERE `id` = '" . $movieId . "' AND `merchant_id` = '" . $merchantId . "'
             LIMIT 1;", __FILE__, __LINE__);
 
@@ -1369,6 +1468,230 @@ class MoviesController
             'status'  => 'ok',
             'message' => 'Der Film wurde erfolgreich gelöscht.',
         ]);
+    }
+
+    /**
+     * GET: Liefert den aktuellen Live-Konvertierungsstatus inkl. Warteschlangen-Position und Restzeit-Schätzung (movies/conversion-status)
+     */
+    public function conversionStatus(): void
+    {
+        $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
+        if ($merchantId === 0) {
+            @session_write_close();
+            Response::error('Deine Sitzung ist abgelaufen.', 401);
+            return;
+        }
+        @session_write_close();
+
+        $movieId = abs((int)$this->request->get('id', $this->request->get('movie_id', 0)));
+        if ($movieId === 0) {
+            Response::error('Ungültige Film-ID.', 400);
+            return;
+        }
+
+        $rsMovie = p4c_query("SELECT `id`, `convert_status`, `playtime_seconds`, `playtime_string`, `resolution`,
+                `convert_starttime`, `convert_endtime`, `released`, `movie_checked`, `filename`
+            FROM `movies`
+            WHERE `id` = '" . $movieId . "'
+              AND `merchant_id` = '" . $merchantId . "'
+              AND `status` != 'deleted'
+            LIMIT 1;", __FILE__, __LINE__);
+
+        if (!$rsMovie || p4c_num_rows($rsMovie) === 0) {
+            Response::error('Der Film wurde nicht gefunden.', 404);
+            return;
+        }
+
+        $mObj       = p4c_fetch_object($rsMovie);
+        $convStatus = (int)$mObj->convert_status;
+        $playtime   = (int)round((float)($mObj->playtime_seconds ?? 0));
+        $convStart  = (string)($mObj->convert_starttime ?? '0000-00-00 00:00:00');
+
+        $queueInfo = $this->calculateConversionQueueInfo($movieId, $convStatus, $playtime, $convStart);
+
+        Response::json([
+            'status'          => 'ok',
+            'movie_id'        => $movieId,
+            'convert_status'  => $convStatus,
+            'released'        => (int)$mObj->released,
+            'is_finished'     => ($convStatus === 2),
+            'is_error'        => ($convStatus === 3),
+            'playtime_string' => (string)($mObj->playtime_string ?? ''),
+            'resolution'      => (string)($mObj->resolution ?? ''),
+            'queue_info'      => $queueInfo,
+        ]);
+    }
+
+    /**
+     * Berechnet Warteschlangen-Position, durchschnittliche Konvertierungsgeschwindigkeit und geschätzte Restdauer.
+     */
+    private function calculateConversionQueueInfo(int $movieId, int $convStatus, int $playtimeSeconds, string $convStart): array
+    {
+        // 1. Durchschnittliche Konvertierungsgeschwindigkeit aus den letzten 25 abgeschlossenen Konvertierungen ermitteln
+        $secPerVideoSec = 0.45; // Realistischer Server-Standardwert (~27 Sek. Konvertierung pro Filmminute)
+        $rsStats = p4c_query("SELECT
+                `playtime_seconds`,
+                TIMESTAMPDIFF(SECOND, `convert_starttime`, `convert_endtime`) AS `conv_duration`
+            FROM `movies`
+            WHERE `convert_status` = '2'
+              AND `playtime_seconds` > 30
+              AND `convert_starttime` != '0000-00-00 00:00:00'
+              AND `convert_endtime` > `convert_starttime`
+            ORDER BY `id` DESC
+            LIMIT 25;", __FILE__, __LINE__);
+
+        if ($rsStats && p4c_num_rows($rsStats) > 0) {
+            $totalVideoSec = 0.0;
+            $totalConvSec  = 0.0;
+            while ($st = p4c_fetch_object($rsStats)) {
+                $vSec = (float)($st->playtime_seconds ?? 0);
+                $cSec = (float)($st->conv_duration ?? 0);
+                // Ausreißer (z. B. hängengebliebene Prozesse > 4 Std.) ignorieren
+                if ($vSec >= 30.0 && $cSec >= 5.0 && $cSec <= 14400.0) {
+                    $totalVideoSec += $vSec;
+                    $totalConvSec  += $cSec;
+                }
+            }
+            if ($totalVideoSec >= 120.0 && $totalConvSec >= 15.0) {
+                $secPerVideoSec = max(0.20, min(1.60, $totalConvSec / $totalVideoSec));
+            }
+        }
+
+        $avgSecPerFilmMinute = max(12, (int)round($secPerVideoSec * 60));
+
+        // Falls bereits fertig oder Fehler, direkt kompaktes Ergebnis liefern
+        if ($convStatus >= 2) {
+            return [
+                'state'                   => $convStatus === 2 ? 'finished' : 'error',
+                'movies_ahead'            => 0,
+                'queue_position'          => 0,
+                'elapsed_seconds'         => 0,
+                'remaining_seconds'       => 0,
+                'remaining_formatted'     => 'Abgeschlossen',
+                'progress_percent'        => $convStatus === 2 ? 100 : 0,
+                'avg_sec_per_film_minute' => $avgSecPerFilmMinute,
+                'status_headline'         => $convStatus === 2
+                    ? 'Die Konvertierung ist abgeschlossen!'
+                    : 'Bei der Konvertierung ist ein Fehler aufgetreten.',
+                'status_detail'           => '',
+            ];
+        }
+
+        // 2. Aktive und wartende Filme in der Warteschlange abfragen (exakt nach Reihenfolge in cronjobs/convert_movie.php)
+        $moviesAhead           = 0;
+        $aheadRemainingSeconds = 0;
+
+        $rsQueue = p4c_query("SELECT `id`, `convert_status`, `playtime_seconds`, `convert_starttime`
+            FROM `movies`
+            WHERE `convert_status` IN ('0', '1')
+              AND `filename` != ''
+              AND `status` != 'deleted'
+            ORDER BY `convert_status` DESC, `id` ASC;", __FILE__, __LINE__);
+
+        if ($rsQueue && p4c_num_rows($rsQueue) > 0) {
+            while ($qRow = p4c_fetch_object($rsQueue)) {
+                $qId = abs((int)$qRow->id);
+                if ($qId === $movieId) {
+                    break;
+                }
+                // Nur Filme zählen, die tatsächlich vor dem aktuellen Film dran sind
+                $qStatus = (int)$qRow->convert_status;
+                if ($convStatus === 1 && $qStatus === 0) {
+                    continue;
+                }
+                if ($convStatus === 0 && $qStatus === 0 && $qId > $movieId) {
+                    continue;
+                }
+
+                $moviesAhead++;
+                $qPlaytime = (float)($qRow->playtime_seconds ?? 0);
+                if ($qPlaytime <= 0.0) {
+                    $qPlaytime = 300.0;
+                }
+                $qEstTotal = max(35, (int)round($qPlaytime * $secPerVideoSec + 22));
+
+                if ($qStatus === 1) {
+                    $qStart   = (string)($qRow->convert_starttime ?? '0000-00-00 00:00:00');
+                    $qElapsed = ($qStart !== '0000-00-00 00:00:00' && $qStart !== '')
+                        ? max(0, time() - (int)strtotime($qStart))
+                        : 0;
+                    $aheadRemainingSeconds += max(15, $qEstTotal - $qElapsed);
+                } else {
+                    $aheadRemainingSeconds += $qEstTotal;
+                }
+            }
+        }
+
+        // 3. Eigene Konvertierungsdauer & Fortschritt berechnen
+        $ownPlaytime = $playtimeSeconds > 0 ? (float)$playtimeSeconds : 300.0;
+        $ownEstTotal = max(35, (int)round($ownPlaytime * $secPerVideoSec + 22));
+        $ownElapsed  = 0;
+
+        if ($convStatus === 1) {
+            if ($convStart !== '0000-00-00 00:00:00' && $convStart !== '') {
+                $ownElapsed = max(0, time() - (int)strtotime($convStart));
+            }
+            $ownRemaining    = max(12, $ownEstTotal - $ownElapsed);
+            $progressPercent = min(95, max(12, (int)round(($ownElapsed / max(1, $ownEstTotal)) * 100)));
+        } else {
+            // Warteschlange (convert_status == 0): + ca. 20 Sek. bis zum nächsten Cronjob-Start
+            $ownRemaining    = $ownEstTotal + 20;
+            $progressPercent = $moviesAhead === 0 ? 8 : max(3, (int)round(12 / ($moviesAhead + 1)));
+        }
+
+        $totalRemainingSeconds = $aheadRemainingSeconds + $ownRemaining;
+        $queuePosition         = $moviesAhead + 1;
+        $remainingFormatted    = self::formatDurationEstimate($totalRemainingSeconds);
+
+        if ($convStatus === 1) {
+            $elapsedStr = $ownElapsed >= 60
+                ? ((int)floor($ownElapsed / 60) . ' Min. ' . ($ownElapsed % 60) . ' Sek.')
+                : (max(1, $ownElapsed) . ' Sek.');
+            $statusHeadline = 'Dein Film wird gerade aktiv in HD konvertiert';
+            $statusDetail   = "Läuft seit {$elapsedStr} · 10 Szenen-Vorschaubilder werden generiert (Ø ca. {$avgSecPerFilmMinute} Sek. pro Filmminute).";
+        } elseif ($moviesAhead === 0) {
+            $statusHeadline = 'Platz 1 in der Warteschlange – Konvertierung startet jeden Moment';
+            $statusDetail   = "Es befindet sich kein anderer Film vor dir. Die Verarbeitung beginnt automatisch im nächsten Durchlauf (Ø ca. {$avgSecPerFilmMinute} Sek. pro Filmminute).";
+        } elseif ($moviesAhead === 1) {
+            $statusHeadline = 'Warteschlange Platz #2 (noch 1 Film vor deinem Video)';
+            $statusDetail   = "Vor deinem Film wird aktuell noch 1 anderer Film konvertiert. Danach startet dein Video sofort automatisch (Ø ca. {$avgSecPerFilmMinute} Sek. pro Filmminute).";
+        } else {
+            $statusHeadline = "Warteschlange Platz #{$queuePosition} (noch {$moviesAhead} Filme vor deinem Video)";
+            $statusDetail   = "Vor deinem Film befinden sich noch {$moviesAhead} weitere Filme in der Verarbeitung. Dein Video startet danach automatisch (Ø ca. {$avgSecPerFilmMinute} Sek. pro Filmminute).";
+        }
+
+        return [
+            'state'                   => $convStatus === 1 ? 'converting' : 'queued',
+            'movies_ahead'            => $moviesAhead,
+            'queue_position'          => $queuePosition,
+            'elapsed_seconds'         => $ownElapsed,
+            'remaining_seconds'       => $totalRemainingSeconds,
+            'remaining_formatted'     => $remainingFormatted,
+            'progress_percent'        => $progressPercent,
+            'avg_sec_per_film_minute' => $avgSecPerFilmMinute,
+            'status_headline'         => $statusHeadline,
+            'status_detail'           => $statusDetail,
+        ];
+    }
+
+    private static function formatDurationEstimate(int $seconds): string
+    {
+        if ($seconds <= 45) {
+            return 'weniger als 1 Minute';
+        }
+        if ($seconds <= 95) {
+            return 'ca. 1 bis 2 Minuten';
+        }
+        $minutes = (int)ceil($seconds / 60);
+        if ($minutes < 60) {
+            return 'ca. ' . $minutes . ' Minuten';
+        }
+        $hours   = (int)floor($minutes / 60);
+        $remMins = $minutes % 60;
+        if ($remMins === 0) {
+            return 'ca. ' . $hours . ' ' . ($hours === 1 ? 'Stunde' : 'Stunden');
+        }
+        return 'ca. ' . $hours . ' Std. ' . $remMins . ' Min.';
     }
 
     /**

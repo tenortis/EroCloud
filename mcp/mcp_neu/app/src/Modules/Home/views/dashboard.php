@@ -19,12 +19,17 @@ use App\Core\View;
 /** @var int $moviesTotal */
 /** @var int $moviesOnline */
 /** @var int $moviesPending */
+/** @var int $moviesRejected */
 /** @var int $albumsTotal */
 /** @var int $albumsOnline */
 /** @var int $albumsPending */
+/** @var int $albumsRejected */
 /** @var int $photosTotal */
 /** @var int $contentPending */
 /** @var array $recentContents */
+
+$moviesRejected = isset($moviesRejected) ? (int)$moviesRejected : 0;
+$albumsRejected = isset($albumsRejected) ? (int)$albumsRejected : 0;
 
 $mcpUrl       = defined('MCP_URL') ? MCP_URL : 'https://erocloud.net';
 $domainName   = defined('DOMAIN') ? DOMAIN : 'erocloud.net';
@@ -70,18 +75,19 @@ $singleCreatorProfileName = (count($actorNamesSummary) === 1) ? $actorNamesSumma
   </div>
   <div class="card-kkc-body">
     <p class="mb-2 fw-semibold">
-      Die Nutzungsrichtlinien zur Vermarktung deines Contents wurden aktualisiert. Bitte überprüfe die Änderungen und bestätige deine Zustimmung.
+      Die Nutzungsrichtlinien zur Vermarktung deines Contents wurden aktualisiert. Bitte überprüfe die Vereinbarungen und bestätige deine Zustimmung.
     </p>
     <p class="text-muted small mb-3">
-      Die aktualisierten Nutzungsrichtlinien stellen klar, dass das Urheberrecht beim Partner verbleibt, während Cipa Media eine nicht-exklusive Lizenz zur Vermarktung erhält. Zudem wurde konkretisiert, dass Inhalte mindestens ein Jahr online bleiben, bevor sie gelöscht werden können, und dass bereits verkaufte Inhalte für Käufer weiterhin zugänglich bleiben, sofern keine technischen Einschränkungen vorliegen. Außerdem wird die Einhaltung gewerblicher Schutz- und Urheberrechte betont, um rechtliche Verstöße zu vermeiden.
+      Die Nutzungsrichtlinien regeln transparent, dass das Urheberrecht an deinen Inhalten bei dir verbleibt, während Cipa Media eine nicht-exklusive Lizenz zur Vermarktung erhält. Zudem sind darin die Mindestlaufzeit von 365 Tagen, der Käuferschutz für bereits erworbene Inhalte, die automatische Bereinigung alter Entwürfe nach 180 Tagen sowie die Einhaltung von Urheber- und Mitwirkendenrechten klar zusammengefasst.
     </p>
     <button type="button" class="btn btn-primary-kkc" data-bs-toggle="modal" data-bs-target="#modal-content-rules">
-      <i class="bi bi-journal-check me-1"></i> Neue Nutzungsrichtlinien anzeigen und akzeptieren
+      <i class="bi bi-journal-check me-1"></i> Nutzungsrichtlinien anzeigen und akzeptieren
     </button>
   </div>
 </div>
+<?php endif; ?>
 
-<!-- Modal: Vollständige Nutzungsrichtlinien bestätigen -->
+<!-- Modal: Vollständige Nutzungsrichtlinien (jederzeit einsehbar & bestätigbar) -->
 <div class="modal fade" id="modal-content-rules" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
     <div class="modal-content shadow-lg">
@@ -91,10 +97,16 @@ $singleCreatorProfileName = (count($actorNamesSummary) === 1) ? $actorNamesSumma
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body small">
+      <div class="modal-body small" style="line-height: 1.6;">
+        <?php if ($needsRulesAccept): ?>
         <div class="alert alert-warning py-2">
-          Bitte lies die nachfolgenden Vereinbarungen sorgfältig durch und bestätige diese am Ende des Dokuments.
+          <i class="bi bi-info-circle-fill me-1"></i>Bitte lies dir die nachfolgende Vereinbarung sorgfältig durch und bestätige diese am Ende des Dokuments.
         </div>
+        <?php else: ?>
+        <div class="alert alert-success py-2">
+          <i class="bi bi-check-circle-fill me-1"></i>Du hast diesen Nutzungsrichtlinien am <strong><?= View::e(date('d.m.Y \u\m H:i', strtotime($acceptContentRulesDate))) ?> Uhr</strong> verbindlich zugestimmt.
+        </div>
+        <?php endif; ?>
 
         <div class="text-center my-3 p-3 rounded border" style="background-color: var(--kkc-surface-hover);">
           <div class="text-muted mb-1">Vereinbarung zwischen</div>
@@ -102,25 +114,63 @@ $singleCreatorProfileName = (count($actorNamesSummary) === 1) ? $actorNamesSumma
           <div>Av. Emilio Luque Moreno 19, Oficina 6, ES-38300 La Orotava (S/C de Tenerife)</div>
           <div class="text-muted my-1">– nachfolgend „Cipa Media“ –</div>
           <div class="text-muted mb-1">und</div>
-          <div class="fw-bold"><?= View::e(trim($firstname . ' ' . $surname)) ?></div>
-          <div class="text-muted mt-1">– nachfolgend „Partner“ –</div>
+          <div class="fw-bold"><?= View::e(trim($firstname . ' ' . $surname) !== '' ? trim($firstname . ' ' . $surname) : (string)($merchantUsername ?? 'Partner')) ?></div>
+          <div class="text-muted mt-1">– nachfolgend „Partner“ (du) –</div>
         </div>
 
         <h6 class="fw-bold mt-3">1. Urheberrecht und Vermarktungsrechte</h6>
-        <p class="text-muted">
-          Das Urheberrecht an den hochgeladenen Inhalten (Filme, Bilder und Texte, nachfolgend „Content“ genannt) verbleibt beim Partner. Mit dem Hochladen des Contents auf <strong><?= View::e($domainName) ?></strong> erteilt der Partner Cipa Media eine nicht-exklusive Lizenz zur Vermarktung des Contents für die Dauer des Vertragsverhältnisses.
-        </p>
+        <ul class="text-muted ps-3 mb-3">
+          <li class="mb-1">Das Urheberrecht an deinen hochgeladenen Inhalten (Filme, Bilder und Texte, nachfolgend „Content“ genannt) verbleibt vollständig bei dir als Partner.</li>
+          <li class="mb-1">Mit dem Hochladen deines Contents auf <strong><?= View::e($domainName) ?></strong> erteilst du Cipa Media eine nicht-exklusive Lizenz zur Vermarktung dieses Contents für die Dauer des Vertragsverhältnisses.</li>
+          <li class="mb-1">Cipa Media ist berechtigt, deinen Content weltweit im Rahmen des geltenden Rechts über eigene Plattformen, angeschlossene Partnerportale sowie externe Vertriebswege zu bewerben, zu verkaufen und Unterlizenzen an Dritte zu vergeben.</li>
+          <li>Cipa Media verpflichtet sich, dir die vereinbarten Provisionen aus der Vermarktung deines Contents gemäß den geltenden Vergütungsregelungen auszuzahlen.</li>
+        </ul>
 
-        <h6 class="fw-bold mt-3">2. Verwaltung und Löschfristen von Content</h6>
-        <p class="text-muted">
-          Filme bleiben mindestens <strong>ein Jahr</strong> zum Verkauf online, bevor sie entfernt werden können. Beantragt ein Partner die Löschung seines Contents, wird dieser für neue Käufe entfernt. Bereits verkaufter Content wird für bestehende Käufer über eine Übergangsfrist von bis zu 365 Tagen (bei aktiver Nutzung innerhalb der letzten 2 Jahre) bzw. 30 Tagen bereitgehalten, bevor die Dateien endgültig vom Server entfernt werden.
-        </p>
+        <h6 class="fw-bold mt-3">2. Verwaltung und Löschung von Content</h6>
+        <ul class="text-muted ps-3 mb-3">
+          <li class="mb-1">Du entscheidest eigenständig über den Upload deines Contents auf <strong><?= View::e($domainName) ?></strong>. Ein hochgeladener und veröffentlichter Film bleibt mindestens <strong>ein Jahr (365 Tage)</strong> zum Verkauf online, bevor er gelöscht werden kann.</li>
+          <li class="mb-1">Beantragst du die Löschung von Content oder wird das Vertragsverhältnis beendet, wird dein Content aus dem aktiven Verkauf genommen, sodass keine neuen Käufe mehr möglich sind.</li>
+          <li class="mb-1"><strong>Käuferschutz für bereits erworbene Inhalte:</strong> Bereits verkaufter Content steht Kunden, die diesen rechtmäßig erworben haben, weiterhin zur Verfügung, solange keine technischen oder rechtlichen Gründe dagegensprechen. Nach einer Kontokündigung oder Löschung gewährt Cipa Media bestehenden Käufern eine Übergangsfrist:
+            <ul class="mt-1 mb-1">
+              <li>Wurde der gekaufte Content innerhalb der letzten <strong>2 Jahre</strong> vom Käufer noch gestreamt, bleibt er für weitere <strong>365 Tage</strong> für diesen Käufer abrufbar und wird danach endgültig gelöscht.</li>
+              <li>Wurde der gekaufte Content in den letzten <strong>2 Jahren</strong> nicht mehr genutzt, bleibt er noch <strong>30 Tage</strong> abrufbar und wird anschließend endgültig gelöscht.</li>
+            </ul>
+            Während dieser Übergangsfrist sind keine Neukäufe möglich.
+          </li>
+          <li><strong>Automatische Bereinigung nach 180 Tagen:</strong> Unvollständige Film-Entwürfe (zu denen noch keine Videodatei hochgeladen wurde) sowie abgelehnte Filme, die nicht erneut zur Prüfung eingereicht wurden, werden nach Ablauf von <strong>180 Tagen</strong> automatisch und unwiderruflich aus dem System entfernt, um Speicherplatz freizugeben.</li>
+        </ul>
 
-        <h6 class="fw-bold mt-3">3. Gesetzliche Bestimmungen, Urheberrechte Dritter &amp; Mitwirkende</h6>
-        <p class="text-muted">
-          Der Partner versichert, dass sämtliche hochgeladenen Inhalte frei von Rechten Dritter sind (insbesondere keine geschützte Hintergrundmusik), keine gesetzlichen Verbote verletzen und für alle im Content sichtbaren Personen ein gültiger Alters- und Einverständnisnachweis (Volljährigkeit zum Zeitpunkt der Aufnahme) vorliegt.
-        </p>
+        <h6 class="fw-bold mt-3">3. Einhaltung gesetzlicher Bestimmungen</h6>
+        <ul class="text-muted ps-3 mb-3">
+          <li class="mb-1">Du verpflichtest dich, ausschließlich Content hochzuladen, der nicht gegen geltendes Recht oder behördliche Vorschriften verstößt.</li>
+          <li>Cipa Media ist jederzeit berechtigt, Inhalte, die gegen gesetzliche Vorschriften oder diese Nutzungsrichtlinien verstoßen, ohne Vorankündigung zu sperren oder zu löschen.</li>
+        </ul>
 
+        <h6 class="fw-bold mt-3">4. Gewerbliche Schutzrechte und Urheberrechte Dritter</h6>
+        <ul class="text-muted ps-3 mb-3">
+          <li class="mb-1">Du bestätigst und garantierst, dass du über sämtliche erforderlichen Rechte an dem von dir hochgeladenen Content verfügst und durch die Veröffentlichung keine Rechte Dritter (z. B. Urheber-, Marken- oder Persönlichkeitsrechte) verletzt werden.</li>
+          <li><strong>Wichtiger Hinweis zu Musik in Videos:</strong> Bitte achte strikt darauf, dass in deinen Filmen keine urheberrechtlich geschützte Musik (auch nicht leise im Hintergrund, z. B. durch Radio, Fernseher oder Streaming-Dienste) zu hören ist.</li>
+        </ul>
+
+        <h6 class="fw-bold mt-3">5. Darstellung weiterer Personen (Co-Darsteller)</h6>
+        <ul class="text-muted ps-3 mb-3">
+          <li class="mb-1">Sind in deinem Content neben dir weitere Personen zu sehen oder zu hören, stellst du sicher, dass dir von jeder beteiligten Person eine schriftliche Einverständniserklärung zur Produktion und kommerziellen Verwertung sowie ein gültiger Altersnachweis (Volljährigkeit zum Zeitpunkt der Aufnahme) vorliegen.</li>
+          <li>Auf Anfrage von Cipa Media bist du verpflichtet, diese Nachweise unverzüglich vorzulegen.</li>
+        </ul>
+
+        <h6 class="fw-bold mt-3">6. Haftung und Freistellung</h6>
+        <ul class="text-muted ps-3 mb-3">
+          <li class="mb-1">Sollten Dritte (einschließlich Behörden oder Rechteinhaber) Ansprüche wegen einer Rechtsverletzung durch deinen Content gegen Cipa Media geltend machen, stellst du Cipa Media von sämtlichen Ansprüchen sowie den notwendigen Kosten der Rechtsverteidigung frei.</li>
+          <li>Bei begründetem Verdacht auf einen Rechtsverstoß ist Cipa Media berechtigt, Auszahlungen bis zur endgültigen Klärung des Sachverhalts zurückzuhalten und etwaige Schadensersatzforderungen mit bestehenden Guthaben zu verrechnen.</li>
+        </ul>
+
+        <h6 class="fw-bold mt-3">7. Schlussbestimmungen</h6>
+        <ul class="text-muted ps-3 mb-0">
+          <li class="mb-1">Diese Nutzungsrichtlinien ergänzen die bestehenden vertraglichen Vereinbarungen zwischen dir und Cipa Media.</li>
+          <li>Sollte eine Bestimmung dieser Vereinbarung unwirksam sein oder werden, bleibt die Wirksamkeit der übrigen Bestimmungen davon unberührt.</li>
+        </ul>
+
+        <?php if ($needsRulesAccept): ?>
         <hr>
         <div class="form-check mt-3">
           <input class="form-check-input" type="checkbox" id="chk-accept-content-rules" value="1">
@@ -128,14 +178,49 @@ $singleCreatorProfileName = (count($actorNamesSummary) === 1) ? $actorNamesSumma
             Ich habe die Nutzungsrichtlinien zur Vermarktung meines Contents gelesen und akzeptiere diese verbindlich.
           </label>
         </div>
+        <?php endif; ?>
       </div>
       <div class="modal-footer border-top">
         <button type="button" class="btn btn-sm btn-outline-kkc" data-bs-dismiss="modal">Schließen</button>
+        <?php if ($needsRulesAccept): ?>
         <button type="button" class="btn btn-sm btn-primary-kkc" id="btn-submit-content-rules">
           <i class="bi bi-check2-circle me-1"></i> Zustimmung verbindlich speichern
         </button>
+        <?php endif; ?>
       </div>
     </div>
+  </div>
+</div>
+
+<?php if ($moviesRejected > 0 || $albumsRejected > 0): ?>
+<!-- Wichtiger Hinweis bei abgelehnten Inhalten oder Konvertierungsfehlern -->
+<div class="alert alert-danger d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4 shadow-sm">
+  <div class="d-flex align-items-center gap-3">
+    <i class="bi bi-exclamation-octagon-fill fs-4 flex-shrink-0"></i>
+    <div>
+      <div class="fw-bold">Bitte überprüfe deine abgelehnten oder fehlerhaften Inhalte</div>
+      <div class="small">
+        <?php if ($moviesRejected > 0 && $albumsRejected > 0): ?>
+          Aktuell <?= $moviesRejected === 1 ? 'erfordert <strong>1 Film</strong>' : 'erfordern <strong>' . $moviesRejected . ' Filme</strong>' ?> sowie <?= $albumsRejected === 1 ? '<strong>1 Fotoalbum</strong>' : '<strong>' . $albumsRejected . ' Fotoalben</strong>' ?> deine Aufmerksamkeit (abgelehnt, gesperrt oder Konvertierungsfehler).
+        <?php elseif ($moviesRejected > 0): ?>
+          Aktuell <?= $moviesRejected === 1 ? 'erfordert <strong>1 Film</strong>' : 'erfordern <strong>' . $moviesRejected . ' Filme</strong>' ?> deine Aufmerksamkeit (abgelehnt, gesperrt oder Konvertierungsfehler). Klicke auf den jeweiligen Film, um den Grund einzusehen und ihn erneut einzureichen.
+        <?php else: ?>
+          Aktuell <?= $albumsRejected === 1 ? 'erfordert <strong>1 Fotoalbum</strong>' : 'erfordern <strong>' . $albumsRejected . ' Fotoalben</strong>' ?> deine Aufmerksamkeit (Korrektur nötig oder abgelehnt). Klicke auf das Album, um die Hinweise einzusehen.
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <?php if ($moviesRejected > 0): ?>
+    <a href="#/movies" class="btn btn-sm btn-danger fw-semibold">
+      <i class="bi bi-film me-1"></i> Zu meinen Filmen (<?= $moviesRejected ?>)
+    </a>
+    <?php endif; ?>
+    <?php if ($albumsRejected > 0): ?>
+    <a href="#/photo-albums" class="btn btn-sm btn-danger fw-semibold">
+      <i class="bi bi-images me-1"></i> Zu meinen Fotoalben (<?= $albumsRejected ?>)
+    </a>
+    <?php endif; ?>
   </div>
 </div>
 <?php endif; ?>
@@ -638,17 +723,23 @@ $singleCreatorProfileName = (count($actorNamesSummary) === 1) ? $actorNamesSumma
           <i class="bi bi-check-circle-fill text-success fs-4 lh-1 mt-1"></i>
           <div>
             <div class="fw-semibold">Content-Richtlinien akzeptiert</div>
-            <div class="text-muted small">
+            <div class="text-muted small mb-2">
               Du hast den Nutzungsrichtlinien zur Vermarktung deines Contents zugestimmt (am <?= View::e(date('d.m.Y H:i', strtotime($acceptContentRulesDate))) ?> Uhr).
             </div>
+            <button type="button" class="btn btn-sm btn-outline-kkc py-1" data-bs-toggle="modal" data-bs-target="#modal-content-rules">
+              <i class="bi bi-journal-text me-1"></i> Richtlinien einsehen
+            </button>
           </div>
           <?php else: ?>
           <i class="bi bi-exclamation-circle-fill text-warning fs-4 lh-1 mt-1"></i>
           <div>
             <div class="fw-semibold">Zustimmung zu den Content-Richtlinien ausstehend</div>
-            <div class="text-muted small">
-              Bitte bestätige oben die aktuellen Nutzungsrichtlinien zur Vermarktung deines Contents.
+            <div class="text-muted small mb-2">
+              Bitte bestätige die aktuellen Nutzungsrichtlinien zur Vermarktung deines Contents.
             </div>
+            <button type="button" class="btn btn-sm btn-primary-kkc py-1" data-bs-toggle="modal" data-bs-target="#modal-content-rules">
+              <i class="bi bi-journal-check me-1"></i> Richtlinien anzeigen &amp; bestätigen
+            </button>
           </div>
           <?php endif; ?>
         </div>
@@ -892,17 +983,23 @@ $singleCreatorProfileName = (count($actorNamesSummary) === 1) ? $actorNamesSumma
           <i class="bi bi-check-circle-fill text-success fs-4 lh-1 mt-1"></i>
           <div>
             <div class="fw-semibold">Content-Richtlinien akzeptiert</div>
-            <div class="text-muted small">
+            <div class="text-muted small mb-2">
               Du hast den Nutzungsrichtlinien zur Vermarktung deines Contents zugestimmt (am <?= View::e(date('d.m.Y H:i', strtotime($acceptContentRulesDate))) ?> Uhr).
             </div>
+            <button type="button" class="btn btn-sm btn-outline-kkc py-1" data-bs-toggle="modal" data-bs-target="#modal-content-rules">
+              <i class="bi bi-journal-text me-1"></i> Richtlinien einsehen
+            </button>
           </div>
           <?php else: ?>
           <i class="bi bi-exclamation-circle-fill text-warning fs-4 lh-1 mt-1"></i>
           <div>
             <div class="fw-semibold">Zustimmung zu den Content-Richtlinien ausstehend</div>
-            <div class="text-muted small">
-              Bitte bestätige oben die aktuellen Nutzungsrichtlinien zur Vermarktung deines Contents.
+            <div class="text-muted small mb-2">
+              Bitte bestätige die aktuellen Nutzungsrichtlinien zur Vermarktung deines Contents.
             </div>
+            <button type="button" class="btn btn-sm btn-primary-kkc py-1" data-bs-toggle="modal" data-bs-target="#modal-content-rules">
+              <i class="bi bi-journal-check me-1"></i> Richtlinien anzeigen &amp; bestätigen
+            </button>
           </div>
           <?php endif; ?>
         </div>

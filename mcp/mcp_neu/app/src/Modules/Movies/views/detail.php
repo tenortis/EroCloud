@@ -52,6 +52,7 @@ $currentFsk18ThumbUrl  = $mcpBaseUrl . '/thumb.php?movie_id=' . rawurlencode($fi
 $currentFsk18ZoomUrl   = $mcpBaseUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=' . $fsk18 . '&w=640&t=' . $nowTs;
 $currentFsk18EditorUrl = $mcpBaseUrl . '/thumb.php?movie_id=' . rawurlencode($fileId) . '&thumb_number=' . $fsk18 . '&w=1024&t=' . $nowTs;
 $convertStatus   = (int)($movie['convert_status'] ?? 0);
+$movieStatus     = (string)($movie['status'] ?? 'active');
 $movieChecked    = (string)($movie['movie_checked'] ?? '0000-00-00 00:00:00');
 $released        = (int)($movie['released'] ?? 0);
 $isOnline        = !empty($movie['is_online']);
@@ -63,15 +64,18 @@ $metaTitle       = (string)($movie['meta_title'] ?? '');
 $metaDescription = (string)($movie['meta_description'] ?? '');
 $seoUrl          = (string)($movie['seo_url'] ?? '');
 
+$convQueue       = isset($conversionQueueInfo) && is_array($conversionQueueInfo) ? $conversionQueueInfo : null;
+
 // Schritt-Status für die 4-stufige Fortschrittsanzeige berechnen
 // Step 1: Hochgeladen (immer aktiv, da filename vorhanden)
-// Step 2: Konvertiert (convert_status == 2)
+// Step 2: Konvertiert (convert_status == 2) bzw. Fehler (convert_status == 3)
 // Step 3: Geprüft (movie_checked != '0000-00-00 00:00:00' && released == 1)
 // Step 4: Online (isOnline === true)
-$step2Done = ($convertStatus === 2);
-$step3Done = ($movieChecked !== '0000-00-00 00:00:00' && $released === 1);
-$step3Warn = ($movieChecked === '0000-00-00 00:00:00' && $released === 2);
-$step4Done = $isOnline;
+$step2Done  = ($convertStatus === 2);
+$step2Error = ($convertStatus === 3);
+$step3Done  = ($movieChecked !== '0000-00-00 00:00:00' && $released === 1 && $movieStatus !== 'blocked');
+$step3Warn  = ($released === 2 || $movieStatus === 'blocked' || ($movieChecked !== '0000-00-00 00:00:00' && $released === 0));
+$step4Done  = $isOnline;
 
 // Prüfen, ob für FSK 16 bzw. FSK 18 bereits ein Vorschaubild aktiv ausgewählt oder als eigenes Cover hochgeladen wurde
 $fsk16StudioReady = ($fsk16 === 11 && $hasCustomFsk16) || ($convertStatus === 2 && $fsk16 >= 1 && $fsk16 <= 10);
@@ -149,12 +153,21 @@ $downloadPercentOptions = range(0, 150);
             </div>
             <div class="text-muted" style="font-size: 0.75rem;">HD-Streaming bereit</div>
           </div>
+        <?php elseif ($step2Error): ?>
+          <div class="p-2 rounded-3 border bg-danger bg-opacity-10 border-danger border-opacity-25">
+            <div class="fw-bold text-danger small">
+              <i class="bi bi-exclamation-octagon-fill me-1"></i> 2. Konvertierungsfehler
+            </div>
+            <div class="text-muted" style="font-size: 0.75rem;">Bitte Datei neu hochladen</div>
+          </div>
         <?php else: ?>
           <div class="p-2 rounded-3 border bg-warning bg-opacity-10 border-warning border-opacity-25">
             <div class="fw-bold text-warning small">
               <i class="bi bi-gear-wide-connected me-1"></i> 2. Konvertierung
             </div>
-            <div class="text-muted" style="font-size: 0.75rem;">Wird verarbeitet...</div>
+            <div class="text-muted" style="font-size: 0.75rem;" id="step2-progress-subtext">
+              <?= $convQueue !== null ? ('Restdauer: ' . htmlspecialchars((string)$convQueue['remaining_formatted'], ENT_QUOTES, 'UTF-8')) : 'Wird verarbeitet...' ?>
+            </div>
           </div>
         <?php endif; ?>
       </div>
@@ -205,39 +218,88 @@ $downloadPercentOptions = range(0, 150);
   </div>
 </div>
 
-<!-- Hinweis-Banner falls der Film noch nicht zur Prüfung eingereicht wurde (released == 0) -->
-<?php if ($released === 0): ?>
-  <?php if ($convertStatus < 2): ?>
-    <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4 shadow-sm">
+<!-- Hinweis-Banner bei Konvertierungsfehler (convert_status == 3), laufender Konvertierung (convert_status < 2) oder noch ausstehender Einreichung (released == 0) -->
+<?php if ($convertStatus === 3): ?>
+  <div class="alert alert-danger d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4 shadow-sm">
+    <div class="d-flex align-items-start gap-3">
+      <i class="bi bi-exclamation-octagon-fill fs-3 text-danger flex-shrink-0"></i>
+      <div>
+        <h6 class="fw-bold mb-1">Bei der Konvertierung deiner Videodatei ist ein technischer Fehler aufgetreten</h6>
+        <div class="small">
+          Die hochgeladene Videodatei konnte leider nicht verarbeitet werden (z. B. wegen einer unvollständigen Datei oder eines defekten Video-Codecs). Bitte lade in Schritt 2 eine intakte Videodatei (empfohlen: <strong>MP4 H.264</strong>) erneut hoch.
+        </div>
+      </div>
+    </div>
+    <a href="#/movie-upload?step=2&amp;movie_id=<?= $movieId ?>" class="btn btn-sm btn-danger fw-semibold flex-shrink-0">
+      <i class="bi bi-cloud-arrow-up-fill me-1"></i> Neue Videodatei hochladen
+    </a>
+  </div>
+<?php elseif ($convertStatus < 2): ?>
+  <?php
+  $qState      = (string)($convQueue['state'] ?? ($convertStatus === 1 ? 'converting' : 'queued'));
+  $qPos        = (int)($convQueue['queue_position'] ?? 1);
+  $qAhead      = (int)($convQueue['movies_ahead'] ?? 0);
+  $qRemText    = (string)($convQueue['remaining_formatted'] ?? 'wenige Minuten');
+  $qPct        = (int)($convQueue['progress_percent'] ?? ($convertStatus === 1 ? 25 : 8));
+  $qHeadline   = (string)($convQueue['status_headline'] ?? 'Dein Video wird aktuell konvertiert & 10 Vorschaubilder werden erstellt');
+  $qDetail     = (string)($convQueue['status_detail'] ?? '');
+  ?>
+  <div class="alert alert-info mb-4 shadow-sm p-3 p-md-4"
+       id="movie-conversion-live-box"
+       data-movie-id="<?= $movieId ?>"
+       data-poll-context="detail"
+       data-released="<?= $released ?>">
+    <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
       <div class="d-flex align-items-start gap-3">
-        <div class="spinner-border text-primary flex-shrink-0 mt-1" role="status" style="width: 1.5rem; height: 1.5rem;"></div>
+        <div class="spinner-border text-primary flex-shrink-0 mt-1" role="status" style="width: 1.75rem; height: 1.75rem;"></div>
         <div>
-          <h6 class="fw-bold mb-1">Dein Video wird aktuell konvertiert &amp; 10 Vorschaubilder werden erstellt</h6>
-          <div class="small">
-            Sobald die Konvertierung abgeschlossen ist, stehen dir unten alle <strong>10 automatisch generierten Szenen-Vorschaubilder</strong> sowie unser <strong>Fullscreen Cover-Studio</strong> (Milchglas, Verpixeln, Sticker, Text &amp; Live-Schnappschuss) zur Verfügung. Anschließend reichst du den Film über <strong>„Film jetzt zur Prüfung einreichen"</strong> frei.
+          <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
+            <h6 class="fw-bold mb-0" id="movie-conv-headline"><?= htmlspecialchars($qHeadline, ENT_QUOTES, 'UTF-8') ?></h6>
+            <span class="badge <?= $qState === 'converting' ? 'bg-primary' : 'bg-warning text-dark' ?>" id="movie-conv-state-badge">
+              <?= $qState === 'converting' ? 'Aktiv in Konvertierung' : ('Warteschlange Platz #' . $qPos) ?>
+            </span>
+          </div>
+          <div class="small text-dark mb-1" id="movie-conv-detail">
+            <?= htmlspecialchars($qDetail, ENT_QUOTES, 'UTF-8') ?>
+          </div>
+          <div class="small text-muted">
+            <i class="bi bi-arrow-repeat me-1 text-primary"></i><strong>Automatische Live-Aktualisierung aktiv:</strong> Du kannst diese Seite einfach geöffnet lassen – sobald die Konvertierung fertig ist, lädt sich diese Ansicht automatisch neu und schaltet alle 10 Vorschaubilder sowie das Cover-Studio frei!
           </div>
         </div>
       </div>
-      <button type="button" class="btn btn-sm btn-outline-primary bg-white flex-shrink-0" onclick="window.MCPApp && window.MCPApp.handleRoute()">
-        <i class="bi bi-arrow-clockwise me-1"></i> Status aktualisieren
-      </button>
+      <div class="d-flex flex-column align-items-md-end gap-2 flex-shrink-0">
+        <div class="px-3 py-1 rounded-pill bg-white border shadow-sm small fw-semibold text-primary">
+          <i class="bi bi-hourglass-split me-1"></i>Geschätzte Restdauer: <strong id="movie-conv-remaining"><?= htmlspecialchars($qRemText, ENT_QUOTES, 'UTF-8') ?></strong>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-primary bg-white" id="btn-refresh-conversion-status">
+          <i class="bi bi-arrow-clockwise me-1"></i> Status jetzt aktualisieren
+        </button>
+      </div>
     </div>
-  <?php else: ?>
-    <div class="alert alert-warning d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4 shadow-sm">
-      <div class="d-flex align-items-start gap-3">
-        <i class="bi bi-magic fs-3 text-warning flex-shrink-0"></i>
-        <div>
-          <h6 class="fw-bold mb-1">Konvertierung abgeschlossen – Vorschaubilder bereit für das Cover-Studio!</h6>
-          <div class="small">
-            Dein Film ist fertig konvertiert und alle <strong>10 Szenen-Vorschaubilder</strong> stehen bereit. Wähle oder bearbeite jetzt links deine <strong>FSK 16 &amp; FSK 18 Cover</strong> im <strong>Cover-Studio</strong> und klicke danach auf <strong>„Film jetzt zur Prüfung einreichen"</strong>.
-          </div>
+
+    <div class="progress bg-white border" style="height: 10px;">
+      <div id="movie-conv-progress-bar"
+           class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+           role="progressbar"
+           style="width: <?= max(5, min(98, $qPct)) ?>%;"
+           aria-valuenow="<?= $qPct ?>" aria-valuemin="0" aria-valuemax="100"></div>
+    </div>
+  </div>
+<?php elseif ($released === 0): ?>
+  <div class="alert alert-warning d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4 shadow-sm">
+    <div class="d-flex align-items-start gap-3">
+      <i class="bi bi-magic fs-3 text-warning flex-shrink-0"></i>
+      <div>
+        <h6 class="fw-bold mb-1">Konvertierung abgeschlossen – Vorschaubilder bereit für das Cover-Studio!</h6>
+        <div class="small">
+          Dein Film ist fertig konvertiert und alle <strong>10 Szenen-Vorschaubilder</strong> stehen bereit. Wähle oder bearbeite jetzt links deine <strong>FSK 16 &amp; FSK 18 Cover</strong> im <strong>Cover-Studio</strong> und klicke danach auf <strong>„Film jetzt zur Prüfung einreichen"</strong>.
         </div>
       </div>
-      <button type="submit" form="kkc-movie-edit-form" class="btn btn-sm btn-kkc-primary flex-shrink-0">
-        <i class="bi bi-send-check me-1"></i> Film jetzt zur Prüfung einreichen
-      </button>
     </div>
-  <?php endif; ?>
+    <button type="submit" form="kkc-movie-edit-form" class="btn btn-sm btn-kkc-primary flex-shrink-0">
+      <i class="bi bi-send-check me-1"></i> Film jetzt zur Prüfung einreichen
+    </button>
+  </div>
 <?php endif; ?>
 
 <!-- Ablehnungs-Hinweis falls released == 2 -->
@@ -297,13 +359,29 @@ $downloadPercentOptions = range(0, 150);
                 </button>
               </div>
             </div>
+          <?php elseif ($convertStatus === 3): ?>
+            <div class="p-4 rounded-3 bg-danger bg-opacity-10 border border-danger border-opacity-25 text-center">
+              <i class="bi bi-exclamation-octagon-fill text-danger fs-2 d-block mb-2"></i>
+              <h6 class="fw-bold text-danger mb-1">Konvertierung fehlgeschlagen</h6>
+              <p class="text-muted small mb-3">
+                Deine hochgeladene Videodatei konnte leider nicht verarbeitet werden. Bitte lade eine neue Videodatei hoch.
+              </p>
+              <a href="#/movie-upload?step=2&amp;movie_id=<?= $movieId ?>" class="btn btn-sm btn-danger">
+                <i class="bi bi-cloud-arrow-up-fill me-1"></i> Neue Videodatei hochladen
+              </a>
+            </div>
           <?php else: ?>
             <div class="p-4 rounded-3 bg-light border text-center">
               <div class="spinner-border text-primary mb-2" role="status"></div>
               <h6 class="fw-bold mb-1">Video wird aktuell konvertiert</h6>
-              <p class="text-muted small mb-0">
-                Sobald die Konvertierung abgeschlossen ist, stehen dir hier der Video-Player sowie die automatisch generierten Vorschaubilder zur Verfügung.
+              <p class="text-muted small mb-2">
+                Sobald die Konvertierung abgeschlossen ist, lädt diese Seite automatisch neu und schaltet den Video-Player sowie die 10 Vorschaubilder frei.
               </p>
+              <?php if ($convQueue !== null): ?>
+                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25" id="movie-player-remaining-badge">
+                  <i class="bi bi-clock-history me-1"></i>Geschätzte Restdauer: <?= htmlspecialchars((string)$convQueue['remaining_formatted'], ENT_QUOTES, 'UTF-8') ?>
+                </span>
+              <?php endif; ?>
             </div>
           <?php endif; ?>
         </div>
@@ -651,9 +729,9 @@ $downloadPercentOptions = range(0, 150);
             <div class="col-12">
               <label class="form-label fw-semibold">Filmtitel <span class="text-danger">*</span></label>
               <input type="text" name="title" id="movie-title-input" class="form-control"
-                     maxlength="100" required
+                     maxlength="65" required
                      value="<?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?>"
-                     placeholder="Gib einen aussagekräftigen Filmtitel ein (mind. 5 Zeichen)">
+                     placeholder="Gib einen aussagekräftigen Filmtitel ein (maximal 65 Zeichen)">
             </div>
 
             <!-- Beschreibung -->

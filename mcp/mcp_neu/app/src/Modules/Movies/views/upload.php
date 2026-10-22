@@ -30,9 +30,11 @@ $seoUrl          = (string)($movie['seo_url'] ?? '');
 $filename        = trim((string)($movie['filename'] ?? ''));
 $playtimeString  = (string)($movie['playtime_string'] ?? '');
 $resolution      = (string)($movie['resolution'] ?? '');
+$convertStatus   = (int)($movie['convert_status'] ?? 0);
 $released        = (int)($movie['released'] ?? 0);
 $notifyOnConvert = (int)($movie['notify_on_convert'] ?? 1);
-$hasUploadedFile = ($filename !== '');
+$hasUploadedFile = ($filename !== '' && $convertStatus !== 3);
+$convQueue       = isset($conversionQueueInfo) && is_array($conversionQueueInfo) ? $conversionQueueInfo : null;
 
 $amountSecondOptions = [];
 for ($i = 1; $i <= 300; $i++) {
@@ -373,6 +375,18 @@ $downloadPercentOptions = range(0, 150);
           </div>
         </div>
         <div class="kkc-card-body p-4">
+          <?php if ($convertStatus === 3): ?>
+            <div class="alert alert-danger d-flex align-items-start gap-3 mb-4 shadow-sm">
+              <i class="bi bi-exclamation-octagon-fill fs-3 text-danger flex-shrink-0"></i>
+              <div>
+                <h6 class="fw-bold mb-1">Bei der Konvertierung deiner bisherigen Videodatei ist ein Fehler aufgetreten</h6>
+                <div class="small">
+                  Bitte wähle unten eine intakte Videodatei (empfohlen: <strong>MP4 H.264</strong>) aus und lade sie erneut hoch, damit die Verarbeitung und Vorschaubild-Generierung neu gestartet werden kann.
+                </div>
+              </div>
+            </div>
+          <?php endif; ?>
+
           <!-- Statusbox: Videodatei bereits erfolgreich übertragen -->
           <div id="movie-file-uploaded-box" class="<?= $hasUploadedFile ? '' : 'd-none' ?> p-4 rounded-3 border border-success bg-success bg-opacity-10 mb-3">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
@@ -542,61 +556,152 @@ $downloadPercentOptions = range(0, 150);
   </div>
 
 <?php else: ?>
-  <!-- SCHRITT 3: Erfolgreicher Abschluss (angepasst an die gewählte Freigabe-Option) -->
+  <!-- SCHRITT 3: Erfolgreicher Abschluss inkl. Live-Warteschlangen- & Konvertierungs-Fortschritt -->
   <div class="row justify-content-center">
-    <div class="col-12 col-lg-8">
+    <div class="col-12 col-lg-9">
       <div class="kkc-card text-center p-4">
         <div class="kkc-card-body">
-          <?php if ($released === 1): ?>
+          <?php if ($convertStatus === 3): ?>
+            <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger bg-opacity-10 text-danger mb-3"
+                 style="width: 72px; height: 72px;">
+              <i class="bi bi-exclamation-octagon-fill fs-1"></i>
+            </div>
+            <h4 class="fw-bold text-danger mb-2">Bei der Konvertierung deiner Videodatei ist ein Fehler aufgetreten</h4>
+            <p class="text-muted mb-4">
+              Die hochgeladene Videodatei konnte leider nicht verarbeitet werden (z. B. wegen einer defekten Datei oder eines nicht unterstützten Codecs). Bitte lade in Schritt 2 eine intakte Videodatei (empfohlen: MP4 H.264) erneut hoch.
+            </p>
+            <div class="d-flex justify-content-center flex-wrap gap-3">
+              <a href="#/movie-upload?step=2&amp;movie_id=<?= $movieId ?>" class="btn btn-danger btn-lg">
+                <i class="bi bi-cloud-arrow-up-fill me-1"></i> Neue Videodatei hochladen (Schritt 2)
+              </a>
+              <a href="#/movies" class="btn btn-outline-secondary btn-lg">
+                <i class="bi bi-collection-play me-1"></i> Zur Film-Übersicht
+              </a>
+            </div>
+          <?php elseif ($convertStatus === 2): ?>
             <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success bg-opacity-10 text-success mb-3"
                  style="width: 72px; height: 72px;">
-              <i class="bi bi-send-check fs-1"></i>
+              <i class="bi bi-check2-circle fs-1"></i>
             </div>
-            <h4 class="fw-bold mb-2">Dein Film wurde erfolgreich hochgeladen &amp; zur Prüfung eingereicht!</h4>
+            <h4 class="fw-bold text-success mb-2">Konvertierung abgeschlossen – alle 10 Vorschaubilder sind bereit!</h4>
             <p class="text-muted mb-4">
-              Deine Videodatei befindet sich nun in der automatischen Konvertierungswarteschlange.
-              Sobald die Verarbeitung abgeschlossen ist, generiert das System automatisch die Vorschaubilder und dein Film wird von unserem Team geprüft.
+              Dein Film ist fertig konvertiert. Du kannst jetzt direkt in die Film-Details wechseln, deine FSK 16 &amp; FSK 18 Cover im <strong>Cover-Studio</strong> gestalten und deinen Film zur Prüfung einreichen.
             </p>
-          <?php else: ?>
-            <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10 text-primary mb-3"
-                 style="width: 72px; height: 72px;">
-              <i class="bi bi-magic fs-1"></i>
+            <div class="d-flex justify-content-center flex-wrap gap-3">
+              <?php if ($movieId > 0): ?>
+                <a href="#/movie?id=<?= $movieId ?>" class="btn btn-kkc-primary btn-lg">
+                  <i class="bi bi-magic me-1"></i> Jetzt Cover-Studio &amp; Film-Details öffnen
+                </a>
+              <?php endif; ?>
+              <a href="#/movie-upload" class="btn btn-outline-kkc btn-lg">
+                <i class="bi bi-plus-circle me-1"></i> Weiteren Film hochladen
+              </a>
             </div>
-            <h4 class="fw-bold mb-2">Dein Film wird jetzt konvertiert &amp; 10 Vorschaubilder werden erstellt!</h4>
-            <p class="text-muted mb-3">
-              Deine Videodatei wurde erfolgreich übertragen und wird nun im Hintergrund verarbeitet.
-              <strong>Dein Film wurde wie gewünscht noch nicht zur Prüfung eingereicht</strong>, damit du zuerst deine Vorschaubilder gestalten kannst.
-            </p>
-            <?php if ($notifyOnConvert === 1): ?>
-              <div class="d-inline-flex align-items-center gap-2 px-3 py-2 rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-25 small fw-semibold mb-4">
-                <i class="bi bi-envelope-check-fill"></i>
-                Wir senden dir automatisch eine E-Mail mit Direkt-Link, sobald deine 10 Vorschaubilder bereitstehen.
+          <?php else: ?>
+            <?php if ($released === 1): ?>
+              <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success bg-opacity-10 text-success mb-3"
+                   style="width: 72px; height: 72px;">
+                <i class="bi bi-send-check fs-1"></i>
+              </div>
+              <h4 class="fw-bold mb-2">Dein Film wurde erfolgreich hochgeladen &amp; zur Prüfung eingereicht!</h4>
+              <p class="text-muted mb-4">
+                Deine Videodatei befindet sich nun in der automatischen Konvertierungswarteschlange.
+                Sobald die Verarbeitung abgeschlossen ist, generiert das System automatisch die Vorschaubilder und dein Film wird von unserem Team geprüft.
+              </p>
+            <?php else: ?>
+              <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10 text-primary mb-3"
+                   style="width: 72px; height: 72px;">
+                <i class="bi bi-magic fs-1"></i>
+              </div>
+              <h4 class="fw-bold mb-2">Dein Film wird jetzt konvertiert &amp; 10 Vorschaubilder werden erstellt!</h4>
+              <p class="text-muted mb-3">
+                Deine Videodatei wurde erfolgreich übertragen und wird nun im Hintergrund verarbeitet.
+                <strong>Dein Film wurde wie gewünscht noch nicht zur Prüfung eingereicht</strong>, damit du zuerst deine Vorschaubilder gestalten kannst.
+              </p>
+              <?php if ($notifyOnConvert === 1): ?>
+                <div class="d-inline-flex align-items-center gap-2 px-3 py-2 rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-25 small fw-semibold mb-4">
+                  <i class="bi bi-envelope-check-fill"></i>
+                  Wir senden dir automatisch eine E-Mail mit Direkt-Link, sobald deine 10 Vorschaubilder bereitstehen.
+                </div>
+              <?php endif; ?>
+            <?php endif; ?>
+
+            <?php if ($movieId > 0): ?>
+              <?php
+              $qState    = (string)($convQueue['state'] ?? ($convertStatus === 1 ? 'converting' : 'queued'));
+              $qPos      = (int)($convQueue['queue_position'] ?? 1);
+              $qRemText  = (string)($convQueue['remaining_formatted'] ?? 'wenige Minuten');
+              $qPct      = (int)($convQueue['progress_percent'] ?? ($convertStatus === 1 ? 25 : 8));
+              $qHeadline = (string)($convQueue['status_headline'] ?? 'Wird in der Warteschlange verarbeitet...');
+              $qDetail   = (string)($convQueue['status_detail'] ?? '');
+              ?>
+              <!-- Live-Konvertierungs-Box mit Warteschlangen-Position, Restdauer & Auto-Weiterleitung -->
+              <div class="p-3 p-md-4 rounded-3 border border-primary border-opacity-25 bg-primary bg-opacity-10 text-start mx-auto mb-4 shadow-sm"
+                   style="max-width: 680px;"
+                   id="movie-conversion-live-box"
+                   data-movie-id="<?= $movieId ?>"
+                   data-poll-context="upload-step3"
+                   data-released="<?= $released ?>">
+                <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+                  <div class="d-flex align-items-start gap-3">
+                    <div class="spinner-border text-primary flex-shrink-0 mt-1" role="status" style="width: 1.6rem; height: 1.6rem;"></div>
+                    <div>
+                      <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
+                        <span class="fw-bold text-dark" id="movie-conv-headline"><?= htmlspecialchars($qHeadline, ENT_QUOTES, 'UTF-8') ?></span>
+                        <span class="badge <?= $qState === 'converting' ? 'bg-primary' : 'bg-warning text-dark' ?>" id="movie-conv-state-badge">
+                          <?= $qState === 'converting' ? 'Aktiv in Konvertierung' : ('Warteschlange Platz #' . $qPos) ?>
+                        </span>
+                      </div>
+                      <div class="small text-muted mb-2" id="movie-conv-detail">
+                        <?= htmlspecialchars($qDetail, ENT_QUOTES, 'UTF-8') ?>
+                      </div>
+                      <div class="small text-dark">
+                        <i class="bi bi-lightning-charge-fill text-primary me-1"></i><strong>Tipp:</strong> Wenn du diese Seite geöffnet lässt, aktualisiert sich der Status automatisch im Hintergrund und leitet dich direkt nach Abschluss der Konvertierung zum <strong>Cover-Studio &amp; den 10 Vorschaubildern</strong> weiter!
+                      </div>
+                    </div>
+                  </div>
+                  <div class="d-flex flex-column align-items-md-end gap-2 flex-shrink-0">
+                    <div class="px-3 py-1 rounded-pill bg-white border shadow-sm small fw-semibold text-primary">
+                      <i class="bi bi-hourglass-split me-1"></i>Restdauer: <strong id="movie-conv-remaining"><?= htmlspecialchars($qRemText, ENT_QUOTES, 'UTF-8') ?></strong>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-primary bg-white" id="btn-refresh-conversion-status">
+                      <i class="bi bi-arrow-clockwise me-1"></i> Status jetzt aktualisieren
+                    </button>
+                  </div>
+                </div>
+                <div class="progress bg-white border" style="height: 10px;">
+                  <div id="movie-conv-progress-bar"
+                       class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                       role="progressbar"
+                       style="width: <?= max(5, min(98, $qPct)) ?>%;"
+                       aria-valuenow="<?= $qPct ?>" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
               </div>
             <?php endif; ?>
 
-            <div class="p-3 rounded-3 border bg-light text-start mx-auto mb-4" style="max-width: 620px;">
+            <div class="p-3 rounded-3 border bg-light text-start mx-auto mb-4" style="max-width: 680px;">
               <div class="fw-bold small text-primary mb-2"><i class="bi bi-list-check me-1"></i>Deine nächsten Schritte:</div>
               <ol class="small text-muted mb-0 ps-3">
-                <li class="mb-1">Sobald die Konvertierung in wenigen Minuten abgeschlossen ist, stehen dir in den <strong>Film-Details</strong> alle <strong>10 automatisch generierten Szenen-Vorschaubilder</strong> zur Verfügung (eigene Cover kannst du dort auch sofort hochladen).</li>
+                <li class="mb-1">Sobald die Konvertierung abgeschlossen ist, wirst du automatisch zu den <strong>Film-Details</strong> weitergeleitet, wo dir alle <strong>10 generierten Szenen-Vorschaubilder</strong> bereitstehen (eigene Cover kannst du dort auch schon während der Konvertierung hochladen).</li>
                 <li class="mb-1">Bearbeite deine FSK 16 &amp; FSK 18 Cover nach Wunsch im <strong>Fullscreen Cover-Studio</strong> (Milchglas-Zensur, Verpixeln, Sticker, Text, Badges oder Live-Schnappschuss aus dem Video).</li>
                 <li>Klicke anschließend in den Film-Details auf <strong>„Film jetzt zur Prüfung einreichen"</strong>, um deinen Film freizugeben.</li>
               </ol>
             </div>
-          <?php endif; ?>
 
-          <div class="d-flex justify-content-center flex-wrap gap-3">
-            <?php if ($movieId > 0): ?>
-              <a href="#/movie?id=<?= $movieId ?>" class="btn btn-kkc-primary btn-lg">
-                <i class="bi bi-magic me-1"></i> Zu den Film-Details &amp; Cover-Studio öffnen
+            <div class="d-flex justify-content-center flex-wrap gap-3">
+              <?php if ($movieId > 0): ?>
+                <a href="#/movie?id=<?= $movieId ?>" class="btn btn-kkc-primary btn-lg">
+                  <i class="bi bi-magic me-1"></i> Zu den Film-Details &amp; Cover-Studio öffnen
+                </a>
+              <?php endif; ?>
+              <a href="#/movie-upload" class="btn btn-outline-kkc btn-lg">
+                <i class="bi bi-plus-circle me-1"></i> Weiteren Film hochladen
               </a>
-            <?php endif; ?>
-            <a href="#/movie-upload" class="btn btn-outline-kkc btn-lg">
-              <i class="bi bi-plus-circle me-1"></i> Weiteren Film hochladen
-            </a>
-            <a href="#/movies" class="btn btn-outline-secondary btn-lg">
-              <i class="bi bi-collection-play me-1"></i> Zur Film-Übersicht
-            </a>
-          </div>
+              <a href="#/movies" class="btn btn-outline-secondary btn-lg">
+                <i class="bi bi-collection-play me-1"></i> Zur Film-Übersicht
+              </a>
+            </div>
+          <?php endif; ?>
         </div>
       </div>
     </div>

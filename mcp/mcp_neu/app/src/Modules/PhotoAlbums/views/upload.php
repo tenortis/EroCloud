@@ -10,6 +10,7 @@ if (!defined('SAFE_INC')) {
  * @var array<string, mixed>             $album
  * @var array<int, array<string, mixed>> $photos
  * @var array<int, array<string, mixed>> $actors
+ * @var array<string, string>|null       $rejectionInfo
  */
 
 $albumDbId       = (int)($album['id'] ?? 0);
@@ -29,8 +30,9 @@ $posterFsk18EditorUrl = (string)($album['poster_fsk18_editor_url'] ?? $posterFsk
 $metaTitle            = (string)($album['meta_title'] ?? '');
 $metaDescription = (string)($album['meta_description'] ?? '');
 $seoUrl          = (string)($album['seo_url'] ?? '');
+$rejectionInfo   = is_array($rejectionInfo ?? null) ? $rejectionInfo : null;
 
-$priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200, 1400, 1500, 1600, 1800, 2000, 2500, 3000, 3500, 4000, 4500, 5000];
+$priceCentsOptions = range(0, 5000, 100);
 ?>
 
 <!-- Kopfbereich -->
@@ -45,6 +47,11 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
       </span>
     </div>
     <h2 class="h4 fw-bold mb-0">Neues Foto-Album hochladen</h2>
+  </div>
+  <div>
+    <button type="button" class="btn btn-outline-kkc" data-bs-toggle="modal" data-bs-target="#modalPhotoAlbumQualityTips">
+      <i class="bi bi-lightbulb text-warning me-1"></i> Tipps für mehr Verkäufe
+    </button>
   </div>
 </div>
 
@@ -80,6 +87,24 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
   </div>
 </div>
 
+<?php if ($rejectionInfo !== null): ?>
+  <div class="alert alert-danger d-flex align-items-start gap-3 mb-4 shadow-sm">
+    <i class="bi bi-exclamation-triangle-fill fs-3 text-danger"></i>
+    <div>
+      <h6 class="fw-bold mb-1">Dein Foto-Album konnte leider noch nicht freigegeben werden</h6>
+      <?php if ($rejectionInfo['reason'] !== ''): ?>
+        <div class="fw-semibold mb-1">Grund: <?= htmlspecialchars($rejectionInfo['reason'], ENT_QUOTES, 'UTF-8') ?></div>
+      <?php endif; ?>
+      <?php if ($rejectionInfo['text'] !== ''): ?>
+        <p class="mb-1 small"><?= nl2br(htmlspecialchars($rejectionInfo['text'], ENT_QUOTES, 'UTF-8')) ?></p>
+      <?php endif; ?>
+      <div class="small text-muted mt-1">
+        Bitte ergänze oder korrigiere die Bilder bzw. Angaben und klicke anschließend auf <strong>„Foto-Album fertigstellen &amp; zur Prüfung einreichen"</strong>.
+      </div>
+    </div>
+  </div>
+<?php endif; ?>
+
 <div id="photo-album-alert-box"></div>
 
 <?php if ($step === 1): ?>
@@ -106,9 +131,9 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
             <div class="row g-3">
               <div class="col-12">
                 <label class="form-label fw-semibold">Albumtitel <span class="text-danger">*</span></label>
-                <input type="text" name="title" class="form-control" maxlength="100" required
+                <input type="text" name="title" class="form-control" maxlength="65" required
                        value="<?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?>"
-                       placeholder="Mindestens 5 Zeichen (keine E-Mail-Adressen oder URLs)">
+                       placeholder="5 bis 65 Zeichen (keine E-Mail-Adressen oder URLs)">
               </div>
 
               <div class="col-12">
@@ -393,11 +418,12 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
                   $phZoomUrl   = (string)($ph['zoom_url'] ?? $phThumbUrl);
                   $phEditorUrl = (string)($ph['editor_url'] ?? $phZoomUrl);
                   $phFileId    = (string)($ph['file_id'] ?? '');
+                  $phRejected  = !empty($ph['rejected']);
                 ?>
                 <div class="col-6 col-sm-4 col-md-3 js-album-photo-card"
                      data-file-id="<?= htmlspecialchars($phFileId, ENT_QUOTES, 'UTF-8') ?>"
                      data-scene-num="<?= htmlspecialchars($phNum, ENT_QUOTES, 'UTF-8') ?>">
-                  <div class="border rounded-3 overflow-hidden bg-light shadow-sm h-100 d-flex flex-column justify-content-between">
+                  <div class="border <?= $phRejected ? 'border-danger border-2' : '' ?> rounded-3 overflow-hidden bg-light shadow-sm h-100 d-flex flex-column justify-content-between">
                     <div class="position-relative">
                       <span class="badge bg-dark bg-opacity-75 position-absolute top-0 start-0 m-1 js-album-photo-num-badge" style="font-size: 0.65rem; pointer-events: none;">
                         #<?= (int)($idx + 1) ?>
@@ -409,9 +435,14 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
                              class="img-fluid w-100 js-hover-zoom-thumb"
                              data-zoom-src="<?= htmlspecialchars($phZoomUrl, ENT_QUOTES, 'UTF-8') ?>"
                              data-zoom-title="<?= htmlspecialchars($phLabel, ENT_QUOTES, 'UTF-8') ?>"
-                             style="height: 110px; object-fit: cover;"
+                             style="height: 110px; object-fit: cover; <?= $phRejected ? 'opacity: 0.65;' : '' ?>"
                              loading="lazy">
                       </a>
+                      <?php if ($phRejected): ?>
+                        <div class="position-absolute bottom-0 start-0 end-0 bg-danger text-white text-center py-1 px-1 fw-bold" style="font-size: 0.65rem;">
+                          <i class="bi bi-exclamation-octagon-fill me-1"></i>Abgelehnt – bitte löschen
+                        </div>
+                      <?php endif; ?>
                       <button type="button"
                               class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 py-0 px-1 js-delete-album-photo-btn"
                               data-album-id="<?= $albumDbId ?>"
@@ -476,21 +507,23 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
   </div>
 
   <?= \App\Core\View::renderCoverStudioModal([
-      'studioContext'     => 'photo-album',
-      'entityId'          => $albumDbId,
-      'fsk16HasCover'     => $hasFsk16,
-      'fsk16ThumbUrl'     => $posterFsk16Url,
-      'fsk16EditorUrl'    => $posterFsk16EditorUrl,
-      'fsk16CustomNum'    => 'cover_16',
-      'fsk18HasCover'     => $hasFsk18,
-      'fsk18ThumbUrl'     => $posterFsk18Url,
-      'fsk18EditorUrl'    => $posterFsk18EditorUrl,
-      'fsk18CustomNum'    => 'cover_18',
-      'filmstripTitle'    => 'Deine Album-Fotos als Vorlage:',
-      'filmstripItems'    => $photos,
-      'allowSceneSelect'  => false,
-      'saveButtonLabel16' => 'Als FSK 16 Cover speichern',
-      'saveButtonLabel18' => 'Als FSK 18 Cover speichern',
+      'studioContext'        => 'photo-album',
+      'studioEntityId'       => $albumDbId,
+      'studioTitle'          => $title !== '' ? $title : ('Foto-Album #' . $albumDbId),
+      'allowVideoCapture'    => false,
+      'hasCustomFsk16'       => $hasFsk16,
+      'customFsk16Num'       => 'cover_16',
+      'customFsk16Label'     => 'FSK16 Cover',
+      'customFsk16Url'       => $posterFsk16Url,
+      'customFsk16ZoomUrl'   => $posterFsk16ZoomUrl,
+      'customFsk16EditorUrl' => $posterFsk16EditorUrl,
+      'hasCustomFsk18'       => $hasFsk18,
+      'customFsk18Num'       => 'cover_18',
+      'customFsk18Label'     => 'FSK18 Cover',
+      'customFsk18Url'       => $posterFsk18Url,
+      'customFsk18ZoomUrl'   => $posterFsk18ZoomUrl,
+      'customFsk18EditorUrl' => $posterFsk18EditorUrl,
+      'filmstripItems'       => $photos,
   ]) ?>
 
 <?php else: ?>
@@ -525,3 +558,58 @@ $priceCentsOptions = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200
     </div>
   </div>
 <?php endif; ?>
+
+<!-- Qualitäts- & Verkaufstipps Modal für Foto-Alben -->
+<div class="modal fade" id="modalPhotoAlbumQualityTips" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold">
+          <i class="bi bi-lightbulb-fill text-warning me-2"></i>Tipps zur Qualität &amp; Vermarktung deiner Foto-Alben
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+      </div>
+      <div class="modal-body p-4">
+        <p class="text-muted small mb-3">
+          Mit diesen Empfehlungen holst du das Maximum aus deinen Foto-Alben heraus und sorgst für eine schnelle Freigabe sowie höhere Verkaufszahlen:
+        </p>
+        <div class="list-group list-group-flush">
+          <div class="list-group-item px-0 py-3">
+            <h6 class="fw-bold mb-1"><i class="bi bi-images text-primary me-2"></i>1. Optimale Anzahl der Fotos</h6>
+            <p class="small text-muted mb-0">
+              Für die technische Freigabe sind mindestens 4 Fotos erforderlich. Für attraktive Verkäufe empfehlen wir dir jedoch, <strong>mindestens 10 bis 20 abwechslungsreiche Fotos</strong> pro Album hochzuladen.
+            </p>
+          </div>
+          <div class="list-group-item px-0 py-3">
+            <h6 class="fw-bold mb-1"><i class="bi bi-card-heading text-primary me-2"></i>2. Aussagekräftiger Albumtitel (5 bis 65 Zeichen)</h6>
+            <p class="small text-muted mb-0">
+              Wähle einen spannenden, treffenden Titel, der das Thema, das Outfit oder die Stimmung deiner Bilderserie genau beschreibt. Verwende jeden Titel nur einmal.
+            </p>
+          </div>
+          <div class="list-group-item px-0 py-3">
+            <h6 class="fw-bold mb-1"><i class="bi bi-file-earmark-text text-primary me-2"></i>3. Ausführliche Beschreibung für Kunden &amp; Google (SEO)</h6>
+            <p class="small text-muted mb-0">
+              Wir empfehlen eine detaillierte Beschreibung (ideal sind 150 bis 200+ Wörter) mit korrekter Rechtschreibung sowie Groß- und Kleinschreibung.
+              Eine ausführliche Beschreibung überzeugt nicht nur deine Käufer, sondern sorgt auch dafür, dass Suchmaschinen wie Google dein Foto-Album besser finden.
+            </p>
+          </div>
+          <div class="list-group-item px-0 py-3">
+            <h6 class="fw-bold mb-1"><i class="bi bi-shield-check text-primary me-2"></i>4. FSK 16 &amp; FSK 18 Coverbilder im Cover-Studio</h6>
+            <p class="small text-muted mb-0">
+              Auf dem <strong>FSK 16 Cover</strong> dürfen keine primären Geschlechtsmerkmale sichtbar sein. Nutze einfach unser integriertes <strong>Vollbild Cover-Studio</strong>, um ein Album-Foto mit einem Klick als Cover auszuwählen, sensible Stellen zu verpixeln oder weichzuzeichnen und verkaufsstarke Badges hinzuzufügen.
+            </p>
+          </div>
+          <div class="list-group-item px-0 py-3 border-bottom-0">
+            <h6 class="fw-bold mb-1"><i class="bi bi-camera text-primary me-2"></i>5. Bildqualität &amp; Auflösung</h6>
+            <p class="small text-muted mb-0">
+              Achte auf scharfe, gut ausgeleuchtete Aufnahmen im JPG- oder PNG-Format (bis 6 MB pro Foto). Lade nur Fotos hoch, die auch du selbst gerne kaufen würdest.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-kkc-primary px-4" data-bs-dismiss="modal">Verstanden</button>
+      </div>
+    </div>
+  </div>
+</div>
