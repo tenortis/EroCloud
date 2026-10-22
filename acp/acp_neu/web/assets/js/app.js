@@ -4399,6 +4399,97 @@ const App = {
         App.toast('Netzwerkfehler: ' + err.message, 'danger');
       }
     }
+  },
+
+  // ========================================================================
+  // 14. Cloud-User / Endkunden (#/users & #/user?id=...)
+  // ========================================================================
+  Users: {
+    submitFilterForm(event) {
+      if (event) event.preventDefault();
+      const form = document.getElementById('users-filter-form');
+      if (!form) return false;
+
+      const fd = new FormData(form);
+      const params = new URLSearchParams();
+
+      const shopId = parseInt((fd.get('shop_id') || '0').toString(), 10) || 0;
+      const coins = (fd.get('coins') || 'all').toString().trim();
+      const device = (fd.get('device') || 'all').toString().trim();
+      const sort = (fd.get('sort') || 'lastonline_desc').toString().trim();
+      const limit = parseInt((fd.get('limit') || '50').toString(), 10) || 50;
+      const q = (fd.get('q') || '').toString().trim();
+
+      if (shopId > 0) params.set('shop_id', String(shopId));
+      if (coins !== 'all') params.set('coins', coins);
+      if (device !== 'all') params.set('device', device);
+      if (sort !== 'lastonline_desc') params.set('sort', sort);
+      if (limit !== 50) params.set('limit', String(limit));
+      if (q !== '') params.set('q', q);
+
+      const qs = params.toString();
+      const targetHash = `#/users${qs ? '?' + qs : ''}`;
+      if (window.location.hash === targetHash) {
+        App.handleRoute();
+      } else {
+        window.location.hash = targetHash;
+      }
+      return false;
+    },
+
+    quickFilterTable(query) {
+      const q = String(query || '').trim().toLowerCase();
+      document.querySelectorAll('.user-list-row').forEach(row => {
+        const hay = row.getAttribute('data-search') || '';
+        row.classList.toggle('d-none', !(q === '' || hay.includes(q)));
+      });
+    },
+
+    filterSubTable(rowClass, query) {
+      const q = String(query || '').trim().toLowerCase();
+      document.querySelectorAll(`.${rowClass}`).forEach(row => {
+        const hay = row.getAttribute('data-search') || '';
+        row.classList.toggle('d-none', !(q === '' || hay.includes(q)));
+      });
+    },
+
+    async toggleLock(memberId, lockFlag) {
+      const isLock = parseInt(lockFlag, 10) === 1;
+      const msg = isLock
+        ? `Möchtest du den Cloud-User #${memberId} wirklich sperren?`
+        : `Möchtest du den Cloud-User #${memberId} wieder entsperren?`;
+      if (!window.confirm(msg)) {
+        return;
+      }
+
+      const fd = new FormData();
+      fd.append('_csrf', App.csrfToken);
+      fd.append('member_id', String(memberId));
+      fd.append('locked', isLock ? '1' : '0');
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=users/toggle-lock`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.status !== 'ok') {
+          App.toast(data.message || 'Status konnte nicht geändert werden.', 'danger');
+          return;
+        }
+
+        App.resetLogoutCountdown();
+        App.toast(data.message || 'Konto-Status aktualisiert.', isLock ? 'warning' : 'success');
+        App.handleRoute();
+      } catch (err) {
+        App.toast('Netzwerkfehler: ' + err.message, 'danger');
+      }
+    }
   }
 };
 

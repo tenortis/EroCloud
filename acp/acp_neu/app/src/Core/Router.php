@@ -106,6 +106,7 @@ class Router
         $storageAnalyticsCtrl    = 'App\\Modules\\StorageAnalytics\\StorageAnalyticsController';
         $actorsCtrl              = 'App\\Modules\\Actors\\ActorsController';
         $merchantsCtrl           = 'App\\Modules\\Merchants\\MerchantsController';
+        $usersCtrl               = 'App\\Modules\\Users\\UsersController';
         $systemTechCtrl          = 'App\\Modules\\SystemTech\\SystemTechController';
         $previewCtrl             = 'App\\Modules\\Preview\\PreviewController';
 
@@ -181,8 +182,9 @@ class Router
         self::register('merchants/save-settings', $merchantsCtrl, 'saveSettings', 'merchants');
 
         // 9. Cloud-User (users)
-        self::register('users', $previewCtrl, 'users', 'users');
-        self::register('user', $previewCtrl, 'user', 'users');
+        self::register('users', $usersCtrl, 'list', 'users');
+        self::register('user', $usersCtrl, 'detail', 'users');
+        self::register('users/toggle-lock', $usersCtrl, 'toggleLock', 'users');
 
         // 10. Punktesystem (point_system)
         self::register('pointssystem', $previewCtrl, 'pointssystem', 'point_system');

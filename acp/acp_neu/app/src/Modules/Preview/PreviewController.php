@@ -126,34 +126,6 @@ final class PreviewController
         );
     }
 
-    // 9. Cloud-User (users)
-    public function users(): string
-    {
-        return $this->renderPlaceholder(
-            'bi-people',
-            'Cloud-User',
-            'Cloud-User (Mitglieder)',
-            'Verwalte alle registrierten Endkunden über alle angeschlossenen Domains hinweg.',
-            'users',
-            '/User',
-            'acp/includes/users.php'
-        );
-    }
-
-    public function user(): string
-    {
-        $id = abs((int)$this->request->get('id', 0));
-        return $this->renderPlaceholder(
-            'bi-person-lines-fill',
-            'Cloud-User',
-            'Cloud-User Details' . ($id > 0 ? ' (#' . $id . ')' : ''),
-            'Konto-Details, Coin-Guthaben, Transaktionen und Aktivitäten des ausgewählten Endkunden.',
-            'user' . ($id > 0 ? '?id=' . $id : ''),
-            '/User/' . ($id > 0 ? $id : ''),
-            'acp/includes/user.php'
-        );
-    }
-
     // 10. Punktesystem (point_system)
     public function pointssystem(): string
     {

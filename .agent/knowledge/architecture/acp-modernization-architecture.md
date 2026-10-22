@@ -181,3 +181,12 @@ acp/acp_neu/ (später: acp/)
 * **`App\Modules\SystemTech` (`SystemTechController.php`, `views/settings.php`, `views/errors.php`):**
   * **`#/system-settings` (`GET ?route=system-settings`):** 3-Tab-Cockpit für **1. Impressums- & Support-Stammdaten** (inkl. Live-E-Mail-Footer-Vorschau beim Tippen & `POST ?route=system-settings/save-imprint`), **2. SMTP-Konfiguration, HTML-/Plaintext-Vorlagen-Labor & Testversand** (`POST ?route=system-settings/send-test-mail`) sowie **3. Versand-Protokoll (`notification_log`) & PHP-8.0/8.4-Server-Umgebung**.
   * **`#/errors` (`GET ?route=errors`):** Speicherschonender Tail-Parser (1,5 MB Stream-Fenster) für `/var/www/web1/htdocs/log/.errorlog` mit automatischer Klassifizierung nach Schweregrad (`Fatal / Exception`, `SQL / Datenbank`, `Warning / Fehler`, `Deprecated / Notice`), Trennung nach `Web/HTTP` vs. `CLI/Cronjob`, 3 Ansichten (*1. Chronologische Fehlerliste*, *2. Gruppiert nach Häufigkeit*, *3. Original `.errorlog` Konsole*) sowie Wartungs-Aktionen (`POST ?route=errors/action`: `clear_log` mit `.errorlog.bak`-Backup, `restore_backup` und `write_test_entry`).
+
+---
+
+## 11. 👥 Modul „Cloud-User“ (`Users`)
+
+* **`App\Modules\Users` (`UsersController.php`, `views/list.php`, `views/detail.php`):**
+  * **`#/users` (`GET ?route=users`):** Serverseitig paginierte Gesamtübersicht aller Cloud-User (`members`) mit 4 KPI-Kacheln (Registrierte Cloud-User Aktiv/Gesperrt, Coins-Guthaben im Umlauf, Endgeräte `Mobile` vs. `Desktop`, Herkunfts-Domains / Shops), Filterung nach Herkunfts-Shop (`p4c_shop_id`), Coin-Guthaben, Gerät, Status, Sortierung und Volltextsuche.
+  * **`#/user?id=...` (`GET ?route=user&id=...`):** Lädt alle Mitglieds-Stammdaten + Shop-Domain in 1 Query (statt 9 Einzel-Queries der Legacy-Klasse `Member`) und bietet ein 3-Tab-Cockpit (*1. Benutzerdaten & Konto-Status* inkl. Sperren/Entsperren via `POST ?route=users/toggle-lock`, *2. Gekaufte Filme aus `movies_access`*, *3. Gekaufte Fotoalben aus `photo_albums_access`*).
+  * *(Hinweis: Alle veralteten Chat- und Nachrichten-Spalten/Tabs wurden gemäß Vorgabe vollständig entfernt.)*
