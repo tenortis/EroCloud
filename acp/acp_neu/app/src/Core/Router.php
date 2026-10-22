@@ -106,6 +106,7 @@ class Router
         $storageAnalyticsCtrl    = 'App\\Modules\\StorageAnalytics\\StorageAnalyticsController';
         $actorsCtrl              = 'App\\Modules\\Actors\\ActorsController';
         $merchantsCtrl           = 'App\\Modules\\Merchants\\MerchantsController';
+        $systemTechCtrl          = 'App\\Modules\\SystemTech\\SystemTechController';
         $previewCtrl             = 'App\\Modules\\Preview\\PreviewController';
 
         // 1. Startseite (Echtes Admin-Dashboard, Globale Schnellsuche, Notizen & Live-Counter)
@@ -187,7 +188,10 @@ class Router
         self::register('pointssystem', $previewCtrl, 'pointssystem', 'point_system');
 
         // 11. System & Technik (error_log)
-        self::register('system-settings', $previewCtrl, 'systemSettings', 'error_log');
-        self::register('errors', $previewCtrl, 'errors', 'error_log');
+        self::register('system-settings', $systemTechCtrl, 'settings', 'error_log');
+        self::register('system-settings/save-imprint', $systemTechCtrl, 'saveImprint', 'error_log');
+        self::register('system-settings/send-test-mail', $systemTechCtrl, 'sendTestMail', 'error_log');
+        self::register('errors', $systemTechCtrl, 'errors', 'error_log');
+        self::register('errors/action', $systemTechCtrl, 'errorLogAction', 'error_log');
     }
 }

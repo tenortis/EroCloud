@@ -167,31 +167,4 @@ final class PreviewController
             'acp/includes/pointssystem.php'
         );
     }
-
-    // 11. System & Technik (error_log)
-    public function systemSettings(): string
-    {
-        return $this->renderPlaceholder(
-            'bi-sliders',
-            'System & Technik',
-            'Impressum & E-Mail',
-            'Zentrale Verwaltung der Impressums- und Support-Stammdaten sowie E-Mail-Benachrichtigungs-Tests.',
-            'system-settings',
-            '/Einstellungen',
-            'acp/includes/system_settings.php'
-        );
-    }
-
-    public function errors(): string
-    {
-        return $this->renderPlaceholder(
-            'bi-bug-fill',
-            'System & Technik',
-            'Zentrales PHP-Error-Log',
-            'Echtzeit-Einsicht in das zentrale Fehlerprotokoll (/var/www/web1/htdocs/log/.errorlog) aller Systembereiche.',
-            'errors',
-            '/Errors',
-            'acp/includes/errors.php'
-        );
-    }
 }

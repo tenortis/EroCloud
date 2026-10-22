@@ -173,3 +173,11 @@ acp/acp_neu/ (später: acp/)
   * **N+1-Query-Eliminierung:** Statt 3 Einzel-Queries pro Händler in einer Schleife (~1.500 Queries im Legacy-AJAX `acp/includes/ajax/merchants.php`) werden alle Zähler für `actors`, `movies_online`, `movies`, `photo_albums_online` und `photo_albums` vorab in gebündelten `GROUP BY`-Abfragen geladen.
   * **Filter & AES-Volltextsuche:** Filter nach Richtlinien-Status (`accepted` / `pending`), Aktivität & Bestand (`active_30d`, `with_actors`, `without_actors`, `with_checking`, `multi_profile`), Sortierung, Seitengröße sowie Volltextsuche über `id`, `partner_id`, `AES_DECRYPT(username/email/firstname/surname/last_ip)` und zugeordnete Profilnamen.
   * **`#/merchant?id=...` (`GET ?route=merchant&id=...`):** Unterstützt sowohl die numerische `merchants.id` (`MID`) als auch die 10-stellige `merchants.partner_id` (`PID`), lädt alle entschlüsselten Stammdaten in 1 Query (statt 11 Einzel-Queries der Legacy-Klasse `Merchant`) und bietet ein 4-Tab-Cockpit (*1. Händler-Infos & Einstellungen*, *2. Darsteller-Profile*, *3. Filme & 18+ Nachweise*, *4. Login- & Aktivitäts-Historie aus `merchant_history`*) inkl. Speichern des Profil-Limits (`POST ?route=merchants/save-settings`).
+
+---
+
+## 10. ⚙️ Modul „System & Technik“ (`SystemTech`)
+
+* **`App\Modules\SystemTech` (`SystemTechController.php`, `views/settings.php`, `views/errors.php`):**
+  * **`#/system-settings` (`GET ?route=system-settings`):** 3-Tab-Cockpit für **1. Impressums- & Support-Stammdaten** (inkl. Live-E-Mail-Footer-Vorschau beim Tippen & `POST ?route=system-settings/save-imprint`), **2. SMTP-Konfiguration, HTML-/Plaintext-Vorlagen-Labor & Testversand** (`POST ?route=system-settings/send-test-mail`) sowie **3. Versand-Protokoll (`notification_log`) & PHP-8.0/8.4-Server-Umgebung**.
+  * **`#/errors` (`GET ?route=errors`):** Speicherschonender Tail-Parser (1,5 MB Stream-Fenster) für `/var/www/web1/htdocs/log/.errorlog` mit automatischer Klassifizierung nach Schweregrad (`Fatal / Exception`, `SQL / Datenbank`, `Warning / Fehler`, `Deprecated / Notice`), Trennung nach `Web/HTTP` vs. `CLI/Cronjob`, 3 Ansichten (*1. Chronologische Fehlerliste*, *2. Gruppiert nach Häufigkeit*, *3. Original `.errorlog` Konsole*) sowie Wartungs-Aktionen (`POST ?route=errors/action`: `clear_log` mit `.errorlog.bak`-Backup, `restore_backup` und `write_test_entry`).

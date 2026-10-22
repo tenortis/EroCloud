@@ -4124,6 +4124,281 @@ const App = {
       }
       return false;
     }
+  },
+
+  // ========================================================================
+  // 13. System & Technik (#/system-settings & #/errors)
+  // ========================================================================
+  SystemTech: {
+    previewDebounceTimer: null,
+
+    updateLiveFooterPreview() {
+      const val = (id) => (document.getElementById(id)?.value || '').trim();
+      const setTxt = (id, text) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+      };
+
+      const email = val('imp-email');
+      setTxt('prev-imp-email-1', email);
+      setTxt('prev-imp-email-2', email);
+      setTxt('prev-imp-company', val('imp-company'));
+      setTxt('prev-imp-street', val('imp-street'));
+      setTxt('prev-imp-city', val('imp-city'));
+      setTxt('prev-imp-court', val('imp-court'));
+      setTxt('prev-imp-regdetails', val('imp-regdetails'));
+      setTxt('prev-imp-vat', val('imp-vat'));
+      setTxt('prev-imp-ceo', val('imp-ceo'));
+      setTxt('prev-imp-phone', val('imp-phone'));
+
+      const emailLink = document.getElementById('prev-imp-email-link');
+      if (emailLink) emailLink.href = `mailto:${email}`;
+      const extLink = document.getElementById('prev-imp-ext-link');
+      if (extLink) extLink.href = val('imp-ext-url') || '#';
+      const waBtn = document.getElementById('prev-imp-wa-btn');
+      if (waBtn) waBtn.href = val('imp-wa-url') || '#';
+      const webBtn = document.getElementById('prev-imp-web-btn');
+      if (webBtn) webBtn.href = val('imp-web-url') || '#';
+    },
+
+    async saveImprint(event, resetDefaults = false) {
+      if (event) event.preventDefault();
+      const form = document.getElementById('sys-imprint-form');
+      const btn = document.getElementById('btn-save-imprint');
+      if (!form) return false;
+
+      const fd = new FormData(form);
+      fd.set('_csrf', App.csrfToken);
+      if (resetDefaults) {
+        fd.set('reset_defaults', '1');
+      }
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Speichere...';
+      }
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=system-settings/save-imprint`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.status !== 'ok') {
+          App.toast(data.message || 'Fehler beim Speichern der Impressums-Daten.', 'danger');
+          return false;
+        }
+
+        App.resetLogoutCountdown();
+        App.toast(data.message || 'Impressums- & Support-Daten gespeichert.', 'success');
+
+        if (resetDefaults && data.imprint) {
+          App.handleRoute();
+        }
+      } catch (err) {
+        App.toast('Netzwerkfehler: ' + err.message, 'danger');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-floppy-fill me-1"></i>Impressums- & Supportdaten speichern';
+        }
+      }
+      return false;
+    },
+
+    resetImprintDefaults() {
+      if (!window.confirm('Möchtest du alle Impressums- und Support-Felder auf die Pay4Coins-Standardwerte zurücksetzen?')) {
+        return;
+      }
+      this.saveImprint(null, true);
+    },
+
+    debouncedPreviewMail() {
+      if (this.previewDebounceTimer) {
+        clearTimeout(this.previewDebounceTimer);
+      }
+      this.previewDebounceTimer = setTimeout(() => {
+        this.sendOrPreviewTestMail(null, 'preview');
+      }, 280);
+    },
+
+    switchMailPreviewMode(mode) {
+      const htmlWrap = document.getElementById('sys-mail-preview-html-wrap');
+      const textWrap = document.getElementById('sys-mail-preview-text-wrap');
+      const btnHtml = document.getElementById('btn-view-mail-html');
+      const btnText = document.getElementById('btn-view-mail-text');
+
+      if (mode === 'text') {
+        if (htmlWrap) htmlWrap.classList.add('d-none');
+        if (textWrap) textWrap.classList.remove('d-none');
+        if (btnHtml) btnHtml.className = 'btn btn-outline-kkc';
+        if (btnText) btnText.className = 'btn btn-primary-kkc';
+      } else {
+        if (htmlWrap) htmlWrap.classList.remove('d-none');
+        if (textWrap) textWrap.classList.add('d-none');
+        if (btnHtml) btnHtml.className = 'btn btn-primary-kkc';
+        if (btnText) btnText.className = 'btn btn-outline-kkc';
+      }
+    },
+
+    async sendOrPreviewTestMail(event, mode = 'send') {
+      if (event) event.preventDefault();
+      const form = document.getElementById('sys-testmail-form');
+      const btn = document.getElementById('btn-send-testmail');
+      if (!form) return false;
+
+      const fd = new FormData(form);
+      fd.set('_csrf', App.csrfToken);
+      fd.set('mode', mode);
+
+      if (mode === 'send' && btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sende Test-E-Mail via SMTP...';
+      }
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=system-settings/send-test-mail`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.status !== 'ok') {
+          if (mode === 'send') {
+            App.toast(data.message || 'Test-E-Mail konnte nicht gesendet werden.', 'danger');
+          }
+          return false;
+        }
+
+        const subjEl = document.getElementById('sys-mail-preview-subject');
+        if (subjEl && typeof data.subject === 'string') {
+          subjEl.textContent = data.subject;
+        }
+        const iframe = document.getElementById('sys-mail-preview-iframe');
+        if (iframe && typeof data.html === 'string') {
+          iframe.srcdoc = data.html;
+        }
+        const txtWrap = document.getElementById('sys-mail-preview-text-wrap');
+        if (txtWrap && typeof data.text === 'string') {
+          txtWrap.textContent = data.text;
+        }
+
+        if (mode === 'send') {
+          App.resetLogoutCountdown();
+          App.toast(data.message || 'Test-E-Mail erfolgreich gesendet.', 'success');
+        }
+      } catch (err) {
+        if (mode === 'send') {
+          App.toast('Netzwerkfehler: ' + err.message, 'danger');
+        }
+      } finally {
+        if (mode === 'send' && btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-send-check-fill me-1"></i>Test-E-Mail („Video konvertiert“) jetzt absenden';
+        }
+      }
+      return false;
+    },
+
+    filterNotificationLog(query) {
+      const q = String(query || '').trim().toLowerCase();
+      document.querySelectorAll('.sys-notif-log-row').forEach(row => {
+        const hay = row.getAttribute('data-search') || '';
+        row.classList.toggle('d-none', !(q === '' || hay.includes(q)));
+      });
+    },
+
+    setErrorFilterSeverity(severity) {
+      const tabBtn = document.getElementById('tab-btn-err-list');
+      if (tabBtn && window.bootstrap?.Tab) {
+        window.bootstrap.Tab.getOrCreateInstance(tabBtn).show();
+      } else if (tabBtn) {
+        tabBtn.click();
+      }
+      const sel = document.getElementById('err-filter-severity');
+      if (sel) {
+        sel.value = severity;
+      }
+      this.applyErrorFilters();
+    },
+
+    applyErrorFilters() {
+      const sev = document.getElementById('err-filter-severity')?.value || 'all';
+      const ctx = document.getElementById('err-filter-context')?.value || 'all';
+      const q = (document.getElementById('err-filter-q')?.value || '').trim().toLowerCase();
+
+      document.querySelectorAll('.err-entry-row').forEach(row => {
+        const rowSev = row.getAttribute('data-severity') || '';
+        const rowCtx = row.getAttribute('data-context') || '';
+        const rowHay = row.getAttribute('data-search') || '';
+
+        const matchSev = (sev === 'all' || rowSev === sev);
+        const matchCtx = (ctx === 'all' || rowCtx === ctx);
+        const matchQ = (q === '' || rowHay.includes(q));
+
+        row.classList.toggle('d-none', !(matchSev && matchCtx && matchQ));
+      });
+    },
+
+    async copyRawErrorLog() {
+      const pre = document.getElementById('err-raw-console');
+      const txt = pre?.textContent || '';
+      if (!txt) return;
+      try {
+        await navigator.clipboard.writeText(txt);
+        App.toast('Log-Inhalt in die Zwischenablage kopiert.', 'success');
+      } catch (_) {
+        App.toast('Kopieren fehlgeschlagen.', 'danger');
+      }
+    },
+
+    async errorLogAction(actionType) {
+      if (actionType === 'clear_log') {
+        if (!window.confirm('Möchtest du das zentrale PHP-Error-Log (.errorlog) wirklich leeren? Es wird automatisch eine Sicherungskopie (.errorlog.bak) angelegt.')) {
+          return;
+        }
+      } else if (actionType === 'restore_backup') {
+        if (!window.confirm('Möchtest du die Sicherungskopie (.errorlog.bak) wiederherstellen?')) {
+          return;
+        }
+      }
+
+      const fd = new FormData();
+      fd.append('_csrf', App.csrfToken);
+      fd.append('action_type', actionType);
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=errors/action`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.status !== 'ok') {
+          App.toast(data.message || 'Aktion fehlgeschlagen.', 'danger');
+          return;
+        }
+
+        App.resetLogoutCountdown();
+        App.toast(data.message || 'Aktion erfolgreich ausgeführt.', 'success');
+        App.handleRoute();
+      } catch (err) {
+        App.toast('Netzwerkfehler: ' + err.message, 'danger');
+      }
+    }
   }
 };
 
