@@ -574,7 +574,7 @@ $singleCreatorProfileName = (count($actorNamesSummary) === 1) ? $actorNamesSumma
                 <?php foreach ($actors as $actor): ?>
                 <?php
                   $avatarUrl = $actor['avatar_fsk16'] !== ''
-                      ? $mcpUrl . '/ProfilePicture/' . rawurlencode($actor['avatar_fsk16'])
+                      ? $mcpUrl . '/ProfilePicture/' . rawurlencode($actor['avatar_fsk16']) . '?w=60'
                       : '';
                   $actorInitials = mb_strtoupper(mb_substr($actor['username'], 0, 2));
                   if ($actor['status'] === 'active') {
@@ -592,7 +592,7 @@ $singleCreatorProfileName = (count($actorNamesSummary) === 1) ? $actorNamesSumma
                   <td>
                     <div class="d-flex align-items-center gap-2">
                       <?php if ($avatarUrl !== ''): ?>
-                      <img src="<?= View::e($avatarUrl) ?>" alt="" class="rounded-circle object-fit-cover border flex-shrink-0" style="width: 28px; height: 28px;">
+                      <img src="<?= View::e($avatarUrl) ?>" alt="" class="rounded-circle object-fit-cover border flex-shrink-0" style="width: 28px; height: 28px;" loading="lazy">
                       <?php else: ?>
                       <span class="sidebar-actor-avatar flex-shrink-0" style="width: 28px; height: 28px;"><?= View::e($actorInitials) ?></span>
                       <?php endif; ?>

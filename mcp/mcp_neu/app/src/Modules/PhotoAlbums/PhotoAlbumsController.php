@@ -36,6 +36,7 @@ final class PhotoAlbumsController
         if ($merchantId === 0) {
             return '<div class="alert alert-danger m-4">Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.</div>';
         }
+        @session_write_close();
 
         $apiUrl = defined('API_URL') ? API_URL : 'https://api.erocloud.net';
 
@@ -189,6 +190,7 @@ final class PhotoAlbumsController
         if ($merchantId === 0) {
             return '<div class="alert alert-danger m-4">Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.</div>';
         }
+        @session_write_close();
 
         $albumDbId = abs((int)$this->request->get('id', 0));
         if ($albumDbId === 0) {
@@ -327,6 +329,7 @@ final class PhotoAlbumsController
         if ($merchantId === 0) {
             return '<div class="alert alert-danger m-4">Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.</div>';
         }
+        @session_write_close();
 
         $step      = abs((int)$this->request->get('step', 1));
         $albumDbId = abs((int)$this->request->get('album_id', 0));

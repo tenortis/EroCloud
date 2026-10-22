@@ -10,6 +10,7 @@ define('SAFE_INC', 1);
 
 include_once("../config.inc.php");
 include_once(MCP_DIR."/common.inc.php");
+@session_write_close();
 
 header('Access-Control-Allow-Origin: *');
 

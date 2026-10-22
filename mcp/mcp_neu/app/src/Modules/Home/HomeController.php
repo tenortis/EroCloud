@@ -36,6 +36,9 @@ class HomeController
         if ($merchantId <= 0) {
             return '<div class="alert alert-warning">Deine Sitzung ist abgelaufen. Bitte melde dich erneut über Pay4Coins an.</div>';
         }
+        @session_write_close();
+
+        self::ensureSearchIndexes();
 
         $merchant = new Merchant($mysql, $merchantId);
 
@@ -603,6 +606,8 @@ class HomeController
                 'items'        => [],
             ], 401);
         }
+        // Session-Lock sofort freigeben, damit der externe cURL-Aufruf niemals parallele Requests (z.B. Schnellsuche) blockiert
+        @session_write_close();
 
         $now        = time();
         $domain     = 'erocloud.net';
@@ -643,6 +648,7 @@ class HomeController
         if ($merchantId <= 0) {
             Response::json(['success' => false], 401);
         }
+        @session_write_close();
 
         $feedbackId = abs((int)$this->request->post('feedback_id', 0));
         $now        = time();
@@ -908,18 +914,27 @@ class HomeController
 
     /**
      * Globale Topbar-Schnellsuche über alle Filme und Fotoalben des Partners (JSON-Antwort).
-     * Kennzeichnet jeden Treffer eindeutig als 'movie' (Film) oder 'photo_album' (Fotoalbum).
+     * Unterstützt sowohl mode=catalog (kompletter In-Memory-Suchindex für Echtzeit-Filterung im Browser)
+     * als auch direkte Server-Filterung via q=...
      */
     public function globalSearch(): void
     {
         $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
         if ($merchantId <= 0) {
+            @session_write_close();
             Response::error('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.', 401);
             return;
         }
+        // Session-Lock sofort freigeben, damit die Suche niemals auf andere Requests warten muss
+        @session_write_close();
 
-        $rawQuery = trim((string)$this->request->get('q', $this->request->post('q', '')));
-        if ($rawQuery === '') {
+        self::ensureSearchIndexes();
+
+        $mode        = trim((string)$this->request->get('mode', $this->request->post('mode', '')));
+        $isCatalog   = ($mode === 'catalog');
+        $rawQuery    = trim((string)$this->request->get('q', $this->request->post('q', '')));
+
+        if (!$isCatalog && $rawQuery === '') {
             Response::json([
                 'status' => 'ok',
                 'query'  => '',
@@ -935,7 +950,9 @@ class HomeController
 
         $queryLower = mb_strtolower($rawQuery, 'UTF-8');
         $idQuery    = ltrim($queryLower, '#');
-        $tokens     = array_values(array_filter(preg_split('/\s+/u', $queryLower) ?: [], static fn(string $t): bool => $t !== ''));
+        $tokens     = $isCatalog
+            ? []
+            : array_values(array_filter(preg_split('/\s+/u', $queryLower) ?: [], static fn(string $t): bool => $t !== ''));
 
         $apiUrl = defined('API_URL') ? API_URL : 'https://api.erocloud.net';
 
@@ -1039,32 +1056,34 @@ class HomeController
                 $searchable = '#' . $movieId . ' ' . $movieId . ' ' . $codeLower . ' ' . $titleLower . ' '
                     . $actorLower . ' ' . mb_strtolower($statusLabel, 'UTF-8') . ' ' . $onlineAtFormatted . ' film filme video';
 
-                $allMatched = true;
-                foreach ($tokens as $token) {
-                    $cleanToken = ltrim($token, '#');
-                    if (
-                        mb_strpos($searchable, $token) === false
-                        && ($cleanToken === '' || mb_strpos($searchable, $cleanToken) === false)
-                    ) {
-                        $allMatched = false;
-                        break;
-                    }
-                }
-                if (!$allMatched) {
-                    continue;
-                }
-
                 $score = 30;
-                if ((string)$movieId === $idQuery || $codeLower === $queryLower) {
-                    $score = 100;
-                } elseif ($idQuery !== '' && ctype_digit($idQuery) && str_starts_with((string)$movieId, $idQuery)) {
-                    $score = 85;
-                } elseif (str_starts_with($titleLower, $queryLower)) {
-                    $score = 75;
-                } elseif (mb_strpos($titleLower, $queryLower) !== false) {
-                    $score = 60;
-                } elseif (mb_strpos($actorLower, $queryLower) !== false) {
-                    $score = 45;
+                if (!$isCatalog) {
+                    $allMatched = true;
+                    foreach ($tokens as $token) {
+                        $cleanToken = ltrim($token, '#');
+                        if (
+                            mb_strpos($searchable, $token) === false
+                            && ($cleanToken === '' || mb_strpos($searchable, $cleanToken) === false)
+                        ) {
+                            $allMatched = false;
+                            break;
+                        }
+                    }
+                    if (!$allMatched) {
+                        continue;
+                    }
+
+                    if ((string)$movieId === $idQuery || $codeLower === $queryLower) {
+                        $score = 100;
+                    } elseif ($idQuery !== '' && ctype_digit($idQuery) && str_starts_with((string)$movieId, $idQuery)) {
+                        $score = 85;
+                    } elseif (str_starts_with($titleLower, $queryLower)) {
+                        $score = 75;
+                    } elseif (mb_strpos($titleLower, $queryLower) !== false) {
+                        $score = 60;
+                    } elseif (mb_strpos($actorLower, $queryLower) !== false) {
+                        $score = 45;
+                    }
                 }
 
                 $playtime   = trim((string)($m->playtime_string ?? ''));
@@ -1181,32 +1200,34 @@ class HomeController
                 $searchable = '#' . $albumDbId . ' ' . $albumDbId . ' ' . $codeLower . ' ' . $titleLower . ' '
                     . $actorLower . ' ' . mb_strtolower($statusLabel, 'UTF-8') . ' ' . $onlineAtFormatted . ' fotoalbum foto-album fotoalben fotos bilder';
 
-                $allMatched = true;
-                foreach ($tokens as $token) {
-                    $cleanToken = ltrim($token, '#');
-                    if (
-                        mb_strpos($searchable, $token) === false
-                        && ($cleanToken === '' || mb_strpos($searchable, $cleanToken) === false)
-                    ) {
-                        $allMatched = false;
-                        break;
-                    }
-                }
-                if (!$allMatched) {
-                    continue;
-                }
-
                 $score = 30;
-                if ((string)$albumDbId === $idQuery || $codeLower === $queryLower) {
-                    $score = 100;
-                } elseif ($idQuery !== '' && ctype_digit($idQuery) && str_starts_with((string)$albumDbId, $idQuery)) {
-                    $score = 85;
-                } elseif (str_starts_with($titleLower, $queryLower)) {
-                    $score = 75;
-                } elseif (mb_strpos($titleLower, $queryLower) !== false) {
-                    $score = 60;
-                } elseif (mb_strpos($actorLower, $queryLower) !== false) {
-                    $score = 45;
+                if (!$isCatalog) {
+                    $allMatched = true;
+                    foreach ($tokens as $token) {
+                        $cleanToken = ltrim($token, '#');
+                        if (
+                            mb_strpos($searchable, $token) === false
+                            && ($cleanToken === '' || mb_strpos($searchable, $cleanToken) === false)
+                        ) {
+                            $allMatched = false;
+                            break;
+                        }
+                    }
+                    if (!$allMatched) {
+                        continue;
+                    }
+
+                    if ((string)$albumDbId === $idQuery || $codeLower === $queryLower) {
+                        $score = 100;
+                    } elseif ($idQuery !== '' && ctype_digit($idQuery) && str_starts_with((string)$albumDbId, $idQuery)) {
+                        $score = 85;
+                    } elseif (str_starts_with($titleLower, $queryLower)) {
+                        $score = 75;
+                    } elseif (mb_strpos($titleLower, $queryLower) !== false) {
+                        $score = 60;
+                    } elseif (mb_strpos($actorLower, $queryLower) !== false) {
+                        $score = 45;
+                    }
                 }
 
                 $matchedAlbums[] = [
@@ -1230,6 +1251,23 @@ class HomeController
             }
         }
 
+        $totalMovies = count($matchedMovies);
+        $totalAlbums = count($matchedAlbums);
+
+        if ($isCatalog) {
+            Response::json([
+                'status' => 'ok',
+                'mode'   => 'catalog',
+                'counts' => [
+                    'total'  => $totalMovies + $totalAlbums,
+                    'movies' => $totalMovies,
+                    'albums' => $totalAlbums,
+                ],
+                'items'  => array_merge($matchedMovies, $matchedAlbums),
+            ]);
+            return;
+        }
+
         $sortFn = static function (array $a, array $b): int {
             $scoreCmp = ((int)$b['score']) <=> ((int)$a['score']);
             if ($scoreCmp !== 0) {
@@ -1240,9 +1278,6 @@ class HomeController
 
         usort($matchedMovies, $sortFn);
         usort($matchedAlbums, $sortFn);
-
-        $totalMovies = count($matchedMovies);
-        $totalAlbums = count($matchedAlbums);
 
         // Jeweils bis zu 20 Top-Filme und 20 Top-Fotoalben zusammenführen, damit beide Filter-Tabs im Dropdown versorgt sind
         $combined = array_merge(
@@ -1261,6 +1296,58 @@ class HomeController
             ],
             'items'  => $combined,
         ]);
+    }
+
+    /**
+     * Prüft einmalig und legt bei Bedarf zusammengesetzte Datenbank-Indizes für schnelle Partner-Abfragen an.
+     */
+    private static function ensureSearchIndexes(): void
+    {
+        $flagDir  = (defined('TEMP_DIR') && is_dir(TEMP_DIR)) ? rtrim((string)TEMP_DIR, '/\\') : sys_get_temp_dir();
+        $flagFile = $flagDir . '/.ec_mcp_search_idx_v1.flag';
+        if (@is_file($flagFile)) {
+            return;
+        }
+
+        $targets = [
+            'movies' => [
+                'name' => 'idx_ec_merchant_status_id',
+                'cols' => '`merchant_id`, `status`, `id`',
+            ],
+            'photo_albums' => [
+                'name' => 'idx_ec_merchant_status_id',
+                'cols' => '`merchant_id`, `status`, `id`',
+            ],
+            'photo_albums_online' => [
+                'name' => 'idx_ec_merchant_album',
+                'cols' => '`merchant_id`, `album_id`',
+            ],
+            'actors' => [
+                'name' => 'idx_ec_merchant_status',
+                'cols' => '`merchant_id`, `status`',
+            ],
+        ];
+
+        foreach ($targets as $table => $idxSpec) {
+            $hasMerchantIdx = false;
+            $rsIdx = p4c_query("SHOW INDEX FROM `" . $table . "`;", __FILE__, __LINE__);
+            if ($rsIdx && p4c_num_rows($rsIdx) > 0) {
+                while ($row = p4c_fetch_object($rsIdx)) {
+                    $keyName = (string)($row->Key_name ?? '');
+                    $colName = (string)($row->Column_name ?? '');
+                    $seqIn   = abs((int)($row->Seq_in_index ?? 0));
+                    if ($keyName === $idxSpec['name'] || ($seqIn === 1 && $colName === 'merchant_id')) {
+                        $hasMerchantIdx = true;
+                        break;
+                    }
+                }
+            }
+            if (!$hasMerchantIdx) {
+                p4c_query("ALTER TABLE `" . $table . "` ADD INDEX `" . $idxSpec['name'] . "` (" . $idxSpec['cols'] . ");", __FILE__, __LINE__);
+            }
+        }
+
+        @file_put_contents($flagFile, date('Y-m-d H:i:s'));
     }
 
     /**

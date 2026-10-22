@@ -274,6 +274,14 @@ const App = {
     this.initCreatorFeedbackEvents();
   },
 
+  searchCatalog: null,
+  searchCatalogPromise: null,
+
+  invalidateSearchCatalog() {
+    this.searchCatalog = null;
+    this.searchCatalogPromise = null;
+  },
+
   hideGlobalSearchDropdown() {
     const dropdown = document.getElementById('global-search-dropdown');
     if (dropdown) {
@@ -281,7 +289,8 @@ const App = {
     }
   },
 
-  // Globale Schnellsuche in der Topbar: Durchsucht Filme & Fotoalben live mit eindeutiger Typ-Kennzeichnung
+  // Globale Schnellsuche in der Topbar: Lädt den kompletten Katalog (Filme & Fotoalben) einmalig in den
+  // Browser-Speicher und filtert anschließend jeden Tastendruck verzögerungsfrei (< 1 ms, 0 Netzwerk-Latenz)
   initGlobalTopbarSearch() {
     const wrapper = document.getElementById('global-search-wrapper');
     const globalInput = document.getElementById('global-search-input');
@@ -289,11 +298,135 @@ const App = {
     const dropdown = document.getElementById('global-search-dropdown');
     if (!globalInput || !dropdown) return;
 
-    let searchTimer = null;
-    let abortCtrl = null;
     let lastData = null;
     let activeFilter = 'all'; // 'all' | 'movie' | 'photo_album'
     let activeIdx = -1;
+
+    const prepareCatalogItems = (rawItems) => {
+      if (!Array.isArray(rawItems)) return [];
+      return rawItems.map(item => {
+        const idNum = parseInt(item.id, 10) || 0;
+        const idStr = String(idNum);
+        const titleLower = String(item.title || '').toLowerCase();
+        const actorLower = String(item.actor_name || '').toLowerCase();
+        const codeLower = String(item.code || '').toLowerCase();
+        const statusLower = String(item.status_label || '').toLowerCase();
+        const onlineStr = String(item.online_at || '').toLowerCase();
+        const typeWords = item.type === 'movie'
+          ? 'film filme video'
+          : 'fotoalbum foto-album fotoalben fotos bilder';
+
+        return {
+          ...item,
+          id: idNum,
+          _idStr: idStr,
+          _titleLower: titleLower,
+          _actorLower: actorLower,
+          _codeLower: codeLower,
+          _searchable: `#${idStr} ${idStr} ${codeLower} ${titleLower} ${actorLower} ${statusLower} ${onlineStr} ${typeWords}`
+        };
+      });
+    };
+
+    const ensureCatalogLoaded = async () => {
+      if (Array.isArray(this.searchCatalog)) {
+        return this.searchCatalog;
+      }
+      if (this.searchCatalogPromise) {
+        return this.searchCatalogPromise;
+      }
+
+      this.searchCatalogPromise = (async () => {
+        try {
+          const res = await fetch(`${this.basePath}/api.php?route=home/global-search&mode=catalog`, {
+            method: 'GET',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+          });
+          if (!res.ok) {
+            this.searchCatalogPromise = null;
+            return null;
+          }
+          const data = await res.json();
+          if (data && data.status === 'ok' && Array.isArray(data.items)) {
+            this.searchCatalog = prepareCatalogItems(data.items);
+            return this.searchCatalog;
+          }
+        } catch (_) {
+          // Stiller Fallback
+        }
+        this.searchCatalogPromise = null;
+        return null;
+      })();
+
+      return this.searchCatalogPromise;
+    };
+
+    const filterCatalogLocally = (query, catalog) => {
+      const qLower = query.toLowerCase().trim();
+      const idQuery = qLower.replace(/^#+/, '');
+      const isDigits = idQuery !== '' && /^\d+$/.test(idQuery);
+      const tokens = qLower.split(/\s+/).filter(Boolean);
+
+      const matchedMovies = [];
+      const matchedAlbums = [];
+
+      for (let i = 0; i < catalog.length; i++) {
+        const item = catalog[i];
+        let allMatched = true;
+        for (let t = 0; t < tokens.length; t++) {
+          const tok = tokens[t];
+          const cleanTok = tok.replace(/^#+/, '');
+          if (
+            !item._searchable.includes(tok) &&
+            (cleanTok === '' || !item._searchable.includes(cleanTok))
+          ) {
+            allMatched = false;
+            break;
+          }
+        }
+        if (!allMatched) continue;
+
+        let score = 30;
+        if (item._idStr === idQuery || item._codeLower === qLower) {
+          score = 100;
+        } else if (isDigits && item._idStr.startsWith(idQuery)) {
+          score = 85;
+        } else if (item._titleLower.startsWith(qLower)) {
+          score = 75;
+        } else if (item._titleLower.includes(qLower)) {
+          score = 60;
+        } else if (item._actorLower.includes(qLower)) {
+          score = 45;
+        }
+
+        const scored = { ...item, score };
+        if (item.type === 'movie') {
+          matchedMovies.push(scored);
+        } else {
+          matchedAlbums.push(scored);
+        }
+      }
+
+      const sortFn = (a, b) => (b.score - a.score) || (b.id - a.id);
+      matchedMovies.sort(sortFn);
+      matchedAlbums.sort(sortFn);
+
+      const combined = [
+        ...matchedMovies.slice(0, 25),
+        ...matchedAlbums.slice(0, 25)
+      ].sort(sortFn);
+
+      return {
+        status: 'ok',
+        query,
+        counts: {
+          total: matchedMovies.length + matchedAlbums.length,
+          movies: matchedMovies.length,
+          albums: matchedAlbums.length
+        },
+        items: combined
+      };
+    };
 
     const getFilteredItems = () => {
       if (!lastData || !Array.isArray(lastData.items)) return [];
@@ -471,52 +604,11 @@ const App = {
       });
     };
 
-    const runSearch = async (query) => {
-      if (abortCtrl) {
-        abortCtrl.abort();
-      }
-      abortCtrl = new AbortController();
-
-      try {
-        const res = await fetch(`${this.basePath}/api.php?route=home/global-search&q=${encodeURIComponent(query)}`, {
-          method: 'GET',
-          headers: { 'X-Requested-With': 'XMLHttpRequest' },
-          signal: abortCtrl.signal
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data && data.status === 'ok') {
-          lastData = data;
-          activeIdx = -1;
-          renderDropdown();
-        }
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          // Stiller Fallback bei Netzwerkunterbrechung
-        }
-      }
-    };
-
-    globalInput.addEventListener('input', () => {
-      const val = globalInput.value.trim();
-      if (clearBtn) {
-        clearBtn.classList.toggle('d-none', val === '');
-      }
-
-      // Falls gerade die Film- oder Fotoalben-Tabelle offen ist, lokal mitsaubern/mitfiltern
-      const smartSearch = document.getElementById('smart-search-input');
-      if (smartSearch) {
-        smartSearch.value = globalInput.value;
-        smartSearch.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-
-      if (searchTimer) {
-        clearTimeout(searchTimer);
-      }
-
-      if (val === '') {
-        lastData = null;
-        this.hideGlobalSearchDropdown();
+    const runInstantSearch = async (query) => {
+      if (Array.isArray(this.searchCatalog)) {
+        lastData = filterCatalogLocally(query, this.searchCatalog);
+        activeIdx = -1;
+        renderDropdown();
         return;
       }
 
@@ -530,19 +622,52 @@ const App = {
         dropdown.classList.remove('d-none');
       }
 
-      searchTimer = setTimeout(() => {
-        runSearch(val);
-      }, 150);
+      const catalog = await ensureCatalogLoaded();
+      const currentVal = globalInput.value.trim();
+      if (currentVal === '') {
+        this.hideGlobalSearchDropdown();
+        return;
+      }
+
+      if (Array.isArray(catalog)) {
+        lastData = filterCatalogLocally(currentVal, catalog);
+        activeIdx = -1;
+        renderDropdown();
+      }
+    };
+
+    // Katalog im Hintergrund nach dem initialen Seitenaufbau vorladen, damit der 1. Tastendruck bereits 0ms braucht
+    setTimeout(() => {
+      ensureCatalogLoaded();
+    }, 900);
+
+    globalInput.addEventListener('input', () => {
+      const val = globalInput.value.trim();
+      if (clearBtn) {
+        clearBtn.classList.toggle('d-none', val === '');
+      }
+
+      // Falls gerade die Film- oder Fotoalben-Tabelle offen ist, lokal mitfiltern
+      const smartSearch = document.getElementById('smart-search-input');
+      if (smartSearch) {
+        smartSearch.value = globalInput.value;
+        smartSearch.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+
+      if (val === '') {
+        lastData = null;
+        this.hideGlobalSearchDropdown();
+        return;
+      }
+
+      runInstantSearch(val);
     });
 
     globalInput.addEventListener('focus', () => {
+      ensureCatalogLoaded();
       const val = globalInput.value.trim();
       if (val !== '') {
-        if (lastData && lastData.query === val) {
-          dropdown.classList.remove('d-none');
-        } else {
-          runSearch(val);
-        }
+        runInstantSearch(val);
       }
     });
 
@@ -2031,13 +2156,17 @@ const App = {
     const btnGrabVideoFrame = document.getElementById('btn-studio-grab-video-frame');
 
     const LOGO_STORAGE_KEY = 'erocloud_creator_logo_v1';
+    const studioContext = modalEl.getAttribute('data-studio-context') || 'movie';
+    const entityId = modalEl.getAttribute('data-entity-id') || modalEl.getAttribute('data-movie-id') || '0';
 
     const state = {
-      movieId: modalEl.getAttribute('data-movie-id') || '0',
+      studioContext,
+      entityId,
+      movieId: modalEl.getAttribute('data-movie-id') || entityId,
       targetFsk: '16', // '16' | '18'
       activeTab: 'censor', // 'censor' | 'adjust' | 'badges' | 'logo'
-      num: '1',
-      sourceLabel: 'Szene #1',
+      num: studioContext === 'photo-album' ? 'cover_16' : '1',
+      sourceLabel: studioContext === 'photo-album' ? 'Album-Foto' : 'Szene #1',
       isCustomSource: false, // true wenn lokales Bild oder Video-Frame geladen wurde
       thumbUrl: '',
       zoomUrl: '',
@@ -2553,9 +2682,15 @@ const App = {
 
       if (lblSavePrimary) {
         const fskLabel = state.targetFsk === '18' ? 'FSK 18 Cover' : 'FSK 16 Cover';
-        lblSavePrimary.textContent = hasAnyEdits()
-          ? `Bearbeitetes Bild als ${fskLabel} speichern & aktivieren`
-          : `${state.sourceLabel} als ${fskLabel} übernehmen`;
+        if (state.studioContext === 'photo-album') {
+          lblSavePrimary.textContent = hasAnyEdits()
+            ? `Bearbeitetes Bild als ${fskLabel} speichern`
+            : `${state.sourceLabel} als ${fskLabel} speichern`;
+        } else {
+          lblSavePrimary.textContent = hasAnyEdits()
+            ? `Bearbeitetes Bild als ${fskLabel} speichern & aktivieren`
+            : `${state.sourceLabel} als ${fskLabel} übernehmen`;
+        }
       }
     };
 
@@ -3129,8 +3264,18 @@ const App = {
       });
     };
 
-    const getSceneLabel = (numStr) => {
+    const getSceneLabel = (numStr, customLabel = '') => {
+      if (customLabel) return customLabel;
       const s = String(numStr);
+      if (state.studioContext === 'photo-album') {
+        if (s === 'cover_16' || s === '11') return 'FSK 16 Cover';
+        if (s === 'cover_18' || s === '12') return 'FSK 18 Cover';
+        const filmItem = modalEl.querySelector(`.js-studio-filmstrip-thumb[data-num="${s}"]`);
+        if (filmItem && filmItem.getAttribute('data-label')) {
+          return filmItem.getAttribute('data-label');
+        }
+        return 'Album-Foto';
+      }
       if (s === '11') return 'Eigenes FSK16 (#11)';
       if (s === '12') return 'Eigenes FSK18 (#12)';
       return `Szene #${s}`;
@@ -3154,15 +3299,33 @@ const App = {
       renderCanvas(true);
     };
 
-    const loadSceneIntoCanvas = (num, thumbUrl, zoomUrl, editorUrl) => {
-      state.num = String(num || '1');
+    const loadSceneIntoCanvas = (num, thumbUrl, zoomUrl, editorUrl, customLabel = '') => {
+      state.num = String(num || (state.studioContext === 'photo-album' ? 'cover_16' : '1'));
       state.thumbUrl = thumbUrl || '';
       state.zoomUrl = zoomUrl || thumbUrl || '';
       state.editorUrl = editorUrl || zoomUrl || thumbUrl || '';
       highlightFilmstripItem(state.num);
       setVideoStageMode(false);
 
-      const labelName = getSceneLabel(state.num);
+      const labelName = getSceneLabel(state.num, customLabel);
+      state.sourceLabel = labelName;
+      syncStudioUI();
+
+      if (!state.editorUrl) {
+        state.baseImage = null;
+        if (canvasContainer) canvasContainer.classList.add('d-none');
+        if (loadingEl) {
+          loadingEl.innerHTML = `
+            <div class="text-info small px-3">
+              <i class="bi bi-images fs-2 d-block mb-2"></i>
+              Bitte wähle unten im Filmstreifen ein Foto aus oder klicke links auf <strong>„Eigenes Foto laden"</strong>, um ein Bild vom Gerät zu öffnen.
+            </div>
+          `;
+          loadingEl.classList.remove('d-none');
+        }
+        return;
+      }
+
       if (loadingEl) {
         loadingEl.innerHTML = `
           <div class="spinner-border text-info mb-2" role="status"></div>
@@ -3172,23 +3335,36 @@ const App = {
       }
       if (canvasContainer) canvasContainer.classList.add('d-none');
 
+      const sep = state.editorUrl.includes('?') ? '&' : '?';
+      const targetUrl = `${state.editorUrl}${sep}_cb=${Date.now()}`;
+
       const img = new Image();
-      img.crossOrigin = 'anonymous';
+      try {
+        const parsedUrl = new URL(targetUrl, window.location.href);
+        if (parsedUrl.origin !== window.location.origin) {
+          img.crossOrigin = 'anonymous';
+        }
+      } catch (_) {
+        img.crossOrigin = 'anonymous';
+      }
+
       img.onload = () => {
         loadBaseImageElement(img, labelName, false);
       };
       img.onerror = () => {
         if (loadingEl) {
-          loadingEl.innerHTML = '<div class="text-danger small">Das Vorschaubild konnte nicht geladen werden.</div>';
+          loadingEl.innerHTML = '<div class="text-danger small">Das Vorschaubild konnte nicht geladen werden. Bitte wähle unten im Filmstreifen ein Foto oder lade ein eigenes Bild vom Gerät.</div>';
         }
       };
-      const sep = state.editorUrl.includes('?') ? '&' : '?';
-      img.src = `${state.editorUrl}${sep}_cb=${Date.now()}`;
+      img.src = targetUrl;
     };
 
-    const openStudioWithScene = (movieId, num, thumbUrl, zoomUrl, editorUrl, targetFsk = '16') => {
+    const openStudioWithScene = (movieId, num, thumbUrl, zoomUrl, editorUrl, targetFsk = '16', customLabel = '', defaultTab = '') => {
       this.hideThumbZoomPopover();
-      state.movieId = String(movieId || state.movieId || '0');
+      if (typeof this.hideGlobalSearchDropdown === 'function') {
+        this.hideGlobalSearchDropdown();
+      }
+      state.movieId = String(movieId || state.entityId || state.movieId || '0');
       state.shapes = [];
       state.objects = [];
       state.selectedObjId = null;
@@ -3196,11 +3372,14 @@ const App = {
       applyAdjustmentValues(0, 0, 0, 0);
 
       setTargetFskMode(targetFsk, true);
+      if (defaultTab) {
+        switchStudioTab(defaultTab);
+      }
 
       const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
       bsModal.show();
 
-      loadSceneIntoCanvas(num, thumbUrl, zoomUrl, editorUrl);
+      loadSceneIntoCanvas(num, thumbUrl, zoomUrl, editorUrl, customLabel);
     };
 
     // Wenn im Header zwischen FSK 16 und FSK 18 umgeschaltet wird (und noch keine Bearbeitung aktiv ist),
@@ -3210,14 +3389,27 @@ const App = {
         const was18 = state.targetFsk === '18';
         setTargetFskMode('16', true);
         if (was18 && !hasAnyEdits()) {
-          const wrap16 = document.getElementById('current-fsk16-wrap');
-          if (wrap16 && wrap16.getAttribute('data-studio-ready') !== '0') {
-            loadSceneIntoCanvas(
-              wrap16.getAttribute('data-num'),
-              wrap16.getAttribute('data-thumb-url'),
-              wrap16.getAttribute('data-zoom-src'),
-              wrap16.getAttribute('data-editor-url')
-            );
+          if (state.studioContext === 'photo-album') {
+            const custom11 = document.getElementById('studio-filmstrip-custom-11');
+            if (custom11 && !custom11.classList.contains('d-none')) {
+              loadSceneIntoCanvas(
+                custom11.getAttribute('data-num') || 'cover_16',
+                custom11.getAttribute('data-thumb-url'),
+                custom11.getAttribute('data-zoom-url'),
+                custom11.getAttribute('data-editor-url'),
+                custom11.getAttribute('data-label') || 'FSK 16 Cover'
+              );
+            }
+          } else {
+            const wrap16 = document.getElementById('current-fsk16-wrap');
+            if (wrap16 && wrap16.getAttribute('data-studio-ready') !== '0') {
+              loadSceneIntoCanvas(
+                wrap16.getAttribute('data-num'),
+                wrap16.getAttribute('data-thumb-url'),
+                wrap16.getAttribute('data-zoom-src'),
+                wrap16.getAttribute('data-editor-url')
+              );
+            }
           }
         }
       });
@@ -3227,14 +3419,27 @@ const App = {
         const was16 = state.targetFsk === '16';
         setTargetFskMode('18', true);
         if (was16 && !hasAnyEdits()) {
-          const wrap18 = document.getElementById('current-fsk18-wrap');
-          if (wrap18 && wrap18.getAttribute('data-studio-ready') !== '0') {
-            loadSceneIntoCanvas(
-              wrap18.getAttribute('data-num'),
-              wrap18.getAttribute('data-thumb-url'),
-              wrap18.getAttribute('data-zoom-src'),
-              wrap18.getAttribute('data-editor-url')
-            );
+          if (state.studioContext === 'photo-album') {
+            const custom12 = document.getElementById('studio-filmstrip-custom-12');
+            if (custom12 && !custom12.classList.contains('d-none')) {
+              loadSceneIntoCanvas(
+                custom12.getAttribute('data-num') || 'cover_18',
+                custom12.getAttribute('data-thumb-url'),
+                custom12.getAttribute('data-zoom-url'),
+                custom12.getAttribute('data-editor-url'),
+                custom12.getAttribute('data-label') || 'FSK 18 Cover'
+              );
+            }
+          } else {
+            const wrap18 = document.getElementById('current-fsk18-wrap');
+            if (wrap18 && wrap18.getAttribute('data-studio-ready') !== '0') {
+              loadSceneIntoCanvas(
+                wrap18.getAttribute('data-num'),
+                wrap18.getAttribute('data-thumb-url'),
+                wrap18.getAttribute('data-zoom-src'),
+                wrap18.getAttribute('data-editor-url')
+              );
+            }
           }
         }
       });
@@ -3247,7 +3452,8 @@ const App = {
         const tUrl = item.getAttribute('data-thumb-url') || '';
         const zUrl = item.getAttribute('data-zoom-url') || tUrl;
         const eUrl = item.getAttribute('data-editor-url') || zUrl;
-        loadSceneIntoCanvas(num, tUrl, zUrl, eUrl);
+        const lbl = item.getAttribute('data-label') || '';
+        loadSceneIntoCanvas(num, tUrl, zUrl, eUrl, lbl);
       });
     });
 
@@ -3347,7 +3553,7 @@ const App = {
       });
     });
 
-    // Klick auf ein Vorschaubild oder auf „Im Studio bearbeiten" öffnet das Fullscreen Cover-Studio
+    // Klick auf ein Vorschaubild oder auf „FSK16 / FSK18" an einem Album-Foto öffnet das Fullscreen Cover-Studio
     document.querySelectorAll('.js-open-thumb-editor-modal').forEach(el => {
       el.addEventListener('click', (ev) => {
         ev.preventDefault();
@@ -3356,24 +3562,65 @@ const App = {
           return;
         }
         const targetFsk = el.getAttribute('data-target-fsk') || el.getAttribute('data-fsk') || '16';
+        const sceneNum = el.getAttribute('data-num') || el.getAttribute('data-scene') || '1';
+        const customLabel = el.getAttribute('data-label') || '';
+        const defaultTab = el.getAttribute('data-default-tab') || '';
+        const editorUrl = el.getAttribute('data-editor-url') || '';
+        const zoomUrl = el.getAttribute('data-zoom-src') || editorUrl;
+        const thumbUrl = el.getAttribute('data-thumb-url') || el.getAttribute('src') || zoomUrl;
+
         openStudioWithScene(
-          el.getAttribute('data-movie-id'),
-          el.getAttribute('data-num'),
-          el.getAttribute('data-thumb-url'),
-          el.getAttribute('data-zoom-src'),
-          el.getAttribute('data-editor-url'),
-          targetFsk
+          el.getAttribute('data-movie-id') || state.entityId,
+          sceneNum,
+          thumbUrl,
+          zoomUrl,
+          editorUrl,
+          targetFsk,
+          customLabel,
+          defaultTab
         );
       });
     });
 
     document.querySelectorAll('.js-open-active-fsk-editor').forEach(btn => {
       btn.addEventListener('click', () => {
+        const fsk = btn.getAttribute('data-target-fsk') || btn.getAttribute('data-fsk') || '16';
+
+        // Foto-Album Modus
+        if (state.studioContext === 'photo-album') {
+          const isReady = btn.getAttribute('data-studio-ready') === '1';
+          if (isReady) {
+            const imgEl = document.getElementById(`preview-fsk${fsk}-img`);
+            const sceneNum = btn.getAttribute('data-scene') || (`cover_${fsk}`);
+            const eUrl = (imgEl && imgEl.getAttribute('data-editor-url')) || btn.getAttribute('data-editor-url') || '';
+            const zUrl = (imgEl && imgEl.getAttribute('data-zoom-src')) || eUrl;
+            const tUrl = (imgEl && imgEl.getAttribute('src')) || zUrl;
+            openStudioWithScene(state.entityId, sceneNum, tUrl, zUrl, eUrl, fsk, `FSK ${fsk} Cover`);
+            return;
+          }
+
+          // Noch kein eigenes FSK16/18 Cover vorhanden -> automatisch erstes Album-Foto aus dem Filmstreifen als Vorlage laden
+          const firstPhotoItem = modalEl.querySelector('.js-studio-filmstrip-thumb:not([id^="studio-filmstrip-custom-"])');
+          if (firstPhotoItem) {
+            const pNum = firstPhotoItem.getAttribute('data-num') || 'photo_1';
+            const pThumb = firstPhotoItem.getAttribute('data-thumb-url') || '';
+            const pZoom = firstPhotoItem.getAttribute('data-zoom-url') || pThumb;
+            const pEditor = firstPhotoItem.getAttribute('data-editor-url') || pZoom;
+            const pLabel = firstPhotoItem.getAttribute('data-label') || 'Foto #1';
+            openStudioWithScene(state.entityId, pNum, pThumb, pZoom, pEditor, fsk, pLabel);
+            this.toast(`${pLabel} wurde als Vorlage geladen. Du kannst unten im Filmstreifen jederzeit ein anderes Album-Foto wählen!`, 'info');
+          } else {
+            openStudioWithScene(state.entityId, `cover_${fsk}`, '', '', '', fsk, `FSK ${fsk} Cover`);
+            this.toast('Lade im Studio über „Eigenes Foto laden" ein Bild vom Gerät oder lade zuerst Fotos in dein Album hoch.', 'info');
+          }
+          return;
+        }
+
+        // Video (Movie) Modus
         if (btn.getAttribute('data-studio-ready') === '0') {
           this.toast('Das Cover-Studio ist erst verfügbar, sobald ein Vorschaubild hochgeladen wurde oder die Video-Konvertierung abgeschlossen ist.', 'info');
           return;
         }
-        const fsk = btn.getAttribute('data-fsk') || '16';
         const wrap = document.getElementById(`current-fsk${fsk}-wrap`);
         if (!wrap || wrap.getAttribute('data-studio-ready') === '0') {
           this.toast('Das Cover-Studio ist erst verfügbar, sobald ein Vorschaubild hochgeladen wurde oder die Video-Konvertierung abgeschlossen ist.', 'info');
@@ -3397,21 +3644,76 @@ const App = {
       btnSavePrimary.addEventListener('click', async () => {
         const targetFsk = state.targetFsk === '18' ? '18' : '16';
 
+        // Foto-Album Modus: Leinwand immer als JPEG exportieren und an photo-albums/upload-cover senden
+        if (state.studioContext === 'photo-album') {
+          if (!state.baseImage) {
+            this.toast('Bitte wähle zuerst unten ein Album-Foto aus oder lade ein eigenes Bild in das Studio.', 'warning');
+            return;
+          }
+
+          state.selectedObjId = null;
+          renderCanvas(false);
+          btnSavePrimary.disabled = true;
+
+          canvas.toBlob(async (blob) => {
+            if (!blob) {
+              this.toast('Das Coverbild konnte nicht erzeugt werden.', 'danger');
+              btnSavePrimary.disabled = false;
+              renderCanvas(true);
+              return;
+            }
+
+            try {
+              const file = new File([blob], `album_fsk${targetFsk}_studio_${state.entityId}.jpg`, { type: 'image/jpeg' });
+              const formData = new FormData();
+              formData.append('album_id', state.entityId);
+              formData.append('fsk', targetFsk);
+              formData.append('cover', file);
+              formData.append('_csrf', this.csrfToken);
+
+              const res = await fetch(`${this.basePath}/api.php?route=photo-albums/upload-cover`, {
+                method: 'POST',
+                headers: { 'X-CSRF-Token': this.csrfToken },
+                body: formData
+              });
+              const data = await res.json();
+
+              if (res.ok && data.status === 'ok') {
+                this.applyPhotoAlbumCoverUpdate(targetFsk, data);
+                const bsModal = bootstrap.Modal.getInstance(modalEl);
+                if (bsModal) bsModal.hide();
+                this.toast(`Dein im Cover-Studio gestaltetes FSK ${targetFsk} Album-Cover wurde gespeichert!`, 'success');
+              } else {
+                this.toast(data.message || `Fehler beim Speichern des FSK ${targetFsk} Album-Covers.`, 'danger');
+                renderCanvas(true);
+              }
+            } catch (err) {
+              this.toast('Upload-Fehler: ' + err.message, 'danger');
+              renderCanvas(true);
+            } finally {
+              btnSavePrimary.disabled = false;
+            }
+          }, 'image/jpeg', 0.92);
+          return;
+        }
+
+        // Video (Movie) Modus:
         // Fall A: Keine Bearbeitungen vorgenommen und ein reguläres Szenenbild (#1..#10) oder passendes eigenes Bild (#11/#12) ist aktiv
         if (!hasAnyEdits()) {
           let targetNum = state.num;
           if (targetFsk === '16' && targetNum === '12') targetNum = '1';
           if (targetFsk === '18' && targetNum === '11') targetNum = '1';
 
-          applyMovieThumbSelection(targetFsk, targetNum, state.thumbUrl, state.zoomUrl, state.editorUrl, false);
+          if (typeof applyMovieThumbSelection === 'function') {
+            applyMovieThumbSelection(targetFsk, targetNum, state.thumbUrl, state.zoomUrl, state.editorUrl, false);
+          }
           const bsModal = bootstrap.Modal.getInstance(modalEl);
           if (bsModal) bsModal.hide();
           this.toast(`${state.sourceLabel} als FSK ${targetFsk} Cover ausgewählt. Bitte speichere anschließend deine Änderungen.`, 'success');
           return;
         }
 
-        // Fall B: Bild wurde im Studio bearbeitet (Zensur, Licht/Farbe, Sticker, Badges, Text, Logo, Video-Frame oder lokales Bild)
-        // -> Auswahlrahmen ausblenden, als hochauflösendes JPEG rendern und als eigenes Cover (#11 für FSK16 bzw. #12 für FSK18) speichern!
+        // Fall B: Bild wurde im Studio bearbeitet -> als eigenes Cover (#11 für FSK16 bzw. #12 für FSK18) speichern!
         state.selectedObjId = null;
         renderCanvas(false);
         btnSavePrimary.disabled = true;
@@ -3445,7 +3747,9 @@ const App = {
               const zoomUrl = data.zoom_url || previewUrl;
               const editorUrl = data.editor_url || zoomUrl;
 
-              applyMovieThumbSelection(targetFsk, thumbNum, previewUrl, zoomUrl, editorUrl, true);
+              if (typeof applyMovieThumbSelection === 'function') {
+                applyMovieThumbSelection(targetFsk, thumbNum, previewUrl, zoomUrl, editorUrl, true);
+              }
               const bsModal = bootstrap.Modal.getInstance(modalEl);
               if (bsModal) bsModal.hide();
               this.toast(`Dein im Cover-Studio gestaltetes FSK ${targetFsk} Cover (#${thumbNum}) wurde gespeichert und aktiviert!`, 'success');
@@ -3462,6 +3766,94 @@ const App = {
         }, 'image/jpeg', 0.92);
       });
     }
+  },
+
+  /**
+   * Aktualisiert die FSK16/FSK18-Cover-Boxen, das Filmstrip-Item im Cover-Studio
+   * sowie die Status-Anzeige eines Foto-Albums ohne Seiten-Reload.
+   */
+  applyPhotoAlbumCoverUpdate(fsk, data) {
+    const fskStr = String(fsk) === '18' ? '18' : '16';
+    const previewUrl = data.preview_url || '';
+    const zoomUrl = data.zoom_url || previewUrl;
+    const editorUrl = data.editor_url || zoomUrl;
+
+    // 1. Vorschau-Bild & Platzhalter aktualisieren
+    const imgWrap = document.getElementById(`preview-fsk${fskStr}-img-wrap`);
+    const imgEl = document.getElementById(`preview-fsk${fskStr}-img`) || document.getElementById(`album-cover-fsk${fskStr}-img`);
+    const placeholderEl = document.getElementById(`empty-fsk${fskStr}-placeholder`);
+    const badgeSourceEl = document.getElementById(`badge-fsk${fskStr}-source`);
+    const studioBtn = document.getElementById(`btn-open-studio-fsk${fskStr}`);
+
+    if (imgWrap) imgWrap.classList.remove('d-none');
+    if (placeholderEl) {
+      placeholderEl.classList.add('d-none');
+      placeholderEl.setAttribute('data-studio-ready', '1');
+      if (editorUrl) placeholderEl.setAttribute('data-editor-url', editorUrl);
+    }
+    if (imgEl && previewUrl) {
+      imgEl.src = previewUrl;
+      imgEl.setAttribute('data-zoom-src', zoomUrl);
+      imgEl.setAttribute('data-editor-url', editorUrl);
+    }
+    if (badgeSourceEl) {
+      badgeSourceEl.textContent = 'Eigenes Cover';
+      badgeSourceEl.className = 'badge bg-primary';
+    }
+    if (studioBtn) {
+      studioBtn.setAttribute('data-studio-ready', '1');
+      if (editorUrl) studioBtn.setAttribute('data-editor-url', editorUrl);
+    }
+
+    // 2. Filmstreifen-Eintrag im Cover-Studio (#studio-filmstrip-custom-11 / 12) aktualisieren
+    const slotNum = fskStr === '16' ? '11' : '12';
+    const stripItem = document.getElementById(`studio-filmstrip-custom-${slotNum}`);
+    const stripImg = document.getElementById(`studio-filmstrip-img-${slotNum}`);
+    if (stripItem) {
+      stripItem.classList.remove('d-none');
+      if (previewUrl) stripItem.setAttribute('data-thumb-url', previewUrl);
+      if (zoomUrl) stripItem.setAttribute('data-zoom-url', zoomUrl);
+      if (editorUrl) stripItem.setAttribute('data-editor-url', editorUrl);
+    }
+    if (stripImg && previewUrl) {
+      stripImg.src = previewUrl;
+    }
+
+    // 3. Warnhinweis & Schritt-1-Statusbox aktualisieren
+    const coversCard = document.getElementById('photo-album-covers-card');
+    if (coversCard) {
+      coversCard.setAttribute(`data-has-fsk${fskStr}`, '1');
+    }
+    const has16 = typeof data.has_fsk16 !== 'undefined'
+      ? !!data.has_fsk16
+      : (coversCard ? coversCard.getAttribute('data-has-fsk16') === '1' : false);
+    const has18 = typeof data.has_fsk18 !== 'undefined'
+      ? !!data.has_fsk18
+      : (coversCard ? coversCard.getAttribute('data-has-fsk18') === '1' : false);
+
+    const warnBox = document.getElementById('fsk16-missing-warning');
+    if (warnBox && has16 && has18) {
+      warnBox.classList.add('d-none');
+    }
+
+    const step1Box = document.getElementById('photo-album-step1-status-box');
+    const gridCountEl = document.getElementById('album-photos-grid-count');
+    const totalPhotos = typeof data.total_photos !== 'undefined'
+      ? parseInt(String(data.total_photos), 10)
+      : parseInt(gridCountEl ? (gridCountEl.textContent || '0') : '0', 10);
+
+    if (step1Box && has16 && has18 && totalPhotos >= 4) {
+      step1Box.innerHTML = `
+        <div class="p-2 rounded-3 border bg-success bg-opacity-10 border-success border-opacity-25">
+          <div class="fw-bold text-success small">
+            <i class="bi bi-check-circle-fill me-1"></i> 1. Fotos &amp; Cover komplett
+          </div>
+          <div class="text-muted" style="font-size: 0.75rem;">${totalPhotos} Fotos sowie FSK16 &amp; FSK18 Cover vorhanden</div>
+        </div>
+      `;
+    }
+
+    this.initThumbnailHoverZoom();
   },
 
   // ========================================================================
@@ -3577,7 +3969,7 @@ const App = {
       });
     }
 
-    // 5. FSK16 / FSK18 Cover für Foto-Album hochladen
+    // 5. FSK16 / FSK18 Cover für Foto-Album direkt per Datei-Auswahl hochladen
     document.querySelectorAll('.js-album-cover-upload').forEach(input => {
       input.addEventListener('change', async () => {
         const file = input.files?.[0];
@@ -3609,10 +4001,7 @@ const App = {
 
           if (res.ok && data.status === 'ok') {
             this.toast(data.message || `FSK${fsk}-Cover gespeichert.`, 'success');
-            const imgEl = document.getElementById(`album-cover-fsk${fsk}-img`);
-            if (imgEl && data.preview_url) {
-              imgEl.src = data.preview_url;
-            }
+            this.applyPhotoAlbumCoverUpdate(fsk, data);
           } else {
             this.toast(data.message || 'Fehler beim Hochladen des Coverbilds.', 'danger');
           }
@@ -3696,6 +4085,9 @@ const App = {
             this.toast(data.message || 'Foto entfernt.', 'success');
             const card = document.querySelector(`.js-album-photo-card[data-file-id="${fileId}"]`);
             if (card) card.remove();
+
+            const stripThumb = document.querySelector(`.js-studio-filmstrip-thumb[data-num="photo_${fileId}"]`);
+            if (stripThumb) stripThumb.remove();
 
             const countEls = document.querySelectorAll('#album-photos-grid-count, #badge-album-photo-count');
             countEls.forEach(el => {
@@ -4266,6 +4658,9 @@ const App = {
   // 4. Toast Notification Helper
   // ========================================================================
   toast(message, type = 'info') {
+    if (type === 'success' && typeof this.invalidateSearchCatalog === 'function') {
+      this.invalidateSearchCatalog();
+    }
     let container = document.getElementById('toast-container');
     if (!container) {
       container = document.createElement('div');
