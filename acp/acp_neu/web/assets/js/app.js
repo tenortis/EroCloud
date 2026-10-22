@@ -1543,6 +1543,390 @@ const App = {
   // ========================================================================
   // 4. Dashboard: Gemeinsame Notizen & Persönliche Notizen (AJAX)
   // ========================================================================
+  // ========================================================================
+  // 3d. Drehpartner & ID-Check (CoActorsChecking)
+  // ========================================================================
+  setCoActorsStatusFilter(statusKey) {
+    const statusInput = document.getElementById('cac-filter-status');
+    if (statusInput) {
+      statusInput.value = statusKey || 'under_review';
+    }
+    this.applyCoActorsFilters(statusKey);
+  },
+
+  applyCoActorsFilters(statusOverride) {
+    const status = statusOverride || document.getElementById('cac-filter-status')?.value || 'under_review';
+    const role = document.getElementById('cac-filter-role')?.value || 'all';
+    const method = document.getElementById('cac-filter-method')?.value || 'all';
+    const sort = document.getElementById('cac-filter-sort')?.value || 'priority';
+    const q = (document.getElementById('cac-filter-q')?.value || '').trim();
+
+    const params = new URLSearchParams();
+    if (status !== 'under_review') params.set('status', status);
+    if (role !== 'all') params.set('role', role);
+    if (method !== 'all') params.set('method', method);
+    if (sort !== 'priority') params.set('sort', sort);
+    if (q !== '') params.set('q', q);
+
+    const qs = params.toString();
+    const targetHash = `#/co-actors-checking${qs ? '?' + qs : ''}`;
+    if (window.location.hash === targetHash) {
+      this.handleRoute();
+    } else {
+      window.location.hash = targetHash;
+    }
+  },
+
+  resetCoActorsFilters() {
+    window.location.hash = '#/co-actors-checking';
+  },
+
+  quickFilterCoActorsTable(query) {
+    const q = String(query || '').trim().toLowerCase();
+    let visible = 0;
+    document.querySelectorAll('.cac-actor-row').forEach(row => {
+      const hay = row.getAttribute('data-search') || '';
+      const show = (q === '' || hay.includes(q));
+      row.classList.toggle('d-none', !show);
+      if (show) visible++;
+    });
+    const cntEl = document.getElementById('cac-visible-count');
+    if (cntEl) cntEl.textContent = String(visible);
+  },
+
+  getCoActorPayload(coActorId) {
+    const row = document.getElementById(`cac-row-${coActorId}`);
+    if (!row) return null;
+    try {
+      return JSON.parse(row.getAttribute('data-actor') || '{}');
+    } catch (_) {
+      return null;
+    }
+  },
+
+  async coActorQuickAction(coActorId, actionType, reasonText = '') {
+    const formData = new FormData();
+    formData.append('_csrf', this.csrfToken);
+    formData.append('co_actor_id', String(coActorId));
+    formData.append('action_type', actionType);
+    if (actionType === 'reject') {
+      formData.append('rejection_reason', reasonText);
+    }
+
+    try {
+      const res = await fetch(`${this.basePath}/api.php?route=co-actors-checking/action`, {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': this.csrfToken },
+        body: formData
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.status !== 'ok') {
+        this.toast(data.message || 'Aktion konnte nicht ausgeführt werden.', 'danger');
+        return false;
+      }
+
+      this.resetLogoutCountdown();
+      const toastType = actionType === 'verify' ? 'success' : (actionType === 'reject' ? 'warning' : 'info');
+      this.toast(data.message || 'Drehpartner-Status aktualisiert.', toastType);
+      this.refreshSidebarCounts();
+
+      const badgeEl = document.getElementById(`cac-status-badge-${coActorId}`);
+      const auditEl = document.getElementById(`cac-audit-info-${coActorId}`);
+      const rejBox = document.getElementById(`cac-reject-box-${coActorId}`);
+      const rejTxt = document.getElementById(`cac-reject-text-${coActorId}`);
+      const btnVerify = document.getElementById(`cac-btn-verify-${coActorId}`);
+      const btnReject = document.getElementById(`cac-btn-reject-${coActorId}`);
+      const btnReset = document.getElementById(`cac-btn-reset-${coActorId}`);
+      const rowEl = document.getElementById(`cac-row-${coActorId}`);
+
+      const newStatus = data.checked_status || actionType;
+      if (badgeEl) {
+        let cls = 'badge-kkc-info';
+        if (newStatus === 'verified') cls = 'badge-kkc-success';
+        else if (newStatus === 'rejected') cls = 'badge-kkc-danger';
+        badgeEl.className = `badge-kkc ${cls}`;
+        badgeEl.textContent = data.status_label || newStatus;
+      }
+
+      if (auditEl && data.checked_by && data.checked_on_de) {
+        auditEl.innerHTML = `Geprüft von <strong>${this.escapeHtml(data.checked_by)}</strong> am ${this.escapeHtml(data.checked_on_de)}`;
+      }
+
+      if (rejBox && rejTxt) {
+        if (newStatus === 'rejected' && data.rejection_reason) {
+          rejTxt.textContent = data.rejection_reason;
+          rejBox.classList.remove('d-none');
+        } else {
+          rejBox.classList.add('d-none');
+        }
+      }
+
+      if (btnVerify) btnVerify.classList.toggle('d-none', newStatus === 'verified');
+      if (btnReject) btnReject.classList.toggle('d-none', newStatus === 'rejected');
+      if (btnReset) btnReset.classList.toggle('d-none', !(newStatus === 'verified' || newStatus === 'rejected'));
+      if (rowEl) {
+        rowEl.setAttribute('data-status', newStatus);
+        rowEl.style.background = newStatus === 'under_review' ? 'rgba(245, 158, 11, 0.04)' : '';
+      }
+
+      const inspModalEl = document.getElementById('cacInspectorModal');
+      if (inspModalEl && window.bootstrap?.Modal) {
+        window.bootstrap.Modal.getInstance(inspModalEl)?.hide();
+      }
+      return true;
+    } catch (err) {
+      this.toast('Verbindungsfehler: ' + err.message, 'danger');
+      return false;
+    }
+  },
+
+  openCoActorInspectorModal(coActorId) {
+    const actor = this.getCoActorPayload(coActorId);
+    const modalEl = document.getElementById('cacInspectorModal');
+    if (!actor || !modalEl) return;
+
+    document.getElementById('cacInspectorTitle').textContent = `18+ ID-Check & Dokumenten-Inspektor – ${actor.display_label}`;
+    document.getElementById('cacInspectorSubtitle').textContent = `Referenz: ${actor.ref_code} (ID #${actor.id}, Merchant #${actor.merchant_id})`;
+
+    document.getElementById('cacInspName').textContent = actor.real_full_name || '-';
+    document.getElementById('cacInspBirth').textContent = (actor.birth_date_de || '-') + (actor.age ? ` (${actor.age} J.)` : '');
+    document.getElementById('cacInspDoc').textContent = `${actor.id_doc_type_label || 'Ausweis'}: ${actor.id_doc_number || '-'}`;
+    const validEl = document.getElementById('cacInspValid');
+    if (validEl) {
+      validEl.textContent = actor.id_doc_valid_label || '-';
+      validEl.className = `fs-6 ${actor.is_doc_expired ? 'text-danger' : ''}`;
+    }
+    document.getElementById('cacInspAddress').textContent = actor.address_text || '-';
+
+    const certBtn = document.getElementById('cacInspCertBtn');
+    if (certBtn) {
+      if (actor.certificate_url) {
+        certBtn.href = actor.certificate_url;
+        certBtn.classList.remove('d-none');
+      } else {
+        certBtn.classList.add('d-none');
+      }
+    }
+
+    const verifyBtn = document.getElementById('cacInspectorVerifyBtn');
+    const rejectBtn = document.getElementById('cacInspectorRejectBtn');
+    if (verifyBtn) {
+      verifyBtn.onclick = () => this.coActorQuickAction(actor.id, 'verify');
+    }
+    if (rejectBtn) {
+      rejectBtn.onclick = () => {
+        if (window.bootstrap?.Modal) {
+          window.bootstrap.Modal.getInstance(modalEl)?.hide();
+        }
+        this.openCoActorRejectModal(actor.id);
+      };
+    }
+
+    const cards = [
+      { url: actor.face_ref_url, title: '1. KI-Referenz-Selfie (Frontal)', badge: 'bg-info text-dark' },
+      { url: actor.id_shot_url, title: '2. ID-Shot (Gesicht + Ausweis)', badge: 'bg-primary' },
+      { url: actor.id_front_url, title: '3. Ausweisdokument Vorderseite', badge: 'bg-secondary' },
+      { url: actor.id_back_url, title: '4. Ausweisdokument Rückseite', badge: 'bg-secondary' }
+    ];
+
+    const gridEl = document.getElementById('cacInspectorGrid');
+    if (gridEl) {
+      gridEl.innerHTML = cards.map(c => {
+        if (!c.url) {
+          return `
+            <div class="col-md-6 col-xl-3">
+              <div class="p-3 rounded border h-100 d-flex flex-column align-items-center justify-content-center text-muted text-center" style="min-height: 240px; background: var(--kkc-surface-hover);">
+                <i class="bi bi-image fs-2 mb-2 opacity-50"></i>
+                <div class="small fw-semibold">${this.escapeHtml(c.title)}</div>
+                <small>Nicht vorhanden</small>
+              </div>
+            </div>
+          `;
+        }
+        return `
+          <div class="col-md-6 col-xl-3">
+            <div class="p-2 rounded border h-100 d-flex flex-column" style="background: var(--kkc-surface-hover);">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="badge ${c.badge}">${this.escapeHtml(c.title)}</span>
+                <a href="${this.escapeHtml(c.url)}" target="_blank" rel="noopener" class="btn btn-xs btn-outline-kkc py-0 px-1.5" title="In neuem Tab öffnen">
+                  <i class="bi bi-box-arrow-up-right"></i>
+                </a>
+              </div>
+              <div class="rounded overflow-hidden bg-dark flex-grow-1 d-flex align-items-center justify-content-center" style="min-height: 260px;">
+                <a href="${this.escapeHtml(c.url)}" target="_blank" rel="noopener" class="w-100 h-100 d-block">
+                  <img src="${this.escapeHtml(c.url)}" alt="${this.escapeHtml(c.title)}" class="w-100 h-100" style="object-fit: contain; max-height: 340px;">
+                </a>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    if (window.bootstrap?.Modal) {
+      window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  },
+
+  openCoActorRejectModal(coActorId) {
+    const actor = this.getCoActorPayload(coActorId);
+    const modalEl = document.getElementById('cacRejectModal');
+    if (!modalEl) return;
+
+    document.getElementById('cacRejectActorId').value = String(coActorId);
+    document.getElementById('cacRejectActorLabel').textContent = actor ? `${actor.display_label} (${actor.ref_code})` : `#${coActorId}`;
+    const tplSel = document.getElementById('cacRejectTemplateSelect');
+    if (tplSel) tplSel.value = '';
+    const reasonInput = document.getElementById('cacRejectReasonInput');
+    if (reasonInput) {
+      reasonInput.value = actor?.rejection_reason || 'Der Personalausweis ist auf dem ID-Shot leider nicht scharf genug lesbar. Bitte nimm den ID-Shot per Smartphone-QR-Code bei guter Beleuchtung erneut auf.';
+    }
+
+    if (window.bootstrap?.Modal) {
+      window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  },
+
+  async submitCoActorRejectModal(event) {
+    if (event) event.preventDefault();
+    const coActorId = parseInt(document.getElementById('cacRejectActorId')?.value || '0', 10);
+    const reason = (document.getElementById('cacRejectReasonInput')?.value || '').trim();
+    const btn = document.getElementById('cacRejectSubmitBtn');
+    if (!coActorId || !reason) {
+      this.toast('Bitte gib einen Ablehnungsgrund an.', 'warning');
+      return false;
+    }
+
+    if (btn) btn.disabled = true;
+    const ok = await this.coActorQuickAction(coActorId, 'reject', reason);
+    if (btn) btn.disabled = false;
+
+    if (ok) {
+      const modalEl = document.getElementById('cacRejectModal');
+      if (modalEl && window.bootstrap?.Modal) {
+        window.bootstrap.Modal.getInstance(modalEl)?.hide();
+      }
+    }
+    return false;
+  },
+
+  openCoActorEditModal(coActorId) {
+    const actor = this.getCoActorPayload(coActorId);
+    const modalEl = document.getElementById('cacEditDataModal');
+    if (!actor || !modalEl) return;
+
+    document.getElementById('cacEditActorId').value = String(actor.id);
+    document.getElementById('cacEditCreatorName').value = actor.creator_name || '';
+    document.getElementById('cacEditFirstName').value = actor.first_name || '';
+    document.getElementById('cacEditLastName').value = actor.last_name || '';
+    document.getElementById('cacEditBirthDate').value = (actor.birth_date && !actor.birth_date.startsWith('0000')) ? actor.birth_date : '';
+    document.getElementById('cacEditDocType').value = actor.id_doc_type || 'id_card';
+    document.getElementById('cacEditDocNumber').value = actor.id_doc_number || '';
+    document.getElementById('cacEditDocValid').value = (actor.id_doc_valid_until && !actor.id_doc_valid_until.startsWith('0000')) ? actor.id_doc_valid_until : '';
+    document.getElementById('cacEditStreet').value = actor.street || '';
+    document.getElementById('cacEditZip').value = actor.zip_code || '';
+    document.getElementById('cacEditCity').value = actor.city || '';
+    document.getElementById('cacEditCountry').value = actor.country || 'DE';
+
+    if (window.bootstrap?.Modal) {
+      window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  },
+
+  async submitCoActorEditData(event) {
+    if (event) event.preventDefault();
+    const form = document.getElementById('cacEditDataForm');
+    const btn = document.getElementById('cacEditSubmitBtn');
+    if (!form) return false;
+
+    const formData = new FormData(form);
+    formData.append('_csrf', this.csrfToken);
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Speichere...';
+    }
+
+    try {
+      const res = await fetch(`${this.basePath}/api.php?route=co-actors-checking/update-data`, {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': this.csrfToken },
+        body: formData
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.status !== 'ok') {
+        this.toast(data.message || 'Daten konnten nicht gespeichert werden.', 'danger');
+        return false;
+      }
+
+      this.resetLogoutCountdown();
+      this.toast(data.message || 'Ausweis- und Personendaten wurden aktualisiert.', 'success');
+
+      const modalEl = document.getElementById('cacEditDataModal');
+      if (modalEl && window.bootstrap?.Modal) {
+        window.bootstrap.Modal.getInstance(modalEl)?.hide();
+      }
+      this.handleRoute();
+    } catch (err) {
+      this.toast('Verbindungsfehler: ' + err.message, 'danger');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-floppy-fill me-1"></i> Änderungen verschlüsselt speichern';
+      }
+    }
+    return false;
+  },
+
+  async openCoActorQrModal(coActorId, regenerate = false) {
+    const modalEl = document.getElementById('cacQrModal');
+    if (!modalEl) return;
+
+    const svgBox = document.getElementById('cacQrSvgBox');
+    const urlInput = document.getElementById('cacQrUrlInput');
+    const labelEl = document.getElementById('cacQrActorLabel');
+    const regenBtn = document.getElementById('cacQrRegenBtn');
+
+    if (svgBox) svgBox.innerHTML = '<div class="spinner-border ec-text-primary m-4" role="status"></div>';
+    if (regenBtn) {
+      regenBtn.onclick = () => this.openCoActorQrModal(coActorId, true);
+    }
+
+    if (window.bootstrap?.Modal) {
+      window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('_csrf', this.csrfToken);
+      formData.append('co_actor_id', String(coActorId));
+      formData.append('action_type', regenerate ? 'regenerate_qr' : 'get_qr');
+
+      const res = await fetch(`${this.basePath}/api.php?route=co-actors-checking/action`, {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': this.csrfToken },
+        body: formData
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.status !== 'ok') {
+        this.toast(data.message || 'QR-Code konnte nicht geladen werden.', 'danger');
+        return;
+      }
+
+      if (labelEl) labelEl.textContent = `${data.display_label} (${data.ref_code})`;
+      if (svgBox) svgBox.innerHTML = data.qr_svg || '';
+      if (urlInput) urlInput.value = data.qr_verify_url || '';
+      if (regenerate) {
+        this.toast(data.message || 'Neuer Smartphone-QR-Link erzeugt.', 'success');
+      }
+    } catch (err) {
+      this.toast('Verbindungsfehler: ' + err.message, 'danger');
+    }
+  },
+
   async adminNotesAction(action) {
     const textarea = document.getElementById('input-admin-notes');
     const actionsWrap = document.getElementById('admin-notes-actions');

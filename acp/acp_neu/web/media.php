@@ -6,6 +6,8 @@ declare(strict_types=1);
  * Ersetzt acp/includes/movie_player.php, acp/includes/movie_poster.php und Cross-Domain-Aufrufe.
  */
 
+define('SAFE_INC', 1);
+
 require_once dirname(__DIR__) . '/app/bootstrap.php';
 
 if (!function_exists('is_logged_in') || is_logged_in('acp') !== true || empty($_SESSION['employee_id'])) {
@@ -185,6 +187,106 @@ if ($type === 'vtt') {
 
     p4c_close(DB_HOST);
     echo "WEBVTT\n\n";
+    exit;
+}
+
+// ============================================================================
+// 2a. DREHPARTNER & ID-CHECK MEDIEN / ZERTIFIKAT (type=co_actor)
+// ============================================================================
+if ($type === 'co_actor') {
+    if (!class_exists('CoActorManager') && defined('SOURCEDIR') && file_exists(SOURCEDIR . '/includes/klassen/CoActorManager.inc.php')) {
+        require_once SOURCEDIR . '/includes/klassen/CoActorManager.inc.php';
+    }
+    $coActorId = isset($_GET['id']) ? abs((int)$_GET['id']) : 0;
+    $subType   = isset($_GET['sub']) ? trim((string)$_GET['sub']) : 'id_shot';
+
+    if ($coActorId <= 0 || !class_exists('CoActorManager')) {
+        p4c_close(DB_HOST);
+        acp_media_output_svg_placeholder('Ungültige ID', '', 200, 140);
+    }
+
+    $coActor = \CoActorManager::getCoActorById($coActorId);
+    @session_write_close();
+
+    if ($coActor === null) {
+        p4c_close(DB_HOST);
+        acp_media_output_svg_placeholder('Nicht gefunden', 'ID #' . $coActorId, 200, 140);
+    }
+
+    $merchantId = (int)$coActor['merchant_id'];
+    $storageDir = \CoActorManager::getStorageDir($merchantId, $coActorId);
+
+    if ($subType === 'certificate' || $subType === 'consent' || $subType === 'consent_raw') {
+        $consentFile = (string)($coActor['consent_doc_file'] ?? '');
+        $sigData     = $coActor['signature_data'] ?? null;
+
+        if ($subType === 'consent_raw' || ($consentFile !== '' && empty($sigData) && is_file($storageDir . '/' . $consentFile))) {
+            $filePath = $storageDir . '/' . basename($consentFile);
+            p4c_close(DB_HOST);
+            if (is_file($filePath)) {
+                $ext  = strtolower((string)pathinfo($filePath, PATHINFO_EXTENSION));
+                $mime = match ($ext) {
+                    'pdf'   => 'application/pdf',
+                    'png'   => 'image/png',
+                    'webp'  => 'image/webp',
+                    default => 'image/jpeg',
+                };
+                header('Content-Type: ' . $mime);
+                header('Content-Disposition: inline; filename="Einverstaendnis_' . $coActor['ref_code'] . '.' . $ext . '"');
+                header('Content-Length: ' . (string)filesize($filePath));
+                header('Cache-Control: private, max-age=300');
+                readfile($filePath);
+                exit;
+            }
+        }
+
+        $sigDataUri = '';
+        if ($consentFile !== '' && is_file($storageDir . '/' . basename($consentFile))) {
+            $rawBytes = @file_get_contents($storageDir . '/' . basename($consentFile));
+            if (is_string($rawBytes) && $rawBytes !== '') {
+                $sigDataUri = 'data:image/png;base64,' . base64_encode($rawBytes);
+            }
+        }
+
+        $merchantIdent = \CoActorManager::getMerchantIdentity($merchantId);
+        p4c_close(DB_HOST);
+        header('Content-Type: text/html; charset=UTF-8');
+        echo \CoActorManager::renderConsentDocumentHtml($coActor, $merchantIdent, $sigDataUri);
+        exit;
+    }
+
+    p4c_close(DB_HOST);
+
+    $fileColumnMap = [
+        'face_ref' => (string)($coActor['face_ref_img'] ?? ''),
+        'id_shot'  => (string)($coActor['id_shot_img1'] ?? ''),
+        'id_front' => (string)($coActor['id_front_img'] ?? ''),
+        'id_back'  => (string)($coActor['id_back_img'] ?? ''),
+    ];
+    $fileName = $fileColumnMap[$subType] ?? '';
+    $filePath = $fileName !== '' ? ($storageDir . '/' . basename($fileName)) : '';
+
+    if ($filePath === '' || !is_file($filePath)) {
+        $labelMap = [
+            'face_ref' => '1. KI-Selfie',
+            'id_shot'  => '2. ID-Shot',
+            'id_front' => '3. Ausweis V.',
+            'id_back'  => '4. Ausweis R.',
+        ];
+        acp_media_output_svg_placeholder($labelMap[$subType] ?? 'Dokument', (string)($coActor['ref_code'] ?? ''), 240, 160);
+    }
+
+    $ext  = strtolower((string)pathinfo($filePath, PATHINFO_EXTENSION));
+    $mime = match ($ext) {
+        'png'   => 'image/png',
+        'webp'  => 'image/webp',
+        'pdf'   => 'application/pdf',
+        default => 'image/jpeg',
+    };
+    header('Content-Type: ' . $mime);
+    header('Content-Length: ' . (string)filesize($filePath));
+    header('Cache-Control: private, max-age=300');
+    readfile($filePath);
     exit;
 }
 

@@ -584,10 +584,10 @@ final class PhotoAlbumsOnlineController
                     'status_label'        => self::decodeText((string)($p['status_label'] ?? '')),
                     'is_ready_for_use'    => !empty($p['is_ready_for_use']),
                     'ai_face_ready'       => !empty($p['ai_face_ready']),
-                    'face_ref_url'        => !empty($p['face_reference_photo']) ? \CoActorManager::getDocumentUrl($merchantId, (string)$p['face_reference_photo']) : '',
-                    'id_shot_url'         => !empty($p['id_shot_photo']) ? \CoActorManager::getDocumentUrl($merchantId, (string)$p['id_shot_photo']) : '',
-                    'id_front_url'        => !empty($p['id_front_photo']) ? \CoActorManager::getDocumentUrl($merchantId, (string)$p['id_front_photo']) : '',
-                    'certificate_url'     => !empty($p['is_ready_for_use']) ? (rtrim((string)MCP_URL, '/') . '/co_actor_certificate.php?id=' . abs((int)$p['id'])) : '',
+                    'face_ref_url'        => (string)($p['face_ref_url'] ?? ''),
+                    'id_shot_url'         => (string)($p['id_shot_url'] ?? ''),
+                    'id_front_url'        => (string)($p['id_front_url'] ?? ''),
+                    'certificate_url'     => (string)($p['certificate_url'] ?? ''),
                 ];
             }
         }

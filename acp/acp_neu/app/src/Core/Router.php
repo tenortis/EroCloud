@@ -100,6 +100,7 @@ class Router
         $moviesOnlineCtrl        = 'App\\Modules\\MoviesOnline\\MoviesOnlineController';
         $photoAlbumsCheckingCtrl = 'App\\Modules\\PhotoAlbumsChecking\\PhotoAlbumsCheckingController';
         $photoAlbumsOnlineCtrl   = 'App\\Modules\\PhotoAlbumsOnline\\PhotoAlbumsOnlineController';
+        $coActorsCheckingCtrl    = 'App\\Modules\\CoActorsChecking\\CoActorsCheckingController';
         $previewCtrl             = 'App\\Modules\\Preview\\PreviewController';
 
         // 1. Startseite (Echtes Admin-Dashboard, Globale Schnellsuche, Notizen & Live-Counter)
@@ -126,7 +127,9 @@ class Router
         self::register('photo-albums-checking/reject', $photoAlbumsCheckingCtrl, 'reject', 'content_check');
         self::register('photo-albums-checking/co-actor-action', $photoAlbumsCheckingCtrl, 'coActorAction', 'content_check,content_online');
 
-        self::register('co-actors-checking', $previewCtrl, 'coActorsChecking', 'content_check');
+        self::register('co-actors-checking', $coActorsCheckingCtrl, 'list', 'content_check');
+        self::register('co-actors-checking/action', $coActorsCheckingCtrl, 'action', 'content_check,content_online');
+        self::register('co-actors-checking/update-data', $coActorsCheckingCtrl, 'updateData', 'content_check,content_online');
         self::register('movies-blocked', $moviesOnlineCtrl, 'blocked', 'content_check,content_online');
         self::register('ai-compliance', $previewCtrl, 'aiCompliance', 'content_check');
 

@@ -118,3 +118,16 @@ acp/acp_neu/ (später: acp/)
 * **`App\Modules\PhotoAlbumsOnline` (`PhotoAlbumsOnlineController.php`):**
   * **`#/photo-albums-online` (`views/list.php`):** Gesamtübersicht aller veröffentlichten Fotoalben (`photo_albums_online`) inkl. 4 KPI-Kacheln, Speicherplatz-Neuberechnung (`POST ?route=photo-albums-online/recalc-size`), FSK16/FSK18-Cover-Lightbox, Live-BRAM-Badges, Aufruf-/Verkaufszahlen, Filterung, Sortierung und Paginierung.
   * **`#/photo-album-edit?id=...` (`views/edit.php`):** Vollständiges Bearbeitungs-Cockpit für veröffentlichte Fotoalben inkl. FSK16/FSK18-Großansicht, 18+ Mitwirkenden-Prüfung (`CoActorManager`), interaktivem Einzelfoto-Grid (`photo_albums_photos`) mit 1-Klick-Foto-Sperre & Galerie-Lightbox, Duplikat-Titel-Prüfung, SEO-Editor und synchronem Speichern in `photo_albums_online` + `photo_albums` inkl. `photo_album_checksum()` (`POST ?route=photo-albums-online/save`).
+
+---
+
+## 6. 🪪 Modul „Drehpartner & ID-Check“ (`CoActorsChecking`)
+
+* **`App\Modules\CoActorsChecking` (`CoActorsCheckingController.php` & `views/list.php`):**
+  * **`#/co-actors-checking`:** Zentrales Prüfcockpit für alle Account-Inhaber („Ich“, `is_owner = 1`) und Drehpartner (`is_owner = 0`) in `co_actors`.
+  * **KPI-Kacheln & Filterung:** Filter nach Prüfstatus (`under_review`, `verified`, `rejected`, `pending_qr`, `all`), Rolle (`owner` vs. `co_actor`), Nachweis-Methode (`qr_live` vs. `manual_legacy`), Sortierung und AES-entschlüsselter Volltextsuche.
+  * **Lokaler Medien- & Zertifikats-Proxy (`media.php?type=co_actor`):** Liefert `face_ref`, `id_shot`, `id_front`, `id_back`, `consent_raw` sowie das druckfähige HTML/PDF-Einverständnis-Zertifikat (`certificate`) direkt über die aktive ACP-Session aus.
+  * **4-fach Vergleichs-Inspektor (`#cacInspectorModal`):** Zeigt KI-Referenz-Selfie, ID-Shot sowie Ausweis Vorder- & Rückseite nebeneinander mit den entschlüsselten Ausweisdaten (Name, Geburtsdatum, Alter, Ausweisnummer, Ablaufwarnung) und direkten Bestätigen-/Ablehnen-Buttons.
+  * **Direkte Ausweisdaten-Korrektur (`POST ?route=co-actors-checking/update-data`):** Erlaubt das Korrigieren von Tippfehlern in den AES-verschlüsselten Personendaten ohne erneuten Smartphone-Scan.
+  * **Verknüpfte Inhalte (`content_co_actors`):** Zeigt sowohl verknüpfte Filme (`movie`) als auch verknüpfte Fotoalben (`photo_album`) mit Direktlink in die jeweilige Prüf- oder Bearbeitungsansicht.
+  * **Smartphone-QR-Modal (`POST ?route=co-actors-checking/action`):** Zeigt den lokalen SVG-QR-Code und Direktlink inkl. Token-Erneuerung (`regenerate_qr`).

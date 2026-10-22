@@ -45,19 +45,6 @@ final class PreviewController
     }
 
     // 2. Content prüfen (content_check)
-    public function coActorsChecking(): string
-    {
-        return $this->renderPlaceholder(
-            'bi-person-badge',
-            'Content prüfen',
-            'Drehpartner & ID-Check',
-            'Prüfe eingereichte Ausweisdokumente, Selfies, Altersangaben und digitale Model-Release-Unterschriften.',
-            'co-actors-checking',
-            '/Drehpartner-pruefen',
-            'acp/includes/co_actors_checking.php'
-        );
-    }
-
     public function aiCompliance(): string
     {
         return $this->renderPlaceholder(
