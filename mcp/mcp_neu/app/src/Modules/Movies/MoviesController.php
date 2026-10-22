@@ -67,7 +67,8 @@ class MoviesController
         $rsMovies = p4c_query("SELECT
                 `id`, `convert_status`, `file_id`, `checksum`, `filename`, `title`,
                 `movie_checked`, `released`, `actor_id`, `online_at`, `playtime_string`, `resolution`,
-                `amount_second`, `as_download`, `amount_download`, `preview`
+                `amount_second`, `as_download`, `amount_download`, `preview`,
+                `preview_image_fsk16`, `preview_image_fsk18`
             FROM `movies`
             WHERE `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted'
             ORDER BY `id` DESC;", __FILE__, __LINE__);
@@ -155,6 +156,9 @@ class MoviesController
                     }
                 }
 
+                $cs16 = $checksum . '_' . abs((int)($m->preview_image_fsk16 ?? 1));
+                $cs18 = $checksum . '_' . abs((int)($m->preview_image_fsk18 ?? 1));
+
                 $movies[] = [
                     'id'              => $movieId,
                     'file_id'         => $fileId,
@@ -166,10 +170,10 @@ class MoviesController
                     'status_badge'    => $statusBadge,
                     'status_icon'     => $statusIcon,
                     'edit_route'      => $editRoute,
-                    'poster_fsk16'    => $apiUrl . '/PlayerPoster/FSK16/' . rawurlencode($fileId) . '?w=180&cs=' . rawurlencode($checksum),
-                    'poster_fsk18'    => $apiUrl . '/PlayerPoster/FSK18/' . rawurlencode($fileId) . '?w=180&cs=' . rawurlencode($checksum),
-                    'zoom_fsk16'      => $apiUrl . '/PlayerPoster/FSK16/' . rawurlencode($fileId) . '?w=640&cs=' . rawurlencode($checksum),
-                    'zoom_fsk18'      => $apiUrl . '/PlayerPoster/FSK18/' . rawurlencode($fileId) . '?w=640&cs=' . rawurlencode($checksum),
+                    'poster_fsk16'    => $apiUrl . '/PlayerPoster/FSK16/' . rawurlencode($fileId) . '?w=180&cs=' . rawurlencode($cs16),
+                    'poster_fsk18'    => $apiUrl . '/PlayerPoster/FSK18/' . rawurlencode($fileId) . '?w=180&cs=' . rawurlencode($cs18),
+                    'zoom_fsk16'      => $apiUrl . '/PlayerPoster/FSK16/' . rawurlencode($fileId) . '?w=640&cs=' . rawurlencode($cs16),
+                    'zoom_fsk18'      => $apiUrl . '/PlayerPoster/FSK18/' . rawurlencode($fileId) . '?w=640&cs=' . rawurlencode($cs18),
                     'online_at'       => $onlineAtFormatted,
                     'online_at_ts'    => $onlineAtTs,
                     'is_scheduled'    => ($statusKey === 'online' && $onlineAtTs > $nowTs),

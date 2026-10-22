@@ -3,6 +3,57 @@
 define('SAFE_INC', 1);
 
 include_once("../config.inc.php");
+
+if (!isset($_GET['file_id']) || empty($_GET['file_id'])) {
+    header('HTTP/1.1 404 Not Found');
+    echo 'movie id not exists';
+    exit;
+}
+
+$file_id = trim((string)$_GET['file_id']);
+$fsk = '16';
+if (isset($_GET['fsk'])) {
+    $fsk_val = abs((int)$_GET['fsk']);
+    if ($fsk_val == 16 || $fsk_val == 18) {
+        $fsk = (string)$fsk_val;
+    }
+}
+$req_width = 0;
+if (isset($_GET['w']) && !empty($_GET['w'])) {
+    $req_width = abs((int)$_GET['w']);
+}
+if ($req_width > 900) { $req_width = 900; }
+if ($req_width > 0 && $req_width < 50) { $req_width = 50; }
+$req_cs = isset($_GET['cs']) ? trim((string)$_GET['cs']) : '';
+
+// Zero-DB / Zero-Session Fast-Path: Wenn das skalierte Poster bereits im Disk-Cache liegt,
+// direkt ohne Session-Start und ohne MySQL-Verbindung in ~1ms ausliefern!
+$fastCacheDir = ((defined('TEMP_DIR') && is_dir(TEMP_DIR)) ? rtrim((string)TEMP_DIR, '/\\') : sys_get_temp_dir()) . '/ec_poster_cache';
+$fastCacheFile = ($req_cs !== '')
+    ? ($fastCacheDir . '/fast_mp_' . md5($file_id . '|' . $fsk . '|' . $req_width . '|' . $req_cs) . '.jpg')
+    : '';
+
+if ($fastCacheFile !== '' && is_file($fastCacheFile) && filesize($fastCacheFile) > 0) {
+    $mtime = (int)@filemtime($fastCacheFile);
+    $etag  = '"' . md5($fastCacheFile . '|' . $mtime) . '"';
+    header("Pragma: cache");
+    header('Cache-Control: public, max-age=31536000, immutable');
+    header('Expires: ' . gmdate(DATE_RFC1123, time() + 31536000));
+    header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $mtime) . ' GMT');
+    header('ETag: ' . $etag);
+    if (
+        (isset($_SERVER['HTTP_IF_NONE_MATCH']) && trim((string)$_SERVER['HTTP_IF_NONE_MATCH']) === $etag)
+        || (isset($_SERVER['HTTP_IF_MODIFIED_SINCE']) && strtotime((string)$_SERVER['HTTP_IF_MODIFIED_SINCE']) === $mtime)
+    ) {
+        http_response_code(304);
+        exit;
+    }
+    header('Content-Type: image/jpeg');
+    header('Content-Length: ' . filesize($fastCacheFile));
+    readfile($fastCacheFile);
+    exit;
+}
+
 include_once(API_DIR."/common.inc.php");
 @session_write_close();
 
@@ -130,6 +181,9 @@ function to_thumb($bild, $size = 0) {
     }
     $cacheFile = $cacheDir . '/mp_' . md5($bild . '|' . (int)@filemtime($bild) . '|' . $neueBreite) . '.bin';
     if (is_file($cacheFile) && filesize($cacheFile) > 0) {
+        if (!empty($GLOBALS['fastCacheFile']) && !is_file($GLOBALS['fastCacheFile'])) {
+            @copy($cacheFile, $GLOBALS['fastCacheFile']);
+        }
         output_raw_file_and_exit($cacheFile, $mime_type);
     }
 
@@ -187,6 +241,9 @@ function to_thumb($bild, $size = 0) {
     $binaryData = ob_get_clean();
     if ($binaryData !== false && $binaryData !== '') {
         @file_put_contents($cacheFile, $binaryData);
+        if (!empty($GLOBALS['fastCacheFile'])) {
+            @file_put_contents($GLOBALS['fastCacheFile'], $binaryData);
+        }
     }
     header('Content-length: '.strlen((string)$binaryData));
     echo $binaryData;

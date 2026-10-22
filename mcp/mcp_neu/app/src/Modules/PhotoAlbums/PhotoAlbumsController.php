@@ -69,7 +69,10 @@ final class PhotoAlbumsController
         $countPending  = 0;
         $countRejected = 0;
 
-        $rsAlbums = p4c_query("SELECT *
+        $rsAlbums = p4c_query("SELECT
+                `id`, `album_id`, `actor_id`, `checksum`, `number_of_photos`,
+                `preview_image_fsk16`, `preview_image_fsk18`, `album_checked`,
+                `released`, `online_at`, `amount_download`, `title`
             FROM `photo_albums`
             WHERE `merchant_id` = '" . $merchantId . "'
               AND `status` != 'deleted'
@@ -147,6 +150,8 @@ final class PhotoAlbumsController
                     : '-';
 
                 $priceEur = ((int)$a->amount_download) / 100.0;
+                $cs16 = $checksum . '_' . trim((string)$a->preview_image_fsk16);
+                $cs18 = $checksum . '_' . trim((string)$a->preview_image_fsk18);
 
                 $albums[] = [
                     'id'               => $albumDbId,
@@ -161,10 +166,10 @@ final class PhotoAlbumsController
                     'status_badge'     => $statusBadge,
                     'status_icon'      => $statusIcon,
                     'edit_route'       => $editRoute,
-                    'poster_fsk16'     => $apiUrl . '/PhotoAlbumPoster/FSK16/' . rawurlencode($albumIdHash) . '?w=180&cs=' . rawurlencode($checksum),
-                    'poster_fsk18'     => $apiUrl . '/PhotoAlbumPoster/FSK18/' . rawurlencode($albumIdHash) . '?w=180&cs=' . rawurlencode($checksum),
-                    'zoom_fsk16'       => $apiUrl . '/PhotoAlbumPoster/FSK16/' . rawurlencode($albumIdHash) . '?w=640&cs=' . rawurlencode($checksum),
-                    'zoom_fsk18'       => $apiUrl . '/PhotoAlbumPoster/FSK18/' . rawurlencode($albumIdHash) . '?w=640&cs=' . rawurlencode($checksum),
+                    'poster_fsk16'     => $apiUrl . '/PhotoAlbumPoster/FSK16/' . rawurlencode($albumIdHash) . '?w=180&cs=' . rawurlencode($cs16),
+                    'poster_fsk18'     => $apiUrl . '/PhotoAlbumPoster/FSK18/' . rawurlencode($albumIdHash) . '?w=180&cs=' . rawurlencode($cs18),
+                    'zoom_fsk16'       => $apiUrl . '/PhotoAlbumPoster/FSK16/' . rawurlencode($albumIdHash) . '?w=640&cs=' . rawurlencode($cs16),
+                    'zoom_fsk18'       => $apiUrl . '/PhotoAlbumPoster/FSK18/' . rawurlencode($albumIdHash) . '?w=640&cs=' . rawurlencode($cs18),
                     'online_at'        => $onlineAtFormatted,
                     'online_at_ts'     => $onlineAtTs,
                     'can_delete'       => ((string)$a->album_checked === '0000-00-00 00:00:00' && (int)$a->released !== 1 && !$isOnline),

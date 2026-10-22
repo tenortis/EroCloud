@@ -3,6 +3,48 @@
 define('SAFE_INC', 1);
 
 include_once("../config.inc.php");
+
+$fast_album_param = '';
+if (!empty($_GET['album_id'])) {
+    $fast_album_param = trim((string)$_GET['album_id']);
+} elseif (!empty($_GET['file_id'])) {
+    $fast_album_param = trim((string)$_GET['file_id']);
+} elseif (!empty($_GET['id'])) {
+    $fast_album_param = trim((string)$_GET['id']);
+}
+$fast_fsk = (isset($_GET['fsk']) && abs((int)$_GET['fsk']) == 18) ? '18' : '16';
+$fast_w   = isset($_GET['w']) && !empty($_GET['w']) ? abs((int)$_GET['w']) : 0;
+if ($fast_w > 1280) { $fast_w = 1280; }
+if ($fast_w > 0 && $fast_w < 50) { $fast_w = 50; }
+$fast_cs  = isset($_GET['cs']) ? trim((string)$_GET['cs']) : '';
+
+$fastCacheDir  = ((defined('TEMP_DIR') && is_dir(TEMP_DIR)) ? rtrim((string)TEMP_DIR, '/\\') : sys_get_temp_dir()) . '/ec_poster_cache';
+$fastCacheFile = ($fast_album_param !== '' && $fast_cs !== '')
+    ? ($fastCacheDir . '/fast_pa_' . md5($fast_album_param . '|' . $fast_fsk . '|' . $fast_w . '|' . $fast_cs) . '.jpg')
+    : '';
+
+if ($fastCacheFile !== '' && is_file($fastCacheFile) && filesize($fastCacheFile) > 0) {
+    $mtime = (int)@filemtime($fastCacheFile);
+    $etag  = '"' . md5($fastCacheFile . '|' . $mtime) . '"';
+    header('Access-Control-Allow-Origin: *');
+    header("Pragma: cache");
+    header('Cache-Control: public, max-age=31536000, immutable');
+    header('Expires: ' . gmdate(DATE_RFC1123, time() + 31536000));
+    header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $mtime) . ' GMT');
+    header('ETag: ' . $etag);
+    if (
+        (isset($_SERVER['HTTP_IF_NONE_MATCH']) && trim((string)$_SERVER['HTTP_IF_NONE_MATCH']) === $etag)
+        || (isset($_SERVER['HTTP_IF_MODIFIED_SINCE']) && strtotime((string)$_SERVER['HTTP_IF_MODIFIED_SINCE']) === $mtime)
+    ) {
+        http_response_code(304);
+        exit;
+    }
+    header('Content-Type: image/jpeg');
+    header('Content-Length: ' . filesize($fastCacheFile));
+    readfile($fastCacheFile);
+    exit;
+}
+
 include_once(API_DIR."/common.inc.php");
 @session_write_close();
 
@@ -168,6 +210,9 @@ function to_thumb($bild, $size = 0) {
     }
     $cacheFile = $cacheDir . '/pa_' . md5($bild . '|' . (int)@filemtime($bild) . '|' . $neueBreite) . '.bin';
     if (is_file($cacheFile) && filesize($cacheFile) > 0) {
+        if (!empty($GLOBALS['fastCacheFile']) && !is_file($GLOBALS['fastCacheFile'])) {
+            @copy($cacheFile, $GLOBALS['fastCacheFile']);
+        }
         output_raw_file_and_exit($cacheFile, $mime_type);
     }
 
@@ -225,6 +270,9 @@ function to_thumb($bild, $size = 0) {
     $binaryData = ob_get_clean();
     if ($binaryData !== false && $binaryData !== '') {
         @file_put_contents($cacheFile, $binaryData);
+        if (!empty($GLOBALS['fastCacheFile'])) {
+            @file_put_contents($GLOBALS['fastCacheFile'], $binaryData);
+        }
     }
     header('Content-length: '.strlen((string)$binaryData));
     echo $binaryData;
