@@ -22,7 +22,7 @@ function aic_utf8($str) {
     }
     $str = (string)$str;
     if (!preg_match('//u', $str)) {
-        $str = utf8_encode($str);
+        $str = mb_convert_encoding($str, 'UTF-8', 'ISO-8859-1');
     }
     if (function_exists('iconv')) {
         $clean = @iconv('UTF-8', 'UTF-8//IGNORE', $str);

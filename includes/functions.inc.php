@@ -262,7 +262,7 @@ function utf8decodeArray($array) {
         if(is_array($value)){
             $array[$key] = utf8decodeArray($value);
         } elseif(is_string($value) && mb_detect_encoding($value, 'UTF-8', true)) {
-            $array[$key] = utf8_decode($value);
+            $array[$key] = mb_convert_encoding($value, 'ISO-8859-1', 'UTF-8');
         }
     }
     
