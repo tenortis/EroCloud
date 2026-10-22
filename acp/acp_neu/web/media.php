@@ -189,6 +189,146 @@ if ($type === 'vtt') {
 }
 
 // ============================================================================
+// 2b. FOTOALBUM COVER-POSTER (type=album_poster) & EINZELFOTO (type=album_photo)
+// ============================================================================
+if ($type === 'album_poster' || $type === 'album_photo') {
+    $albumParam = isset($_GET['album_id']) ? preg_replace('/[^a-zA-Z0-9_-]/', '', (string)$_GET['album_id']) : '';
+    $photoParam = isset($_GET['photo_id']) ? preg_replace('/[^a-zA-Z0-9_-]/', '', (string)$_GET['photo_id']) : '';
+    $reqWidth   = isset($_GET['w']) ? abs((int)$_GET['w']) : 0;
+
+    $targetFile = '';
+    $fallbackTitle = 'Fotoalbum';
+    $fallbackSub   = '';
+
+    if ($type === 'album_poster') {
+        $fsk = (isset($_GET['fsk']) && abs((int)$_GET['fsk']) === 18) ? 18 : 16;
+        $numId = ctype_digit($albumParam) ? abs((int)$albumParam) : 0;
+        $whereSql = $numId > 0
+            ? "(`album_id` = '" . p4c_escape_string($albumParam) . "' OR `id` = '" . $numId . "')"
+            : "`album_id` = '" . p4c_escape_string($albumParam) . "'";
+
+        $rsAlb = p4c_query(
+            "SELECT `id`, `merchant_id`, `storage_location`, `album_id`, `preview_image_fsk16`, `preview_image_fsk18`
+             FROM `photo_albums`
+             WHERE {$whereSql}
+             LIMIT 1;",
+            __FILE__,
+            __LINE__
+        );
+        @session_write_close();
+
+        if (!$rsAlb || p4c_num_rows($rsAlb) === 0) {
+            p4c_close(DB_HOST);
+            acp_media_output_svg_placeholder('FSK' . $fsk . ' Cover', 'Album nicht gefunden', 240, 180);
+        }
+
+        $alb = p4c_fetch_object($rsAlb);
+        $albId = abs((int)$alb->id);
+        $fallbackTitle = 'FSK' . $fsk . ' Cover';
+        $fallbackSub   = 'Album #' . $albId;
+
+        $albumFolder = rtrim((string)PHOTO_ALBUMS_PATH, '/\\') . '/'
+            . (string)$alb->storage_location . '/'
+            . abs((int)$alb->merchant_id) . '/'
+            . $albId . '/';
+
+        $colPri = $fsk === 18 ? 'preview_image_fsk18' : 'preview_image_fsk16';
+        $colAlt = $fsk === 18 ? 'preview_image_fsk16' : 'preview_image_fsk18';
+
+        if (!empty($alb->$colPri) && is_file($albumFolder . $alb->$colPri)) {
+            $targetFile = $albumFolder . $alb->$colPri;
+        } elseif (!empty($alb->$colAlt) && is_file($albumFolder . $alb->$colAlt)) {
+            $targetFile = $albumFolder . $alb->$colAlt;
+        } else {
+            $rsFirst = p4c_query(
+                "SELECT `filename` FROM `photo_albums_photos`
+                 WHERE `album_id` = '" . p4c_escape_string((string)$alb->album_id) . "'
+                 ORDER BY `id` ASC LIMIT 1;",
+                __FILE__,
+                __LINE__
+            );
+            if ($rsFirst && p4c_num_rows($rsFirst) > 0) {
+                $firstObj = p4c_fetch_object($rsFirst);
+                $cand = $albumFolder . 'images/' . (string)$firstObj->filename;
+                if (is_file($cand)) {
+                    $targetFile = $cand;
+                }
+            }
+        }
+        p4c_close(DB_HOST);
+    } else {
+        // type === 'album_photo'
+        $rsPh = p4c_query(
+            "SELECT pa.`id` AS `album_db_id`, pa.`storage_location`, pap.`merchant_id`, pap.`filename`, pap.`id` AS `photo_db_id`
+             FROM `photo_albums_photos` pap
+             INNER JOIN `photo_albums` pa ON pap.`album_id` = pa.`album_id`
+             WHERE pap.`file_id` = '" . p4c_escape_string($photoParam) . "'
+             LIMIT 1;",
+            __FILE__,
+            __LINE__
+        );
+        @session_write_close();
+
+        if (!$rsPh || p4c_num_rows($rsPh) === 0) {
+            p4c_close(DB_HOST);
+            acp_media_output_svg_placeholder('Foto fehlt', $photoParam, 240, 180);
+        }
+
+        $ph = p4c_fetch_object($rsPh);
+        p4c_close(DB_HOST);
+
+        $fallbackTitle = 'Foto #' . abs((int)$ph->photo_db_id);
+        $fallbackSub   = 'Album #' . abs((int)$ph->album_db_id);
+
+        $cand = rtrim((string)PHOTO_ALBUMS_PATH, '/\\') . '/'
+            . (string)$ph->storage_location . '/'
+            . abs((int)$ph->merchant_id) . '/'
+            . abs((int)$ph->album_db_id) . '/images/'
+            . (string)$ph->filename;
+
+        if (is_file($cand) && filesize($cand) > 0) {
+            $targetFile = $cand;
+        }
+    }
+
+    if ($targetFile === '' || !is_file($targetFile)) {
+        acp_media_output_svg_placeholder($fallbackTitle, $fallbackSub, 260, 180);
+    }
+
+    $mtime = (int)@filemtime($targetFile);
+    $mime  = function_exists('mime_content_type') ? (string)@mime_content_type($targetFile) : 'image/jpeg';
+    if ($mime === '') {
+        $mime = 'image/jpeg';
+    }
+
+    header('Cache-Control: private, max-age=3600');
+    header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $mtime ?: time()) . ' GMT');
+
+    if ($reqWidth > 0 && $reqWidth <= 1024 && ($mime === 'image/jpeg' || $mime === 'image/png') && function_exists('imagecreatetruecolor')) {
+        $imgSize = @getimagesize($targetFile);
+        if (is_array($imgSize) && $imgSize[0] > $reqWidth && $imgSize[1] > 0) {
+            $srcImg = $mime === 'image/png' ? @imagecreatefrompng($targetFile) : @imagecreatefromjpeg($targetFile);
+            if ($srcImg !== false) {
+                $ratio     = $imgSize[0] / $imgSize[1];
+                $newWidth  = $reqWidth;
+                $newHeight = max(1, (int)round($newWidth / $ratio));
+                $dstImg    = imagecreatetruecolor($newWidth, $newHeight);
+                imagecopyresampled($dstImg, $srcImg, 0, 0, 0, 0, $newWidth, $newHeight, $imgSize[0], $imgSize[1]);
+                header('Content-Type: image/jpeg');
+                imagejpeg($dstImg, null, 88);
+                imagedestroy($dstImg);
+                imagedestroy($srcImg);
+                exit;
+            }
+        }
+    }
+
+    header('Content-Type: ' . $mime);
+    readfile($targetFile);
+    exit;
+}
+
+// ============================================================================
 // 3. SZENEN-THUMBNAIL (1..12) ODER POSTER (FSK16 / FSK18)
 // ============================================================================
 $movie = acp_media_resolve_movie($fileId, $movieId);

@@ -95,9 +95,10 @@ class Router
 
     private static function registerDefaults(): void
     {
-        $homeCtrl           = 'App\\Modules\\Home\\HomeController';
-        $moviesCheckingCtrl = 'App\\Modules\\MoviesChecking\\MoviesCheckingController';
-        $previewCtrl        = 'App\\Modules\\Preview\\PreviewController';
+        $homeCtrl                = 'App\\Modules\\Home\\HomeController';
+        $moviesCheckingCtrl      = 'App\\Modules\\MoviesChecking\\MoviesCheckingController';
+        $photoAlbumsCheckingCtrl = 'App\\Modules\\PhotoAlbumsChecking\\PhotoAlbumsCheckingController';
+        $previewCtrl             = 'App\\Modules\\Preview\\PreviewController';
 
         // 1. Startseite (Echtes Admin-Dashboard, Globale Schnellsuche, Notizen & Live-Counter)
         self::register('startseite', $homeCtrl, 'view', '');
@@ -116,8 +117,13 @@ class Router
         self::register('movies-checking/ai-action', $moviesCheckingCtrl, 'aiAction', 'content_check');
         self::register('movies-checking/file-meta', $moviesCheckingCtrl, 'fileMeta', 'content_check');
 
-        self::register('photo-albums-checking', $previewCtrl, 'photoAlbumsChecking', 'content_check');
-        self::register('photo-album-checking', $previewCtrl, 'photoAlbumChecking', 'content_check');
+        self::register('photo-albums-checking', $photoAlbumsCheckingCtrl, 'list', 'content_check');
+        self::register('photo-album-checking', $photoAlbumsCheckingCtrl, 'detail', 'content_check');
+        self::register('photo-albums-checking/toggle-photo', $photoAlbumsCheckingCtrl, 'togglePhoto', 'content_check');
+        self::register('photo-albums-checking/approve', $photoAlbumsCheckingCtrl, 'approve', 'content_check');
+        self::register('photo-albums-checking/reject', $photoAlbumsCheckingCtrl, 'reject', 'content_check');
+        self::register('photo-albums-checking/co-actor-action', $photoAlbumsCheckingCtrl, 'coActorAction', 'content_check');
+
         self::register('co-actors-checking', $previewCtrl, 'coActorsChecking', 'content_check');
         self::register('movies-blocked', $previewCtrl, 'moviesBlocked', 'content_check');
         self::register('ai-compliance', $previewCtrl, 'aiCompliance', 'content_check');

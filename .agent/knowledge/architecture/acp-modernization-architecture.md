@@ -95,8 +95,11 @@ acp/acp_neu/ (später: acp/)
 
 ---
 
-## 4. 🎬 Modul „Filme prüfen“ (`App\Modules\MoviesChecking`)
+## 4. 🎬 Module „Filme prüfen“ & „Fotoalben prüfen“
 
-* **Routen:**
-  * `#/movies-checking` (`GET ?route=movies-checking`): Prüf-Warteschlange aller Filme mit `released = '1'`, `convert_status > '1'` und `movie_checked = '0000-00-00 00:00:00'` inkl. KPI-Kacheln, Echtzeit-Filterung (BRAM-Status, 18+ ID-Check, Hauptkategorie), FSK16/FSK18-Vorschau und automatischer BRAM-Erstberechnung.
-  * `#/movie-checking?id=...` (`GET ?route=movie-checking&id=...`): 3-Tab-Prüfcockpit mit HTML5-Videoplayer (inkl. WebVTT-Untertiteln, Schnell-Spul- & Speed-Steuerung), `getID3`-Metadaten-Modal, 1-Klick-Prüfung für mitwirkende Personen (`CoActorManager`), FSK16/FSK18-Szenenbild-Wähler (`1..12`), Live-Streamingpreis-Rechner, SEO-Generator, Kategorie-Suche mit Texterkennungs-Hervorhebung, Freigabe (`POST ?route=movies-checking/approve` inkl. `movies_online`-Sync & `PointsSystem`) und Ablehnung (`POST ?route=movies-checking/reject` inkl. Historie).
+* **`App\Modules\MoviesChecking` (`#/movies-checking` & `#/movie-checking?id=...`):**
+  * Prüf-Warteschlange inkl. KPI-Kacheln, Echtzeit-Filterung (BRAM-Status, 18+ ID-Check, Hauptkategorie), FSK16/FSK18-Vorschau und automatischer BRAM-Erstberechnung.
+  * 3-Tab-Prüfcockpit mit HTML5-Videoplayer (inkl. WebVTT-Untertiteln, Schnell-Spul- & Speed-Steuerung), `getID3`-Metadaten-Modal, 1-Klick-Prüfung für mitwirkende Personen (`CoActorManager`), FSK16/FSK18-Szenenbild-Wähler (`1..12`), Live-Streamingpreis-Rechner, SEO-Generator, Kategorie-Suche mit Texterkennungs-Hervorhebung, Freigabe (`POST ?route=movies-checking/approve` inkl. `movies_online`-Sync & `PointsSystem`) und Ablehnung (`POST ?route=movies-checking/reject` inkl. Historie).
+* **`App\Modules\PhotoAlbumsChecking` (`#/photo-albums-checking` & `#/photo-album-checking?id=...`):**
+  * Fotoalben-Warteschlange mit KPI-Kacheln, Echtzeit-Filterung, FSK16/FSK18-Cover-Lightbox, BRAM-Textanalyse und 18+ ID-Shot-Status.
+  * Einzelprüfung mit FSK16/FSK18-Cover-Großansicht, 1-Klick-Verifizierung für mitwirkende Personen (`CoActorManager`), interaktivem Einzelfoto-Grid (inkl. 1-Klick-Ablehnung einzelner Fotos per AJAX `photo-albums-checking/toggle-photo` & durchblätterbarer Galerie-Lightbox), Duplikat-Titel-Erkennung, Kategorie-Hervorhebung (aus Text & Darsteller-Profil), Freigabe (`photo-albums-checking/approve` inkl. `photo_albums_online`-Sync & `PointsSystem`) und Ablehnung (`photo-albums-checking/reject` inkl. Historie).

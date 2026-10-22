@@ -45,33 +45,6 @@ final class PreviewController
     }
 
     // 2. Content prüfen (content_check)
-    public function photoAlbumsChecking(): string
-    {
-        return $this->renderPlaceholder(
-            'bi-images',
-            'Content prüfen',
-            'Fotoalben prüfen',
-            'Prüfe neu eingereichte Fotoalben, FSK16/FSK18 Cover und enthaltene Einzelbilder.',
-            'photo-albums-checking',
-            '/Fotoalben-pruefen',
-            'acp/includes/photo_albums_checking.php'
-        );
-    }
-
-    public function photoAlbumChecking(): string
-    {
-        $id = abs((int)$this->request->get('id', 0));
-        return $this->renderPlaceholder(
-            'bi-journal-check',
-            'Content prüfen',
-            'Fotoalbum prüfen' . ($id > 0 ? ' (#' . $id . ')' : ''),
-            'Einzelprüfung eines Fotoalbums mit allen Bildern, Preisen und Kategorien.',
-            'photo-album-checking' . ($id > 0 ? '?id=' . $id : ''),
-            '/Fotoalbum-pruefen/' . ($id > 0 ? $id : ''),
-            'acp/includes/photo_album_checking.php'
-        );
-    }
-
     public function coActorsChecking(): string
     {
         return $this->renderPlaceholder(

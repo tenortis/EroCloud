@@ -745,6 +745,410 @@ const App = {
   },
 
   // ========================================================================
+  // 3c. Modul: Fotoalben prüfen (#/photo-albums-checking & #/photo-album-checking)
+  // ========================================================================
+  activePhotoAlbumsCheckingFilter: 'all',
+  currentAlbumGalleryIndex: 0,
+
+  setPhotoAlbumsCheckingFilter(btnEl) {
+    if (!btnEl) return;
+    this.activePhotoAlbumsCheckingFilter = btnEl.getAttribute('data-pac-filter') || 'all';
+    document.querySelectorAll('.pac-filter-btn').forEach(b => {
+      b.classList.remove('active', 'btn-kkc');
+      b.classList.add('btn-outline-kkc');
+    });
+    btnEl.classList.remove('btn-outline-kkc');
+    btnEl.classList.add('active', 'btn-kkc');
+    this.filterPhotoAlbumsCheckingList();
+  },
+
+  filterPhotoAlbumsCheckingList() {
+    const q = (document.getElementById('pac-search-input')?.value || '').trim().toLowerCase();
+    const filter = this.activePhotoAlbumsCheckingFilter || 'all';
+
+    document.querySelectorAll('.pac-queue-row').forEach(row => {
+      const haystack = row.getAttribute('data-pac-search') || '';
+      const bram = row.getAttribute('data-pac-bram') || '';
+      const coactor = row.getAttribute('data-pac-coactor') || '';
+      const cat = row.getAttribute('data-pac-cat') || '';
+
+      let matchesFilter = true;
+      if (filter === 'bram_ok') {
+        matchesFilter = (bram === 'bram_ok');
+      } else if (filter === 'bram_attention') {
+        matchesFilter = (bram === 'bram_attention');
+      } else if (filter === 'co_actor_open') {
+        matchesFilter = (coactor === 'co_actor_open');
+      } else if (filter === 'porn' || filter === 'fetish') {
+        matchesFilter = (cat === filter);
+      }
+
+      const matchesSearch = (q === '' || haystack.includes(q));
+      row.classList.toggle('d-none', !(matchesFilter && matchesSearch));
+    });
+  },
+
+  openAlbumGalleryModal(index) {
+    const cards = Array.from(document.querySelectorAll('.pac-photo-card'));
+    if (cards.length === 0) return;
+
+    this.currentAlbumGalleryIndex = ((index % cards.length) + cards.length) % cards.length;
+    const card = cards[this.currentAlbumGalleryIndex];
+    const modalEl = document.getElementById('pacGalleryModal');
+    const imgEl = document.getElementById('pacGalleryModalImg');
+    const titleEl = document.getElementById('pacGalleryModalTitle');
+    if (!modalEl || !imgEl || !card) return;
+
+    imgEl.src = card.getAttribute('data-full-src') || '';
+    if (titleEl) {
+      titleEl.textContent = `${card.getAttribute('data-photo-label') || 'Foto'} (${this.currentAlbumGalleryIndex + 1} / ${cards.length})`;
+    }
+
+    if (window.bootstrap?.Modal) {
+      window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  },
+
+  stepAlbumGallery(delta) {
+    this.openAlbumGalleryModal(this.currentAlbumGalleryIndex + Number(delta));
+  },
+
+  async toggleAlbumPhotoReject(photoId, btnEl) {
+    if (!photoId || !btnEl) return;
+    const currentlyRejected = btnEl.getAttribute('data-rejected') === '1';
+    const nextRejected = currentlyRejected ? 0 : 1;
+
+    btnEl.disabled = true;
+
+    try {
+      const formData = new FormData();
+      formData.append('_csrf', this.csrfToken);
+      formData.append('photo_id', photoId);
+      formData.append('rejected', String(nextRejected));
+
+      const res = await fetch(`${this.basePath}/api.php?route=photo-albums-checking/toggle-photo`, {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': this.csrfToken },
+        body: formData
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.status !== 'ok') {
+        this.toast(data.message || 'Status des Fotos konnte nicht geändert werden.', 'danger');
+        return;
+      }
+
+      this.resetLogoutCountdown();
+      const card = document.getElementById(`pac-photo-card-${photoId}`);
+      const overlay = card?.querySelector('.pac-photo-rej-overlay');
+
+      btnEl.setAttribute('data-rejected', String(nextRejected));
+      if (nextRejected === 1) {
+        card?.classList.add('border-danger', 'bg-danger', 'bg-opacity-10');
+        overlay?.classList.remove('d-none');
+        btnEl.className = 'btn btn-sm flex-fill py-0 pac-photo-toggle-btn btn-success';
+        btnEl.innerHTML = '<i class="bi bi-check-lg me-1"></i>Zulassen';
+      } else {
+        card?.classList.remove('border-danger', 'bg-danger', 'bg-opacity-10');
+        overlay?.classList.add('d-none');
+        btnEl.className = 'btn btn-sm flex-fill py-0 pac-photo-toggle-btn btn-outline-danger';
+        btnEl.innerHTML = '<i class="bi bi-trash3 me-1"></i>Ablehnen';
+      }
+
+      const rejBadge = document.getElementById('pac-rejected-photos-badge');
+      if (rejBadge && typeof data.rejected_count === 'number') {
+        if (data.rejected_count > 0) {
+          rejBadge.className = 'badge-kkc badge-kkc-danger';
+          rejBadge.textContent = `${data.rejected_count} Foto(s) abgelehnt`;
+        } else {
+          rejBadge.className = 'badge-kkc badge-kkc-success';
+          rejBadge.textContent = 'Alle Fotos zulässig';
+        }
+      }
+    } catch (err) {
+      this.toast('Verbindungsfehler: ' + err.message, 'danger');
+    } finally {
+      btnEl.disabled = false;
+    }
+  },
+
+  async batchAllowAllAlbumPhotos(albumDbId) {
+    try {
+      const formData = new FormData();
+      formData.append('_csrf', this.csrfToken);
+      formData.append('album_db_id', String(albumDbId));
+      formData.append('batch_mode', 'allow_all');
+
+      const res = await fetch(`${this.basePath}/api.php?route=photo-albums-checking/toggle-photo`, {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': this.csrfToken },
+        body: formData
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.status !== 'ok') {
+        this.toast(data.message || 'Fehler beim Freigeben der Fotos.', 'danger');
+        return;
+      }
+
+      this.toast(data.message || 'Alle Fotos im Album wurden zugelassen.', 'success');
+
+      document.querySelectorAll('.pac-photo-card').forEach(card => {
+        card.classList.remove('border-danger', 'bg-danger', 'bg-opacity-10');
+        card.querySelector('.pac-photo-rej-overlay')?.classList.add('d-none');
+        const btn = card.querySelector('.pac-photo-toggle-btn');
+        if (btn) {
+          btn.setAttribute('data-rejected', '0');
+          btn.className = 'btn btn-sm flex-fill py-0 pac-photo-toggle-btn btn-outline-danger';
+          btn.innerHTML = '<i class="bi bi-trash3 me-1"></i>Ablehnen';
+        }
+      });
+
+      const rejBadge = document.getElementById('pac-rejected-photos-badge');
+      if (rejBadge) {
+        rejBadge.className = 'badge-kkc badge-kkc-success';
+        rejBadge.textContent = 'Alle Fotos zulässig';
+      }
+    } catch (err) {
+      this.toast('Verbindungsfehler: ' + err.message, 'danger');
+    }
+  },
+
+  updatePhotoAlbumFormCounters() {
+    const titleEl = document.getElementById('pac-input-title');
+    const descEl = document.getElementById('pac-input-description');
+    const metaTitleEl = document.getElementById('pac-input-meta-title');
+    const metaDescEl = document.getElementById('pac-input-meta-desc');
+
+    const titleCnt = document.getElementById('pac-title-counter');
+    const descCnt = document.getElementById('pac-desc-counter');
+    const metaTitleCnt = document.getElementById('pac-meta-title-counter');
+    const metaDescCnt = document.getElementById('pac-meta-desc-counter');
+
+    if (titleEl && titleCnt) titleCnt.textContent = `${titleEl.value.length}/65`;
+    if (descEl && descCnt) descCnt.textContent = `${descEl.value.length} Zeichen`;
+    if (metaTitleEl && metaTitleCnt) metaTitleCnt.textContent = `${metaTitleEl.value.length}/65`;
+    if (metaDescEl && metaDescCnt) metaDescCnt.textContent = `${metaDescEl.value.length}/156`;
+  },
+
+  autofillPhotoAlbumSeoFields() {
+    const title = (document.getElementById('pac-input-title')?.value || '').trim();
+    const desc = (document.getElementById('pac-input-description')?.value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    const metaTitleEl = document.getElementById('pac-input-meta-title');
+    const metaDescEl = document.getElementById('pac-input-meta-desc');
+    const seoUrlEl = document.getElementById('pac-input-seo-url');
+
+    if (metaTitleEl && title !== '') {
+      metaTitleEl.value = title.substring(0, 65).trim();
+    }
+    if (metaDescEl && desc !== '') {
+      metaDescEl.value = desc.substring(0, 156).trim();
+    }
+    if (seoUrlEl && title !== '') {
+      const slug = title
+        .toLowerCase()
+        .replace(/ä/g, 'ae')
+        .replace(/ö/g, 'oe')
+        .replace(/ü/g, 'ue')
+        .replace(/ß/g, 'ss')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      seoUrlEl.value = slug;
+    }
+    this.updatePhotoAlbumFormCounters();
+    this.toast('SEO-Felder wurden automatisch aus Titel und Beschreibung erzeugt.', 'info');
+  },
+
+  filterPhotoAlbumCategories(query) {
+    const q = String(query || '').trim().toLowerCase();
+    document.querySelectorAll('.pac-cat-item').forEach(item => {
+      const lbl = item.getAttribute('data-cat-label') || '';
+      item.classList.toggle('d-none', q !== '' && !lbl.includes(q));
+    });
+  },
+
+  onPhotoAlbumCategoryChange(checkboxEl) {
+    if (checkboxEl) {
+      const label = checkboxEl.closest('label');
+      if (label) {
+        label.classList.toggle('border-primary', checkboxEl.checked);
+        label.classList.toggle('bg-primary', checkboxEl.checked);
+        label.classList.toggle('bg-opacity-10', checkboxEl.checked);
+        label.classList.toggle('fw-semibold', checkboxEl.checked);
+      }
+    }
+    const checkedCount = document.querySelectorAll('.pac-cat-checkbox:checked').length;
+    const badge = document.getElementById('pac-selected-cats-badge');
+    if (badge) {
+      badge.textContent = `${checkedCount} Unterkategorien gewählt`;
+    }
+  },
+
+  onPhotoAlbumRejectionReasonChange(selectEl) {
+    if (!selectEl) return;
+    const opt = selectEl.options[selectEl.selectedIndex];
+    const longText = opt ? (opt.getAttribute('data-long-text') || '') : '';
+    const textarea = document.getElementById('pac-rejection-text');
+    if (textarea) {
+      textarea.value = longText;
+    }
+  },
+
+  async submitPhotoAlbumApprove(event) {
+    if (event) event.preventDefault();
+    const form = document.getElementById('pac-approve-form');
+    const btn = document.getElementById('pac-submit-approve-btn');
+    if (!form) return false;
+
+    const formData = new FormData(form);
+    formData.append('_csrf', this.csrfToken);
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Speichere & veröffentliche...';
+    }
+
+    try {
+      const res = await fetch(`${this.basePath}/api.php?route=photo-albums-checking/approve`, {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': this.csrfToken },
+        body: formData
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.status !== 'ok') {
+        this.toast(data.message || 'Fotoalbum konnte nicht veröffentlicht werden.', 'danger');
+        return false;
+      }
+
+      this.resetLogoutCountdown();
+      this.toast(data.message || 'Fotoalbum erfolgreich geprüft und veröffentlicht!', 'success');
+      this.refreshSidebarCounts();
+
+      const autoNext = document.getElementById('pac-auto-next-check')?.checked;
+      if (autoNext && data.next_album_id && Number(data.next_album_id) > 0) {
+        window.location.hash = `#/photo-album-checking?id=${Number(data.next_album_id)}`;
+      } else {
+        window.location.hash = '#/photo-albums-checking';
+      }
+    } catch (err) {
+      this.toast('Verbindungsfehler: ' + err.message, 'danger');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Fotoalbum speichern &amp; veröffentlichen';
+      }
+    }
+    return false;
+  },
+
+  async submitPhotoAlbumReject(event) {
+    if (event) event.preventDefault();
+    const form = document.getElementById('pac-reject-form');
+    const btn = document.getElementById('pac-submit-reject-btn');
+    if (!form) return false;
+
+    const reasonSel = document.getElementById('pac-rejection-reason-select');
+    const reasonTxt = document.getElementById('pac-rejection-text');
+    if (!reasonSel || reasonSel.value === '0' || !reasonTxt || reasonTxt.value.trim() === '') {
+      this.toast('Bitte wähle einen Ablehnungsgrund und gib eine Begründung an.', 'warning');
+      return false;
+    }
+
+    const formData = new FormData(form);
+    formData.append('_csrf', this.csrfToken);
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Lehne Fotoalbum ab...';
+    }
+
+    try {
+      const res = await fetch(`${this.basePath}/api.php?route=photo-albums-checking/reject`, {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': this.csrfToken },
+        body: formData
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.status !== 'ok') {
+        this.toast(data.message || 'Fotoalbum konnte nicht abgelehnt werden.', 'danger');
+        return false;
+      }
+
+      this.resetLogoutCountdown();
+      this.toast(data.message || 'Fotoalbum wurde abgelehnt.', 'warning');
+      this.refreshSidebarCounts();
+
+      const autoNext = document.getElementById('pac-auto-next-check')?.checked;
+      if (autoNext && data.next_album_id && Number(data.next_album_id) > 0) {
+        window.location.hash = `#/photo-album-checking?id=${Number(data.next_album_id)}`;
+      } else {
+        window.location.hash = '#/photo-albums-checking';
+      }
+    } catch (err) {
+      this.toast('Verbindungsfehler: ' + err.message, 'danger');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-slash-circle me-1"></i> Fotoalbum jetzt verbindlich ablehnen';
+      }
+    }
+    return false;
+  },
+
+  async reviewAlbumCoActor(albumDbId, merchantId, coActorId, decision) {
+    let reason = '';
+    if (decision === 'reject') {
+      const r = window.prompt(
+        'Grund für die Ablehnung des ID-Shots / Drehpartners:',
+        'Der Personalausweis ist auf dem ID-Shot leider nicht scharf genug lesbar. Bitte nimm den ID-Shot per Smartphone-QR-Code erneut auf.'
+      );
+      if (r === null) return;
+      reason = r.trim();
+    }
+
+    const formData = new FormData();
+    formData.append('_csrf', this.csrfToken);
+    formData.append('album_id', String(albumDbId));
+    formData.append('merchant_id', String(merchantId));
+    formData.append('co_actor_id', String(coActorId));
+    formData.append('decision', decision);
+    formData.append('reason', reason);
+
+    try {
+      const res = await fetch(`${this.basePath}/api.php?route=photo-albums-checking/co-actor-action`, {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': this.csrfToken },
+        body: formData
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.status !== 'ok') {
+        this.toast(data.message || 'Drehpartner-Status konnte nicht geändert werden.', 'danger');
+        return;
+      }
+
+      this.resetLogoutCountdown();
+      this.toast(data.message || 'Drehpartner-Status aktualisiert.', decision === 'verify' ? 'success' : 'warning');
+      this.refreshSidebarCounts();
+
+      const badge = document.getElementById(`pac-coactor-status-${coActorId}`);
+      if (badge) {
+        if (decision === 'verify') {
+          badge.className = 'badge-kkc badge-kkc-success';
+          badge.textContent = 'Geprüft & Freigegeben';
+        } else if (decision === 'reject') {
+          badge.className = 'badge-kkc badge-kkc-danger';
+          badge.textContent = 'Abgelehnt – Korrektur nötig';
+        }
+      }
+    } catch (err) {
+      this.toast('Verbindungsfehler: ' + err.message, 'danger');
+    }
+  },
+
+  // ========================================================================
   // 4. Dashboard: Gemeinsame Notizen & Persönliche Notizen (AJAX)
   // ========================================================================
   async adminNotesAction(action) {
