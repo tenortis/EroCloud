@@ -220,6 +220,9 @@ $countActorCams = $rsActorCams ? abs((int)(p4c_fetch_object($rsActorCams)->cnt ?
 $rsNewActors = p4c_query("SELECT COUNT(*) AS `cnt` FROM `actors` WHERE `created_datetime` >= '" . date('Y-m-d H:i:s', strtotime('-5 days')) . "' AND `status`='inactive';", __FILE__, __LINE__);
 $countNewActors = $rsNewActors ? abs((int)(p4c_fetch_object($rsNewActors)->cnt ?? 0)) : 0;
 
+$rsEmployeesCount = p4c_query("SELECT COUNT(*) AS `cnt` FROM `employee`;", __FILE__, __LINE__);
+$countEmployees = $rsEmployeesCount ? abs((int)(p4c_fetch_object($rsEmployeesCount)->cnt ?? 0)) : 0;
+
 $sessionRemainingSeconds = 1800;
 ?>
 <!DOCTYPE html>
@@ -425,10 +428,19 @@ $sessionRemainingSeconds = 1800;
       </a>
       <?php endif; ?>
 
-      <?php if (acp_has_access('error_log')): ?>
-      <!-- 11. System & Technik -->
+      <?php if (acp_has_access('error_log') || acp_has_access('employees')): ?>
+      <!-- 11. System, Team & Technik -->
       <div class="sidebar-heading mt-3">System &amp; Technik</div>
 
+      <?php if (acp_has_access('employees')): ?>
+      <a href="#/employees" class="sidebar-link" data-route="#/employees">
+        <i class="bi bi-person-gear"></i>
+        <span class="text-nowrap">Mitarbeiter &amp; Admins</span>
+        <span class="sidebar-count-badge ms-auto"><?= (int)$countEmployees ?></span>
+      </a>
+      <?php endif; ?>
+
+      <?php if (acp_has_access('error_log')): ?>
       <a href="#/system-settings" class="sidebar-link" data-route="#/system-settings">
         <i class="bi bi-sliders"></i>
         <span class="text-nowrap">Impressum &amp; E-Mail</span>
@@ -438,6 +450,7 @@ $sessionRemainingSeconds = 1800;
         <i class="bi bi-bug-fill"></i>
         <span class="text-nowrap">Error-Log</span>
       </a>
+      <?php endif; ?>
       <?php endif; ?>
 
       <!-- 13. Pay4Coins ACP Verknüpfung -->
@@ -535,6 +548,18 @@ $sessionRemainingSeconds = 1800;
                 <i class="bi bi-speedometer2 me-2 text-muted"></i>Admin-Dashboard
               </a>
             </li>
+            <?php if (acp_has_access('employees')): ?>
+            <li>
+              <a class="dropdown-item" href="#/employee?id=<?= (int)$employeeId ?>">
+                <i class="bi bi-person-gear me-2 text-muted"></i>Mein Admin-Account
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="#/employees">
+                <i class="bi bi-people-fill me-2 text-muted"></i>Mitarbeiter &amp; Berechtigungen
+              </a>
+            </li>
+            <?php endif; ?>
             <li>
               <a class="dropdown-item" href="<?= htmlspecialchars($acpUrl, ENT_QUOTES, 'UTF-8') ?>/Startseite" target="_blank" rel="noopener">
                 <i class="bi bi-box-arrow-up-right me-2 text-muted"></i>Altes ACP öffnen (Vergleich)

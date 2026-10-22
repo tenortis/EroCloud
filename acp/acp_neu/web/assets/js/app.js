@@ -139,7 +139,8 @@ const App = {
       'actor': 'actors',
       'site': 'sites',
       'merchant': 'merchants',
-      'user': 'users'
+      'user': 'users',
+      'employee': 'employees'
     };
     const effectiveNavRoute = routeToParentLink[pathPart] || pathPart;
 
@@ -4788,6 +4789,336 @@ const App = {
         }
       } catch (err) {
         App.toast('Netzwerkfehler bei Banner-Aktion: ' + err.message, 'danger');
+      }
+    }
+  },
+
+  // ===========================================================================
+  // 16. MODUL: MITARBEITER, ADMINISTRATOREN & MODERATOREN (#/employees & #/employee?id=...)
+  // ===========================================================================
+  Employees: {
+    submitFilterForm(event) {
+      if (event) event.preventDefault();
+      const form = document.getElementById('employees-filter-form');
+      if (!form) return false;
+
+      const fd = new FormData(form);
+      const params = new URLSearchParams();
+
+      const rule   = (fd.get('rule') || 'all').toString().trim();
+      const access = (fd.get('access') || 'all').toString().trim();
+      const sort   = (fd.get('sort') || 'id_asc').toString().trim();
+      const q      = (fd.get('q') || '').toString().trim();
+
+      if (rule !== 'all') params.set('rule', rule);
+      if (access !== 'all') params.set('access', access);
+      if (sort !== 'id_asc') params.set('sort', sort);
+      if (q !== '') params.set('q', q);
+
+      const qs = params.toString();
+      const targetHash = `#/employees${qs ? '?' + qs : ''}`;
+      if (window.location.hash === targetHash) {
+        App.handleRoute();
+      } else {
+        window.location.hash = targetHash;
+      }
+      return false;
+    },
+
+    quickFilterTable(query) {
+      const q = String(query || '').trim().toLowerCase();
+      document.querySelectorAll('.employee-list-row').forEach(row => {
+        const hay = row.getAttribute('data-search') || '';
+        row.classList.toggle('d-none', !(q === '' || hay.includes(q)));
+      });
+    },
+
+    filterHistoryTable(query) {
+      const q = String(query || '').trim().toLowerCase();
+      document.querySelectorAll('.emp-history-row').forEach(row => {
+        const hay = row.getAttribute('data-search') || '';
+        row.classList.toggle('d-none', !(q === '' || hay.includes(q)));
+      });
+    },
+
+    generatePassword() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*+-=';
+      let pwd = '';
+      const randomValues = new Uint32Array(16);
+      if (window.crypto && window.crypto.getRandomValues) {
+        window.crypto.getRandomValues(randomValues);
+        for (let i = 0; i < 16; i++) {
+          pwd += chars[randomValues[i] % chars.length];
+        }
+      } else {
+        for (let i = 0; i < 16; i++) {
+          pwd += chars[Math.floor(Math.random() * chars.length)];
+        }
+      }
+
+      const pwInput  = document.getElementById('emp-password-input');
+      const pwRepInp = document.getElementById('emp-password-confirm-input');
+      const eyeIcon  = document.getElementById('emp-pw-eye-icon');
+
+      if (pwInput) {
+        pwInput.value = pwd;
+        pwInput.type = 'text';
+      }
+      if (pwRepInp) {
+        pwRepInp.value = pwd;
+        pwRepInp.type = 'text';
+      }
+      if (eyeIcon) {
+        eyeIcon.className = 'bi bi-eye-slash';
+      }
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(pwd).then(() => {
+          App.toast('Sicheres Passwort generiert und direkt in die Zwischenablage kopiert.', 'success');
+        }).catch(() => {
+          App.toast('Sicheres Passwort wurde generiert.', 'info');
+        });
+      } else {
+        App.toast('Sicheres Passwort wurde generiert.', 'info');
+      }
+    },
+
+    togglePasswordVisibility() {
+      const pwInput  = document.getElementById('emp-password-input');
+      const pwRepInp = document.getElementById('emp-password-confirm-input');
+      const eyeIcon  = document.getElementById('emp-pw-eye-icon');
+      if (!pwInput) return;
+
+      const show = pwInput.type === 'password';
+      pwInput.type = show ? 'text' : 'password';
+      if (pwRepInp) pwRepInp.type = show ? 'text' : 'password';
+      if (eyeIcon) eyeIcon.className = show ? 'bi bi-eye-slash' : 'bi bi-eye';
+    },
+
+    async copyPassword() {
+      const pwInput = document.getElementById('emp-password-input');
+      const val = (pwInput?.value || '').trim();
+      if (!val) {
+        App.toast('Das Passwort-Feld ist aktuell leer. Generiere oder tippe zuerst ein Passwort ein.', 'warning');
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(val);
+        App.toast('Passwort in die Zwischenablage kopiert.', 'success');
+      } catch (_) {
+        App.toast('Kopieren in die Zwischenablage fehlgeschlagen.', 'danger');
+      }
+    },
+
+    applyPreset(rule, isAll, areas) {
+      const ruleWrite = document.getElementById('emp-rule-write');
+      const ruleRead  = document.getElementById('emp-rule-read');
+      if (rule === 'write' && ruleWrite && !ruleWrite.disabled) {
+        ruleWrite.checked = true;
+      } else if (rule === 'read' && ruleRead && !ruleRead.disabled) {
+        ruleRead.checked = true;
+      }
+
+      const allSwitch = document.getElementById('emp-access-all-switch');
+      if (allSwitch && !allSwitch.disabled) {
+        allSwitch.checked = !!isAll;
+      }
+
+      const areaSet = new Set(Array.isArray(areas) ? areas : []);
+      document.querySelectorAll('.emp-area-checkbox').forEach(cb => {
+        if (!cb.disabled) {
+          cb.checked = !!isAll || areaSet.has(cb.value);
+        }
+      });
+
+      this.onToggleAllAccess(!!isAll);
+      App.toast('Rollen-Vorlage übernommen. Klicke unten auf „Speichern“, um die Berechtigungen zu aktivieren.', 'info');
+    },
+
+    onToggleAllAccess(checked) {
+      const box  = document.getElementById('emp-all-access-box');
+      const grid = document.getElementById('emp-individual-areas-grid');
+
+      if (box) {
+        box.classList.toggle('border-success', !!checked);
+        box.classList.toggle('bg-success', !!checked);
+        box.classList.toggle('bg-opacity-10', !!checked);
+      }
+      if (grid) {
+        grid.style.opacity = checked ? '0.55' : '1';
+      }
+      if (checked) {
+        document.querySelectorAll('.emp-area-checkbox').forEach(cb => {
+          cb.checked = true;
+        });
+      }
+    },
+
+    selectAllIndividualAreas(checked) {
+      const allSwitch = document.getElementById('emp-access-all-switch');
+      if (!checked && allSwitch) {
+        allSwitch.checked = false;
+        this.onToggleAllAccess(false);
+      }
+      document.querySelectorAll('.emp-area-checkbox').forEach(cb => {
+        if (!cb.disabled) {
+          cb.checked = !!checked;
+        }
+      });
+    },
+
+    onIndividualAreaChange() {
+      const allCbs = Array.from(document.querySelectorAll('.emp-area-checkbox'));
+      const anyUnchecked = allCbs.some(cb => !cb.checked);
+      const allSwitch = document.getElementById('emp-access-all-switch');
+      if (anyUnchecked && allSwitch && allSwitch.checked) {
+        allSwitch.checked = false;
+        const box  = document.getElementById('emp-all-access-box');
+        const grid = document.getElementById('emp-individual-areas-grid');
+        if (box) {
+          box.classList.remove('border-success', 'bg-success', 'bg-opacity-10');
+        }
+        if (grid) {
+          grid.style.opacity = '1';
+        }
+      }
+    },
+
+    async saveEmployee(event) {
+      if (event) event.preventDefault();
+      const form = document.getElementById('employee-edit-form');
+      const btn  = document.getElementById('btn-save-employee');
+      if (!form) return false;
+
+      const fd = new FormData(form);
+      fd.set('_csrf', App.csrfToken);
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Speichere...';
+      }
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=employees/save`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.status !== 'ok') {
+          App.toast(data.message || 'Mitarbeiter konnte nicht gespeichert werden.', 'danger');
+          return false;
+        }
+
+        App.resetLogoutCountdown();
+        App.toast(data.message || 'Mitarbeiter erfolgreich gespeichert.', 'success');
+
+        if (data.is_new && data.employee_id > 0) {
+          window.location.hash = `#/employee?id=${data.employee_id}`;
+        } else {
+          App.handleRoute();
+        }
+      } catch (err) {
+        App.toast('Netzwerkfehler beim Speichern: ' + err.message, 'danger');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-floppy-fill me-1"></i>Änderungen speichern';
+        }
+      }
+      return false;
+    },
+
+    async deleteEmployee(employeeId, username, redirectAfter = false) {
+      const empId = parseInt(employeeId, 10) || 0;
+      if (empId <= 0) return;
+
+      if (!window.confirm(`Möchtest du den Mitarbeiter-Account „${username}“ (#${empId}) wirklich dauerhaft löschen?`)) {
+        return;
+      }
+
+      const fd = new FormData();
+      fd.append('_csrf', App.csrfToken);
+      fd.append('employee_id', String(empId));
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=employees/delete`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.status !== 'ok') {
+          App.toast(data.message || 'Mitarbeiter konnte nicht gelöscht werden.', 'danger');
+          return;
+        }
+
+        App.resetLogoutCountdown();
+        App.toast(data.message || 'Mitarbeiter-Account gelöscht.', 'success');
+
+        if (redirectAfter) {
+          window.location.hash = '#/employees';
+        } else {
+          const rowEl = document.getElementById(`employee-row-${empId}`);
+          if (rowEl) {
+            rowEl.style.transition = 'opacity 0.2s ease';
+            rowEl.style.opacity = '0';
+            setTimeout(() => App.handleRoute(), 200);
+          } else {
+            App.handleRoute();
+          }
+        }
+      } catch (err) {
+        App.toast('Netzwerkfehler beim Löschen: ' + err.message, 'danger');
+      }
+    },
+
+    async clearEmployeeHistory(employeeId, mode = 'older_30d') {
+      const empId = parseInt(employeeId, 10) || 0;
+      if (empId <= 0) return;
+
+      const msg = mode === 'all'
+        ? `Möchtest du wirklich die gesamte Aktivitäts-Historie von Mitarbeiter #${empId} leeren?`
+        : `Möchtest du alle Historien-Einträge von Mitarbeiter #${empId}, die älter als 30 Tage sind, bereinigen?`;
+
+      if (!window.confirm(msg)) {
+        return;
+      }
+
+      const fd = new FormData();
+      fd.append('_csrf', App.csrfToken);
+      fd.append('employee_id', String(empId));
+      fd.append('mode', mode);
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=employees/clear-history`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.status !== 'ok') {
+          App.toast(data.message || 'Historie konnte nicht bereinigt werden.', 'danger');
+          return;
+        }
+
+        App.resetLogoutCountdown();
+        App.toast(data.message || 'Historie erfolgreich bereinigt.', 'success');
+        App.handleRoute();
+      } catch (err) {
+        App.toast('Netzwerkfehler: ' + err.message, 'danger');
       }
     }
   }

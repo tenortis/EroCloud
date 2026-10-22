@@ -110,6 +110,7 @@ class Router
         $merchantsCtrl           = 'App\\Modules\\Merchants\\MerchantsController';
         $usersCtrl               = 'App\\Modules\\Users\\UsersController';
         $systemTechCtrl          = 'App\\Modules\\SystemTech\\SystemTechController';
+        $employeesCtrl           = 'App\\Modules\\Employees\\EmployeesController';
         $previewCtrl             = 'App\\Modules\\Preview\\PreviewController';
 
         // 1. Startseite (Echtes Admin-Dashboard, Globale Schnellsuche, Notizen & Live-Counter)
@@ -200,5 +201,12 @@ class Router
         self::register('system-settings/send-test-mail', $systemTechCtrl, 'sendTestMail', 'error_log');
         self::register('errors', $systemTechCtrl, 'errors', 'error_log');
         self::register('errors/action', $systemTechCtrl, 'errorLogAction', 'error_log');
+
+        // 12. Mitarbeiter, Administratoren & Moderatoren (employees)
+        self::register('employees', $employeesCtrl, 'list', 'employees');
+        self::register('employee', $employeesCtrl, 'detail', 'employees');
+        self::register('employees/save', $employeesCtrl, 'save', 'employees');
+        self::register('employees/delete', $employeesCtrl, 'delete', 'employees');
+        self::register('employees/clear-history', $employeesCtrl, 'clearHistory', 'employees');
     }
 }

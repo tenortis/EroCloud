@@ -416,6 +416,39 @@ class HomeController
             }
         }
 
+        // 5. Mitarbeiter & Admins (employee)
+        if (function_exists('acp_has_access') && acp_has_access('employees')) {
+            $whereEmp = "`username` LIKE '%" . $escQ . "%'";
+            if ($cleanId > 0) {
+                $whereEmp = "(`id` = '" . $cleanId . "' OR " . $whereEmp . ")";
+            }
+            $rsEmps = p4c_query(
+                "SELECT `id`, `username`, `rule`, `access_area`
+                 FROM `employee`
+                 WHERE " . $whereEmp . "
+                 ORDER BY `id` ASC
+                 LIMIT 5;",
+                __FILE__,
+                __LINE__
+            );
+            if ($rsEmps && p4c_num_rows($rsEmps) > 0) {
+                while ($e = p4c_fetch_object($rsEmps)) {
+                    $eid = abs((int)$e->id);
+                    $isWrite = strtolower((string)($e->rule ?? '')) === 'write';
+                    $items[] = [
+                        'type'         => 'employee',
+                        'type_label'   => 'Team / Admin',
+                        'icon'         => 'bi-person-gear',
+                        'id'           => $eid,
+                        'title'        => self::decodeLegacyText((string)($e->username ?? ('Admin #' . $eid))),
+                        'subtitle'     => 'Bereiche: ' . (string)($e->access_area ?? '-'),
+                        'status_label' => $isWrite ? 'Administrator' : 'Moderator',
+                        'route'        => '#/employee?id=' . $eid,
+                    ];
+                }
+            }
+        }
+
         Response::json([
             'status' => 'ok',
             'items'  => $items,
