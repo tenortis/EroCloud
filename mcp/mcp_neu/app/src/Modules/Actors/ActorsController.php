@@ -156,7 +156,7 @@ class ActorsController
                     $countActive++;
                 } elseif ($status === 'inactive') {
                     $countReview++;
-                } elseif ($status === 'locked') {
+                } elseif ($status === 'locked' || $status === 'blocked') {
                     $countLocked++;
                 }
 
@@ -916,31 +916,46 @@ class ActorsController
             'check_gender'             => $this->request->post('check_gender') !== null ? 1 : 0,
             'age'                      => $age,
             'check_age'                => $this->request->post('check_age') !== null ? 1 : 0,
-            'star_sign'                => $starSign,
+            'star_sign'                => self::encodeLegacyEntities($starSign),
             'check_star_sign'          => $this->request->post('check_star_sign') !== null ? 1 : 0,
             'body_height'              => $bodyHeight,
             'check_body_height'        => $this->request->post('check_body_height') !== null ? 1 : 0,
             'body_weight'              => $bodyWeight,
             'check_body_weight'        => $this->request->post('check_body_weight') !== null ? 1 : 0,
-            'hair_color'               => $hairColor,
+            'hair_color'               => self::encodeLegacyEntities($hairColor),
             'check_hair_color'         => $this->request->post('check_hair_color') !== null ? 1 : 0,
-            'eye_color'                => $eyeColor,
+            'eye_color'                => self::encodeLegacyEntities($eyeColor),
             'check_eye_color'          => $this->request->post('check_eye_color') !== null ? 1 : 0,
             'cup_size'                 => $cupSizeA . $cupSizeB,
             'check_cup_size'           => $this->request->post('check_cup_size') !== null ? 1 : 0,
             'shaven'                   => $shaven,
             'check_shaven'             => $this->request->post('check_shaven') !== null ? 1 : 0,
-            'sexual_orientation'       => $sexualOrientation,
+            'sexual_orientation'       => self::encodeLegacyEntities($sexualOrientation),
             'check_sexual_orientation' => $this->request->post('check_sexual_orientation') !== null ? 1 : 0,
-            'marital_status'           => $maritalStatus,
+            'marital_status'           => self::encodeLegacyEntities($maritalStatus),
             'check_marital_status'     => $this->request->post('check_marital_status') !== null ? 1 : 0,
-            'interests'                => implode('|', $validInterests),
+            'interests'                => self::encodeLegacyEntities(implode('|', $validInterests)),
             'check_interests'          => $this->request->post('check_interests') !== null ? 1 : 0,
-            'looking_for'              => implode('|', $validLookingFor),
+            'looking_for'              => self::encodeLegacyEntities(implode('|', $validLookingFor)),
             'check_looking_for'        => $this->request->post('check_looking_for') !== null ? 1 : 0,
-            'sexual_preferences'       => implode('|', $validPrefs),
+            'sexual_preferences'       => self::encodeLegacyEntities(implode('|', $validPrefs)),
             'check_sexual_preferences' => $this->request->post('check_sexual_preferences') !== null ? 1 : 0,
         ];
+    }
+
+    /**
+     * Kodiert deutsche Umlaute und & in HTML-Entities für 100%ige Rückwärtskompatibilität mit dem ACP (acp/includes/actor.php).
+     */
+    private static function encodeLegacyEntities(string $text): string
+    {
+        if ($text === '') {
+            return '';
+        }
+        return str_replace(
+            ['&', 'ä', 'ö', 'ü', 'ß', 'Ä', 'Ö', 'Ü'],
+            ['&amp;', '&auml;', '&ouml;', '&uuml;', '&szlig;', '&Auml;', '&Ouml;', '&Uuml;'],
+            $text
+        );
     }
 
     /**

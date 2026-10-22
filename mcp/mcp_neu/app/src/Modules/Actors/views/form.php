@@ -48,7 +48,7 @@ $backRoute = ($countActors > 1) ? '#/actors' : '#/startseite';
             <span class="badge bg-warning-subtle text-warning border border-warning-subtle" title="Das Profil wird durch unser Support-Team geprüft.">
               <i class="bi bi-hourglass-split me-1"></i>Wird geprüft
             </span>
-          <?php elseif ($status === 'locked'): ?>
+          <?php elseif ($status === 'locked' || $status === 'blocked'): ?>
             <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
               <i class="bi bi-exclamation-octagon-fill me-1"></i>Gesperrt
             </span>
@@ -79,7 +79,7 @@ $backRoute = ($countActors > 1) ? '#/actors' : '#/startseite';
 </div>
 
 <!-- Status-Hinweise (bei Prüfung oder Sperrung im Edit-Modus) -->
-<?php if ($isEdit && $status === 'locked'): ?>
+<?php if ($isEdit && ($status === 'locked' || $status === 'blocked')): ?>
 <div class="alert alert-danger d-flex align-items-start gap-3 p-3 mb-4 shadow-sm">
   <i class="bi bi-exclamation-octagon-fill fs-4 text-danger flex-shrink-0"></i>
   <div>

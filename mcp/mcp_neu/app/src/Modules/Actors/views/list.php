@@ -143,7 +143,7 @@ if (!defined('SAFE_INC')) {
           <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1" title="Das Profil wird durch unser Support-Team geprüft.">
             <i class="bi bi-hourglass-split me-1"></i>Wird geprüft
           </span>
-        <?php elseif ($status === 'locked'): ?>
+        <?php elseif ($status === 'locked' || $status === 'blocked'): ?>
           <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
             <i class="bi bi-exclamation-octagon-fill me-1"></i>Gesperrt
           </span>
@@ -153,10 +153,10 @@ if (!defined('SAFE_INC')) {
       <!-- Kachel-Body: FSK16/FSK18 Bilder & Kurz-Steckbrief -->
       <div class="p-3 flex-grow-1">
 
-        <?php if ($status === 'locked' && $actor['locked_reason'] !== ''): ?>
+        <?php if ($status === 'locked' || $status === 'blocked'): ?>
         <div class="alert alert-danger py-2 px-3 small mb-3">
           <div class="fw-bold"><i class="bi bi-exclamation-triangle-fill me-1"></i>Grund der Sperrung:</div>
-          <div><?= htmlspecialchars((string)$actor['locked_reason'], ENT_QUOTES, 'UTF-8') ?></div>
+          <div><?= $actor['locked_reason'] !== '' ? htmlspecialchars((string)$actor['locked_reason'], ENT_QUOTES, 'UTF-8') : 'Dieses Profil wurde durch den Support gesperrt. Bitte wende dich bei Rückfragen an den Support.' ?></div>
         </div>
         <?php elseif ($status === 'inactive'): ?>
         <div class="alert alert-warning py-2 px-3 small mb-3 d-flex align-items-center gap-2">
