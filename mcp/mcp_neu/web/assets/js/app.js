@@ -1108,6 +1108,18 @@ const App = {
           if (zoomUrl || url) restoreBtn.setAttribute('data-zoom-url', zoomUrl || url);
           if (editorUrl || zoomUrl || url) restoreBtn.setAttribute('data-editor-url', editorUrl || zoomUrl || url);
         }
+
+        const stripItem = document.getElementById(`studio-filmstrip-custom-${customNum}`);
+        const stripImg = document.getElementById(`studio-filmstrip-img-${customNum}`);
+        if (stripItem) {
+          stripItem.classList.remove('d-none');
+          if (url) stripItem.setAttribute('data-thumb-url', url);
+          if (zoomUrl || url) stripItem.setAttribute('data-zoom-url', zoomUrl || url);
+          if (editorUrl || zoomUrl || url) stripItem.setAttribute('data-editor-url', editorUrl || zoomUrl || url);
+        }
+        if (stripImg && url) {
+          stripImg.src = url;
+        }
       }
 
       // „Wieder eigenes FSK16/18 nutzen"-Button einblenden, sobald ein eigenes Bild existiert, aber aktuell eine Szene #1..10 aktiv ist
@@ -1375,7 +1387,7 @@ const App = {
   },
 
   // ========================================================================
-  // 3b-2. Vorschaubild-Großansicht & Interaktiver FSK16 Milchglas-Editor
+  // 3b-2. EroCloud Fullscreen Cover-Studio (FSK 16 & FSK 18)
   // ========================================================================
   initMovieThumbEditorModal(applyMovieThumbSelection) {
     const modalEl = document.getElementById('modalMovieThumbEditor');
@@ -1384,103 +1396,496 @@ const App = {
 
     const ctx = canvas.getContext('2d');
     const loadingEl = document.getElementById('thumb-editor-loading');
+    const canvasContainer = document.getElementById('studio-canvas-container');
     const titleEl = document.getElementById('thumb-editor-modal-title');
+    const sourceBadgeEl = document.getElementById('studio-source-badge');
+    const summaryTextEl = document.getElementById('studio-edit-summary-text');
+
+    // Ziel-Modus Buttons (FSK 16 vs FSK 18)
+    const btnModeFsk16 = document.getElementById('btn-studio-mode-fsk16');
+    const btnModeFsk18 = document.getElementById('btn-studio-mode-fsk18');
+    const btnSavePrimary = document.getElementById('btn-studio-save-primary');
+    const icoSavePrimary = document.getElementById('ico-studio-save-primary');
+    const lblSavePrimary = document.getElementById('lbl-studio-save-primary');
+
+    // Zensur-Werkzeuge
     const shapesBadge = document.getElementById('thumb-editor-shapes-badge');
     const shapesListEl = document.getElementById('thumb-editor-shapes-list');
     const btnUndo = document.getElementById('btn-thumb-editor-undo');
     const btnClear = document.getElementById('btn-thumb-editor-clear');
-    const btnApplyFsk18 = document.getElementById('btn-editor-apply-fsk18');
-    const btnSaveFsk16 = document.getElementById('btn-editor-save-fsk16');
-    const btnSaveFsk16Label = document.getElementById('btn-editor-save-fsk16-label');
+    const btnResetAll = document.getElementById('btn-studio-reset-all');
     const toolBtns = modalEl.querySelectorAll('.js-editor-tool-btn');
+    const effectBtns = modalEl.querySelectorAll('.js-editor-effect-btn');
     const intensityBtns = modalEl.querySelectorAll('.js-editor-intensity-btn');
+    const brushSizeWrap = document.getElementById('studio-brush-size-wrap');
+    const rngBrushSize = document.getElementById('rng-studio-brush-size');
+    const lblBrushSize = document.getElementById('lbl-studio-brush-size');
+
+    // Bild-Optimierung (Licht & Farbe)
+    const rngBright = document.getElementById('rng-studio-bright');
+    const rngContrast = document.getElementById('rng-studio-contrast');
+    const rngSat = document.getElementById('rng-studio-sat');
+    const rngVignette = document.getElementById('rng-studio-vignette');
+    const lblBright = document.getElementById('lbl-studio-bright');
+    const lblContrast = document.getElementById('lbl-studio-contrast');
+    const lblSat = document.getElementById('lbl-studio-sat');
+    const lblVignette = document.getElementById('lbl-studio-vignette');
+    const btnResetAdjust = document.getElementById('btn-studio-reset-adjust');
+    const presetBtns = modalEl.querySelectorAll('.js-studio-preset-btn');
+
+    // Objekt-Inspektor (Sticker, Badges, Text, Logo)
+    const selectedObjPanel = document.getElementById('studio-selected-object-panel');
+    const btnDeleteSelectedObj = document.getElementById('btn-studio-delete-selected-obj');
+    const rngObjScale = document.getElementById('rng-studio-obj-scale');
+    const lblObjScale = document.getElementById('lbl-studio-obj-scale');
+    const rngObjRotate = document.getElementById('rng-studio-obj-rotate');
+    const lblObjRotate = document.getElementById('lbl-studio-obj-rotate');
+    const rngObjOpacity = document.getElementById('rng-studio-obj-opacity');
+    const lblObjOpacity = document.getElementById('lbl-studio-obj-opacity');
+
+    // Text & Logo Inputs
+    const inpCustomText = document.getElementById('inp-studio-custom-text');
+    const selTextColor = document.getElementById('sel-studio-text-color');
+    const selTextBg = document.getElementById('sel-studio-text-bg');
+    const btnAddText = document.getElementById('btn-studio-add-text');
+    const inpLogoUpload = document.getElementById('inp-studio-logo-upload');
+    const btnInsertSavedLogo = document.getElementById('btn-studio-insert-saved-logo');
+    const btnClearSavedLogo = document.getElementById('btn-studio-clear-saved-logo');
+    const inpLocalImage = document.getElementById('studio-local-image-input');
+
+    // Video-Schnappschuss Drawer
+    const videoDrawer = document.getElementById('studio-video-capture-drawer');
+    const studioVideoEl = document.getElementById('studio-capture-video');
+    const btnToggleVideoDrawer = document.getElementById('btn-studio-toggle-video-drawer');
+    const btnCloseVideoDrawer = document.getElementById('btn-studio-close-video-drawer');
+    const btnGrabVideoFrame = document.getElementById('btn-studio-grab-video-frame');
+
+    const LOGO_STORAGE_KEY = 'erocloud_creator_logo_v1';
 
     const state = {
-      movieId: '0',
+      movieId: modalEl.getAttribute('data-movie-id') || '0',
+      targetFsk: '16', // '16' | '18'
+      activeTab: 'censor', // 'censor' | 'adjust' | 'badges' | 'logo'
       num: '1',
+      sourceLabel: 'Szene #1',
+      isCustomSource: false, // true wenn lokales Bild oder Video-Frame geladen wurde
       thumbUrl: '',
       zoomUrl: '',
       editorUrl: '',
-      currentTool: 'rect', // 'rect' | 'circle'
-      currentIntensity: 2, // 1 = Mittel, 2 = Stark, 3 = Maximal
+      currentTool: 'rect', // 'rect' | 'circle' | 'brush'
+      currentEffect: 'frosted', // 'frosted' | 'pixel'
+      currentIntensity: 2, // 1 | 2 | 3
+      brushSize: 45,
+      adjust: {
+        bright: 0,
+        contrast: 0,
+        sat: 0,
+        vignette: 0
+      },
       baseImage: null,
-      frostedCache: {},
-      shapes: [],
-      isDrawing: false,
-      startX: 0,
-      startY: 0,
-      activeDragShape: null
+      adjustedBaseCanvas: null,
+      effectCache: {}, // key: `${effect}_${intensity}`
+      shapes: [], // { type: 'rect'|'circle'|'brush', effect: 'frosted'|'pixel', intensity: 1|2|3, x, y, w, h, points: [], brushSize: 45 }
+      objects: [], // { id, type: 'sticker'|'stamp'|'text'|'logo', x, y, w, h, scale, rotate, opacity, text, bg, color, img }
+      selectedObjId: null,
+      nextObjId: 1,
+      interaction: null // null | { mode: 'draw-shape'|'drag-obj'|'scale-obj', ... }
     };
 
-    // Erzeugt einen echten Milchglas-Buffer (Frosted Glass) für die gegebene Stärke (1..3)
-    const getFrostedBuffer = (intensity) => {
+    // ----------------------------------------------------------------------
+    // 1. Tab-Umschaltung & Ziel-FSK-Modus
+    // ----------------------------------------------------------------------
+    const switchStudioTab = (tabName) => {
+      state.activeTab = tabName;
+      modalEl.querySelectorAll('.js-studio-tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
+      });
+      modalEl.querySelectorAll('.js-studio-tab-pane').forEach(pane => {
+        pane.classList.toggle('d-none', pane.id !== `studio-tab-${tabName}`);
+      });
+      canvas.style.cursor = (tabName === 'censor') ? 'crosshair' : 'default';
+    };
+
+    modalEl.querySelectorAll('.js-studio-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        switchStudioTab(btn.getAttribute('data-tab') || 'censor');
+      });
+    });
+
+    const setTargetFskMode = (fsk, autoSwitchTab = false) => {
+      state.targetFsk = String(fsk) === '18' ? '18' : '16';
+      const is16 = state.targetFsk === '16';
+
+      if (btnModeFsk16) {
+        btnModeFsk16.classList.toggle('active-fsk16', is16);
+      }
+      if (btnModeFsk18) {
+        btnModeFsk18.classList.toggle('active-fsk18', !is16);
+      }
+      if (titleEl) {
+        titleEl.textContent = is16
+          ? 'FSK 16 Cover gestalten (Jugendfrei)'
+          : 'FSK 18 Cover gestalten (Uncut)';
+      }
+      if (btnSavePrimary) {
+        btnSavePrimary.classList.toggle('btn-success', is16);
+        btnSavePrimary.classList.toggle('btn-danger', !is16);
+      }
+      if (icoSavePrimary) {
+        icoSavePrimary.className = is16 ? 'bi bi-shield-check me-1' : 'bi bi-fire me-1';
+      }
+      if (autoSwitchTab) {
+        switchStudioTab(is16 ? 'censor' : 'adjust');
+      }
+      syncStudioUI();
+    };
+
+    if (btnModeFsk16) {
+      btnModeFsk16.addEventListener('click', () => setTargetFskMode('16', false));
+    }
+    if (btnModeFsk18) {
+      btnModeFsk18.addEventListener('click', () => setTargetFskMode('18', false));
+    }
+
+    // ----------------------------------------------------------------------
+    // 2. Bild-Puffer: Licht/Farbe + Milchglas + Pixel-Mosaik
+    // ----------------------------------------------------------------------
+    const invalidateCaches = () => {
+      state.adjustedBaseCanvas = null;
+      state.effectCache = {};
+    };
+
+    const hasColorAdjustments = () => {
+      const a = state.adjust;
+      return a.bright !== 0 || a.contrast !== 0 || a.sat !== 0 || a.vignette > 0;
+    };
+
+    const hasAnyEdits = () => {
+      return state.isCustomSource || state.shapes.length > 0 || state.objects.length > 0 || hasColorAdjustments();
+    };
+
+    const getAdjustedBaseCanvas = () => {
       if (!state.baseImage) return null;
-      if (state.frostedCache[intensity]) {
-        return state.frostedCache[intensity];
+      if (state.adjustedBaseCanvas) return state.adjustedBaseCanvas;
+
+      const w = canvas.width;
+      const h = canvas.height;
+      const off = document.createElement('canvas');
+      off.width = w;
+      off.height = h;
+      const octx = off.getContext('2d');
+
+      const { bright, contrast, sat, vignette } = state.adjust;
+      const bPct = 100 + bright;
+      const cPct = 100 + contrast;
+      const sPct = Math.max(0, 100 + sat * 1.5);
+
+      if (bright !== 0 || contrast !== 0 || sat !== 0) {
+        try {
+          octx.filter = `brightness(${bPct}%) contrast(${cPct}%) saturate(${sPct}%)`;
+        } catch (_) {}
+      }
+      octx.drawImage(state.baseImage, 0, 0, w, h);
+      octx.filter = 'none';
+
+      if (vignette > 0) {
+        const cx = w / 2;
+        const cy = h / 2;
+        const outerR = Math.hypot(cx, cy);
+        const innerR = outerR * 0.38;
+        const grad = octx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
+        const alpha = Math.min(0.88, (vignette / 100) * 0.82);
+        grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        grad.addColorStop(1, `rgba(0, 0, 0, ${alpha})`);
+        octx.fillStyle = grad;
+        octx.fillRect(0, 0, w, h);
+      }
+
+      state.adjustedBaseCanvas = off;
+      return off;
+    };
+
+    const getEffectBuffer = (effect, intensity) => {
+      const baseLayer = getAdjustedBaseCanvas();
+      if (!baseLayer) return null;
+
+      const key = `${effect}_${intensity}`;
+      if (state.effectCache[key]) {
+        return state.effectCache[key];
       }
 
       const w = canvas.width;
       const h = canvas.height;
-      const scaleFactor = intensity === 1 ? 14 : (intensity === 2 ? 22 : 34);
-      const blurPx = intensity === 1 ? 12 : (intensity === 2 ? 20 : 30);
-      const tintAlpha = intensity === 1 ? 0.18 : (intensity === 2 ? 0.25 : 0.32);
+      const outCanvas = document.createElement('canvas');
+      outCanvas.width = w;
+      outCanvas.height = h;
+      const outCtx = outCanvas.getContext('2d');
 
-      // Schritt 1: Weiches Downscaling & Upscaling zur sicheren Auflösung feiner Details
-      const smallW = Math.max(12, Math.round(w / scaleFactor));
-      const smallH = Math.max(8, Math.round(h / scaleFactor));
-      const tmpCanvas = document.createElement('canvas');
-      tmpCanvas.width = smallW;
-      tmpCanvas.height = smallH;
-      const tmpCtx = tmpCanvas.getContext('2d');
-      tmpCtx.imageSmoothingEnabled = true;
-      tmpCtx.imageSmoothingQuality = 'high';
-      tmpCtx.drawImage(state.baseImage, 0, 0, smallW, smallH);
+      if (effect === 'pixel') {
+        // Echter Pixel-Mosaik-Effekt (ohne Weichzeichnung beim Hochskalieren)
+        const blockDiv = intensity === 1 ? 26 : (intensity === 2 ? 42 : 64);
+        const smallW = Math.max(8, Math.round(w / blockDiv));
+        const smallH = Math.max(6, Math.round(h / blockDiv));
+        const tmp = document.createElement('canvas');
+        tmp.width = smallW;
+        tmp.height = smallH;
+        const tctx = tmp.getContext('2d');
+        tctx.imageSmoothingEnabled = true;
+        tctx.drawImage(baseLayer, 0, 0, smallW, smallH);
 
-      // Schritt 2: Hochskalieren + Gaußscher Weichzeichner + Milchglas-Tönung
-      const frostCanvas = document.createElement('canvas');
-      frostCanvas.width = w;
-      frostCanvas.height = h;
-      const frostCtx = frostCanvas.getContext('2d');
-      frostCtx.imageSmoothingEnabled = true;
-      frostCtx.imageSmoothingQuality = 'high';
+        outCtx.imageSmoothingEnabled = false;
+        outCtx.drawImage(tmp, 0, 0, smallW, smallH, 0, 0, w, h);
+      } else {
+        // Milchglas-Effekt (Frosted Glass)
+        const scaleFactor = intensity === 1 ? 14 : (intensity === 2 ? 22 : 34);
+        const blurPx = intensity === 1 ? 12 : (intensity === 2 ? 20 : 30);
+        const tintAlpha = intensity === 1 ? 0.18 : (intensity === 2 ? 0.25 : 0.32);
 
-      try {
-        frostCtx.filter = `blur(${blurPx}px) brightness(1.06) saturate(0.9)`;
-      } catch (_) {
-        // Fallback falls Browser kein ctx.filter unterstützt
+        const smallW = Math.max(12, Math.round(w / scaleFactor));
+        const smallH = Math.max(8, Math.round(h / scaleFactor));
+        const tmp = document.createElement('canvas');
+        tmp.width = smallW;
+        tmp.height = smallH;
+        const tctx = tmp.getContext('2d');
+        tctx.imageSmoothingEnabled = true;
+        tctx.imageSmoothingQuality = 'high';
+        tctx.drawImage(baseLayer, 0, 0, smallW, smallH);
+
+        outCtx.imageSmoothingEnabled = true;
+        outCtx.imageSmoothingQuality = 'high';
+        try {
+          outCtx.filter = `blur(${blurPx}px) brightness(1.06) saturate(0.9)`;
+        } catch (_) {}
+        outCtx.drawImage(tmp, 0, 0, smallW, smallH, 0, 0, w, h);
+        outCtx.filter = 'none';
+
+        outCtx.globalAlpha = 0.65;
+        outCtx.drawImage(tmp, 0, 0, smallW, smallH, 0, 0, w, h);
+        outCtx.globalAlpha = 1.0;
+
+        outCtx.fillStyle = `rgba(255, 255, 255, ${tintAlpha})`;
+        outCtx.fillRect(0, 0, w, h);
       }
-      frostCtx.drawImage(tmpCanvas, 0, 0, smallW, smallH, 0, 0, w, h);
-      frostCtx.filter = 'none';
 
-      // Zweiter Weichzeichner-Durchgang für besonders weiche Übergänge
-      frostCtx.globalAlpha = 0.65;
-      frostCtx.drawImage(tmpCanvas, 0, 0, smallW, smallH, 0, 0, w, h);
-      frostCtx.globalAlpha = 1.0;
-
-      // Milchglas-Schleier (Frosted White Glaze)
-      frostCtx.fillStyle = `rgba(255, 255, 255, ${tintAlpha})`;
-      frostCtx.fillRect(0, 0, w, h);
-
-      state.frostedCache[intensity] = frostCanvas;
-      return frostCanvas;
+      state.effectCache[key] = outCanvas;
+      return outCanvas;
     };
 
-    const traceShapePath = (targetCtx, shape) => {
+    // ----------------------------------------------------------------------
+    // 3. Rendering: Basisbild + Zensur-Formen + Overlay-Objekte
+    // ----------------------------------------------------------------------
+    const traceShapePath = (targetCtx, sh) => {
       targetCtx.beginPath();
-      if (shape.type === 'circle') {
-        const cx = shape.x + shape.w / 2;
-        const cy = shape.y + shape.h / 2;
-        const rx = Math.max(1, Math.abs(shape.w / 2));
-        const ry = Math.max(1, Math.abs(shape.h / 2));
+      if (sh.type === 'circle') {
+        const cx = sh.x + sh.w / 2;
+        const cy = sh.y + sh.h / 2;
+        const rx = Math.max(1, Math.abs(sh.w / 2));
+        const ry = Math.max(1, Math.abs(sh.h / 2));
         targetCtx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
       } else {
-        const r = Math.min(10, Math.abs(shape.w) / 4, Math.abs(shape.h) / 4);
+        const r = Math.min(10, Math.abs(sh.w) / 4, Math.abs(sh.h) / 4);
         if (typeof targetCtx.roundRect === 'function') {
-          targetCtx.roundRect(shape.x, shape.y, shape.w, shape.h, r);
+          targetCtx.roundRect(sh.x, sh.y, sh.w, sh.h, r);
         } else {
-          targetCtx.rect(shape.x, shape.y, shape.w, shape.h);
+          targetCtx.rect(sh.x, sh.y, sh.w, sh.h);
         }
       }
+    };
+
+    const drawCensorShape = (sh, idx, showGuides) => {
+      const w = canvas.width;
+      const h = canvas.height;
+      const effBuf = getEffectBuffer(sh.effect || 'frosted', sh.intensity || 2);
+      if (!effBuf) return;
+
+      if (sh.type === 'brush') {
+        if (!sh.points || sh.points.length === 0) return;
+        // Für Freihand-Pinsel erzeugen wir eine Maske auf einem Hilfs-Canvas
+        const maskCanvas = document.createElement('canvas');
+        maskCanvas.width = w;
+        maskCanvas.height = h;
+        const mctx = maskCanvas.getContext('2d');
+        mctx.lineCap = 'round';
+        mctx.lineJoin = 'round';
+        mctx.lineWidth = sh.brushSize || 45;
+        mctx.strokeStyle = '#000';
+        mctx.beginPath();
+        mctx.moveTo(sh.points[0].x, sh.points[0].y);
+        for (let i = 1; i < sh.points.length; i++) {
+          mctx.lineTo(sh.points[i].x, sh.points[i].y);
+        }
+        if (sh.points.length === 1) {
+          mctx.lineTo(sh.points[0].x + 0.5, sh.points[0].y + 0.5);
+        }
+        mctx.stroke();
+
+        mctx.globalCompositeOperation = 'source-in';
+        mctx.drawImage(effBuf, 0, 0, w, h);
+
+        ctx.save();
+        ctx.drawImage(maskCanvas, 0, 0, w, h);
+        ctx.restore();
+        return;
+      }
+
+      if (sh.w < 4 || sh.h < 4) return;
+      ctx.save();
+      traceShapePath(ctx, sh);
+      ctx.clip();
+      ctx.drawImage(effBuf, 0, 0, w, h);
+      ctx.restore();
+
+      if (showGuides) {
+        ctx.save();
+        traceShapePath(ctx, sh);
+        ctx.lineWidth = Math.max(2, Math.round(w / 460));
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.9)';
+        ctx.setLineDash([6, 4]);
+        ctx.stroke();
+
+        const labelText = `#${idx + 1}`;
+        ctx.font = `bold ${Math.max(12, Math.round(w / 68))}px sans-serif`;
+        const textW = ctx.measureText(labelText).width + 10;
+        const badgeH = Math.max(20, Math.round(w / 46));
+        const bx = Math.max(4, Math.min(w - textW - 4, sh.x));
+        const by = Math.max(4, Math.min(h - badgeH - 4, sh.y));
+
+        ctx.fillStyle = 'rgba(2, 132, 199, 0.92)';
+        ctx.fillRect(bx, by, textW, badgeH);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(labelText, bx + 5, by + badgeH - 6);
+        ctx.restore();
+      }
+    };
+
+    // Berechnet die aktuelle Breite/Höhe eines Overlay-Objekts (inkl. Skalierung)
+    const getObjectMetrics = (obj) => {
+      const scale = (obj.scale || 100) / 100;
+      const baseRef = Math.max(480, canvas.width);
+
+      if (obj.type === 'sticker') {
+        const size = Math.round(baseRef * 0.12 * scale);
+        return { w: size, h: size, fontSize: size };
+      }
+      if (obj.type === 'logo' && obj.img) {
+        const aspect = (obj.img.naturalWidth || 200) / Math.max(1, obj.img.naturalHeight || 100);
+        const w = Math.round(baseRef * 0.22 * scale);
+        const h = Math.round(w / aspect);
+        return { w, h, fontSize: 16 };
+      }
+
+      // 'stamp' oder 'text'
+      const fontSize = Math.max(14, Math.round(baseRef * (obj.type === 'stamp' ? 0.042 : 0.048) * scale));
+      ctx.save();
+      ctx.font = `900 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
+      const textWidth = ctx.measureText(obj.text || '').width;
+      ctx.restore();
+
+      const padX = Math.round(fontSize * 0.75);
+      const padY = Math.round(fontSize * 0.42);
+      return {
+        w: Math.round(textWidth + padX * 2),
+        h: Math.round(fontSize + padY * 2),
+        fontSize
+      };
+    };
+
+    const drawOverlayObject = (obj, showGuides) => {
+      const m = getObjectMetrics(obj);
+      obj.w = m.w;
+      obj.h = m.h;
+
+      ctx.save();
+      ctx.translate(obj.x, obj.y);
+      if (obj.rotate) {
+        ctx.rotate((obj.rotate * Math.PI) / 180);
+      }
+      ctx.globalAlpha = Math.max(0.1, Math.min(1, (obj.opacity || 100) / 100));
+
+      if (obj.type === 'sticker') {
+        ctx.font = `${m.fontSize}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(0,0,0,0.45)';
+        ctx.shadowBlur = 10;
+        ctx.fillText(obj.text, 0, 0);
+      } else if (obj.type === 'logo' && obj.img) {
+        ctx.shadowColor = 'rgba(0,0,0,0.35)';
+        ctx.shadowBlur = 8;
+        ctx.drawImage(obj.img, -m.w / 2, -m.h / 2, m.w, m.h);
+      } else if (obj.type === 'stamp' || obj.type === 'text') {
+        const rx = -m.w / 2;
+        const ry = -m.h / 2;
+        const radius = obj.type === 'stamp' ? Math.min(10, m.h / 4) : Math.min(12, m.h / 3);
+
+        if (obj.bg && obj.bg !== 'shadow') {
+          ctx.fillStyle = obj.bg;
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+          ctx.shadowBlur = 12;
+          ctx.shadowOffsetY = 3;
+          ctx.beginPath();
+          if (typeof ctx.roundRect === 'function') {
+            ctx.roundRect(rx, ry, m.w, m.h, radius);
+          } else {
+            ctx.rect(rx, ry, m.w, m.h);
+          }
+          ctx.fill();
+
+          if (obj.type === 'stamp') {
+            ctx.lineWidth = Math.max(2, Math.round(m.fontSize * 0.08));
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+            ctx.stroke();
+          }
+        }
+
+        ctx.font = `900 ${m.fontSize}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        if (!obj.bg || obj.bg === 'shadow') {
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+          ctx.shadowBlur = 10;
+          ctx.lineWidth = Math.max(3, Math.round(m.fontSize * 0.14));
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+          ctx.strokeText(obj.text || '', 0, 0);
+        } else {
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
+        }
+
+        ctx.fillStyle = obj.color || '#FFFFFF';
+        ctx.fillText(obj.text || '', 0, 0);
+      }
+
+      // Auswahlrahmen + Skalier-Griff (↘) wenn ausgewählt
+      if (showGuides && state.selectedObjId === obj.id) {
+        ctx.globalAlpha = 1;
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        const pad = 6;
+        const bx = -m.w / 2 - pad;
+        const by = -m.h / 2 - pad;
+        const bw = m.w + pad * 2;
+        const bh = m.h + pad * 2;
+
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#38BDF8';
+        ctx.setLineDash([5, 4]);
+        ctx.strokeRect(bx, by, bw, bh);
+        ctx.setLineDash([]);
+
+        // Resize-Handle unten rechts
+        const handleR = Math.max(8, Math.round(canvas.width / 85));
+        ctx.fillStyle = '#0284C7';
+        ctx.beginPath();
+        ctx.arc(bx + bw, by + bh, handleR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.stroke();
+      }
+
+      ctx.restore();
     };
 
     const renderCanvas = (showGuides = true) => {
@@ -1489,75 +1894,60 @@ const App = {
       const h = canvas.height;
 
       ctx.clearRect(0, 0, w, h);
-      ctx.drawImage(state.baseImage, 0, 0, w, h);
 
-      const allShapes = state.activeDragShape
-        ? [...state.shapes, state.activeDragShape]
+      // 1. Basisbild inkl. Farb-/Helligkeits-/Vignette-Optimierung
+      const baseLayer = getAdjustedBaseCanvas();
+      if (baseLayer) {
+        ctx.drawImage(baseLayer, 0, 0, w, h);
+      }
+
+      // 2. Zensur-Formen (Milchglas / Pixel-Mosaik / Pinsel)
+      const allShapes = (state.interaction && state.interaction.mode === 'draw-shape' && state.interaction.shape)
+        ? [...state.shapes, state.interaction.shape]
         : state.shapes;
 
       allShapes.forEach((sh, idx) => {
-        if (sh.w < 4 || sh.h < 4) return;
-        const frostBuf = getFrostedBuffer(sh.intensity || state.currentIntensity);
-        if (!frostBuf) return;
+        drawCensorShape(sh, idx, showGuides);
+      });
 
-        ctx.save();
-        traceShapePath(ctx, sh);
-        ctx.clip();
-        ctx.drawImage(frostBuf, 0, 0, w, h);
-        ctx.restore();
-
-        if (showGuides) {
-          ctx.save();
-          traceShapePath(ctx, sh);
-          ctx.lineWidth = Math.max(2, Math.round(w / 420));
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-          ctx.setLineDash([6, 4]);
-          ctx.stroke();
-
-          // Nummeriertes Badge oben links an der Form
-          const labelText = `#${idx + 1}`;
-          ctx.font = `bold ${Math.max(12, Math.round(w / 65))}px sans-serif`;
-          const textW = ctx.measureText(labelText).width + 10;
-          const badgeH = Math.max(20, Math.round(w / 45));
-          const bx = Math.max(4, Math.min(w - textW - 4, sh.x));
-          const by = Math.max(4, Math.min(h - badgeH - 4, sh.y));
-
-          ctx.fillStyle = 'rgba(124, 58, 237, 0.9)';
-          ctx.fillRect(bx, by, textW, badgeH);
-          ctx.fillStyle = '#ffffff';
-          ctx.fillText(labelText, bx + 5, by + badgeH - 6);
-          ctx.restore();
-        }
+      // 3. Interaktive Overlay-Objekte (Sticker, Badges, Text, Logo)
+      state.objects.forEach(obj => {
+        drawOverlayObject(obj, showGuides);
       });
     };
 
-    const syncToolbarAndPills = () => {
-      const count = state.shapes.length;
+    // ----------------------------------------------------------------------
+    // 4. UI-Synchronisation (Badges, Listen, Objekt-Inspektor, Footer-Summary)
+    // ----------------------------------------------------------------------
+    const syncStudioUI = () => {
+      const shapeCount = state.shapes.length;
+      const objCount = state.objects.length;
+
+      if (sourceBadgeEl) {
+        sourceBadgeEl.textContent = state.sourceLabel;
+      }
+
       if (shapesBadge) {
-        shapesBadge.textContent = count === 1 ? '1 Milchglas-Bereich' : `${count} Milchglas-Bereiche`;
-        shapesBadge.className = count > 0 ? 'badge bg-primary' : 'badge bg-secondary';
+        shapesBadge.textContent = shapeCount === 1 ? '1 Bereich' : `${shapeCount} Bereiche`;
+        shapesBadge.className = shapeCount > 0 ? 'badge bg-info text-dark' : 'badge bg-secondary';
       }
-      if (btnUndo) btnUndo.disabled = count === 0;
-      if (btnClear) btnClear.disabled = count === 0;
+      if (btnUndo) btnUndo.disabled = shapeCount === 0;
+      if (btnClear) btnClear.disabled = shapeCount === 0;
 
-      if (btnSaveFsk16Label) {
-        btnSaveFsk16Label.textContent = count > 0
-          ? `Bearbeitetes Bild (${count}× Milchglas) als FSK 16 speichern`
-          : 'Unverändert als FSK 16 Cover übernehmen';
-      }
-
+      // Liste der gezeichneten Zensur-Bereiche
       if (shapesListEl) {
-        if (count === 0) {
+        if (shapeCount === 0) {
           shapesListEl.classList.add('d-none');
           shapesListEl.innerHTML = '';
         } else {
           shapesListEl.classList.remove('d-none');
           shapesListEl.innerHTML = state.shapes.map((sh, i) => {
-            const typeLabel = sh.type === 'circle' ? 'Kreis' : 'Viereck';
+            const tName = sh.type === 'circle' ? 'Kreis' : (sh.type === 'brush' ? 'Pinsel' : 'Viereck');
+            const eName = sh.effect === 'pixel' ? 'Pixel' : 'Milchglas';
             return `
-              <span class="badge bg-light text-dark border d-inline-flex align-items-center gap-1 py-1 px-2">
-                <span>#${i + 1} ${typeLabel}</span>
-                <button type="button" class="btn-close js-remove-single-shape" data-shape-idx="${i}" style="font-size: 0.55rem;" title="Diesen Bereich entfernen"></button>
+              <span class="badge bg-dark text-light border border-secondary d-inline-flex align-items-center gap-1 py-1 px-2">
+                <span>#${i + 1} ${tName} (${eName})</span>
+                <button type="button" class="btn-close btn-close-white js-remove-single-shape" data-shape-idx="${i}" style="font-size: 0.55rem;" title="Diesen Bereich löschen"></button>
               </span>
             `;
           }).join('');
@@ -1567,37 +1957,102 @@ const App = {
               const idx = parseInt(rmBtn.getAttribute('data-shape-idx') || '-1', 10);
               if (idx >= 0 && idx < state.shapes.length) {
                 state.shapes.splice(idx, 1);
-                syncToolbarAndPills();
+                syncStudioUI();
                 renderCanvas(true);
               }
             });
           });
         }
       }
+
+      // Ausgewähltes Overlay-Objekt im Inspektor anzeigen
+      const selObj = state.objects.find(o => o.id === state.selectedObjId) || null;
+      if (selectedObjPanel) {
+        if (!selObj) {
+          selectedObjPanel.classList.add('d-none');
+        } else {
+          selectedObjPanel.classList.remove('d-none');
+          if (rngObjScale) rngObjScale.value = String(selObj.scale || 100);
+          if (lblObjScale) lblObjScale.textContent = `${selObj.scale || 100}%`;
+          if (rngObjRotate) rngObjRotate.value = String(selObj.rotate || 0);
+          if (lblObjRotate) lblObjRotate.textContent = `${selObj.rotate || 0}°`;
+          if (rngObjOpacity) rngObjOpacity.value = String(selObj.opacity || 100);
+          if (lblObjOpacity) lblObjOpacity.textContent = `${selObj.opacity || 100}%`;
+        }
+      }
+
+      // Zusammenfassung im Footer & Primärer Speichern-Button
+      const parts = [];
+      if (state.isCustomSource) parts.push(state.sourceLabel);
+      if (shapeCount > 0) parts.push(`${shapeCount}× Zensur`);
+      if (hasColorAdjustments()) parts.push('Licht/Farbe optimiert');
+      if (objCount > 0) parts.push(`${objCount}× Sticker/Badge/Logo`);
+
+      if (summaryTextEl) {
+        summaryTextEl.textContent = parts.length > 0
+          ? `Aktive Bearbeitungen: ${parts.join(' • ')}`
+          : `Unverändertes Originalbild (${state.sourceLabel})`;
+      }
+
+      if (lblSavePrimary) {
+        const fskLabel = state.targetFsk === '18' ? 'FSK 18 Cover' : 'FSK 16 Cover';
+        lblSavePrimary.textContent = hasAnyEdits()
+          ? `Bearbeitetes Bild als ${fskLabel} speichern & aktivieren`
+          : `${state.sourceLabel} als ${fskLabel} übernehmen`;
+      }
     };
 
-    // Werkzeug-Umschalter (Viereck vs. Kreis)
+    // ----------------------------------------------------------------------
+    // 5. Event-Handler für Werkzeuge (Zensur, Licht/Farbe, Sticker, Text, Logo)
+    // ----------------------------------------------------------------------
     toolBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         state.currentTool = btn.getAttribute('data-shape-tool') || 'rect';
         toolBtns.forEach(b => {
           const active = b === btn;
-          b.classList.toggle('btn-primary-kkc', active);
+          b.classList.toggle('btn-info', active);
+          b.classList.toggle('text-dark', active);
+          b.classList.toggle('fw-semibold', active);
           b.classList.toggle('active', active);
-          b.classList.toggle('btn-outline-kkc', !active);
+          b.classList.toggle('btn-outline-light', !active);
+        });
+        if (brushSizeWrap) {
+          brushSizeWrap.classList.toggle('d-none', state.currentTool !== 'brush');
+        }
+      });
+    });
+
+    if (rngBrushSize) {
+      rngBrushSize.addEventListener('input', () => {
+        state.brushSize = parseInt(rngBrushSize.value || '45', 10);
+        if (lblBrushSize) lblBrushSize.textContent = `${state.brushSize} px`;
+      });
+    }
+
+    effectBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.currentEffect = btn.getAttribute('data-effect') || 'frosted';
+        effectBtns.forEach(b => {
+          const active = b === btn;
+          b.classList.toggle('btn-info', active);
+          b.classList.toggle('text-dark', active);
+          b.classList.toggle('fw-semibold', active);
+          b.classList.toggle('active', active);
+          b.classList.toggle('btn-outline-light', !active);
         });
       });
     });
 
-    // Milchglas-Stärke Umschalter (Mittel / Stark / Maximal)
     intensityBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         state.currentIntensity = parseInt(btn.getAttribute('data-intensity') || '2', 10);
         intensityBtns.forEach(b => {
           const active = b === btn;
-          b.classList.toggle('btn-primary-kkc', active);
+          b.classList.toggle('btn-info', active);
+          b.classList.toggle('text-dark', active);
+          b.classList.toggle('fw-semibold', active);
           b.classList.toggle('active', active);
-          b.classList.toggle('btn-outline-kkc', !active);
+          b.classList.toggle('btn-outline-light', !active);
         });
       });
     });
@@ -1606,7 +2061,7 @@ const App = {
       btnUndo.addEventListener('click', () => {
         if (state.shapes.length > 0) {
           state.shapes.pop();
-          syncToolbarAndPills();
+          syncStudioUI();
           renderCanvas(true);
         }
       });
@@ -1615,12 +2070,290 @@ const App = {
     if (btnClear) {
       btnClear.addEventListener('click', () => {
         state.shapes = [];
-        syncToolbarAndPills();
+        syncStudioUI();
         renderCanvas(true);
       });
     }
 
-    // Maus- & Touch-Koordinaten auf Canvas-Auflösung umrechnen
+    const applyAdjustmentValues = (bright, contrast, sat, vignette) => {
+      state.adjust.bright = bright;
+      state.adjust.contrast = contrast;
+      state.adjust.sat = sat;
+      state.adjust.vignette = vignette;
+
+      if (rngBright) rngBright.value = String(bright);
+      if (rngContrast) rngContrast.value = String(contrast);
+      if (rngSat) rngSat.value = String(sat);
+      if (rngVignette) rngVignette.value = String(vignette);
+
+      if (lblBright) lblBright.textContent = bright > 0 ? `+${bright}` : String(bright);
+      if (lblContrast) lblContrast.textContent = contrast > 0 ? `+${contrast}` : String(contrast);
+      if (lblSat) lblSat.textContent = sat > 0 ? `+${sat}` : String(sat);
+      if (lblVignette) lblVignette.textContent = `${vignette}%`;
+
+      invalidateCaches();
+      syncStudioUI();
+      renderCanvas(true);
+    };
+
+    modalEl.querySelectorAll('.js-studio-adjust-slider').forEach(slider => {
+      slider.addEventListener('input', () => {
+        applyAdjustmentValues(
+          parseInt(rngBright?.value || '0', 10),
+          parseInt(rngContrast?.value || '0', 10),
+          parseInt(rngSat?.value || '0', 10),
+          parseInt(rngVignette?.value || '0', 10)
+        );
+      });
+    });
+
+    presetBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        presetBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        applyAdjustmentValues(
+          parseInt(btn.getAttribute('data-bright') || '0', 10),
+          parseInt(btn.getAttribute('data-contrast') || '0', 10),
+          parseInt(btn.getAttribute('data-sat') || '0', 10),
+          parseInt(btn.getAttribute('data-vignette') || '0', 10)
+        );
+      });
+    });
+
+    if (btnResetAdjust) {
+      btnResetAdjust.addEventListener('click', () => {
+        applyAdjustmentValues(0, 0, 0, 0);
+      });
+    }
+
+    if (btnResetAll) {
+      btnResetAll.addEventListener('click', () => {
+        state.shapes = [];
+        state.objects = [];
+        state.selectedObjId = null;
+        applyAdjustmentValues(0, 0, 0, 0);
+        this.toast('Alle Bearbeitungen auf der Leinwand wurden zurückgesetzt.', 'info');
+      });
+    }
+
+    // ----------------------------------------------------------------------
+    // 6. Sticker, Verkaufs-Badges, Text & Creator-Logo hinzufügen
+    // ----------------------------------------------------------------------
+    const addOverlayObject = (objConfig) => {
+      const w = canvas.width || 960;
+      const h = canvas.height || 540;
+      const offset = (state.objects.length % 5) * 18;
+      const newObj = {
+        id: state.nextObjId++,
+        type: objConfig.type || 'sticker',
+        x: objConfig.x ?? Math.round(w / 2 + offset),
+        y: objConfig.y ?? Math.round(h / 2 + offset),
+        w: 80,
+        h: 80,
+        scale: objConfig.scale ?? 100,
+        rotate: objConfig.rotate ?? 0,
+        opacity: objConfig.opacity ?? 100,
+        text: objConfig.text || '',
+        bg: objConfig.bg || '',
+        color: objConfig.color || '#FFFFFF',
+        img: objConfig.img || null
+      };
+      state.objects.push(newObj);
+      state.selectedObjId = newObj.id;
+      syncStudioUI();
+      renderCanvas(true);
+    };
+
+    modalEl.querySelectorAll('.js-studio-add-sticker').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const emoji = btn.getAttribute('data-sticker') || '❤️';
+        addOverlayObject({ type: 'sticker', text: emoji, scale: 110 });
+      });
+    });
+
+    modalEl.querySelectorAll('.js-studio-add-stamp').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const stamp = btn.getAttribute('data-stamp') || 'FULL HD';
+        const bg = btn.getAttribute('data-bg') || '#0284C7';
+        const color = btn.getAttribute('data-color') || '#FFFFFF';
+        const isCornerBadge = !stamp.includes('CENSORED') && !stamp.includes('FSK 16');
+        const w = canvas.width || 960;
+        const h = canvas.height || 540;
+        addOverlayObject({
+          type: 'stamp',
+          text: stamp,
+          bg,
+          color,
+          scale: 100,
+          x: isCornerBadge ? Math.round(w * 0.82) : Math.round(w * 0.5),
+          y: isCornerBadge ? Math.round(h * 0.14) : Math.round(h * 0.5)
+        });
+      });
+    });
+
+    if (btnAddText && inpCustomText) {
+      btnAddText.addEventListener('click', () => {
+        const raw = (inpCustomText.value || '').trim();
+        if (!raw) {
+          this.toast('Bitte gib zuerst einen kurzen Cover-Text ein.', 'warning');
+          return;
+        }
+        // Schutz vor URLs / E-Mail-Adressen gemäß EroCloud-Richtlinien
+        if (/https?:\/\/|www\.|[a-z0-9.-]+\.(de|com|net|org|io|tv|sex|xxx|cam|at|ch)\b|@/i.test(raw)) {
+          this.toast('Internetadressen (URLs) oder E-Mail-Adressen sind auf Vorschaubildern nicht erlaubt.', 'danger');
+          return;
+        }
+        addOverlayObject({
+          type: 'text',
+          text: raw,
+          color: selTextColor?.value || '#FFFFFF',
+          bg: selTextBg?.value || 'shadow',
+          scale: 100,
+          x: Math.round((canvas.width || 960) * 0.5),
+          y: Math.round((canvas.height || 540) * 0.84)
+        });
+        inpCustomText.value = '';
+      });
+    }
+
+    // Gespeichertes Creator-Logo aus localStorage verwalten
+    const syncSavedLogoButtons = () => {
+      let hasSaved = false;
+      try {
+        hasSaved = !!localStorage.getItem(LOGO_STORAGE_KEY);
+      } catch (_) {}
+      if (btnInsertSavedLogo) btnInsertSavedLogo.classList.toggle('d-none', !hasSaved);
+      if (btnClearSavedLogo) btnClearSavedLogo.classList.toggle('d-none', !hasSaved);
+    };
+    syncSavedLogoButtons();
+
+    const insertLogoFromDataUrl = (dataUrl) => {
+      const logoImg = new Image();
+      logoImg.onload = () => {
+        const w = canvas.width || 960;
+        const h = canvas.height || 540;
+        addOverlayObject({
+          type: 'logo',
+          img: logoImg,
+          scale: 100,
+          opacity: 90,
+          x: Math.round(w * 0.84),
+          y: Math.round(h * 0.86)
+        });
+      };
+      logoImg.src = dataUrl;
+    };
+
+    if (inpLogoUpload) {
+      inpLogoUpload.addEventListener('change', () => {
+        const file = inpLogoUpload.files?.[0];
+        if (!file) return;
+        if (file.size > 4 * 1024 * 1024) {
+          this.toast('Deine Logo-Datei darf maximal 4 MB groß sein.', 'warning');
+          inpLogoUpload.value = '';
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const dataUrl = String(ev.target?.result || '');
+          if (!dataUrl) return;
+          try {
+            localStorage.setItem(LOGO_STORAGE_KEY, dataUrl);
+            syncSavedLogoButtons();
+          } catch (_) {}
+          insertLogoFromDataUrl(dataUrl);
+          this.toast('Dein Creator-Logo wurde eingefügt und für künftige Filme gemerkt!', 'success');
+        };
+        reader.readAsDataURL(file);
+        inpLogoUpload.value = '';
+      });
+    }
+
+    if (btnInsertSavedLogo) {
+      btnInsertSavedLogo.addEventListener('click', () => {
+        try {
+          const saved = localStorage.getItem(LOGO_STORAGE_KEY);
+          if (saved) insertLogoFromDataUrl(saved);
+        } catch (_) {}
+      });
+    }
+
+    if (btnClearSavedLogo) {
+      btnClearSavedLogo.addEventListener('click', () => {
+        try {
+          localStorage.removeItem(LOGO_STORAGE_KEY);
+        } catch (_) {}
+        syncSavedLogoButtons();
+        this.toast('Gespeichertes Browser-Logo wurde entfernt.', 'info');
+      });
+    }
+
+    // Objekt-Inspektor Regler (Größe, Drehung, Deckkraft, Löschen, Eck-Positionierung)
+    if (rngObjScale) {
+      rngObjScale.addEventListener('input', () => {
+        const sel = state.objects.find(o => o.id === state.selectedObjId);
+        if (!sel) return;
+        sel.scale = parseInt(rngObjScale.value || '100', 10);
+        if (lblObjScale) lblObjScale.textContent = `${sel.scale}%`;
+        renderCanvas(true);
+      });
+    }
+    if (rngObjRotate) {
+      rngObjRotate.addEventListener('input', () => {
+        const sel = state.objects.find(o => o.id === state.selectedObjId);
+        if (!sel) return;
+        sel.rotate = parseInt(rngObjRotate.value || '0', 10);
+        if (lblObjRotate) lblObjRotate.textContent = `${sel.rotate}°`;
+        renderCanvas(true);
+      });
+    }
+    if (rngObjOpacity) {
+      rngObjOpacity.addEventListener('input', () => {
+        const sel = state.objects.find(o => o.id === state.selectedObjId);
+        if (!sel) return;
+        sel.opacity = parseInt(rngObjOpacity.value || '100', 10);
+        if (lblObjOpacity) lblObjOpacity.textContent = `${sel.opacity}%`;
+        renderCanvas(true);
+      });
+    }
+    if (btnDeleteSelectedObj) {
+      btnDeleteSelectedObj.addEventListener('click', () => {
+        if (!state.selectedObjId) return;
+        state.objects = state.objects.filter(o => o.id !== state.selectedObjId);
+        state.selectedObjId = null;
+        syncStudioUI();
+        renderCanvas(true);
+      });
+    }
+
+    modalEl.querySelectorAll('.js-studio-snap-corner').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sel = state.objects.find(o => o.id === state.selectedObjId) || state.objects[state.objects.length - 1];
+        if (!sel) {
+          this.toast('Bitte füge zuerst ein Logo, Badge oder Text hinzu.', 'warning');
+          return;
+        }
+        state.selectedObjId = sel.id;
+        const m = getObjectMetrics(sel);
+        const w = canvas.width || 960;
+        const h = canvas.height || 540;
+        const padX = Math.round(w * 0.035) + Math.round(m.w / 2);
+        const padY = Math.round(h * 0.045) + Math.round(m.h / 2);
+        const corner = btn.getAttribute('data-corner') || 'br';
+
+        if (corner === 'tl') { sel.x = padX; sel.y = padY; }
+        if (corner === 'tr') { sel.x = w - padX; sel.y = padY; }
+        if (corner === 'bl') { sel.x = padX; sel.y = h - padY; }
+        if (corner === 'br') { sel.x = w - padX; sel.y = h - padY; }
+
+        syncStudioUI();
+        renderCanvas(true);
+      });
+    });
+
+    // ----------------------------------------------------------------------
+    // 7. Canvas Maus- & Touch-Interaktion (Objekte ziehen/skalieren + Zensur zeichnen)
+    // ----------------------------------------------------------------------
     const getCanvasCoords = (clientX, clientY) => {
       const rect = canvas.getBoundingClientRect();
       const scaleX = canvas.width / Math.max(1, rect.width);
@@ -1631,105 +2364,243 @@ const App = {
       };
     };
 
-    const startDrawing = (clientX, clientY) => {
+    const hitTestObjects = (pt) => {
+      // Von oben nach unten prüfen
+      for (let i = state.objects.length - 1; i >= 0; i--) {
+        const obj = state.objects[i];
+        const m = getObjectMetrics(obj);
+        const pad = 8;
+        const halfW = m.w / 2 + pad;
+        const halfH = m.h / 2 + pad;
+
+        const dx = pt.x - obj.x;
+        const dy = pt.y - obj.y;
+
+        // Prüfen, ob der Resize-Griff unten rechts getroffen wurde
+        if (state.selectedObjId === obj.id) {
+          const handleDist = Math.hypot(dx - halfW, dy - halfH);
+          const handleR = Math.max(14, Math.round(canvas.width / 55));
+          if (handleDist <= handleR) {
+            return { hit: 'resize', obj };
+          }
+        }
+
+        if (Math.abs(dx) <= halfW && Math.abs(dy) <= halfH) {
+          return { hit: 'move', obj };
+        }
+      }
+      return null;
+    };
+
+    const onPointerDown = (clientX, clientY) => {
       if (!state.baseImage) return;
       const pt = getCanvasCoords(clientX, clientY);
-      state.isDrawing = true;
-      state.startX = pt.x;
-      state.startY = pt.y;
-      state.activeDragShape = {
-        type: state.currentTool,
-        intensity: state.currentIntensity,
-        x: pt.x,
-        y: pt.y,
-        w: 0,
-        h: 0
-      };
-    };
 
-    const moveDrawing = (clientX, clientY) => {
-      if (!state.isDrawing || !state.activeDragShape) return;
-      const pt = getCanvasCoords(clientX, clientY);
-      const x = Math.min(state.startX, pt.x);
-      const y = Math.min(state.startY, pt.y);
-      const w = Math.abs(pt.x - state.startX);
-      const h = Math.abs(pt.y - state.startY);
-
-      state.activeDragShape.x = x;
-      state.activeDragShape.y = y;
-      state.activeDragShape.w = w;
-      state.activeDragShape.h = h;
-      renderCanvas(true);
-    };
-
-    const endDrawing = () => {
-      if (!state.isDrawing) return;
-      state.isDrawing = false;
-      if (state.activeDragShape && state.activeDragShape.w >= 10 && state.activeDragShape.h >= 10) {
-        state.shapes.push({ ...state.activeDragShape });
-        syncToolbarAndPills();
+      // 1. Zuerst prüfen, ob ein Sticker / Badge / Text / Logo angeklickt wurde
+      const hitResult = hitTestObjects(pt);
+      if (hitResult) {
+        state.selectedObjId = hitResult.obj.id;
+        if (hitResult.hit === 'resize') {
+          state.interaction = {
+            mode: 'scale-obj',
+            obj: hitResult.obj,
+            startScale: hitResult.obj.scale || 100,
+            startDist: Math.max(10, Math.hypot(pt.x - hitResult.obj.x, pt.y - hitResult.obj.y))
+          };
+        } else {
+          state.interaction = {
+            mode: 'drag-obj',
+            obj: hitResult.obj,
+            offsetX: pt.x - hitResult.obj.x,
+            offsetY: pt.y - hitResult.obj.y
+          };
+        }
+        syncStudioUI();
+        renderCanvas(true);
+        return;
       }
-      state.activeDragShape = null;
+
+      // Klick ins Leere hebt Objekt-Auswahl auf
+      if (state.selectedObjId !== null) {
+        state.selectedObjId = null;
+        syncStudioUI();
+        renderCanvas(true);
+      }
+
+      // 2. Falls im Zensur-Tab aktiv: Neue Zensur-Form zeichnen
+      if (state.activeTab === 'censor') {
+        if (state.currentTool === 'brush') {
+          state.interaction = {
+            mode: 'draw-shape',
+            startX: pt.x,
+            startY: pt.y,
+            shape: {
+              type: 'brush',
+              effect: state.currentEffect,
+              intensity: state.currentIntensity,
+              brushSize: state.brushSize,
+              points: [{ x: pt.x, y: pt.y }]
+            }
+          };
+        } else {
+          state.interaction = {
+            mode: 'draw-shape',
+            startX: pt.x,
+            startY: pt.y,
+            shape: {
+              type: state.currentTool,
+              effect: state.currentEffect,
+              intensity: state.currentIntensity,
+              x: pt.x,
+              y: pt.y,
+              w: 0,
+              h: 0
+            }
+          };
+        }
+      }
+    };
+
+    const onPointerMove = (clientX, clientY) => {
+      if (!state.interaction) return;
+      const pt = getCanvasCoords(clientX, clientY);
+      const act = state.interaction;
+
+      if (act.mode === 'drag-obj' && act.obj) {
+        act.obj.x = Math.max(0, Math.min(canvas.width, pt.x - act.offsetX));
+        act.obj.y = Math.max(0, Math.min(canvas.height, pt.y - act.offsetY));
+        renderCanvas(true);
+        return;
+      }
+
+      if (act.mode === 'scale-obj' && act.obj) {
+        const curDist = Math.max(10, Math.hypot(pt.x - act.obj.x, pt.y - act.obj.y));
+        const newScale = Math.max(30, Math.min(280, Math.round((act.startScale * curDist) / act.startDist)));
+        act.obj.scale = newScale;
+        if (rngObjScale) rngObjScale.value = String(newScale);
+        if (lblObjScale) lblObjScale.textContent = `${newScale}%`;
+        renderCanvas(true);
+        return;
+      }
+
+      if (act.mode === 'draw-shape' && act.shape) {
+        if (act.shape.type === 'brush') {
+          act.shape.points.push({ x: pt.x, y: pt.y });
+        } else {
+          act.shape.x = Math.min(act.startX, pt.x);
+          act.shape.y = Math.min(act.startY, pt.y);
+          act.shape.w = Math.abs(pt.x - act.startX);
+          act.shape.h = Math.abs(pt.y - act.startY);
+        }
+        renderCanvas(true);
+      }
+    };
+
+    const onPointerUp = () => {
+      if (!state.interaction) return;
+      const act = state.interaction;
+      state.interaction = null;
+
+      if (act.mode === 'draw-shape' && act.shape) {
+        if (act.shape.type === 'brush' && act.shape.points.length >= 1) {
+          state.shapes.push(act.shape);
+          syncStudioUI();
+        } else if (act.shape.w >= 10 && act.shape.h >= 10) {
+          state.shapes.push({ ...act.shape });
+          syncStudioUI();
+        }
+      }
       renderCanvas(true);
     };
 
     canvas.addEventListener('mousedown', (ev) => {
       if (ev.button !== 0) return;
-      startDrawing(ev.clientX, ev.clientY);
+      onPointerDown(ev.clientX, ev.clientY);
     });
     window.addEventListener('mousemove', (ev) => {
-      if (state.isDrawing) {
-        moveDrawing(ev.clientX, ev.clientY);
+      if (state.interaction) {
+        onPointerMove(ev.clientX, ev.clientY);
       }
     });
     window.addEventListener('mouseup', () => {
-      if (state.isDrawing) {
-        endDrawing();
+      if (state.interaction) {
+        onPointerUp();
       }
     });
 
     canvas.addEventListener('touchstart', (ev) => {
       if (ev.touches.length === 1) {
         ev.preventDefault();
-        startDrawing(ev.touches[0].clientX, ev.touches[0].clientY);
+        onPointerDown(ev.touches[0].clientX, ev.touches[0].clientY);
       }
     }, { passive: false });
     canvas.addEventListener('touchmove', (ev) => {
-      if (state.isDrawing && ev.touches.length === 1) {
+      if (state.interaction && ev.touches.length === 1) {
         ev.preventDefault();
-        moveDrawing(ev.touches[0].clientX, ev.touches[0].clientY);
+        onPointerMove(ev.touches[0].clientX, ev.touches[0].clientY);
       }
     }, { passive: false });
     canvas.addEventListener('touchend', () => {
-      if (state.isDrawing) {
-        endDrawing();
+      if (state.interaction) {
+        onPointerUp();
       }
     });
 
-    // Modal für ein bestimmtes Vorschaubild öffnen
-    const openEditorForThumb = (movieId, num, thumbUrl, zoomUrl, editorUrl) => {
+    // ----------------------------------------------------------------------
+    // 8. Quellen laden: Szenenbild, Lokales Foto oder Live-Video-Frame
+    // ----------------------------------------------------------------------
+    const highlightFilmstripItem = (numStr) => {
+      modalEl.querySelectorAll('.js-studio-filmstrip-thumb').forEach(el => {
+        el.classList.toggle('active', el.getAttribute('data-num') === String(numStr));
+      });
+    };
+
+    const loadBaseImageElement = (img, label, isCustomSource) => {
+      // Standard-Zielauflösung auf mind. 960px Breite normieren, damit Sticker & Text gestochen scharf sind
+      const natW = img.naturalWidth || img.width || 960;
+      const natH = img.naturalHeight || img.height || 540;
+      canvas.width = natW;
+      canvas.height = natH;
+
+      state.baseImage = img;
+      state.sourceLabel = label;
+      state.isCustomSource = !!isCustomSource;
+      invalidateCaches();
+
+      if (loadingEl) loadingEl.classList.add('d-none');
+      if (canvasContainer) canvasContainer.classList.remove('d-none');
+      syncStudioUI();
+      renderCanvas(true);
+    };
+
+    const openStudioWithScene = (movieId, num, thumbUrl, zoomUrl, editorUrl, targetFsk = '16') => {
       this.hideThumbZoomPopover();
-      state.movieId = String(movieId || '0');
+      state.movieId = String(movieId || state.movieId || '0');
       state.num = String(num || '1');
       state.thumbUrl = thumbUrl || '';
       state.zoomUrl = zoomUrl || thumbUrl || '';
       state.editorUrl = editorUrl || zoomUrl || thumbUrl || '';
       state.shapes = [];
-      state.frostedCache = {};
-      state.baseImage = null;
-      state.isDrawing = false;
-      state.activeDragShape = null;
+      state.objects = [];
+      state.selectedObjId = null;
+      state.interaction = null;
+      applyAdjustmentValues(0, 0, 0, 0);
 
       const labelName = (state.num === '11' || state.num === '12')
         ? `Eigenes Bild (#${state.num})`
         : `Szene #${state.num}`;
-      if (titleEl) {
-        titleEl.textContent = `${labelName} – Großansicht & FSK16 Milchglas-Editor`;
-      }
 
-      syncToolbarAndPills();
-      if (loadingEl) loadingEl.classList.remove('d-none');
-      canvas.classList.add('d-none');
+      setTargetFskMode(targetFsk, true);
+      highlightFilmstripItem(state.num);
+
+      if (loadingEl) {
+        loadingEl.innerHTML = `
+          <div class="spinner-border text-info mb-2" role="status"></div>
+          <div class="small">Hochauflösendes Coverbild wird im Studio geladen...</div>
+        `;
+        loadingEl.classList.remove('d-none');
+      }
+      if (canvasContainer) canvasContainer.classList.add('d-none');
 
       const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
       bsModal.show();
@@ -1737,13 +2608,7 @@ const App = {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
-        canvas.width = img.naturalWidth || 960;
-        canvas.height = img.naturalHeight || 540;
-        state.baseImage = img;
-        state.frostedCache = {};
-        if (loadingEl) loadingEl.classList.add('d-none');
-        canvas.classList.remove('d-none');
-        renderCanvas(true);
+        loadBaseImageElement(img, labelName, false);
       };
       img.onerror = () => {
         if (loadingEl) {
@@ -1754,15 +2619,141 @@ const App = {
       img.src = `${state.editorUrl}${sep}_cb=${Date.now()}`;
     };
 
+    // Filmstreifen-Klick im Studio
+    modalEl.querySelectorAll('.js-studio-filmstrip-thumb').forEach(item => {
+      item.addEventListener('click', () => {
+        const num = item.getAttribute('data-num') || '1';
+        const tUrl = item.getAttribute('data-thumb-url') || '';
+        const zUrl = item.getAttribute('data-zoom-url') || tUrl;
+        const eUrl = item.getAttribute('data-editor-url') || zUrl;
+
+        state.num = num;
+        state.thumbUrl = tUrl;
+        state.zoomUrl = zUrl;
+        state.editorUrl = eUrl;
+        highlightFilmstripItem(num);
+
+        const labelName = (num === '11' || num === '12') ? `Eigenes Bild (#${num})` : `Szene #${num}`;
+        if (loadingEl) loadingEl.classList.remove('d-none');
+        if (canvasContainer) canvasContainer.classList.add('d-none');
+
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          loadBaseImageElement(img, labelName, false);
+        };
+        const sep = eUrl.includes('?') ? '&' : '?';
+        img.src = `${eUrl}${sep}_cb=${Date.now()}`;
+      });
+    });
+
+    // Lokales Bild vom Gerät in das Studio laden
+    if (inpLocalImage) {
+      inpLocalImage.addEventListener('change', () => {
+        const file = inpLocalImage.files?.[0];
+        if (!file) return;
+        if (file.size > 10 * 1024 * 1024) {
+          this.toast('Das ausgewählte Foto darf maximal 10 MB groß sein.', 'warning');
+          inpLocalImage.value = '';
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const dataUrl = String(ev.target?.result || '');
+          if (!dataUrl) return;
+          const img = new Image();
+          img.onload = () => {
+            highlightFilmstripItem('');
+            loadBaseImageElement(img, 'Eigenes Foto vom Gerät', true);
+            this.toast('Dein eigenes Foto wurde auf die Studio-Leinwand geladen!', 'success');
+          };
+          img.src = dataUrl;
+        };
+        reader.readAsDataURL(file);
+        inpLocalImage.value = '';
+      });
+    }
+
+    // Live-Schnappschuss aus einem <video>-Element auf die Studio-Leinwand übernehmen
+    const captureVideoFrameToStudio = (videoEl, openModalIfClosed = false, targetFsk = '16') => {
+      if (!videoEl || videoEl.readyState < 2 || !videoEl.videoWidth) {
+        this.toast('Bitte starte das Video kurz und pausiere an deiner Wunschstelle, damit ein Bild aufgenommen werden kann.', 'warning');
+        return;
+      }
+      videoEl.pause();
+
+      try {
+        const vw = videoEl.videoWidth || 1280;
+        const vh = videoEl.videoHeight || 720;
+        const snapCanvas = document.createElement('canvas');
+        snapCanvas.width = vw;
+        snapCanvas.height = vh;
+        const sctx = snapCanvas.getContext('2d');
+        sctx.drawImage(videoEl, 0, 0, vw, vh);
+
+        const dataUrl = snapCanvas.toDataURL('image/jpeg', 0.95);
+        const snapImg = new Image();
+        snapImg.onload = () => {
+          if (openModalIfClosed) {
+            state.shapes = [];
+            state.objects = [];
+            state.selectedObjId = null;
+            applyAdjustmentValues(0, 0, 0, 0);
+            setTargetFskMode(targetFsk, true);
+            const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            bsModal.show();
+          }
+          if (videoDrawer) videoDrawer.classList.add('d-none');
+          highlightFilmstripItem('');
+          const sec = Math.floor(videoEl.currentTime || 0);
+          const minStr = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+          loadBaseImageElement(snapImg, `Video-Schnappschuss (${minStr})`, true);
+          this.toast(`Live-Schnappschuss bei ${minStr} Min. in das Cover-Studio übernommen!`, 'success');
+        };
+        snapImg.src = dataUrl;
+      } catch (err) {
+        this.toast('Schnappschuss konnte nicht erstellt werden: ' + err.message, 'danger');
+      }
+    };
+
+    if (btnToggleVideoDrawer && videoDrawer) {
+      btnToggleVideoDrawer.addEventListener('click', () => {
+        videoDrawer.classList.toggle('d-none');
+      });
+    }
+    if (btnCloseVideoDrawer && videoDrawer) {
+      btnCloseVideoDrawer.addEventListener('click', () => {
+        if (studioVideoEl) studioVideoEl.pause();
+        videoDrawer.classList.add('d-none');
+      });
+    }
+    if (btnGrabVideoFrame && studioVideoEl) {
+      btnGrabVideoFrame.addEventListener('click', () => {
+        captureVideoFrameToStudio(studioVideoEl, false, state.targetFsk);
+      });
+    }
+
+    // Direkt-Buttons unter dem Haupt-Videoplayer auf der Film-Detailseite
+    document.querySelectorAll('.js-capture-video-to-studio').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mainVideo = document.getElementById('movie-detail-video-player');
+        const targetFsk = btn.getAttribute('data-target-fsk') || '16';
+        captureVideoFrameToStudio(mainVideo, true, targetFsk);
+      });
+    });
+
+    // Klick auf ein Vorschaubild oder auf „Im Studio bearbeiten" öffnet das Fullscreen Cover-Studio
     document.querySelectorAll('.js-open-thumb-editor-modal').forEach(el => {
       el.addEventListener('click', (ev) => {
         ev.preventDefault();
-        openEditorForThumb(
+        const targetFsk = el.getAttribute('data-target-fsk') || el.getAttribute('data-fsk') || '16';
+        openStudioWithScene(
           el.getAttribute('data-movie-id'),
           el.getAttribute('data-num'),
           el.getAttribute('data-thumb-url'),
           el.getAttribute('data-zoom-src'),
-          el.getAttribute('data-editor-url')
+          el.getAttribute('data-editor-url'),
+          targetFsk
         );
       });
     });
@@ -1772,56 +2763,56 @@ const App = {
         const fsk = btn.getAttribute('data-fsk') || '16';
         const wrap = document.getElementById(`current-fsk${fsk}-wrap`);
         if (!wrap) return;
-        openEditorForThumb(
+        openStudioWithScene(
           wrap.getAttribute('data-movie-id'),
           wrap.getAttribute('data-num'),
           wrap.getAttribute('data-thumb-url'),
           wrap.getAttribute('data-zoom-src'),
-          wrap.getAttribute('data-editor-url')
+          wrap.getAttribute('data-editor-url'),
+          fsk
         );
       });
     });
 
-    // Unzensiert als FSK 18 Cover übernehmen
-    if (btnApplyFsk18) {
-      btnApplyFsk18.addEventListener('click', () => {
-        const targetNum = state.num === '11' ? '1' : state.num;
-        applyMovieThumbSelection('18', targetNum, state.thumbUrl, state.zoomUrl, state.editorUrl, false);
-        const bsModal = bootstrap.Modal.getInstance(modalEl);
-        if (bsModal) bsModal.hide();
-        this.toast(`Bild #${targetNum} als FSK 18 Cover ausgewählt. Bitte speichere anschließend deine Änderungen.`, 'success');
-      });
-    }
+    // ----------------------------------------------------------------------
+    // 9. Speichern & Aktivieren (für den gewählten Ziel-Modus FSK 16 oder FSK 18)
+    // ----------------------------------------------------------------------
+    if (btnSavePrimary) {
+      btnSavePrimary.addEventListener('click', async () => {
+        const targetFsk = state.targetFsk === '18' ? '18' : '16';
 
-    // Als FSK 16 Cover speichern (entweder direkt oder mit eingezeichneten Milchglas-Bereichen als Bild #11 hochladen)
-    if (btnSaveFsk16) {
-      btnSaveFsk16.addEventListener('click', async () => {
-        if (state.shapes.length === 0) {
-          const targetNum = state.num === '12' ? '11' : state.num;
-          applyMovieThumbSelection('16', targetNum, state.thumbUrl, state.zoomUrl, state.editorUrl, false);
+        // Fall A: Keine Bearbeitungen vorgenommen und ein reguläres Szenenbild (#1..#10) oder passendes eigenes Bild (#11/#12) ist aktiv
+        if (!hasAnyEdits()) {
+          let targetNum = state.num;
+          if (targetFsk === '16' && targetNum === '12') targetNum = '1';
+          if (targetFsk === '18' && targetNum === '11') targetNum = '1';
+
+          applyMovieThumbSelection(targetFsk, targetNum, state.thumbUrl, state.zoomUrl, state.editorUrl, false);
           const bsModal = bootstrap.Modal.getInstance(modalEl);
           if (bsModal) bsModal.hide();
-          this.toast(`Bild #${targetNum} als FSK 16 Cover ausgewählt. Bitte speichere anschließend deine Änderungen.`, 'success');
+          this.toast(`${state.sourceLabel} als FSK ${targetFsk} Cover ausgewählt. Bitte speichere anschließend deine Änderungen.`, 'success');
           return;
         }
 
-        // Mit Milchglas-Bereichen: Hilfslinien ausblenden und fertiges Bild als eigenes FSK16-Cover (#11) hochladen
+        // Fall B: Bild wurde im Studio bearbeitet (Zensur, Licht/Farbe, Sticker, Badges, Text, Logo, Video-Frame oder lokales Bild)
+        // -> Auswahlrahmen ausblenden, als hochauflösendes JPEG rendern und als eigenes Cover (#11 für FSK16 bzw. #12 für FSK18) speichern!
+        state.selectedObjId = null;
         renderCanvas(false);
-        btnSaveFsk16.disabled = true;
+        btnSavePrimary.disabled = true;
 
         canvas.toBlob(async (blob) => {
           if (!blob) {
-            this.toast('Das bearbeitete Bild konnte nicht erzeugt werden.', 'danger');
-            btnSaveFsk16.disabled = false;
+            this.toast('Das bearbeitete Coverbild konnte nicht erzeugt werden.', 'danger');
+            btnSavePrimary.disabled = false;
             renderCanvas(true);
             return;
           }
 
           try {
-            const file = new File([blob], `fsk16_milchglas_${state.movieId}.jpg`, { type: 'image/jpeg' });
+            const file = new File([blob], `fsk${targetFsk}_studio_${state.movieId}.jpg`, { type: 'image/jpeg' });
             const formData = new FormData();
             formData.append('movie_id', state.movieId);
-            formData.append('fsk', '16');
+            formData.append('fsk', targetFsk);
             formData.append('poster', file);
             formData.append('_csrf', this.csrfToken);
 
@@ -1833,24 +2824,24 @@ const App = {
             const data = await res.json();
 
             if (res.ok && data.status === 'ok') {
-              const thumbNum = data.thumb_number || 11;
+              const thumbNum = data.thumb_number || (targetFsk === '16' ? 11 : 12);
               const previewUrl = data.preview_url || data.thumb_url || '';
               const zoomUrl = data.zoom_url || previewUrl;
               const editorUrl = data.editor_url || zoomUrl;
 
-              applyMovieThumbSelection('16', thumbNum, previewUrl, zoomUrl, editorUrl, true);
+              applyMovieThumbSelection(targetFsk, thumbNum, previewUrl, zoomUrl, editorUrl, true);
               const bsModal = bootstrap.Modal.getInstance(modalEl);
               if (bsModal) bsModal.hide();
-              this.toast('Dein mit Milchglas bearbeitetes FSK16-Coverbild (#11) wurde gespeichert und ausgewählt!', 'success');
+              this.toast(`Dein im Cover-Studio gestaltetes FSK ${targetFsk} Cover (#${thumbNum}) wurde gespeichert und aktiviert!`, 'success');
             } else {
-              this.toast(data.message || 'Fehler beim Speichern des bearbeiteten FSK16-Covers.', 'danger');
+              this.toast(data.message || `Fehler beim Speichern des FSK ${targetFsk} Covers.`, 'danger');
               renderCanvas(true);
             }
           } catch (err) {
             this.toast('Upload-Fehler: ' + err.message, 'danger');
             renderCanvas(true);
           } finally {
-            btnSaveFsk16.disabled = false;
+            btnSavePrimary.disabled = false;
           }
         }, 'image/jpeg', 0.92);
       });
