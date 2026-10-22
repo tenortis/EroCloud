@@ -254,6 +254,33 @@ if (isset($_POST['btn']['save_movie'])) {
     
     $status = p4c_escape_string(filter_input(INPUT_POST, 'movie_status', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_LOW));
     $admin_infos = p4c_escape_string(filter_input(INPUT_POST, 'admin_infos', FILTER_SANITIZE_STRING, FILTER_FLAG_ENCODE_LOW));
+
+    // Prüfen, ob für alle im Film gemeldeten Personen ein gültiger ID-Shot & eine Freigabe vorliegen
+    if ((!isset($error) || empty($error)) && $status == 'active') {
+        include_once(SOURCEDIR . '/includes/klassen/CoActorManager.inc.php');
+        $acpPerfInfo = CoActorManager::getContentPerformers('movie', abs((int)$movie_id), abs((int)$movie['merchant_id']));
+        if (!empty($acpPerfInfo['performers'])) {
+            foreach ($acpPerfInfo['performers'] as $acpPerson) {
+                $pStatus = (string)($acpPerson['checked_status'] ?? 'pending_qr');
+                $pReady  = !empty($acpPerson['is_ready_for_use']);
+                if ($pStatus === 'rejected') {
+                    $error = 'Der Film kann noch nicht freigeschaltet werden: Der ID-Shot f&uuml;r "' . htmlspecialchars((string)$acpPerson['display_label'], ENT_QUOTES, 'UTF-8') . '" wurde abgelehnt.';
+                    break;
+                }
+                // Für neu eingereichte Drehpartner, die bereits ihre Aufnahmen/Unterschrift eingereicht haben ('under_review'), bei Freigabe des Films direkt als 'verified' bestätigen
+                if ($pReady && $pStatus === 'under_review') {
+                    p4c_query("UPDATE `co_actors` SET
+                        `checked_status`      = 'verified',
+                        `checked_by_employee` = '" . abs((int)($_SESSION['employee_id'] ?? 0)) . "',
+                        `checked_on`          = '" . date('Y-m-d H:i:s') . "',
+                        `rejection_reason`    = ''
+                        WHERE `id` = '" . abs((int)$acpPerson['id']) . "'
+                          AND `merchant_id` = '" . abs((int)$movie['merchant_id']) . "'
+                        LIMIT 1;", __FILE__, __LINE__);
+                }
+            }
+        }
+    }
     
     /*
     echo '<pre>';
@@ -1103,8 +1130,12 @@ $site .= $ai_tabs_data['css_html'] . '
                 </select><br />
                 <a href="'.ACP_URL.'/Actor/'.$movie['actor_id'].'" target="_blank">Profil anzeigen</a>
             </div>
-        </div>
+        </div>';
 
+        include_once(SOURCEDIR . '/includes/klassen/CoActorManager.inc.php');
+        $site .= CoActorManager::renderAcpMoviePerformersBox(abs((int)$movie_id), abs((int)$movie['merchant_id']));
+
+        $site .= '
         <div class="ui-widget-header" style="padding:5px 10px; margin-top:10px; ">Film-Status</div>
         <div class="ui-widget-content radioset" style="font-size:12px; padding:10px; border-top:none; margin-bottom:10px;">';
         

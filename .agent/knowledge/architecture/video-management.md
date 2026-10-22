@@ -51,7 +51,13 @@ Der Creator (Händler/Merchant) lädt ein Video über das **Merchant Control Pan
   * **Endgültige Bereinigung**: Sobald alle verbleibenden Webmaster-/Syndication-Prozesse eingestellt werden, kann diese Whitelist mitsamt der `public`-Option im Creator-Portal vollständig entfernt werden. Filme werden dann ausschließlich expliziten Partnerdomains zugeordnet.
 
 ### Workflow bei der Neuerstellung:
-* **Schritt 1 (Metadaten & Kategorisierung)**: Eingabe aller Filminfos, Festlegen von `category_master` (*Porno* / *Fetisch*) und `category_slave` (Kommagetrennte Kategorien-IDs), Darsteller-Zuweisung, Preise und SEO.
+* **Schritt 1 (Metadaten, Kategorisierung & Pflicht-Darsteller-/ID-Check)**:
+  * Eingabe aller Filminfos, Festlegen von `category_master` (*Porno* / *Fetisch*) und `category_slave` (Kommagetrennte Kategorien-IDs), Preise und SEO.
+  * **Verbindlicher Darsteller- & Drehpartner-Check (`performer_mode` & `content_co_actors` im neuen MCP `mcp_neu`):**
+    * Der Partner muss zwingend auswählen, wer im Film zu sehen ist: **„Nur ich bin im Film zu sehen“** (`solo_self`), **„Ich zusammen mit anderen Personen“** (`group`) oder **„Nur andere Personen (ohne mich)“** (`others_only`).
+    * Sowohl der eigene „Ich“-Eintrag (`is_owner = 1`) als auch alle ausgewählten Drehpartner müssen über einen gültigen ID-Shot, Ausweisfotos, ein unverdecktes KI-Referenz-Selfie (`face_ref_image`) und eine unterschriebene Einverständniserklärung (per Smartphone-QR-Code `verify_co_actor.php` oder Altbestand-Upload) verfügen.
+    * `CoActorManager::validateContentPerformers()` gleicht außerdem automatisch ab, ob die Anzahl der ausgewählten Personen zu den gewählten Kategorien passt (z. B. Blockade bei Kategorie *Frau-Mann*, *Lesben*, *Dreier* oder *Gruppensex*, wenn nur 1 Person angegeben wurde).
+    * Vollständige Dokumentation: siehe `@co-actor-verification-and-model-release.md`.
 * **Schritt 2 (Datei-Upload)**:
   * **Validierung**: Erlaubte Formate sind `avi`, `flv`, `m4v`, `mkv`, `mov`, `mp4`, `mpg`, `wmv`. Maximale Größe beträgt 2,0 bis 4,0 GB.
   * **Analyse (getID3)**: Die PHP-Bibliothek `getID3` analysiert die temporäre Datei bezüglich Abspieldauer (`playtime_seconds`) und Auflösung (mindestens 640x480).
@@ -144,7 +150,12 @@ Ein Administrator prüft das Video im **Admin Control Panel (ACP)**:
 * **Prüfungs- & Bearbeitungsseite (`/Film-pruefen/{id}` -> `acp/includes/movie_checking.php` & `/Film-bearbeiten/{id}` -> `acp/includes/movie_edit.php`)**:
   * **Top-Compliance-Banner & KI-Reiter:** Direkt über dem Bearbeitungsformular erscheint das farbige BRAM-Compliance-Banner (`aic_get_movie_bram_and_ai_tabs_data()`) inkl. Fundstellen-Pills. Zudem stehen die beiden Reiter **„BRAM & KI-Analyse“ (`#tab-bram`)** und **„Audio & Transkript (.vtt)“ (`#tab-transcript`)** bereit, über die das gesprochene Audio jederzeit live per `whisper.cpp` transkribiert und auf BRAM-Verstöße geprüft werden kann. Beim Speichern von Änderungen wird der BRAM-Score automatisch neu berechnet (`$force_recalc = true`).
   * Der Admin kann alle Metadaten anpassen, die FSK16/18 Covers ändern und die Vorschau-Länge definieren.
-  * **Freischaltung (Status active)**: Setzt `status = 'active'`, `movie_checked = current_datetime` und fügt das Video in die Tabelle `movies_online` ein. Erst hierdurch ist das Video auf den Frontend-Webseiten sichtbar.
+  * **Darsteller-Verifizierung & Einverständniserklärungen (ID-Check Box):**
+    * In `acp/includes/movie_checking.php` und `acp/includes/movie_edit.php` zeigt `CoActorManager::renderAcpMoviePerformersBox()` alle für das Video gemeldeten Personen inkl. entschlüsselter Ausweisdaten, Vorschau-Thumbnails (KI-Gesicht, ID-Shot, Ausweis Vorder-/Rückseite, Unterschrift) und dem druckbaren **Einverständnis-Zertifikat (PDF)**.
+    * Der Admin kann einzelne Darsteller direkt per Klick bestätigen (`verified`) oder mit Begründung ablehnen (`rejected`).
+  * **Freischaltung (Status active)**:
+    * Setzt `status = 'active'`, `movie_checked = current_datetime` und fügt das Video in die Tabelle `movies_online` ein. Erst hierdurch ist das Video auf den Frontend-Webseiten sichtbar.
+    * **Freigabe-Schutz:** Ist ein verknüpfter Darsteller abgelehnt (`rejected`) oder unvollständig, blockiert `movie_checking.php` die Veröffentlichung automatisch. Sind alle Darsteller vollständig und stehen auf `under_review`, werden sie bei der Film-Freigabe automatisch auf `verified` gesetzt (Details siehe `@co-actor-verification-and-model-release.md`).
   * **Ablehnung (Rejection)**: Der Admin wählt einen Ablehnungsgrund aus.
     * Der Status `released` wird auf `2` (abgelehnt) gesetzt.
     * Der Grund wird in der Tabelle `rejection_reason_movie_history` geloggt.

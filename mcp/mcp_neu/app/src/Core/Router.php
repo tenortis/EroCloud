@@ -89,6 +89,7 @@ class Router
     {
         $homeCtrl        = 'App\\Modules\\Home\\HomeController';
         $actorsCtrl      = 'App\\Modules\\Actors\\ActorsController';
+        $coActorsCtrl    = 'App\\Modules\\CoActors\\CoActorsController';
         $moviesCtrl      = 'App\\Modules\\Movies\\MoviesController';
         $photoAlbumsCtrl = 'App\\Modules\\PhotoAlbums\\PhotoAlbumsController';
         $previewCtrl     = 'App\\Modules\\Preview\\PreviewController';
@@ -139,6 +140,13 @@ class Router
         self::register('actors/create', $actorsCtrl, 'create');
         self::register('actors/update', $actorsCtrl, 'update');
         self::register('actors/upload-image', $actorsCtrl, 'uploadImage');
+
+        // 4b. Drehpartner & ID-Check (Smartphone QR-Code & Einverständniserklärungen)
+        self::register('co-actors', $coActorsCtrl, 'list');
+        self::register('co-actors/create-qr', $coActorsCtrl, 'createQr');
+        self::register('co-actors/save-legacy', $coActorsCtrl, 'saveLegacy');
+        self::register('co-actors/poll-status', $coActorsCtrl, 'pollStatus');
+        self::register('co-actors/delete', $coActorsCtrl, 'delete');
 
         // 5. Partnerprogramm (Webmaster)
         self::register('webmaster-ads', $previewCtrl, 'webmasterAds');

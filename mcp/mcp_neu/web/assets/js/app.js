@@ -131,6 +131,9 @@ const App = {
       clearInterval(this.conversionPollTimer);
       this.conversionPollTimer = null;
     }
+    if (window.MCPCoActors && typeof window.MCPCoActors.stopPolling === 'function') {
+      window.MCPCoActors.stopPolling();
+    }
 
     let rawHash = window.location.hash.replace(/^#\/?/, '') || 'startseite';
 
@@ -291,6 +294,7 @@ const App = {
   initDynamicEvents() {
     this.initContentRulesEvents();
     this.initActorsEvents();
+    this.initCoActorsEvents();
     this.initSmartContentTable();
     this.initThumbnailHoverZoom();
     this.initMoviesEvents();
@@ -2121,6 +2125,9 @@ const App = {
     if (this.conversionPollTimer) {
       clearInterval(this.conversionPollTimer);
       this.conversionPollTimer = null;
+    }
+    if (window.MCPCoActors && typeof window.MCPCoActors.stopPolling === 'function') {
+      window.MCPCoActors.stopPolling();
     }
 
     const liveBox = document.getElementById('movie-conversion-live-box');
@@ -5076,6 +5083,547 @@ const App = {
         if (successBox) successBox.classList.add('d-none');
         formEl.classList.remove('d-none');
         if (messageEl) messageEl.focus();
+      });
+    }
+  },
+
+  // ========================================================================
+  // 3g. Drehpartner & ID-Check (Smartphone QR-Code, Live-Polling & Alt-Upload)
+  // ========================================================================
+  initCoActorsEvents() {
+    const self = this;
+
+    if (!window.MCPCoActors) {
+      window.MCPCoActors = {
+        pollTimer: null,
+        activeCoActorId: 0,
+        needsPageRefreshOnClose: false,
+
+        stopPolling() {
+          if (this.pollTimer) {
+            clearInterval(this.pollTimer);
+            this.pollTimer = null;
+          }
+        },
+
+        onModeChange(mode) {
+          const panel = document.getElementById('mcp-multiple-performers-panel');
+          const soloCard = document.getElementById('card-performer-mode-solo');
+          const multiCard = document.getElementById('card-performer-mode-multiple');
+
+          if (panel) {
+            panel.classList.toggle('d-none', mode !== 'multiple');
+          }
+          if (soloCard) {
+            soloCard.classList.toggle('border-primary', mode === 'solo_owner');
+            soloCard.classList.toggle('bg-primary', mode === 'solo_owner');
+            soloCard.classList.toggle('bg-opacity-10', mode === 'solo_owner');
+            soloCard.classList.toggle('shadow-sm', mode === 'solo_owner');
+            soloCard.classList.toggle('bg-light', mode !== 'solo_owner');
+          }
+          if (multiCard) {
+            multiCard.classList.toggle('border-primary', mode === 'multiple');
+            multiCard.classList.toggle('bg-primary', mode === 'multiple');
+            multiCard.classList.toggle('bg-opacity-10', mode === 'multiple');
+            multiCard.classList.toggle('shadow-sm', mode === 'multiple');
+            multiCard.classList.toggle('bg-light', mode !== 'multiple');
+          }
+        },
+
+        getModalInstance(id) {
+          const el = document.getElementById(id);
+          if (!el || !window.bootstrap?.Modal) return null;
+          return window.bootstrap.Modal.getOrCreateInstance(el);
+        },
+
+        resetQrAlert() {
+          const alertBox = document.getElementById('co-actor-qr-alert');
+          if (alertBox) {
+            alertBox.classList.add('d-none');
+            alertBox.textContent = '';
+          }
+        },
+
+        showQrAlert(msg) {
+          const alertBox = document.getElementById('co-actor-qr-alert');
+          if (alertBox) {
+            alertBox.textContent = msg;
+            alertBox.classList.remove('d-none');
+          } else {
+            self.toast(msg, 'danger');
+          }
+        },
+
+        showQrEditStep() {
+          this.stopPolling();
+          this.resetQrAlert();
+          document.getElementById('co-actor-qr-step-form')?.classList.remove('d-none');
+          document.getElementById('co-actor-qr-step-display')?.classList.add('d-none');
+        },
+
+        openCreateQrModal() {
+          this.stopPolling();
+          this.resetQrAlert();
+
+          const titleEl = document.getElementById('modalCoActorQrTitle');
+          if (titleEl) {
+            titleEl.innerHTML = '<i class="bi bi-qr-code-scan text-primary me-2"></i>Neuen Drehpartner per Smartphone &amp; QR-Code anlegen';
+          }
+
+          const idInput = document.getElementById('qr-form-co-actor-id');
+          const ownerInput = document.getElementById('qr-form-is-owner');
+          const creatorInput = document.getElementById('qr-form-creator-name');
+          const firstInput = document.getElementById('qr-form-first-name');
+          const lastInput = document.getElementById('qr-form-last-name');
+
+          if (idInput) idInput.value = '0';
+          if (ownerInput) ownerInput.value = '0';
+          if (creatorInput) creatorInput.value = '';
+          if (firstInput) firstInput.value = '';
+          if (lastInput) lastInput.value = '';
+
+          this.showQrEditStep();
+          this.getModalInstance('modalCoActorQr')?.show();
+        },
+
+        async openOwnerQrModal() {
+          this.stopPolling();
+          this.resetQrAlert();
+
+          const hostEl = document.getElementById('mcp-performer-selector-card') || document.getElementById('mcp-co-actors-page');
+          const ownerRealName = hostEl?.getAttribute('data-owner-real-name') || '';
+          const ownerCreatorName = hostEl?.getAttribute('data-owner-creator-name') || '';
+          const parts = ownerRealName.trim().split(/\s+/);
+          const fName = parts.shift() || '';
+          const lName = parts.join(' ');
+
+          const titleEl = document.getElementById('modalCoActorQrTitle');
+          if (titleEl) {
+            titleEl.innerHTML = '<i class="bi bi-person-badge text-primary me-2"></i>Meinen eigenen „Ich“-ID-Shot per Smartphone aufnehmen';
+          }
+
+          const idInput = document.getElementById('qr-form-co-actor-id');
+          const ownerInput = document.getElementById('qr-form-is-owner');
+          const creatorInput = document.getElementById('qr-form-creator-name');
+          const firstInput = document.getElementById('qr-form-first-name');
+          const lastInput = document.getElementById('qr-form-last-name');
+
+          if (idInput) idInput.value = hostEl?.getAttribute('data-owner-id') || '0';
+          if (ownerInput) ownerInput.value = '1';
+          if (creatorInput) creatorInput.value = ownerCreatorName;
+          if (firstInput) firstInput.value = fName;
+          if (lastInput) lastInput.value = lName;
+
+          this.getModalInstance('modalCoActorQr')?.show();
+          await this.requestAndShowQr({ is_owner: '1', co_actor_id: idInput?.value || '0' });
+        },
+
+        async openExistingQrModal(coActorId) {
+          this.stopPolling();
+          this.resetQrAlert();
+
+          const titleEl = document.getElementById('modalCoActorQrTitle');
+          if (titleEl) {
+            titleEl.innerHTML = '<i class="bi bi-qr-code-scan text-primary me-2"></i>Smartphone-QR-Code für Drehpartner';
+          }
+
+          const idInput = document.getElementById('qr-form-co-actor-id');
+          const ownerInput = document.getElementById('qr-form-is-owner');
+          if (idInput) idInput.value = String(coActorId);
+          if (ownerInput) ownerInput.value = '0';
+
+          this.getModalInstance('modalCoActorQr')?.show();
+          await this.requestAndShowQr({ is_owner: '0', co_actor_id: String(coActorId) });
+        },
+
+        async requestAndShowQr(extraFields = {}) {
+          const btn = document.getElementById('btn-generate-co-actor-qr');
+          if (btn) btn.disabled = true;
+
+          try {
+            const fd = new FormData();
+            fd.append('_csrf', self.csrfToken);
+
+            const formEl = document.getElementById('form-create-co-actor-qr');
+            if (formEl) {
+              const formFd = new FormData(formEl);
+              for (const [k, v] of formFd.entries()) {
+                fd.set(k, v);
+              }
+            }
+            Object.entries(extraFields).forEach(([k, v]) => fd.set(k, String(v)));
+
+            const res = await fetch(`${self.basePath}/api.php?route=co-actors/create-qr`, {
+              method: 'POST',
+              headers: { 'X-CSRF-Token': self.csrfToken },
+              body: fd
+            });
+            const data = await res.json();
+
+            if (!res.ok || data.status !== 'ok' || !data.co_actor) {
+              this.showQrEditStep();
+              this.showQrAlert(data.message || 'Der QR-Code konnte nicht erstellt werden.');
+              return;
+            }
+
+            const ca = data.co_actor;
+            this.activeCoActorId = parseInt(ca.id, 10) || 0;
+
+            const idInput = document.getElementById('qr-form-co-actor-id');
+            const ownerInput = document.getElementById('qr-form-is-owner');
+            const creatorInput = document.getElementById('qr-form-creator-name');
+            const firstInput = document.getElementById('qr-form-first-name');
+            const lastInput = document.getElementById('qr-form-last-name');
+
+            if (idInput) idInput.value = String(ca.id || 0);
+            if (ownerInput) ownerInput.value = ca.is_owner ? '1' : '0';
+            if (creatorInput) creatorInput.value = ca.creator_name || '';
+            if (firstInput) firstInput.value = ca.first_name || '';
+            if (lastInput) lastInput.value = ca.last_name || '';
+
+            const badgeEl = document.getElementById('qr-display-person-badge');
+            if (badgeEl) {
+              badgeEl.textContent = ca.is_owner
+                ? `ICH SELBST: ${ca.display_label || ''}`
+                : `Drehpartner: ${ca.display_label || ''}`;
+            }
+
+            const svgBox = document.getElementById('qr-display-svg-box');
+            if (svgBox) {
+              svgBox.innerHTML = data.qr_svg || '';
+            }
+
+            const urlInput = document.getElementById('qr-display-url-input');
+            if (urlInput) {
+              urlInput.value = data.verify_url || '';
+            }
+
+            const openBtn = document.getElementById('qr-display-open-btn');
+            if (openBtn) {
+              openBtn.href = data.verify_url || '#';
+            }
+
+            document.getElementById('co-actor-qr-step-form')?.classList.add('d-none');
+            document.getElementById('co-actor-qr-step-display')?.classList.remove('d-none');
+            document.getElementById('qr-live-waiting-box')?.classList.remove('d-none');
+            document.getElementById('qr-live-completed-box')?.classList.add('d-none');
+
+            if (Array.isArray(data.all_actors)) {
+              this.syncPerformersUI(data.all_actors, ca.is_owner ? 0 : this.activeCoActorId);
+            }
+
+            this.startPolling(this.activeCoActorId);
+          } catch (err) {
+            this.showQrAlert('Verbindungsfehler: ' + err.message);
+          } finally {
+            if (btn) btn.disabled = false;
+          }
+        },
+
+        startPolling(coActorId) {
+          this.stopPolling();
+          if (!coActorId) return;
+
+          this.pollTimer = setInterval(async () => {
+            const modalEl = document.getElementById('modalCoActorQr');
+            if (!modalEl || !modalEl.classList.contains('show')) {
+              this.stopPolling();
+              return;
+            }
+
+            try {
+              const res = await fetch(`${self.basePath}/api.php?route=co-actors/poll-status&id=${encodeURIComponent(coActorId)}`, {
+                cache: 'no-store'
+              });
+              if (!res.ok) return;
+              const data = await res.json();
+              if (!data || data.status !== 'ok') return;
+
+              if (Array.isArray(data.all_actors)) {
+                this.syncPerformersUI(data.all_actors, data.co_actor && !data.co_actor.is_owner ? parseInt(data.co_actor.id, 10) : 0);
+              }
+
+              if (data.co_actor && data.co_actor.is_ready_for_use) {
+                document.getElementById('qr-live-waiting-box')?.classList.add('d-none');
+                document.getElementById('qr-live-completed-box')?.classList.remove('d-none');
+                this.needsPageRefreshOnClose = true;
+                this.stopPolling();
+                self.toast('ID-Shot & Finger-Unterschrift wurden live vom Smartphone übertragen!', 'success');
+              }
+            } catch (_) {
+              // Silent ignore during polling
+            }
+          }, 3000);
+        },
+
+        async copyVerifyUrl() {
+          const input = document.getElementById('qr-display-url-input');
+          if (!input || !input.value) return;
+          try {
+            await navigator.clipboard.writeText(input.value);
+            self.toast('Smartphone-Link wurde in die Zwischenablage kopiert.', 'success');
+          } catch (_) {
+            input.select();
+            document.execCommand('copy');
+            self.toast('Smartphone-Link wurde in die Zwischenablage kopiert.', 'success');
+          }
+        },
+
+        openLegacyModal(coActorId = 0) {
+          const alertBox = document.getElementById('co-actor-legacy-alert');
+          if (alertBox) {
+            alertBox.classList.add('d-none');
+            alertBox.textContent = '';
+          }
+          const formEl = document.getElementById('form-co-actor-legacy');
+          if (formEl) formEl.reset();
+          const idInput = document.getElementById('legacy-form-co-actor-id');
+          if (idInput) idInput.value = String(coActorId || 0);
+
+          this.getModalInstance('modalCoActorLegacy')?.show();
+        },
+
+        switchToLegacyModal() {
+          const cName = document.getElementById('qr-form-creator-name')?.value || '';
+          const fName = document.getElementById('qr-form-first-name')?.value || '';
+          const lName = document.getElementById('qr-form-last-name')?.value || '';
+
+          this.getModalInstance('modalCoActorQr')?.hide();
+          this.openLegacyModal(0);
+
+          const legCreator = document.getElementById('legacy-creator-name');
+          const legFirst = document.getElementById('legacy-first-name');
+          const legLast = document.getElementById('legacy-last-name');
+          if (legCreator && cName) legCreator.value = cName;
+          if (legFirst && fName) legFirst.value = fName;
+          if (legLast && lName) legLast.value = lName;
+        },
+
+        async deleteCoActor(coActorId, label) {
+          if (!confirm(`Möchtest du den Drehpartner „${label}“ wirklich entfernen?`)) {
+            return;
+          }
+          try {
+            const fd = new FormData();
+            fd.append('_csrf', self.csrfToken);
+            fd.append('co_actor_id', String(coActorId));
+
+            const res = await fetch(`${self.basePath}/api.php?route=co-actors/delete`, {
+              method: 'POST',
+              headers: { 'X-CSRF-Token': self.csrfToken },
+              body: fd
+            });
+            const data = await res.json();
+            if (res.ok && data.status === 'ok') {
+              self.toast(data.message || 'Drehpartner wurde entfernt.', 'success');
+              if (Array.isArray(data.all_actors)) {
+                this.syncPerformersUI(data.all_actors, 0);
+              }
+              if (document.getElementById('mcp-co-actors-page')) {
+                self.handleRoute();
+              }
+            } else {
+              self.toast(data.message || 'Drehpartner konnte nicht entfernt werden.', 'danger');
+            }
+          } catch (err) {
+            self.toast('Verbindungsfehler: ' + err.message, 'danger');
+          }
+        },
+
+        syncPerformersUI(allActors, autoCheckId = 0) {
+          if (!Array.isArray(allActors)) return;
+
+          const ownerObj = allActors.find(a => a.is_owner) || null;
+          const otherActors = allActors.filter(a => !a.is_owner);
+
+          // 1. Sidebar-Zähler aktualisieren
+          const sidebarBadge = document.getElementById('sidebar-co-actors-count');
+          if (sidebarBadge) {
+            sidebarBadge.textContent = String(otherActors.length);
+          }
+
+          // 2. Falls #/movie-upload oder #/movie geöffnet ist, Darsteller-Karte live aktualisieren
+          const cardEl = document.getElementById('mcp-performer-selector-card');
+          if (!cardEl) return;
+
+          if (ownerObj) {
+            cardEl.setAttribute('data-owner-id', String(ownerObj.id || 0));
+            const ownerBanner = document.getElementById('mcp-owner-self-status-banner');
+            const ownerChkBadge = document.getElementById('chk-owner-status-badge');
+            const ownerRealName = cardEl.getAttribute('data-owner-real-name') || ownerObj.full_name || 'Account-Inhaber';
+
+            if (ownerChkBadge) {
+              ownerChkBadge.className = `badge ${ownerObj.status_badge_cls || 'bg-secondary'}`;
+              ownerChkBadge.textContent = ownerObj.status_label || '';
+            }
+
+            if (ownerBanner && ownerObj.is_ready_for_use) {
+              ownerBanner.innerHTML = `
+                <div class="p-2 px-3 rounded-3 border bg-success bg-opacity-10 border-success border-opacity-25 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                  <div class="small d-flex align-items-center gap-2">
+                    <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                    <span>
+                      <strong>Dein eigener „Ich“-ID-Shot (${self.escapeHtml(ownerRealName)}) ist hinterlegt</strong>
+                      <span class="badge ${self.escapeHtml(ownerObj.status_badge_cls || 'bg-success')} ms-1">
+                        ${self.escapeHtml(ownerObj.status_label || 'Bereit')}
+                      </span>
+                    </span>
+                  </div>
+                  <div class="d-flex align-items-center gap-2">
+                    ${ownerObj.certificate_url ? `
+                      <a href="${self.escapeHtml(ownerObj.certificate_url)}" target="_blank" class="btn btn-xs btn-outline-secondary py-1 px-2 small">
+                        <i class="bi bi-file-earmark-pdf me-1"></i> Mein PDF/Beleg
+                      </a>
+                    ` : ''}
+                    <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 small"
+                            onclick="window.MCPCoActors && window.MCPCoActors.openOwnerQrModal()">
+                      <i class="bi bi-qr-code me-1"></i> „Ich“-ID-Shot erneuern
+                    </button>
+                  </div>
+                </div>
+              `;
+            }
+          }
+
+          const listBody = document.getElementById('mcp-co-actors-checklist-body');
+          if (!listBody) return;
+
+          // Aktuell angehakte IDs sammeln
+          const checkedSet = new Set();
+          listBody.querySelectorAll('.co-actor-checkbox:checked').forEach(chk => {
+            const val = parseInt(chk.value, 10);
+            if (val > 0) checkedSet.add(val);
+          });
+          if (autoCheckId > 0) {
+            checkedSet.add(autoCheckId);
+          }
+
+          if (otherActors.length === 0) {
+            return;
+          }
+
+          listBody.innerHTML = otherActors.map(ca => {
+            const caId = parseInt(ca.id, 10);
+            const isChecked = checkedSet.has(caId);
+            const caReady = !!ca.is_ready_for_use;
+            const isLegacy = ca.verification_method === 'manual_legacy';
+
+            return `
+              <div class="p-3 rounded-3 border bg-white d-flex align-items-center justify-content-between flex-wrap gap-2 co-actor-select-row ${isChecked ? 'border-primary' : ''}"
+                   data-co-actor-id="${caId}">
+                <div class="form-check mb-0 d-flex align-items-center gap-2">
+                  <input class="form-check-input co-actor-checkbox" type="checkbox"
+                         name="co_actor_ids[]" id="chk-co-actor-${caId}" value="${caId}"
+                         ${isChecked ? 'checked' : ''}
+                         style="width: 1.2rem; height: 1.2rem;">
+                  <label class="form-check-label ms-1" for="chk-co-actor-${caId}" style="cursor: pointer;">
+                    <span class="fw-bold text-dark">${self.escapeHtml(ca.display_label || '')}</span>
+                    ${ca.ai_face_ready ? `
+                      <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 ms-1" style="font-size: 0.68rem;">
+                        <i class="bi bi-cpu me-1"></i>KI-Ready
+                      </span>
+                    ` : (isLegacy ? `
+                      <span class="badge bg-secondary bg-opacity-10 text-secondary border ms-1" style="font-size: 0.68rem;">
+                        <i class="bi bi-file-earmark-arrow-up me-1"></i>Alt-Dokumente
+                      </span>
+                    ` : '')}
+                  </label>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <span class="badge ${self.escapeHtml(ca.status_badge_cls || 'bg-secondary')}">
+                    ${self.escapeHtml(ca.status_label || '')}
+                  </span>
+                  ${!caReady ? `
+                    <button type="button" class="btn btn-xs btn-primary py-1 px-2 small"
+                            onclick="window.MCPCoActors && window.MCPCoActors.openExistingQrModal(${caId})">
+                      <i class="bi bi-qr-code-scan me-1"></i> QR-Code scannen lassen
+                    </button>
+                  ` : (isLegacy ? `
+                    <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 small"
+                            onclick="window.MCPCoActors && window.MCPCoActors.openExistingQrModal(${caId})">
+                      <i class="bi bi-qr-code me-1"></i> Wiedersehen: QR-Upgrade
+                    </button>
+                  ` : '')}
+                  ${(caReady && ca.certificate_url) ? `
+                    <a href="${self.escapeHtml(ca.certificate_url)}" target="_blank"
+                       class="btn btn-xs btn-outline-secondary py-1 px-2 small" title="Einverständniserklärung anzeigen / als PDF drucken">
+                      <i class="bi bi-file-earmark-pdf"></i>
+                    </a>
+                  ` : ''}
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      };
+    }
+
+    // Formular-Events in den Modals binden
+    const qrForm = document.getElementById('form-create-co-actor-qr');
+    if (qrForm && !qrForm.dataset.bound) {
+      qrForm.dataset.bound = '1';
+      qrForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await window.MCPCoActors.requestAndShowQr();
+      });
+    }
+
+    const qrModalEl = document.getElementById('modalCoActorQr');
+    if (qrModalEl && !qrModalEl.dataset.bound) {
+      qrModalEl.dataset.bound = '1';
+      qrModalEl.addEventListener('hidden.bs.modal', () => {
+        window.MCPCoActors.stopPolling();
+        if (window.MCPCoActors.needsPageRefreshOnClose && document.getElementById('mcp-co-actors-page')) {
+          window.MCPCoActors.needsPageRefreshOnClose = false;
+          self.handleRoute();
+        }
+      });
+    }
+
+    const legacyForm = document.getElementById('form-co-actor-legacy');
+    if (legacyForm && !legacyForm.dataset.bound) {
+      legacyForm.dataset.bound = '1';
+      legacyForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('btn-save-co-actor-legacy');
+        const alertBox = document.getElementById('co-actor-legacy-alert');
+        if (alertBox) alertBox.classList.add('d-none');
+        if (btn) btn.disabled = true;
+
+        try {
+          const fd = new FormData(legacyForm);
+          fd.append('_csrf', self.csrfToken);
+
+          const res = await fetch(`${self.basePath}/api.php?route=co-actors/save-legacy`, {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': self.csrfToken },
+            body: fd
+          });
+          const data = await res.json();
+
+          if (res.ok && data.status === 'ok') {
+            self.toast(data.message || 'Unterlagen wurden gespeichert.', 'success');
+            if (Array.isArray(data.all_actors)) {
+              const newId = data.co_actor ? parseInt(data.co_actor.id, 10) : 0;
+              window.MCPCoActors.syncPerformersUI(data.all_actors, newId);
+            }
+            window.MCPCoActors.getModalInstance('modalCoActorLegacy')?.hide();
+            if (document.getElementById('mcp-co-actors-page')) {
+              self.handleRoute();
+            }
+          } else {
+            if (alertBox) {
+              alertBox.textContent = data.message || 'Fehler beim Speichern.';
+              alertBox.classList.remove('d-none');
+            } else {
+              self.toast(data.message || 'Fehler beim Speichern.', 'danger');
+            }
+          }
+        } catch (err) {
+          self.toast('Verbindungsfehler: ' + err.message, 'danger');
+        } finally {
+          if (btn) btn.disabled = false;
+        }
       });
     }
   },

@@ -426,6 +426,13 @@ class MoviesController
             );
         }
 
+        // Darsteller- & Drehpartner-Daten für die Pflichtprüfung laden
+        \CoActorManager::ensureSchema();
+        $merchantIdent     = \CoActorManager::getMerchantIdentity($merchantId);
+        $ownerCoActor      = \CoActorManager::ensureOwnerCoActor($merchantId);
+        $coActors          = \CoActorManager::getMerchantCoActors($merchantId, false);
+        $contentPerformers = \CoActorManager::getContentPerformers('movie', $movieId, $merchantId);
+
         return View::render('Movies', 'detail', [
             'movie'               => $movieData,
             'availableThumbs'     => $availableThumbs,
@@ -434,6 +441,10 @@ class MoviesController
             'websites'            => $websites,
             'rejectionInfo'       => $rejectionInfo,
             'conversionQueueInfo' => $conversionQueueInfo,
+            'merchantIdent'       => $merchantIdent,
+            'ownerCoActor'        => $ownerCoActor,
+            'coActors'            => $coActors,
+            'contentPerformers'   => $contentPerformers,
         ]);
     }
 
@@ -567,6 +578,20 @@ class MoviesController
             (string)$draft['category_slave']
         );
 
+        // Darsteller- & Drehpartner-Daten für Schritt 1 des Film-Uploads laden
+        \CoActorManager::ensureSchema();
+        $merchantIdent     = \CoActorManager::getMerchantIdentity($merchantId);
+        $ownerCoActor      = \CoActorManager::ensureOwnerCoActor($merchantId);
+        $coActors          = \CoActorManager::getMerchantCoActors($merchantId, false);
+        $contentPerformers = (int)$draft['id'] > 0
+            ? \CoActorManager::getContentPerformers('movie', (int)$draft['id'], $merchantId)
+            : [
+                'performer_mode'   => 'solo_owner',
+                'owner_in_content' => 1,
+                'co_actor_ids'     => [],
+                'co_actors'        => [],
+            ];
+
         return View::render('Movies', 'upload', [
             'step'                => $step,
             'movie'               => $draft,
@@ -574,6 +599,10 @@ class MoviesController
             'websites'            => $websites,
             'categoryGroups'      => $categoryGroups,
             'conversionQueueInfo' => $conversionQueueInfo,
+            'merchantIdent'       => $merchantIdent,
+            'ownerCoActor'        => $ownerCoActor,
+            'coActors'            => $coActors,
+            'contentPerformers'   => $contentPerformers,
         ]);
     }
 
@@ -696,6 +725,27 @@ class MoviesController
             }
         }
 
+        // Darsteller- & Drehpartner-Prüfung (Pflicht vor dem Upload)
+        \CoActorManager::ensureSchema();
+        $performerMode  = trim((string)$this->request->post('performer_mode', 'solo_owner'));
+        $ownerInContent = ($performerMode === 'solo_owner')
+            ? true
+            : (abs((int)$this->request->post('owner_in_content', 0)) === 1);
+        $rawCoActorIds  = isset($_POST['co_actor_ids']) && is_array($_POST['co_actor_ids']) ? $_POST['co_actor_ids'] : [];
+
+        $performerCheck = \CoActorManager::validateContentPerformers(
+            $merchantId,
+            $performerMode,
+            $ownerInContent,
+            $rawCoActorIds,
+            $categorySlave
+        );
+        if (!$performerCheck['valid']) {
+            foreach ($performerCheck['errors'] as $pErr) {
+                $errors[] = $pErr;
+            }
+        }
+
         if (!empty($errors)) {
             Response::error(implode(' ', $errors), 400);
             return;
@@ -778,6 +828,16 @@ class MoviesController
             Response::error('Der Film-Entwurf konnte nicht gespeichert werden.', 500);
             return;
         }
+
+        // Ausgewählte Darsteller & Drehpartner dauerhaft mit dem Film verknüpfen
+        \CoActorManager::saveContentPerformers(
+            'movie',
+            $movieId,
+            $merchantId,
+            (string)$performerCheck['performer_mode'],
+            (int)$performerCheck['owner_in_content'],
+            (array)$performerCheck['final_co_actor_ids']
+        );
 
         $_SESSION['upload_movie'] = ['movie_id' => $movieId];
 
@@ -1126,6 +1186,27 @@ class MoviesController
         }
         $categorySlave = implode(',', array_unique($validSlaves));
 
+        // Darsteller- & Drehpartner-Prüfung (Pflicht vor dem Einreichen)
+        \CoActorManager::ensureSchema();
+        $performerMode  = trim((string)$this->request->post('performer_mode', (string)($mObj->performer_mode ?? 'solo_owner')));
+        $ownerInContent = ($performerMode === 'solo_owner')
+            ? true
+            : (abs((int)$this->request->post('owner_in_content', 0)) === 1);
+        $rawCoActorIds  = isset($_POST['co_actor_ids']) && is_array($_POST['co_actor_ids']) ? $_POST['co_actor_ids'] : [];
+
+        $performerCheck = \CoActorManager::validateContentPerformers(
+            $merchantId,
+            $performerMode,
+            $ownerInContent,
+            $rawCoActorIds,
+            $categorySlave
+        );
+        if (!$performerCheck['valid']) {
+            foreach ($performerCheck['errors'] as $pErr) {
+                $errors[] = $pErr;
+            }
+        }
+
         if (!empty($errors)) {
             Response::error(implode(' ', $errors), 400);
             return;
@@ -1232,6 +1313,16 @@ class MoviesController
             `released`            = '1'
             WHERE `id` = '" . $movieId . "' AND `merchant_id` = '" . $merchantId . "'
             LIMIT 1;", __FILE__, __LINE__);
+
+        // Ausgewählte Darsteller & Drehpartner dauerhaft mit dem Film verknüpfen
+        \CoActorManager::saveContentPerformers(
+            'movie',
+            $movieId,
+            $merchantId,
+            (string)$performerCheck['performer_mode'],
+            (int)$performerCheck['owner_in_content'],
+            (array)$performerCheck['final_co_actor_ids']
+        );
 
         // Falls Film bereits in movies_online existiert, Kategorien synchronisieren
         $fileId = (string)$mObj->file_id;

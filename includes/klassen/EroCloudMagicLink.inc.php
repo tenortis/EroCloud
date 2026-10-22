@@ -101,6 +101,8 @@ class EroCloudMagicLink
             'actor',
             'new-actor',
             'actor-new',
+            'co-actors',
+            'co-actor',
             'preview',
             'webmaster',
         ];

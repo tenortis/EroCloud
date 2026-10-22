@@ -81,6 +81,7 @@ mcp_neu/ (später: mcp/)
 │           │       ├── dashboard.php   # Eingeloggtes Partner-Dashboard (Kachel-Layout)
 │           │       └── guest.php       # Öffentliche Landingpage (Pay4Coins-Login)
 │           ├── Actors/
+│           ├── CoActors/               # Drehpartner & ID-Check (Model Release & QR-Verifizierung)
 │           ├── Movies/
 │           ├── PhotoAlbums/
 │           ├── Webmaster/
@@ -90,6 +91,8 @@ mcp_neu/ (später: mcp/)
     ├── index.php                  # App-Shell (Sidebar, Topbar, #app-content) bzw. Guest-View
     ├── api.php                    # Zentraler AJAX-Dispatcher für SPA-Navigation
     ├── login.php                  # Pay4Coins Auto-Login (?pid=XXXXXXXXXX)
+    ├── verify_co_actor.php        # Smartphone Self-Service für Drehpartner-ID-Check & Touch-Unterschrift (?t=<token>)
+    ├── co_actor_media.php         # Geschützter Medien- & PDF-Zertifikats-Proxy für Ausweisfotos & Model-Releases
     └── assets/
         ├── css/
         │   ├── bootstrap.min.css
@@ -150,6 +153,11 @@ mcp_neu/ (später: mcp/)
      * **Film:** Blaues Badge `<i class="bi bi-film"></i> Film` + `#ID`, Vorschaubild, Filmtitel, Darsteller, Spielzeit/Auflösung und Status.
      * **Fotoalbum:** Violettes Badge `<i class="bi bi-images"></i> Fotoalbum` + `#ID`, Coverbild, Albumtitel, Darsteller, Fotoanzahl und Status.
    * Zusätzlich bietet der Dropdown-Kopf Schnellfilter-Pills (`Alle`, `Filme`, `Fotoalben`) sowie Fußzeilen-Buttons zum direkten Filtern in `#/movies` bzw. `#/photo-albums`.
+6. **Drehpartner & ID-Check (`#/co-actors` & Integration in `#/movie-upload` / `#/movie`):**
+   * Unter `Profile` $\rightarrow$ **„Drehpartner & ID-Check“** (`#/co-actors`) verwalten Partner ihre eigene Identitäts- & Einverständnis-Verifizierung („Ich“-Eintrag mit `is_owner = 1`) sowie alle weiteren Drehpartner (`co_actors`).
+   * **Mobile-First QR-Code-Workflow:** Statt Papierformularen scannt der Drehpartner (oder der Partner für sich selbst) einen lokal per `QrCodeSvg` erzeugten QR-Code, nimmt am Smartphone ein unverdecktes KI-Referenz-Selfie (`face_ref_image`), einen ID-Shot mit Ausweis neben dem Gesicht (`id_shot_image`) sowie Ausweis-Vorder-/Rückseite auf und unterschreibt mit dem Finger direkt auf dem Smartphone-Display (`verify_co_actor.php`).
+   * Während das QR-Modal im MCP geöffnet ist, prüft ein **4-Sekunden-Live-Polling** (`co-actors/get`) den Status und schaltet bei erfolgreichem Abschluss am Handy sofort live auf Grün um.
+   * Alle Details zu Tabellen (`co_actors`, `content_co_actors`), AES-Verschlüsselung, Kategorie-Plausibilitätsprüfung, Zertifikats-Generierung und ACP-Prüfung sind verbindlich dokumentiert in `@co-actor-verification-and-model-release.md`.
 
 
 

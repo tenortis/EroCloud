@@ -184,6 +184,12 @@ $downloadPercentOptions = range(0, 150);
           </div>
         </div>
 
+        <!-- 1b. Darsteller & Drehpartner-Prüfung (Pflichtangabe vor Veröffentlichung) -->
+        <?php
+        $contentLabel = 'Film';
+        require dirname(__DIR__, 2) . '/CoActors/views/partials/performer_selector_card.php';
+        ?>
+
         <!-- Preisgestaltung -->
         <div class="kkc-card mb-4">
           <div class="kkc-card-header">
@@ -747,3 +753,5 @@ $downloadPercentOptions = range(0, 150);
     </div>
   </div>
 </div>
+
+<?php require dirname(__DIR__, 2) . '/CoActors/views/partials/co_actor_modals.php'; ?>

@@ -95,6 +95,17 @@ if ($countActors > 0) {
     }
 }
 
+// Anzahl der angelegten Drehpartner für den Sidebar-Zähler laden
+\CoActorManager::ensureSchema();
+$countCoActors = 0;
+$rsCoActorsCount = p4c_query("SELECT COUNT(*) AS `cnt`
+    FROM `co_actors`
+    WHERE `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted' AND `is_owner` = 0;", __FILE__, __LINE__);
+if ($rsCoActorsCount && p4c_num_rows($rsCoActorsCount) > 0) {
+    $cntCaObj = p4c_fetch_object($rsCoActorsCount);
+    $countCoActors = abs((int)($cntCaObj->cnt ?? 0));
+}
+
 // Prüfen, ob Partnerprogramm für diesen Partner aktiv ist
 $showWebmasterMenu = in_array($partnerId, ['ABPP2HNMDG', 'KJDJEEESAX', 'CCRVWMVD67', '9SN2XTH2TU'], true);
 
@@ -243,6 +254,13 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
         </a>
         <?php endforeach; ?>
       </div>
+
+      <!-- 4b. Drehpartner & ID-Check (Separater Menüpunkt in der Sidebar) -->
+      <a href="#/co-actors" class="sidebar-link" data-route="#/co-actors">
+        <i class="bi bi-people-fill"></i>
+        <span class="text-nowrap">Drehpartner</span>
+        <span id="sidebar-co-actors-count" class="sidebar-count-badge ms-auto" title="Anzahl deiner angelegten Drehpartner"><?= (int)$countCoActors ?></span>
+      </a>
 
       <?php if ($showWebmasterMenu): ?>
       <!-- 5. Partnerprogramm (Nur für freigeschaltete Bestands-Partner) -->

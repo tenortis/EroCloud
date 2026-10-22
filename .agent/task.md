@@ -83,3 +83,11 @@
     - [x] Implement live `Profile / Actors` module (`ActorsController`, `views/list.php`, `views/form.php`) with live username check, Steckbrief editor, `actor_checksum()` sync, and AJAX FSK16/FSK18 profile image upload
     - [x] Implement `Movies` (`#/movies`, `#/movie`, `#/movie-upload`) and `Photo-Albums` (`#/photo-albums`, `#/photo-album`, `#/photo-album-upload`) modules in `mcp_neu`
     - [x] Implement live `FAQ` module (`#/faq`) and finalize `mcp_neu` production readiness
+    - [x] **Performer & Co-Actor Verification + Digital Model Release System („Drehpartner & ID-Check“)**
+        - [x] Implement 100% local ISO/IEC 18004 QR-Code SVG generator (`includes/klassen/QrCodeSvg.inc.php`)
+        - [x] Implement `CoActorManager` (`includes/klassen/CoActorManager.inc.php`) with self-healing tables (`co_actors`, `content_co_actors`), AES encryption, mandatory owner self-entry (`is_owner = 1`), category plausibility checks, and printable/PDF consent certificate generator
+        - [x] Build mobile-first QR self-service verification web app (`mcp/mcp_neu/web/verify_co_actor.php`) with dual selfie capture (`face_ref_image` for future Vision-AI + `id_shot_image`), ID front/back capture, client-side image compression, and resize-safe touch signature canvas
+        - [x] Implement protected media & certificate proxy (`mcp/mcp_neu/web/co_actor_media.php`)
+        - [x] Build dedicated MCP module `#/co-actors` (`CoActorsController`, `views/co_actors/index.php`, `views/co_actors/_quick_modal.php` with 4s live polling) and integrate into movie upload/edit (`views/movies/_performer_section.php` & `MoviesController`)
+        - [x] Integrate ACP performer verification box, single-performer approve/reject, and publish protection into `acp/includes/movie_checking.php` and `acp/includes/movie_edit.php`
+        - [x] Document complete architecture and workflows in `.agent/knowledge/architecture/co-actor-verification-and-model-release.md`

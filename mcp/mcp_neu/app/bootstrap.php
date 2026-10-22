@@ -68,6 +68,9 @@ if (defined('SOURCEDIR')) {
     include_once SOURCEDIR . '/includes/klassen/movie.inc.php';
     include_once SOURCEDIR . '/includes/klassen/PhotoAlbum.inc.php';
     include_once SOURCEDIR . '/includes/klassen/sendSMTPmail.inc.php';
+    if (file_exists(SOURCEDIR . '/includes/klassen/CoActorManager.inc.php')) {
+        include_once SOURCEDIR . '/includes/klassen/CoActorManager.inc.php';
+    }
 }
 
 // 7. Partner-Historie Logging-Funktion bereitstellen

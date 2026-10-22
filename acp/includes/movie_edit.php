@@ -1012,6 +1012,9 @@ $site .= $ai_tabs_data['css_html'] . '
             </div>
         </div>';
 
+        include_once(SOURCEDIR . '/includes/klassen/CoActorManager.inc.php');
+        $site .= CoActorManager::renderAcpMoviePerformersBox(abs((int)$m->field('id')), abs((int)$movie['merchant_id']));
+
         $rs_rejection_reason_movie_history = p4c_query("SELECT * FROM `rejection_reason_movie_history` WHERE `movie_file_id`='".p4c_escape_string($m_online->field('file_id'))."' ORDER BY `datetime`DESC;",__FILE__,__LINE__);
         if (p4c_num_rows($rs_rejection_reason_movie_history) > 0) {
             $site .= '
