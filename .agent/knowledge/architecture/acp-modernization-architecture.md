@@ -131,3 +131,16 @@ acp/acp_neu/ (später: acp/)
   * **Direkte Ausweisdaten-Korrektur (`POST ?route=co-actors-checking/update-data`):** Erlaubt das Korrigieren von Tippfehlern in den AES-verschlüsselten Personendaten ohne erneuten Smartphone-Scan.
   * **Verknüpfte Inhalte (`content_co_actors`):** Zeigt sowohl verknüpfte Filme (`movie`) als auch verknüpfte Fotoalben (`photo_album`) mit Direktlink in die jeweilige Prüf- oder Bearbeitungsansicht.
   * **Smartphone-QR-Modal (`POST ?route=co-actors-checking/action`):** Zeigt den lokalen SVG-QR-Code und Direktlink inkl. Token-Erneuerung (`regenerate_qr`).
+
+---
+
+## 7. 🤖 Modul „KI-Analyse & BRAM“ (`AiCompliance`)
+
+* **`App\Modules\AiCompliance` (`AiComplianceController.php` & `views/index.php`):**
+  * **`#/ai-compliance` (`GET ?route=ai-compliance` & `GET/POST ?route=ai-compliance/ajax`):** Zentrales 5-Tab-Cockpit für die Whisper-Audio-Transkription (`.vtt`) sowie die Visa/Mastercard BRAM- & Rechts-Compliance-Prüfung (`movies_ai_analysis`).
+  * **Top-KPI-Kacheln & System-Readiness-Leiste:** Zeigt konvertierte Videos (`convert_status = 2`), Whisper-Untertitel-Fortschritt, BRAM-Prüfquote, klickbare Compliance-Bilanz (`ok` / `warning` / `violation`) und den Live-Status von FFmpeg, `whisper.cpp`, `llama.cpp` und `cronjobs/ai_compliance_worker.php`.
+  * **Tab 1 – Einzel-Video-Testlabor:** Video-Schnellauswahl, editierbare Test-Eingaben (Titel, Beschreibung, gesprochenes Transkript), Schritt 1 (Whisper Audio-Extraktion & `.vtt`-Vorschau inkl. Simulationsszenarien) und Schritt 2 (BRAM- & Rechts-Prüfung mit Risiko-Score und Zitat-Fundstellen).
+  * **Tab 2 – Batch- & Cronjob-Steuerung:** Fortschrittsbalken für Stufe 1 & 2, Katalog-Schnellscan (`run_bulk_text_precheck` in 250er-Paketen), Live-Whisper-Batch im Browser (`run_batch_step` + `poll_worker_status`) und Konfiguration des 24/7 Server-Cronjobs (`save_batch_config`).
+  * **Tab 3 – Visa/Mastercard BRAM-Regelwerk & Prompt:** Übersicht der aktiven Kategorien & Schlagwörter sowie Live-Editoren für `includes/ai_rules/bram_system_prompt.md` und `includes/ai_rules/bram_keyword_rules.json` (`save_rules`).
+  * **Tab 4 – Analyse-Historie & Filter:** Echtzeit-Filterung über `movies_ai_analysis` nach BRAM-Status, Untertitel-Status und Volltext/ID (`filter_history`).
+  * **Tab 5 – Transkript- & VTT-Inspektor:** Gesamtauswertung aller `.vtt`-Transkripte auf Klammer-Tags, Sprachverteilung, Filme ohne Dialog und Phrasen-Wiederholungen (`inspect_transcripts`) inkl. 1-Klick-Bestandsbereinigung (`clean_all_vtt_transcripts`) und Re-Queue exotischer Sprachen (`requeue_exotic_lang_movies`).

@@ -2231,6 +2231,1020 @@ const App = {
     } else {
       setTimeout(() => toastEl.remove(), 3500);
     }
+  },
+
+  // ========================================================================
+  // 8. KI-Analyse & BRAM-Compliance (#/ai-compliance)
+  // ========================================================================
+  AiCompliance: {
+    currentMovieId: 0,
+    liveBatchRunning: false,
+    batchStepTimer: null,
+    batchStepElapsedSec: 0,
+    batchAnnouncedMovieId: 0,
+    lastInspectorData: null,
+
+    ensureCurrentMovieId() {
+      if (this.currentMovieId > 0) return this.currentMovieId;
+      const inp = document.getElementById('aic-input-movie-id');
+      if (inp && parseInt(inp.value, 10) > 0) {
+        this.currentMovieId = parseInt(inp.value, 10);
+      } else if (window.__aicInitialMovie && window.__aicInitialMovie.id) {
+        this.currentMovieId = parseInt(window.__aicInitialMovie.id, 10);
+      }
+      return this.currentMovieId;
+    },
+
+    async callAjax(params = {}, method = 'GET') {
+      const url = new URL(`${App.basePath}/api.php`, window.location.origin);
+      url.searchParams.set('route', 'ai-compliance/ajax');
+
+      const opts = {
+        method,
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-Token': App.csrfToken
+        }
+      };
+
+      if (method === 'GET') {
+        Object.entries(params).forEach(([k, v]) => {
+          if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+        });
+      } else {
+        const fd = new FormData();
+        Object.entries(params).forEach(([k, v]) => {
+          if (v !== undefined && v !== null) fd.append(k, String(v));
+        });
+        opts.body = fd;
+      }
+
+      const res = await fetch(url.toString(), opts);
+      return await res.json();
+    },
+
+    setText(id, val) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = String(val ?? '');
+    },
+
+    setHtml(id, html) {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = html;
+    },
+
+    activateTab(tabBtnId) {
+      const btn = document.getElementById(tabBtnId);
+      if (btn && window.bootstrap?.Tab) {
+        window.bootstrap.Tab.getOrCreateInstance(btn).show();
+      } else if (btn) {
+        btn.click();
+      }
+    },
+
+    renderComplianceBadge(status, score) {
+      const s = score !== undefined ? ` (${score}/100)` : '';
+      if (status === 'ok') {
+        return `<span class="badge bg-success">OK / Unbedenklich${s}</span>`;
+      } else if (status === 'warning') {
+        return `<span class="badge bg-warning text-dark">Gelb / Ohne KK${s}</span>`;
+      } else if (status === 'violation') {
+        return `<span class="badge bg-danger">BRAM-Verstoß${s}</span>`;
+      }
+      return `<span class="badge bg-secondary">Noch ungeprüft</span>`;
+    },
+
+    updateStatsUI(stats, workerStatus, batchCfg) {
+      if (stats) {
+        this.setText('aic-stat-total', stats.total_converted);
+        this.setText('aic-stat-subtitled', stats.total_subtitled);
+        this.setText('aic-stat-sub-pct', stats.pct_subtitles);
+        this.setText('aic-stat-sub-rem', stats.remaining_subtitles);
+        this.setText('aic-stat-checked', stats.total_text_checked);
+        this.setText('aic-stat-txt-pct', stats.pct_text);
+        this.setText('aic-stat-txt-rem', stats.remaining_text);
+        this.setText('aic-stat-ok', stats.cnt_ok);
+        this.setText('aic-stat-warn', stats.cnt_warn);
+        this.setText('aic-stat-viol', stats.cnt_viol);
+
+        this.setText('aic-prog-sub-text', `${stats.sub_processed_total} / ${stats.total_converted} Videos (${stats.pct_subtitles}%)`);
+        const subBar = document.getElementById('aic-prog-sub-bar');
+        if (subBar) subBar.style.width = `${stats.pct_subtitles}%`;
+        this.setText('aic-prog-sub-label', `${stats.pct_subtitles}%`);
+        this.setText('aic-det-sub-ok', stats.sub_created);
+        this.setText('aic-det-sub-noaudio', stats.sub_no_audio);
+        this.setText('aic-det-sub-err', stats.sub_error);
+        this.setText('aic-det-sub-rem', stats.remaining_subtitles);
+
+        this.setText('aic-prog-txt-text', `${stats.total_text_checked} / ${stats.total_converted} Videos (${stats.pct_text}%)`);
+        const txtBar = document.getElementById('aic-prog-txt-bar');
+        if (txtBar) txtBar.style.width = `${stats.pct_text}%`;
+        this.setText('aic-prog-txt-label', `${stats.pct_text}%`);
+      }
+
+      if (workerStatus) {
+        this.setText('aic-worker-last-msg', workerStatus.last_message || '-');
+        this.setText('aic-worker-last-time', workerStatus.last_run_at || '-');
+        if (workerStatus.state === 'running') {
+          this.setHtml('aic-worker-live-badge', `<span class="badge bg-success">Verarbeitet Video #${workerStatus.current_movie_id}</span>`);
+        } else if (workerStatus.state === 'waiting_for_ffmpeg') {
+          this.setHtml('aic-worker-live-badge', `<span class="badge bg-warning text-dark">Wartet auf Video-Konvertierung</span>`);
+        } else {
+          this.setHtml('aic-worker-live-badge', `<span class="badge bg-primary">Bereit (Durchläufe: ${workerStatus.total_processed_runs || 0})</span>`);
+        }
+      }
+
+      if (batchCfg) {
+        const cronBadge = document.getElementById('aic-env-cron');
+        if (cronBadge) {
+          if (batchCfg.cron_enabled) {
+            cronBadge.className = 'badge bg-success';
+            cronBadge.textContent = 'Hintergrund-Cronjob: Aktiv';
+          } else {
+            cronBadge.className = 'badge bg-secondary';
+            cronBadge.textContent = 'Hintergrund-Cronjob: Pausiert';
+          }
+        }
+      }
+    },
+
+    async reloadDashboard() {
+      try {
+        const res = await this.callAjax({ action: 'init_dashboard' }, 'GET');
+        if (!res || res.status !== 'ok') {
+          App.toast('Fehler beim Aktualisieren des Dashboards.', 'danger');
+          return;
+        }
+        this.updateStatsUI(res.stats, res.worker_status, res.batch_config);
+        this.renderHistoryTable(res.history || []);
+        if (res.rules && res.rules.parsed_categories) {
+          this.renderRuleCategories(res.rules.parsed_categories);
+        }
+        App.toast('KI- & BRAM-Dashboard aktualisiert.', 'success');
+      } catch (e) {
+        App.toast('Netzwerkfehler beim Aktualisieren.', 'danger');
+      }
+    },
+
+    displayMovieInLab(m) {
+      if (!m) return;
+      this.currentMovieId = m.id;
+      const wrap = document.getElementById('aic-loaded-movie-wrap');
+      if (wrap) wrap.style.display = '';
+
+      const inpMid = document.getElementById('aic-input-movie-id');
+      if (inpMid) inpMid.value = m.id;
+      const selRec = document.getElementById('aic-select-recent');
+      if (selRec) selRec.value = String(m.id);
+
+      this.setText('aic-m-title-head', m.title);
+      this.setText('aic-m-id', m.id);
+      this.setText('aic-m-merchant', m.merchant_id);
+      this.setText('aic-m-duration', `${m.playtime_fmt} (${m.playtime_seconds} Sek.)`);
+      this.setText('aic-m-filepath', m.mp4_path);
+
+      const chkLink = document.getElementById('aic-m-check-link');
+      if (chkLink) chkLink.setAttribute('href', `#/movie-checking?id=${m.id}`);
+      const edtLink = document.getElementById('aic-m-edit-link');
+      if (edtLink) edtLink.setAttribute('href', `#/movie-edit?id=${m.id}`);
+
+      if (m.mp4_exists) {
+        this.setHtml('aic-m-mp4-status', `<span class="badge bg-success">Vorhanden (${m.mp4_size_mb} MB)</span>`);
+      } else {
+        this.setHtml('aic-m-mp4-status', `<span class="badge bg-info text-dark">Lokale DB-Ansicht (MP4 auf Live-Server)</span>`);
+      }
+
+      if (m.is_online) {
+        this.setHtml('aic-m-online-status', `<span class="badge bg-success">Online</span>`);
+      } else {
+        this.setHtml('aic-m-online-status', `<span class="badge bg-secondary">Status: ${App.escapeHtml(m.status)} (Released: ${m.released})</span>`);
+      }
+
+      const edtTitle = document.getElementById('aic-edit-title');
+      if (edtTitle) edtTitle.value = m.title || '';
+      const edtDesc = document.getElementById('aic-edit-desc');
+      if (edtDesc) edtDesc.value = m.description || '';
+      this.setText('aic-m-meta-title', m.meta_title || '-');
+      this.setText('aic-m-meta-desc', m.meta_description || '-');
+
+      const edtTrans = document.getElementById('aic-edit-transcript');
+      const outVtt = document.getElementById('aic-out-vtt');
+
+      if (m.ai && m.ai.subtitle_status === 2) {
+        this.setHtml('aic-step1-badge-wrap', `<span class="badge bg-success">Transkript &amp; .vtt vorhanden (${m.ai.whisper_duration_sec} Sek.)</span>`);
+        this.setText('aic-out-lang', `${String(m.ai.detected_language || '').toUpperCase()} (${m.ai.language_confidence} %)`);
+        this.setText('aic-out-subfile', m.ai.subtitle_filename || '-');
+        if (edtTrans) edtTrans.value = m.ai.spoken_transcript || '';
+        if (outVtt) outVtt.value = m.ai.vtt_preview || '';
+      } else if (m.ai && m.ai.subtitle_status === 3) {
+        this.setHtml('aic-step1-badge-wrap', `<span class="badge bg-secondary">Stummfilm (Keine Tonspur im Video)</span>`);
+        this.setText('aic-out-lang', '-');
+        this.setText('aic-out-subfile', '-');
+        if (edtTrans) edtTrans.value = m.ai.spoken_transcript || '';
+        if (outVtt) outVtt.value = '';
+      } else {
+        this.setHtml('aic-step1-badge-wrap', `<span class="badge bg-secondary">Noch kein Untertitel / Audio-Transkript erstellt</span>`);
+        this.setText('aic-out-lang', 'Noch nicht ermittelt');
+        this.setText('aic-out-subfile', m.ai ? (m.ai.subtitle_filename || '-') : '-');
+        if (edtTrans) edtTrans.value = '';
+        if (outVtt) outVtt.value = '';
+      }
+
+      if (m.ai && m.ai.text_check_status === 2) {
+        this.renderComplianceReport({
+          compliance_status: m.ai.text_compliance,
+          risk_score: m.ai.text_risk_score,
+          engine_used: m.ai.text_engine_used,
+          summary_de: m.ai.text_summary,
+          violations: m.ai.violations,
+          duration_sec: m.ai.text_duration_sec
+        });
+      } else {
+        const repBox = document.getElementById('aic-report-box');
+        if (repBox) repBox.style.display = 'none';
+      }
+    },
+
+    renderComplianceReport(rep) {
+      const repBox = document.getElementById('aic-report-box');
+      if (repBox) repBox.style.display = '';
+
+      const banner = document.getElementById('aic-report-banner');
+      if (banner) {
+        banner.className = 'alert d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3 ';
+        if (rep.compliance_status === 'ok') {
+          banner.className += 'alert-success';
+          this.setHtml('aic-report-status-title', '&#x2705; FREIGABE-EMPFEHLUNG: UNBEDENKLICH (KEINE BRAM-VERSTÖSSE ERKANNT)');
+        } else if (rep.compliance_status === 'warning') {
+          banner.className += 'alert-warning';
+          this.setHtml('aic-report-status-title', '&#x26A0; PRÜFHINWEIS (GELB): NUR AUF PORTALEN OHNE KREDITKARTE ZULÄSSIG / MANUELLE SICHTUNG');
+        } else {
+          banner.className += 'alert-danger';
+          this.setHtml('aic-report-status-title', '&#x1F6D1; STOPP (ROT): KRITISCHER VISA/MASTERCARD BRAM- ODER RECHTS-VERSTOSS ERKANNT!');
+        }
+      }
+
+      this.setText('aic-report-summary', rep.summary_de || '');
+      this.setText('aic-report-score', rep.risk_score || 0);
+      this.setText('aic-report-engine', `${rep.engine_used || 'BRAM-Engine'} (${rep.duration_sec || 0} Sek.)`);
+
+      const viols = rep.violations || [];
+      if (!viols.length) {
+        this.setHtml(
+          'aic-tbody-violations',
+          '<tr><td colspan="5" class="text-center text-success fw-semibold py-3">&#x2714; Es wurden in keiner Textquelle (Titel, Beschreibung, SEO, gesprochenes Video-Audio) verbotene Begriffe oder Verstöße gefunden.</td></tr>'
+        );
+        return;
+      }
+
+      let html = '';
+      viols.forEach(v => {
+        const sevBadge = v.severity === 'violation'
+          ? '<span class="badge bg-danger">VERSTOSS (ROT)</span>'
+          : '<span class="badge bg-warning text-dark">HINWEIS (GELB)</span>';
+        const tsInfo = (v.timestamp && v.timestamp !== '-')
+          ? `<br><strong>Zeit im Video: <code>${App.escapeHtml(v.timestamp)}</code></strong>`
+          : '';
+        html += `<tr>
+          <td>${sevBadge}</td>
+          <td><strong>${App.escapeHtml(v.category)}</strong></td>
+          <td>${App.escapeHtml(v.source_label || v.source)}${tsInfo}</td>
+          <td><code class="text-danger fw-bold">${App.escapeHtml(v.matched_term || '-')}</code></td>
+          <td>
+            <div class="bg-danger bg-opacity-10 border-start border-danger border-3 px-2 py-1 fst-italic mb-1">&bdquo;${App.escapeHtml(v.matched_quote || '')}&ldquo;</div>
+            <small class="text-muted">${App.escapeHtml(v.reason || '')}</small>
+          </td>
+        </tr>`;
+      });
+      this.setHtml('aic-tbody-violations', html);
+    },
+
+    async loadMovieIntoLab(params) {
+      try {
+        const res = await this.callAjax({ ...params, action: 'load_movie' }, 'GET');
+        if (!res || res.status !== 'ok') {
+          App.toast(res?.message || 'Fehler beim Laden des Videos.', 'danger');
+          return;
+        }
+        this.displayMovieInLab(res.movie);
+      } catch (e) {
+        App.toast('Netzwerkfehler beim Laden des Videos.', 'danger');
+      }
+    },
+
+    onSelectRecent(val) {
+      if (val) {
+        this.loadMovieIntoLab({ movie_id: val });
+      }
+    },
+
+    loadMovieByInput() {
+      const mid = document.getElementById('aic-input-movie-id')?.value || '';
+      const merch = document.getElementById('aic-input-merchant-id')?.value || '';
+      this.loadMovieIntoLab({ movie_id: mid, merchant_id: merch });
+    },
+
+    loadMovieMode(mode) {
+      const merch = document.getElementById('aic-input-merchant-id')?.value || '';
+      this.loadMovieIntoLab({ mode, merchant_id: merch });
+    },
+
+    openMovieInLab(movieId) {
+      this.activateTab('tab-btn-aic-lab');
+      this.loadMovieIntoLab({ movie_id: movieId });
+    },
+
+    async runWhisper() {
+      const mid = this.ensureCurrentMovieId();
+      if (!mid) {
+        App.toast('Bitte wähle zuerst ein Video aus.', 'warning');
+        return;
+      }
+      const btn = document.getElementById('btn-aic-run-whisper');
+      const scenario = document.getElementById('aic-sim-scenario')?.value || 'clean';
+      const audioLimit = document.getElementById('aic-audio-limit')?.value || '120';
+
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Audio & Untertitel werden verarbeitet...';
+      }
+      this.setText('aic-whisper-timer', 'Bitte warten (Whisper transkribiert Audio)...');
+
+      try {
+        const res = await this.callAjax({
+          action: 'run_whisper',
+          movie_id: mid,
+          sim_scenario: scenario,
+          audio_limit_sec: audioLimit
+        }, 'POST');
+
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-mic me-1"></i>1. Audio jetzt auswerten &amp; Untertitel erzeugen';
+        }
+
+        if (!res || res.status !== 'ok') {
+          App.toast(res?.message || 'Fehler bei der Audio-Auswertung.', 'danger');
+          return;
+        }
+        this.setHtml('aic-whisper-timer', `<strong class="text-success">&#x2714; Abgeschlossen (${App.escapeHtml(res.mode_used)})</strong>`);
+        this.displayMovieInLab(res.movie);
+        App.toast('Audio-Analyse & .vtt erfolgreich abgeschlossen.', 'success');
+      } catch (e) {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-mic me-1"></i>1. Audio jetzt auswerten &amp; Untertitel erzeugen';
+        }
+        App.toast('Netzwerkfehler bei Schritt 1.', 'danger');
+      }
+    },
+
+    async runTextCheck() {
+      const mid = this.ensureCurrentMovieId();
+      if (!mid) {
+        App.toast('Bitte wähle zuerst ein Video aus.', 'warning');
+        return;
+      }
+      const btn = document.getElementById('btn-aic-run-textcheck');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Prüfe Texte & Audio-Transkript...';
+      }
+
+      try {
+        const res = await this.callAjax({
+          action: 'run_text_check',
+          movie_id: mid,
+          custom_title: document.getElementById('aic-edit-title')?.value || '',
+          custom_desc: document.getElementById('aic-edit-desc')?.value || '',
+          custom_transcript: document.getElementById('aic-edit-transcript')?.value || ''
+        }, 'POST');
+
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-shield-check me-1"></i>2. Jetzt BRAM- &amp; Rechts-Prüfung starten (Titel + Beschreibung + Audio)';
+        }
+
+        if (!res || res.status !== 'ok') {
+          App.toast(res?.message || 'Fehler bei der BRAM-Prüfung.', 'danger');
+          return;
+        }
+        this.renderComplianceReport(res.report);
+        App.toast('BRAM- & Rechts-Prüfung abgeschlossen.', 'success');
+      } catch (e) {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-shield-check me-1"></i>2. Jetzt BRAM- &amp; Rechts-Prüfung starten (Titel + Beschreibung + Audio)';
+        }
+        App.toast('Netzwerkfehler bei Schritt 2.', 'danger');
+      }
+    },
+
+    // Tab 2: Batch & Cronjob
+    appendBatchLog(line) {
+      const box = document.getElementById('aic-live-batch-log');
+      if (!box) return;
+      const now = new Date().toLocaleTimeString('de-DE');
+      box.value = (box.value ? box.value + '\n' : '') + `[${now}] ${line}`;
+      box.scrollTop = box.scrollHeight;
+    },
+
+    stopBatchStepPoller() {
+      if (this.batchStepTimer) {
+        clearInterval(this.batchStepTimer);
+        this.batchStepTimer = null;
+      }
+      this.setText('aic-live-batch-ticker', '');
+    },
+
+    startLiveBatch() {
+      this.liveBatchRunning = true;
+      const startBtn = document.getElementById('btn-aic-start-live-batch');
+      const stopBtn = document.getElementById('btn-aic-stop-live-batch');
+      if (startBtn) startBtn.style.display = 'none';
+      if (stopBtn) stopBtn.style.display = '';
+      this.appendBatchLog('=== LIVE-BATCH AUTO-LOOP GESTARTET ===');
+      this.executeNextLiveBatchStep(true);
+    },
+
+    stopLiveBatch() {
+      this.liveBatchRunning = false;
+      this.appendBatchLog('Stopp angefordert – warte auf Abschluss des aktuell laufenden Videos...');
+    },
+
+    stepLiveBatch() {
+      this.liveBatchRunning = false;
+      this.executeNextLiveBatchStep(false);
+    },
+
+    async executeNextLiveBatchStep(autoContinue) {
+      const startBtn = document.getElementById('btn-aic-start-live-batch');
+      const stopBtn = document.getElementById('btn-aic-stop-live-batch');
+      const stepBtn = document.getElementById('btn-aic-step-live-batch');
+
+      if (autoContinue && !this.liveBatchRunning) {
+        this.stopBatchStepPoller();
+        this.appendBatchLog('Live-Batch wurde pausiert.');
+        if (startBtn) { startBtn.style.display = ''; startBtn.disabled = false; }
+        if (stopBtn) stopBtn.style.display = 'none';
+        if (stepBtn) stepBtn.disabled = false;
+        return;
+      }
+
+      this.appendBatchLog('Starte nächstes offenes Video (Whisper Audio-Extraktion + .vtt + BRAM-Check)...');
+      if (stepBtn) stepBtn.disabled = true;
+
+      this.batchStepElapsedSec = 0;
+      this.batchAnnouncedMovieId = 0;
+      this.stopBatchStepPoller();
+      this.setText('aic-live-batch-ticker', '⏳ Whisper läuft (0 Sek.)...');
+
+      this.batchStepTimer = setInterval(async () => {
+        this.batchStepElapsedSec += 2;
+        try {
+          const pRes = await this.callAjax({ action: 'poll_worker_status' }, 'GET');
+          if (pRes && pRes.status === 'ok' && pRes.current_movie && pRes.current_movie.id) {
+            const cm = pRes.current_movie;
+            this.setText('aic-live-batch-ticker', `⏳ Verarbeite #${cm.id} (Dauer: ${cm.playtime_fmt} Min.) – läuft seit ${this.batchStepElapsedSec} Sek.`);
+            if (this.batchAnnouncedMovieId !== cm.id) {
+              this.batchAnnouncedMovieId = cm.id;
+              this.appendBatchLog(`   ↳ Aktuell in Arbeit: Video #${cm.id} "${cm.title}" (Spieldauer: ${cm.playtime_fmt} Min.)...`);
+            }
+          } else {
+            this.setText('aic-live-batch-ticker', `⏳ Whisper läuft (${this.batchStepElapsedSec} Sek.)...`);
+          }
+        } catch (_) {}
+      }, 2000);
+
+      try {
+        const res = await this.callAjax({ action: 'run_batch_step' }, 'POST');
+        this.stopBatchStepPoller();
+
+        if (!res || res.status !== 'ok') {
+          this.appendBatchLog('FEHLER: ' + (res?.message || 'Unbekannter Fehler.'));
+          this.liveBatchRunning = false;
+          if (startBtn) { startBtn.style.display = ''; startBtn.disabled = false; }
+          if (stopBtn) stopBtn.style.display = 'none';
+          if (stepBtn) stepBtn.disabled = false;
+          return;
+        }
+
+        this.appendBatchLog('✔ ' + res.message);
+        this.updateStatsUI(res.stats, res.worker_status, null);
+
+        if (!res.has_more) {
+          this.appendBatchLog('FERTIG! Alle konvertierten Videos wurden verarbeitet.');
+          this.liveBatchRunning = false;
+          if (startBtn) { startBtn.style.display = ''; startBtn.disabled = false; }
+          if (stopBtn) stopBtn.style.display = 'none';
+          if (stepBtn) stepBtn.disabled = false;
+          this.applyHistoryFilter();
+          return;
+        }
+
+        if (autoContinue && this.liveBatchRunning) {
+          setTimeout(() => this.executeNextLiveBatchStep(true), 600);
+        } else {
+          if (stepBtn) stepBtn.disabled = false;
+          this.applyHistoryFilter();
+        }
+      } catch (e) {
+        this.stopBatchStepPoller();
+        this.appendBatchLog('Netzwerk- oder Timeout-Fehler beim Batch-Schritt. Pausiere.');
+        this.liveBatchRunning = false;
+        if (startBtn) { startBtn.style.display = ''; startBtn.disabled = false; }
+        if (stopBtn) stopBtn.style.display = 'none';
+        if (stepBtn) stepBtn.disabled = false;
+      }
+    },
+
+    async runBulkPrecheck(forceRecheck, lastId = 0, totalProcessedSoFar = 0) {
+      const btnPre = document.getElementById('btn-aic-bulk-precheck');
+      const btnAll = document.getElementById('btn-aic-bulk-recheck-all');
+      const statusEl = document.getElementById('aic-bulk-precheck-status');
+      if (btnPre) btnPre.disabled = true;
+      if (btnAll) btnAll.disabled = true;
+      if (statusEl) {
+        statusEl.className = 'small fw-bold text-primary';
+        statusEl.textContent = `Prüfe Katalog-Paket... (${totalProcessedSoFar} Filme geprüft)`;
+      }
+
+      try {
+        const res = await this.callAjax({
+          action: 'run_bulk_text_precheck',
+          chunk_size: 250,
+          force_recheck: forceRecheck ? 1 : 0,
+          last_id: lastId || 0
+        }, 'POST');
+
+        if (!res || res.status !== 'ok') {
+          if (btnPre) btnPre.disabled = false;
+          if (btnAll) btnAll.disabled = false;
+          if (statusEl) {
+            statusEl.className = 'small fw-bold text-danger';
+            statusEl.textContent = 'Fehler beim Schnell-Scan.';
+          }
+          return;
+        }
+
+        const newTotal = totalProcessedSoFar + (res.processed_in_chunk || 0);
+        this.updateStatsUI(res.stats, null, null);
+
+        if (res.has_more && res.processed_in_chunk > 0) {
+          this.runBulkPrecheck(forceRecheck, res.last_id, newTotal);
+        } else {
+          if (btnPre) btnPre.disabled = false;
+          if (btnAll) btnAll.disabled = false;
+          if (statusEl) {
+            statusEl.className = 'small fw-bold text-success';
+            statusEl.textContent = `✔ Katalog-Schnellscan abgeschlossen! (${newTotal} Videos in diesem Durchlauf bewertet)`;
+          }
+          this.applyHistoryFilter();
+        }
+      } catch (e) {
+        if (btnPre) btnPre.disabled = false;
+        if (btnAll) btnAll.disabled = false;
+        if (statusEl) {
+          statusEl.className = 'small fw-bold text-danger';
+          statusEl.textContent = 'Netzwerkfehler beim Schnell-Scan.';
+        }
+      }
+    },
+
+    async saveBatchConfig() {
+      const btn = document.getElementById('btn-aic-save-batch-cfg');
+      const msgEl = document.getElementById('aic-save-batch-msg');
+      if (btn) btn.disabled = true;
+      if (msgEl) {
+        msgEl.className = 'small fw-bold text-muted';
+        msgEl.textContent = 'Speichere...';
+      }
+
+      try {
+        const res = await this.callAjax({
+          action: 'save_batch_config',
+          cron_enabled: document.getElementById('aic-cfg-cron-enabled')?.checked ? 1 : 0,
+          whisper_model_pref: document.getElementById('aic-cfg-model')?.value || 'small',
+          audio_limit_sec: document.getElementById('aic-cfg-audiolimit')?.value || '0',
+          whisper_threads: document.getElementById('aic-cfg-threads')?.value || '12',
+          max_movies_per_run: document.getElementById('aic-cfg-maxruns')?.value || '2',
+          order_direction: document.getElementById('aic-cfg-order')?.value || 'DESC',
+          pause_on_ffmpeg_convert: document.getElementById('aic-cfg-pause-ffmpeg')?.checked ? 1 : 0,
+          sync_empty_movie_lang: document.getElementById('aic-cfg-sync-lang')?.checked ? 1 : 0
+        }, 'POST');
+
+        if (btn) btn.disabled = false;
+        if (!res || res.status !== 'ok') {
+          if (msgEl) {
+            msgEl.className = 'small fw-bold text-danger';
+            msgEl.textContent = 'Fehler beim Speichern.';
+          }
+          return;
+        }
+        if (msgEl) {
+          msgEl.className = 'small fw-bold text-success';
+          msgEl.textContent = res.message;
+        }
+        this.updateStatsUI(null, null, res.batch_config);
+        App.toast(res.message, 'success');
+      } catch (e) {
+        if (btn) btn.disabled = false;
+        if (msgEl) {
+          msgEl.className = 'small fw-bold text-danger';
+          msgEl.textContent = 'Netzwerkfehler.';
+        }
+      }
+    },
+
+    // Tab 3: Regelwerk
+    renderRuleCategories(parsed) {
+      const cats = (parsed && parsed.categories) ? parsed.categories : [];
+      if (!cats.length) {
+        this.setHtml('aic-tbody-rule-cats', '<tr><td colspan="4" class="text-center text-muted">Keine Kategorien gefunden.</td></tr>');
+        return;
+      }
+      let html = '';
+      cats.forEach(c => {
+        const badge = c.severity === 'violation'
+          ? `<span class="badge bg-danger">Hard-Block (Rot)</span><div class="small text-muted mt-1">Basis-Score: ${App.escapeHtml(c.base_risk_score)}</div>`
+          : `<span class="badge bg-warning text-dark">Prüfhinweis (Gelb)</span><div class="small text-muted mt-1">Basis-Score: ${App.escapeHtml(c.base_risk_score)}</div>`;
+        const kws = (c.keywords || []).map(kw => `<span class="badge bg-light text-dark border fw-normal">${App.escapeHtml(kw)}</span>`).join(' ');
+        html += `<tr>
+          <td><strong>${App.escapeHtml(c.name)}</strong></td>
+          <td>${badge}</td>
+          <td>${App.escapeHtml(c.description)}</td>
+          <td><div class="d-flex flex-wrap gap-1">${kws}</div></td>
+        </tr>`;
+      });
+      this.setHtml('aic-tbody-rule-cats', html);
+    },
+
+    async saveRules() {
+      const btn = document.getElementById('btn-aic-save-rules');
+      const msgEl = document.getElementById('aic-save-rules-msg');
+      if (btn) btn.disabled = true;
+      if (msgEl) {
+        msgEl.className = 'small fw-bold text-muted';
+        msgEl.textContent = 'Speichere Regelwerk...';
+      }
+
+      try {
+        const res = await this.callAjax({
+          action: 'save_rules',
+          system_prompt_md: document.getElementById('aic-rules-md-editor')?.value || '',
+          keyword_rules_json: document.getElementById('aic-rules-json-editor')?.value || ''
+        }, 'POST');
+
+        if (btn) btn.disabled = false;
+        if (!res || res.status !== 'ok') {
+          if (msgEl) {
+            msgEl.className = 'small fw-bold text-danger';
+            msgEl.textContent = res?.message || 'Fehler beim Speichern.';
+          }
+          App.toast(res?.message || 'Fehler beim Speichern.', 'danger');
+          return;
+        }
+        if (msgEl) {
+          msgEl.className = 'small fw-bold text-success';
+          msgEl.textContent = res.message;
+        }
+        this.renderRuleCategories(res.parsed_categories);
+        App.toast(res.message, 'success');
+      } catch (e) {
+        if (btn) btn.disabled = false;
+        if (msgEl) {
+          msgEl.className = 'small fw-bold text-danger';
+          msgEl.textContent = 'Netzwerkfehler beim Speichern.';
+        }
+      }
+    },
+
+    // Tab 4: Analyse-Historie
+    renderHistoryTable(rows) {
+      this.setText('aic-hist-count', rows ? rows.length : 0);
+      if (!rows || !rows.length) {
+        this.setHtml('aic-tbody-history', '<tr><td colspan="8" class="text-center text-muted py-4">Keine Videos für die gewählten Filterkriterien gefunden.</td></tr>');
+        return;
+      }
+      let html = '';
+      rows.forEach(r => {
+        let subBadge = '';
+        if (r.subtitle_status === 2) {
+          subBadge = `<span class="badge bg-info text-dark">Sprache: ${App.escapeHtml(String(r.detected_language || '').toUpperCase())} (${r.whisper_duration_sec}s)</span><br><small><code>${App.escapeHtml(r.subtitle_filename)}</code></small>`;
+        } else if (r.subtitle_status === 3) {
+          subBadge = `<span class="badge bg-secondary">Stummfilm (Kein Audio)</span>`;
+        } else if (r.subtitle_status === 4) {
+          subBadge = `<span class="badge bg-danger" title="${App.escapeHtml(r.last_error)}">MP4 fehlt / Fehler</span>`;
+        } else {
+          subBadge = `<span class="badge bg-secondary">Audio noch offen</span>`;
+        }
+
+        html += `<tr>
+          <td><strong>#${r.movie_id}</strong></td>
+          <td>${r.merchant_id}</td>
+          <td><strong>${App.escapeHtml(r.title)}</strong><br><small class="text-muted">Dauer: ${App.escapeHtml(r.playtime_fmt)} Min.</small></td>
+          <td>${subBadge}</td>
+          <td>${this.renderComplianceBadge(r.text_compliance, r.text_risk_score)}</td>
+          <td>${App.escapeHtml(r.text_summary || '-')}</td>
+          <td>${App.escapeHtml(r.updated_at)}</td>
+          <td>
+            <div class="d-flex flex-column gap-1">
+              <button type="button" class="btn btn-xs btn-outline-primary py-0 px-2 small" onclick="App.AiCompliance.openMovieInLab(${r.movie_id})">Im Labor öffnen</button>
+              <a href="#/movie-edit?id=${r.movie_id}" class="btn btn-xs btn-outline-secondary py-0 px-2 small">Film bearbeiten</a>
+            </div>
+          </td>
+        </tr>`;
+      });
+      this.setHtml('aic-tbody-history', html);
+    },
+
+    async applyHistoryFilter() {
+      try {
+        const res = await this.callAjax({
+          action: 'filter_history',
+          compliance_filter: document.getElementById('aic-filter-comp')?.value || 'all',
+          subtitle_filter: document.getElementById('aic-filter-sub')?.value || 'all',
+          search_query: document.getElementById('aic-filter-search')?.value || ''
+        }, 'GET');
+        if (!res || res.status !== 'ok') return;
+        this.renderHistoryTable(res.history || []);
+        this.updateStatsUI(res.stats, null, null);
+      } catch (_) {}
+    },
+
+    resetHistoryFilter() {
+      const comp = document.getElementById('aic-filter-comp');
+      const sub = document.getElementById('aic-filter-sub');
+      const q = document.getElementById('aic-filter-search');
+      if (comp) comp.value = 'all';
+      if (sub) sub.value = 'all';
+      if (q) q.value = '';
+      this.applyHistoryFilter();
+    },
+
+    jumpToHistoryFilter(compStatus, searchQuery = '', subStatus = 'all') {
+      this.activateTab('tab-btn-aic-history');
+      const comp = document.getElementById('aic-filter-comp');
+      const sub = document.getElementById('aic-filter-sub');
+      const q = document.getElementById('aic-filter-search');
+      if (comp) comp.value = compStatus || 'all';
+      if (sub) sub.value = subStatus || 'all';
+      if (q) q.value = searchQuery || '';
+      this.applyHistoryFilter();
+    },
+
+    // Tab 5: Transkript- & VTT-Inspektor
+    renderMovieSampleLinks(samples) {
+      if (!samples || !samples.length) return '-';
+      return samples.map(sm => {
+        const mid = sm.id;
+        const ttl = App.escapeHtml(sm.title || `Film #${mid}`);
+        return `<button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1 small me-1 mb-1" onclick="App.AiCompliance.openMovieInLab(${mid})" title="Im Testlabor öffnen: ${ttl}">#${mid}</button>`;
+      }).join('');
+    },
+
+    async runInspector() {
+      const btn = document.getElementById('btn-aic-run-inspector');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Analysiere alle vorhandenen .vtt-Transkripte...';
+      }
+      const expMsg = document.getElementById('aic-insp-export-msg');
+      if (expMsg) expMsg.style.display = 'none';
+      this.setHtml('aic-tbody-insp-brackets', '<tr><td colspan="5" class="text-center py-3">Werte alle gespeicherten Transkripte und Segmente aus...</td></tr>');
+
+      try {
+        const res = await this.callAjax({ action: 'inspect_transcripts' }, 'POST');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Transkript-Analyse aktualisieren';
+        }
+        if (!res || res.status !== 'ok') {
+          App.toast(res?.message || 'Fehler bei der Transkript-Auswertung.', 'danger');
+          return;
+        }
+
+        this.lastInspectorData = res;
+        const copyBtn = document.getElementById('btn-aic-copy-inspector');
+        const dlBtn = document.getElementById('btn-aic-download-inspector');
+        if (copyBtn) copyBtn.style.display = '';
+        if (dlBtn) dlBtn.style.display = '';
+
+        const sum = res.summary || {};
+        this.setText('aic-insp-total-sub', sum.total_transcribed || 0);
+        this.setText('aic-insp-total-silent', sum.total_silent || 0);
+        this.setText('aic-insp-real-speech', sum.total_with_real_speech || 0);
+        this.setText('aic-insp-only-brackets', sum.total_only_brackets || 0);
+        this.setText('aic-insp-unique-brackets', sum.unique_bracket_tags || 0);
+        this.setText('aic-insp-occ-brackets', sum.total_bracket_occ || 0);
+
+        // 1. Klammer-Ausdrücke
+        const bList = res.bracket_tags || [];
+        if (!bList.length) {
+          this.setHtml('aic-tbody-insp-brackets', '<tr><td colspan="5" class="text-center text-muted py-3">Keine Klammer-Ausdrücke in den aktuell vorhandenen Transkripten gefunden.</td></tr>');
+        } else {
+          let bHtml = '';
+          bList.forEach(b => {
+            let badgeCls = 'bg-secondary';
+            if (b.cat_type === 'keep_atmosphere') badgeCls = 'bg-success';
+            else if (b.cat_type === 'convert_moan') badgeCls = 'bg-info text-dark';
+            else if (b.cat_type === 'remove_artifact') badgeCls = 'bg-danger';
+
+            const safeQ = App.escapeHtml(b.tag).replace(/'/g, "\\'");
+            bHtml += `<tr>
+              <td><code class="fw-bold">${App.escapeHtml(b.tag)}</code></td>
+              <td><strong>${b.total_occurrences}x</strong></td>
+              <td>${b.movie_count} Film(e)</td>
+              <td><span class="badge ${badgeCls}">${App.escapeHtml(b.cat_label)}</span></td>
+              <td>
+                ${this.renderMovieSampleLinks(b.sample_movies)}
+                <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1 small" onclick="App.AiCompliance.jumpToHistoryFilter('all', '${safeQ}', 'has_sub')">In Historie &rarr;</button>
+              </td>
+            </tr>`;
+          });
+          this.setHtml('aic-tbody-insp-brackets', bHtml);
+        }
+
+        // 2. Sprachen
+        const lList = res.languages || [];
+        if (!lList.length) {
+          this.setHtml('aic-tbody-insp-langs', '<tr><td colspan="6" class="text-center text-muted py-3">Noch keine transkribierten Videos vorhanden.</td></tr>');
+        } else {
+          const allowedWl = { de: 1, en: 1, es: 1, fr: 1, it: 1, nl: 1, pl: 1, cs: 1, ru: 1, pt: 1, tr: 1, hu: 1, sv: 1, da: 1 };
+          let lHtml = '';
+          lList.forEach(lg => {
+            const isSuspect = (!allowedWl[lg.code_lower] || (lg.only_brackets_count > 0 && lg.real_speech_count === 0));
+            const codeBadge = isSuspect
+              ? `<span class="badge bg-warning text-dark">${App.escapeHtml(lg.code)}</span>`
+              : `<span class="badge bg-success">${App.escapeHtml(lg.code)}</span>`;
+            const safeLang = App.escapeHtml(lg.code_lower).replace(/'/g, "\\'");
+            lHtml += `<tr>
+              <td>${codeBadge}</td>
+              <td><strong>${App.escapeHtml(lg.name)}</strong></td>
+              <td><strong>${lg.movie_count}</strong></td>
+              <td class="text-success fw-bold">${lg.real_speech_count}</td>
+              <td class="${lg.only_brackets_count > 0 ? 'text-danger fw-bold' : 'text-muted'}">${lg.only_brackets_count}</td>
+              <td>
+                ${this.renderMovieSampleLinks(lg.sample_movies)}
+                <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1 small" onclick="App.AiCompliance.jumpToHistoryFilter('all', '${safeLang}', 'has_sub')">Alle &rarr;</button>
+              </td>
+            </tr>`;
+          });
+          this.setHtml('aic-tbody-insp-langs', lHtml);
+        }
+
+        // 3. Filme ohne echten Dialog
+        const ndList = res.no_dialog_movies || [];
+        if (!ndList.length) {
+          this.setHtml('aic-tbody-insp-nodialog', '<tr><td colspan="6" class="text-center text-success py-3">Keine Filme gefunden, die nur aus Klammer-Geräuschen bestehen.</td></tr>');
+        } else {
+          let ndHtml = '';
+          ndList.forEach(nd => {
+            ndHtml += `<tr>
+              <td><strong>#${nd.movie_id}</strong></td>
+              <td>${App.escapeHtml(nd.title)}</td>
+              <td><span class="badge bg-warning text-dark">${App.escapeHtml(nd.detected_language)}</span></td>
+              <td>${nd.segment_count}</td>
+              <td><code class="small text-muted">${App.escapeHtml(nd.preview)}</code></td>
+              <td>
+                <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1 small" onclick="App.AiCompliance.openMovieInLab(${nd.movie_id})">Labor</button>
+                <a href="#/movie-edit?id=${nd.movie_id}" class="btn btn-xs btn-outline-secondary py-0 px-1 small">Film</a>
+              </td>
+            </tr>`;
+          });
+          this.setHtml('aic-tbody-insp-nodialog', ndHtml);
+        }
+
+        // 4. Wiederholte Kurz-Phrasen
+        const pList = res.repeated_phrases || [];
+        if (!pList.length) {
+          this.setHtml('aic-tbody-insp-phrases', '<tr><td colspan="4" class="text-center text-muted py-3">Keine mehrfach wiederholten Kurz-Phrasen gefunden.</td></tr>');
+        } else {
+          let pHtml = '';
+          pList.forEach(ph => {
+            pHtml += `<tr>
+              <td><strong>${App.escapeHtml(ph.phrase)}</strong></td>
+              <td>${ph.total_occurrences}x</td>
+              <td>${ph.movie_count} Film(e)</td>
+              <td>${this.renderMovieSampleLinks(ph.sample_movies)}</td>
+            </tr>`;
+          });
+          this.setHtml('aic-tbody-insp-phrases', pHtml);
+        }
+      } catch (e) {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Transkript-Analyse starten';
+        }
+        App.toast('Netzwerkfehler beim Laden des Transkript-Inspektors.', 'danger');
+      }
+    },
+
+    copyInspectorJson() {
+      if (!this.lastInspectorData) return;
+      const jsonStr = JSON.stringify(this.lastInspectorData, null, 2);
+      const expMsg = document.getElementById('aic-insp-export-msg');
+      navigator.clipboard?.writeText(jsonStr).then(() => {
+        if (expMsg) {
+          expMsg.style.display = '';
+          expMsg.innerHTML = '&#x2705; Die komplette Auswertung wurde in deine Zwischenablage kopiert!';
+        }
+        App.toast('Auswertung in die Zwischenablage kopiert.', 'success');
+      });
+    },
+
+    downloadInspectorJson() {
+      if (!this.lastInspectorData) return;
+      const jsonStr = JSON.stringify(this.lastInspectorData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'erocloud_vtt_analyse.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    },
+
+    async cleanAllVtt() {
+      const btn = document.getElementById('btn-aic-clean-all-vtt');
+      const msgEl = document.getElementById('aic-insp-clean-msg');
+      const origHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '&#x23F3; Bereinige alle Transkripte &amp; .vtt-Dateien...';
+      }
+      if (msgEl) {
+        msgEl.style.display = '';
+        msgEl.className = 'alert alert-info py-2 px-3 mt-2 mb-0 small';
+        msgEl.innerHTML = '&#x23F3; Bitte warten: Alle vorhandenen Transkripte werden normalisiert, entflackert und die .vtt-Dateien neu geschrieben...';
+      }
+
+      try {
+        const res = await this.callAjax({ action: 'clean_all_vtt_transcripts' }, 'POST');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = origHtml;
+        }
+        if (res && res.status === 'ok') {
+          if (msgEl) {
+            msgEl.className = 'alert alert-success py-2 px-3 mt-2 mb-0 small';
+            msgEl.textContent = '✔ ' + res.message;
+          }
+          this.runInspector();
+        } else if (msgEl) {
+          msgEl.className = 'alert alert-danger py-2 px-3 mt-2 mb-0 small';
+          msgEl.textContent = 'Fehler bei der Bereinigung.';
+        }
+      } catch (e) {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = origHtml;
+        }
+        if (msgEl) {
+          msgEl.className = 'alert alert-danger py-2 px-3 mt-2 mb-0 small';
+          msgEl.textContent = 'Netzwerkfehler bei der Bereinigung.';
+        }
+      }
+    },
+
+    async requeueExotic() {
+      const btn = document.getElementById('btn-aic-requeue-exotic');
+      const msgEl = document.getElementById('aic-insp-clean-msg');
+      const mode = document.getElementById('aic-requeue-exotic-mode')?.value || 'foreign_speech_only';
+      const origHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '&#x23F3; Reihe Filme ein...';
+      }
+
+      try {
+        const res = await this.callAjax({
+          action: 'requeue_exotic_lang_movies',
+          requeue_mode: mode
+        }, 'POST');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = origHtml;
+        }
+        if (res && res.status === 'ok') {
+          if (res.stats) this.updateStatsUI(res.stats, null, null);
+          if (msgEl) {
+            msgEl.style.display = '';
+            msgEl.className = 'alert alert-warning py-2 px-3 mt-2 mb-0 small';
+            msgEl.textContent = '🔄 ' + res.message;
+          }
+          this.runInspector();
+        }
+      } catch (e) {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = origHtml;
+        }
+        App.toast('Netzwerkfehler beim Einreihen der Filme.', 'danger');
+      }
+    }
   }
 };
 

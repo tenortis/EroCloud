@@ -44,20 +44,6 @@ final class PreviewController
         ]);
     }
 
-    // 2. Content prüfen (content_check)
-    public function aiCompliance(): string
-    {
-        return $this->renderPlaceholder(
-            'bi-cpu',
-            'Content prüfen',
-            'KI-Analyse & BRAM',
-            'Lokales KI-Testlabor, Whisper-Untertitel-Pipeline, Gesichtsabgleich und Visa/Mastercard BRAM-Compliance-Cockpit.',
-            'ai-compliance',
-            '/KI-Analyse',
-            'acp/includes/ai_compliance.php'
-        );
-    }
-
     // 3. Content Online (content_online)
     public function contentCleanup(): string
     {
