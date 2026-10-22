@@ -791,23 +791,21 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
 
       <!-- 1. Studio Header -->
       <div class="ec-studio-header">
-        <div class="d-flex align-items-center gap-3">
-          <div class="d-flex align-items-center gap-2">
-            <span class="badge bg-primary bg-opacity-25 text-info border border-info border-opacity-25 px-2 py-1">
-              <i class="bi bi-stars me-1"></i>Cover-Studio
-            </span>
-            <h5 class="modal-title fw-bold mb-0 fs-6 text-white" id="thumb-editor-modal-title">
-              Vorschaubild bearbeiten
-            </h5>
-          </div>
-          <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary border-opacity-25 small" id="studio-source-badge">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-50 px-2 py-1">
+            <i class="bi bi-stars me-1"></i>Cover-Studio
+          </span>
+          <h5 class="modal-title fw-bold mb-0 fs-6 text-white text-truncate" style="max-width: 320px;" id="thumb-editor-modal-title">
+            <?= htmlspecialchars($title !== '' ? $title : ('Film #' . $movieId), ENT_QUOTES, 'UTF-8') ?>
+          </h5>
+          <span class="badge bg-dark text-info border border-info border-opacity-50 small" id="studio-source-badge">
             Szene #1
           </span>
         </div>
 
         <!-- Ziel-Modus Umschalter: FSK 16 vs. FSK 18 -->
         <div class="d-flex align-items-center gap-2">
-          <span class="small text-secondary d-none d-md-inline">Ziel-Cover:</span>
+          <span class="ec-studio-subtext fw-semibold d-none d-md-inline">Bearbeitungs-Ziel:</span>
           <div class="ec-studio-mode-switch" role="group" aria-label="Ziel-Cover FSK Modus">
             <button type="button" class="ec-studio-mode-btn active-fsk16" id="btn-studio-mode-fsk16" data-target-fsk="16">
               <i class="bi bi-shield-check"></i>
@@ -820,15 +818,12 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
           </div>
         </div>
 
-        <!-- Globale Studio-Aktionen (Undo / Reset / Schließen) -->
+        <!-- Globale Studio-Aktionen (Reset / Schließen) -->
         <div class="d-flex align-items-center gap-2">
-          <button type="button" class="btn btn-sm btn-outline-light" id="btn-thumb-editor-undo" disabled title="Letzte Zensur-Form rückgängig machen">
-            <i class="bi bi-arrow-counterclockwise me-1"></i><span class="d-none d-sm-inline">Zensur rückgängig</span>
-          </button>
           <button type="button" class="btn btn-sm btn-outline-warning" id="btn-studio-reset-all" title="Alle Bearbeitungen auf diesem Bild zurücksetzen">
             <i class="bi bi-arrow-repeat me-1"></i><span class="d-none d-sm-inline">Alles zurücksetzen</span>
           </button>
-          <button type="button" class="btn btn-sm btn-outline-secondary text-light border-secondary" data-bs-dismiss="modal" aria-label="Schließen">
+          <button type="button" class="btn btn-sm btn-outline-light" data-bs-dismiss="modal" aria-label="Schließen">
             <i class="bi bi-x-lg me-1"></i>Schließen
           </button>
         </div>
@@ -837,47 +832,52 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
       <!-- 2. Studio Hauptbereich (Links: Bühne + Filmstreifen | Rechts: Werkzeuge) -->
       <div class="ec-studio-body">
 
-        <!-- Linke Spalte: Interaktive Zeichenfläche + Video-Schnappschuss + Filmstreifen -->
+        <!-- Linke Spalte: Interaktive Zeichenfläche + Filmstreifen -->
         <div class="ec-studio-main">
 
-          <!-- Ausklappbarer Live-Video-Schnappschuss-Player im Studio -->
-          <?php if ($convertStatus === 2 && $playerVideoUrl !== ''): ?>
-            <div id="studio-video-capture-drawer" class="bg-black border-bottom border-secondary p-3 d-none">
-              <div class="row g-3 align-items-center">
-                <div class="col-12 col-md-7 col-lg-8">
-                  <div class="ratio ratio-16x9 rounded overflow-hidden border border-secondary mx-auto" style="max-height: 240px;">
-                    <video id="studio-capture-video" controls preload="metadata" poster="<?= htmlspecialchars($playerPosterUrl, ENT_QUOTES, 'UTF-8') ?>" class="w-100 h-100">
-                      <source src="<?= htmlspecialchars($playerVideoUrl, ENT_QUOTES, 'UTF-8') ?>" type="video/mp4">
-                    </video>
-                  </div>
-                </div>
-                <div class="col-12 col-md-5 col-lg-4 text-start">
-                  <h6 class="fw-bold text-info mb-1">
-                    <i class="bi bi-camera-video me-1"></i>Live-Schnappschuss aus deinem Video
-                  </h6>
-                  <p class="small text-secondary mb-2">
-                    Spule im Player exakt zu deiner Wunsch-Sekunde, pausiere kurz und klicke auf <strong>„Diesen Moment übernehmen"</strong>.
-                  </p>
-                  <div class="d-grid gap-2">
-                    <button type="button" class="btn btn-sm btn-info fw-bold text-dark" id="btn-studio-grab-video-frame">
-                      <i class="bi bi-camera-fill me-1"></i> Diesen Moment auf die Leinwand übernehmen
-                    </button>
-                    <button type="button" class="btn btn-xs btn-outline-secondary text-light" id="btn-studio-close-video-drawer">
-                      Video-Player ausblenden
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          <?php endif; ?>
-
-          <!-- Canvas-Bühne -->
+          <!-- Canvas- & Video-Bühne -->
           <div class="ec-studio-stage">
+            <!-- Ladeanzeige -->
             <div id="thumb-editor-loading" class="text-center p-5 text-light">
               <div class="spinner-border text-info mb-2" role="status"></div>
-              <div class="small">Hochauflösendes Coverbild wird im Studio geladen...</div>
+              <div class="ec-studio-subtext">Hochauflösendes Coverbild wird im Studio geladen...</div>
             </div>
 
+            <!-- Live-Video-Schnappschuss direkt zentriert auf der Bühne (ersetzt temporär das Canvas ohne Platzverlust) -->
+            <?php if ($convertStatus === 2 && $playerVideoUrl !== ''): ?>
+              <div id="studio-video-capture-drawer" class="ec-studio-video-stage-card d-none">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                  <div>
+                    <h6 class="fw-bold text-info mb-0">
+                      <i class="bi bi-camera-reels me-1"></i>Live-Schnappschuss aus deinem Video aufnehmen
+                    </h6>
+                    <div class="ec-studio-subtext">
+                      Spule im Video exakt zu deiner Wunsch-Sekunde, pausiere kurz und übernimm das Standbild direkt auf die Studio-Leinwand.
+                    </div>
+                  </div>
+                  <button type="button" class="btn btn-sm btn-outline-light" id="btn-studio-close-video-drawer">
+                    <i class="bi bi-arrow-left me-1"></i>Zurück zur Leinwand
+                  </button>
+                </div>
+
+                <div class="ec-studio-video-player-box mb-3">
+                  <video id="studio-capture-video" controls preload="metadata" poster="<?= htmlspecialchars($playerPosterUrl, ENT_QUOTES, 'UTF-8') ?>">
+                    <source src="<?= htmlspecialchars($playerVideoUrl, ENT_QUOTES, 'UTF-8') ?>" type="video/mp4">
+                  </video>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2">
+                  <button type="button" class="btn btn-outline-light" id="btn-studio-cancel-video-drawer">
+                    Abbrechen
+                  </button>
+                  <button type="button" class="btn btn-info fw-bold text-dark px-4" id="btn-studio-grab-video-frame">
+                    <i class="bi bi-camera-fill me-1"></i> Diesen Moment auf die Leinwand übernehmen
+                  </button>
+                </div>
+              </div>
+            <?php endif; ?>
+
+            <!-- Haupt-Zeichenfläche (Canvas) -->
             <div class="ec-studio-canvas-wrap d-none" id="studio-canvas-container">
               <canvas id="movie-thumb-editor-canvas" style="cursor: crosshair;"></canvas>
             </div>
@@ -886,22 +886,26 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
           <!-- Unterer Filmstreifen (Quellen-Auswahl: Eigenes Bild, Video-Frame, #11, #12, Szenen #1..#10) -->
           <div class="ec-studio-filmstrip" id="studio-filmstrip">
             <!-- Aktion 1: Lokales Bild vom Gerät in den Editor laden -->
-            <label class="ec-filmstrip-item d-flex flex-column align-items-center justify-content-center text-center p-1 mb-0"
-                   style="height: 76px; border-style: dashed;"
+            <label class="ec-filmstrip-item mb-0"
+                   style="border-style: dashed;"
                    title="Eigenes Foto von deinem Gerät im Studio öffnen">
-              <i class="bi bi-folder2-open text-info fs-5"></i>
-              <span class="ec-filmstrip-label bg-transparent text-info">Eigenes Foto</span>
+              <div class="d-flex align-items-center justify-content-center" style="height: 48px;">
+                <i class="bi bi-folder2-open text-info fs-5"></i>
+              </div>
+              <div class="ec-filmstrip-label text-info">Eigenes Foto</div>
               <input type="file" id="studio-local-image-input" class="d-none" accept=".jpg,.jpeg,.png,.webp">
             </label>
 
             <!-- Aktion 2: Live-Schnappschuss aus dem Video -->
             <?php if ($convertStatus === 2 && $playerVideoUrl !== ''): ?>
-              <div class="ec-filmstrip-item d-flex flex-column align-items-center justify-content-center text-center p-1"
+              <div class="ec-filmstrip-item"
                    id="btn-studio-toggle-video-drawer"
-                   style="height: 76px; border-style: dashed;"
+                   style="border-style: dashed;"
                    title="Live-Schnappschuss direkt aus dem Video aufnehmen">
-                <i class="bi bi-camera-reels text-warning fs-5"></i>
-                <span class="ec-filmstrip-label bg-transparent text-warning">Aus Video</span>
+                <div class="d-flex align-items-center justify-content-center" style="height: 48px;">
+                  <i class="bi bi-camera-reels text-warning fs-5"></i>
+                </div>
+                <div class="ec-filmstrip-label text-warning">Aus Video</div>
               </div>
             <?php endif; ?>
 
@@ -913,7 +917,7 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
                  data-zoom-url="<?= htmlspecialchars($customFsk16ZoomUrl, ENT_QUOTES, 'UTF-8') ?>"
                  data-editor-url="<?= htmlspecialchars($customFsk16EditorUrl, ENT_QUOTES, 'UTF-8') ?>">
               <img id="studio-filmstrip-img-11" src="<?= htmlspecialchars($customFsk16Url, ENT_QUOTES, 'UTF-8') ?>" alt="Eigenes #11">
-              <div class="ec-filmstrip-label text-success">Eigenes #11</div>
+              <div class="ec-filmstrip-label text-info">FSK16 (#11)</div>
             </div>
 
             <!-- Gespeichertes eigenes FSK 18 Bild (#12) -->
@@ -924,7 +928,7 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
                  data-zoom-url="<?= htmlspecialchars($customFsk18ZoomUrl, ENT_QUOTES, 'UTF-8') ?>"
                  data-editor-url="<?= htmlspecialchars($customFsk18EditorUrl, ENT_QUOTES, 'UTF-8') ?>">
               <img id="studio-filmstrip-img-12" src="<?= htmlspecialchars($customFsk18Url, ENT_QUOTES, 'UTF-8') ?>" alt="Eigenes #12">
-              <div class="ec-filmstrip-label text-danger">Eigenes #12</div>
+              <div class="ec-filmstrip-label text-warning">FSK18 (#12)</div>
             </div>
 
             <!-- Automatisch generierte Szenen #1..#10 -->
@@ -957,7 +961,7 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
               <span>1. Zensur</span>
             </button>
             <button type="button" class="ec-studio-tab-btn js-studio-tab-btn" data-tab="adjust">
-              <i class="bi bi-Sliders"></i>
+              <i class="bi bi-sliders"></i>
               <span>2. Licht/Farbe</span>
             </button>
             <button type="button" class="ec-studio-tab-btn js-studio-tab-btn" data-tab="badges">
@@ -1010,11 +1014,11 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
               <div class="ec-studio-panel">
                 <div class="ec-studio-panel-title">
                   <span><i class="bi bi-vector-pen me-1 text-info"></i>Zensur-Zeichenwerkzeug</span>
-                  <span class="badge bg-info text-dark" id="thumb-editor-shapes-badge">0 Bereiche</span>
+                  <span class="badge bg-secondary" id="thumb-editor-shapes-badge">0 Bereiche</span>
                 </div>
 
-                <p class="small text-secondary mb-2">
-                  Ziehe mit der Maus über sensible Bildstellen, um sie für dein FSK 16 Cover unkenntlich zu machen:
+                <p class="ec-studio-subtext mb-2">
+                  Ziehe mit gedrückter Maustaste direkt auf dem Bild über sensible Stellen, um sie unkenntlich zu machen:
                 </p>
 
                 <!-- Werkzeug-Auswahl: Viereck, Kreis, Freihand-Pinsel -->
@@ -1053,17 +1057,24 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
 
                 <!-- Intensität: Mittel, Stark, Maximal -->
                 <label class="small text-light fw-semibold mb-1 d-block">Effekt-Stärke:</label>
-                <div class="btn-group btn-group-sm w-100 mb-3" role="group">
+                <div class="btn-group btn-group-sm w-100 mb-2" role="group">
                   <button type="button" class="btn btn-outline-light js-editor-intensity-btn" data-intensity="1">Mittel</button>
                   <button type="button" class="btn btn-info text-dark fw-semibold active js-editor-intensity-btn" data-intensity="2">Stark</button>
                   <button type="button" class="btn btn-outline-light js-editor-intensity-btn" data-intensity="3">Maximal</button>
                 </div>
 
-                <!-- Gezeichnete Bereiche verwalten -->
-                <div id="thumb-editor-shapes-list" class="d-flex flex-wrap gap-1 mb-2 d-none"></div>
-                <button type="button" class="btn btn-xs btn-outline-danger w-100" id="btn-thumb-editor-clear" disabled>
-                  <i class="bi bi-trash3 me-1"></i>Alle gezeichneten Zensur-Bereiche löschen
-                </button>
+                <!-- Gezeichnete Bereiche verwalten (erscheint automatisch, sobald mind. 1 Bereich gezeichnet wurde) -->
+                <div id="studio-censor-actions-wrap" class="border-top border-secondary pt-2 mt-2 d-none">
+                  <div id="thumb-editor-shapes-list" class="d-flex flex-wrap gap-1 mb-2"></div>
+                  <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-xs btn-outline-light flex-fill" id="btn-thumb-editor-undo">
+                      <i class="bi bi-arrow-counterclockwise me-1"></i>Letzte rückgängig
+                    </button>
+                    <button type="button" class="btn btn-xs btn-outline-warning flex-fill" id="btn-thumb-editor-clear">
+                      <i class="bi bi-trash3 me-1"></i>Alle entfernen
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <!-- Zensur-Sticker zum Aufkleben -->
@@ -1071,8 +1082,8 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
                 <div class="ec-studio-panel-title">
                   <span><i class="bi bi-emoji-heart-eyes me-1 text-warning"></i>Zensur-Sticker aufkleben</span>
                 </div>
-                <p class="small text-secondary mb-2">
-                  Klicke auf einen Sticker, um ihn auf das Bild zu setzen. Du kannst ihn danach mit der Maus frei verschieben und skalieren:
+                <p class="ec-studio-subtext mb-2">
+                  Klicke auf einen Sticker, um ihn auf das Bild zu setzen. Du kannst ihn danach mit der Maus frei verschieben und größer/kleiner ziehen:
                 </p>
                 <div class="d-flex flex-wrap gap-2 mb-2">
                   <button type="button" class="ec-sticker-btn js-studio-add-sticker" data-sticker="❤️" title="Herz">❤️</button>
@@ -1085,7 +1096,7 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
                   <button type="button" class="ec-sticker-btn js-studio-add-sticker" data-sticker="🔞" title="18+ Symbol">🔞</button>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
-                  <button type="button" class="ec-badge-preset-btn border-danger text-danger js-studio-add-stamp" data-stamp="CENSORED" data-bg="#EF4444" data-color="#FFFFFF">
+                  <button type="button" class="ec-badge-preset-btn border-info text-info js-studio-add-stamp" data-stamp="CENSORED" data-bg="#EF4444" data-color="#FFFFFF">
                     CENSORED Balken
                   </button>
                   <button type="button" class="ec-badge-preset-btn border-warning text-warning js-studio-add-stamp" data-stamp="FSK 16 PREVIEW" data-bg="#10B981" data-color="#FFFFFF">
@@ -1185,7 +1196,7 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
                 <div class="ec-studio-panel-title">
                   <span><i class="bi bi-award me-1 text-warning"></i>1-Klick Verkaufs-Badges</span>
                 </div>
-                <p class="small text-secondary mb-2">
+                <p class="ec-studio-subtext mb-2">
                   Füge hochwertige Badges hinzu und schiebe sie mit der Maus in deine Wunschecke:
                 </p>
                 <div class="d-flex flex-wrap gap-2">
@@ -1220,13 +1231,13 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
                 <div class="mb-2">
                   <input type="text" id="inp-studio-custom-text" class="form-control form-control-sm bg-dark text-white border-secondary"
                          maxlength="40" placeholder="Kurzer Cover-Text (z.B. Teil 1, Hotel-Date...)">
-                  <div class="form-text text-secondary" style="font-size: 0.7rem;">
+                  <div class="ec-studio-subtext mt-1" style="font-size: 0.72rem;">
                     Hinweis: Keine Internetadressen (URLs) oder E-Mail-Adressen erlaubt.
                   </div>
                 </div>
                 <div class="row g-2 mb-2">
                   <div class="col-6">
-                    <label class="small text-secondary d-block mb-1">Textfarbe:</label>
+                    <label class="ec-studio-subtext d-block mb-1">Textfarbe:</label>
                     <select id="sel-studio-text-color" class="form-select form-select-sm bg-dark text-white border-secondary">
                       <option value="#FFFFFF">Weiß (Klassisch)</option>
                       <option value="#FACC15">Gold-Gelb</option>
@@ -1236,7 +1247,7 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
                     </select>
                   </div>
                   <div class="col-6">
-                    <label class="small text-secondary d-block mb-1">Hintergrund:</label>
+                    <label class="ec-studio-subtext d-block mb-1">Hintergrund:</label>
                     <select id="sel-studio-text-bg" class="form-select form-select-sm bg-dark text-white border-secondary">
                       <option value="shadow">Nur Schlagschatten</option>
                       <option value="rgba(15,23,42,0.85)">Dunkler Balken</option>
@@ -1259,7 +1270,7 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
                 <div class="ec-studio-panel-title">
                   <span><i class="bi bi-badge-tm me-1 text-info"></i>Dein Creator-Logo / Wasserzeichen</span>
                 </div>
-                <p class="small text-secondary mb-2">
+                <p class="ec-studio-subtext mb-2">
                   Lade dein eigenes Logo (am besten als transparentes PNG) auf das Coverbild. Dein Logo wird lokal in deinem Browser gemerkt, damit du es bei jedem Film sofort parat hast!
                 </p>
 
@@ -1271,13 +1282,13 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
                   <button type="button" class="btn btn-sm btn-info text-dark fw-semibold d-none" id="btn-studio-insert-saved-logo">
                     <i class="bi bi-stars me-1"></i>Gespeichertes Creator-Logo einfügen
                   </button>
-                  <button type="button" class="btn btn-xs btn-outline-secondary text-light d-none" id="btn-studio-clear-saved-logo">
+                  <button type="button" class="btn btn-xs btn-outline-light d-none" id="btn-studio-clear-saved-logo">
                     Gespeichertes Browser-Logo entfernen
                   </button>
                 </div>
 
                 <div class="border-top border-secondary pt-2 mt-2">
-                  <label class="small text-secondary d-block mb-1">Ausgewähltes Objekt schnell in Ecke setzen:</label>
+                  <label class="ec-studio-subtext d-block mb-1">Ausgewähltes Objekt schnell in Ecke setzen:</label>
                   <div class="row g-1">
                     <div class="col-6">
                       <button type="button" class="btn btn-xs btn-outline-light w-100 js-studio-snap-corner" data-corner="tl">↖ Oben links</button>
@@ -1303,11 +1314,9 @@ $downloadEurOptions  = [5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 25, 30, 35, 4
       <!-- 3. Studio Footer -->
       <div class="ec-studio-footer">
         <div class="d-flex align-items-center gap-2 flex-wrap">
-          <button type="button" class="btn btn-outline-secondary text-light border-secondary" data-bs-dismiss="modal">
-            Abbrechen
-          </button>
-          <span class="small text-secondary" id="studio-edit-summary-text">
-            Keine Änderungen aktiv – Originalbild wird verwendet.
+          <i class="bi bi-info-circle text-info"></i>
+          <span class="ec-studio-subtext" id="studio-edit-summary-text">
+            Unverändertes Originalbild wird verwendet.
           </span>
         </div>
 

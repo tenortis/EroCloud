@@ -1410,6 +1410,7 @@ const App = {
 
     // Zensur-Werkzeuge
     const shapesBadge = document.getElementById('thumb-editor-shapes-badge');
+    const censorActionsWrap = document.getElementById('studio-censor-actions-wrap');
     const shapesListEl = document.getElementById('thumb-editor-shapes-list');
     const btnUndo = document.getElementById('btn-thumb-editor-undo');
     const btnClear = document.getElementById('btn-thumb-editor-clear');
@@ -1458,6 +1459,7 @@ const App = {
     const studioVideoEl = document.getElementById('studio-capture-video');
     const btnToggleVideoDrawer = document.getElementById('btn-studio-toggle-video-drawer');
     const btnCloseVideoDrawer = document.getElementById('btn-studio-close-video-drawer');
+    const btnCancelVideoDrawer = document.getElementById('btn-studio-cancel-video-drawer');
     const btnGrabVideoFrame = document.getElementById('btn-studio-grab-video-frame');
 
     const LOGO_STORAGE_KEY = 'erocloud_creator_logo_v1';
@@ -1522,11 +1524,6 @@ const App = {
       if (btnModeFsk18) {
         btnModeFsk18.classList.toggle('active-fsk18', !is16);
       }
-      if (titleEl) {
-        titleEl.textContent = is16
-          ? 'FSK 16 Cover gestalten (Jugendfrei)'
-          : 'FSK 18 Cover gestalten (Uncut)';
-      }
       if (btnSavePrimary) {
         btnSavePrimary.classList.toggle('btn-success', is16);
         btnSavePrimary.classList.toggle('btn-danger', !is16);
@@ -1539,13 +1536,6 @@ const App = {
       }
       syncStudioUI();
     };
-
-    if (btnModeFsk16) {
-      btnModeFsk16.addEventListener('click', () => setTargetFskMode('16', false));
-    }
-    if (btnModeFsk18) {
-      btnModeFsk18.addEventListener('click', () => setTargetFskMode('18', false));
-    }
 
     // ----------------------------------------------------------------------
     // 2. Bild-Puffer: Licht/Farbe + Milchglas + Pixel-Mosaik
@@ -1931,16 +1921,15 @@ const App = {
         shapesBadge.textContent = shapeCount === 1 ? '1 Bereich' : `${shapeCount} Bereiche`;
         shapesBadge.className = shapeCount > 0 ? 'badge bg-info text-dark' : 'badge bg-secondary';
       }
-      if (btnUndo) btnUndo.disabled = shapeCount === 0;
-      if (btnClear) btnClear.disabled = shapeCount === 0;
+      if (censorActionsWrap) {
+        censorActionsWrap.classList.toggle('d-none', shapeCount === 0);
+      }
 
       // Liste der gezeichneten Zensur-Bereiche
       if (shapesListEl) {
         if (shapeCount === 0) {
-          shapesListEl.classList.add('d-none');
           shapesListEl.innerHTML = '';
         } else {
-          shapesListEl.classList.remove('d-none');
           shapesListEl.innerHTML = state.shapes.map((sh, i) => {
             const tName = sh.type === 'circle' ? 'Kreis' : (sh.type === 'brush' ? 'Pinsel' : 'Viereck');
             const eName = sh.effect === 'pixel' ? 'Pixel' : 'Milchglas';
@@ -2549,14 +2538,37 @@ const App = {
     // ----------------------------------------------------------------------
     // 8. Quellen laden: Szenenbild, Lokales Foto oder Live-Video-Frame
     // ----------------------------------------------------------------------
+    const setVideoStageMode = (showVideo) => {
+      if (!videoDrawer) return;
+      if (showVideo) {
+        videoDrawer.classList.remove('d-none');
+        if (canvasContainer) canvasContainer.classList.add('d-none');
+        if (loadingEl) loadingEl.classList.add('d-none');
+        if (btnToggleVideoDrawer) btnToggleVideoDrawer.classList.add('active');
+      } else {
+        if (studioVideoEl) studioVideoEl.pause();
+        videoDrawer.classList.add('d-none');
+        if (state.baseImage && canvasContainer) {
+          canvasContainer.classList.remove('d-none');
+        }
+        if (btnToggleVideoDrawer) btnToggleVideoDrawer.classList.remove('active');
+      }
+    };
+
     const highlightFilmstripItem = (numStr) => {
       modalEl.querySelectorAll('.js-studio-filmstrip-thumb').forEach(el => {
         el.classList.toggle('active', el.getAttribute('data-num') === String(numStr));
       });
     };
 
+    const getSceneLabel = (numStr) => {
+      const s = String(numStr);
+      if (s === '11') return 'Eigenes FSK16 (#11)';
+      if (s === '12') return 'Eigenes FSK18 (#12)';
+      return `Szene #${s}`;
+    };
+
     const loadBaseImageElement = (img, label, isCustomSource) => {
-      // Standard-Zielauflösung auf mind. 960px Breite normieren, damit Sticker & Text gestochen scharf sind
       const natW = img.naturalWidth || img.width || 960;
       const natH = img.naturalHeight || img.height || 540;
       canvas.width = natW;
@@ -2567,43 +2579,30 @@ const App = {
       state.isCustomSource = !!isCustomSource;
       invalidateCaches();
 
+      setVideoStageMode(false);
       if (loadingEl) loadingEl.classList.add('d-none');
       if (canvasContainer) canvasContainer.classList.remove('d-none');
       syncStudioUI();
       renderCanvas(true);
     };
 
-    const openStudioWithScene = (movieId, num, thumbUrl, zoomUrl, editorUrl, targetFsk = '16') => {
-      this.hideThumbZoomPopover();
-      state.movieId = String(movieId || state.movieId || '0');
+    const loadSceneIntoCanvas = (num, thumbUrl, zoomUrl, editorUrl) => {
       state.num = String(num || '1');
       state.thumbUrl = thumbUrl || '';
       state.zoomUrl = zoomUrl || thumbUrl || '';
       state.editorUrl = editorUrl || zoomUrl || thumbUrl || '';
-      state.shapes = [];
-      state.objects = [];
-      state.selectedObjId = null;
-      state.interaction = null;
-      applyAdjustmentValues(0, 0, 0, 0);
-
-      const labelName = (state.num === '11' || state.num === '12')
-        ? `Eigenes Bild (#${state.num})`
-        : `Szene #${state.num}`;
-
-      setTargetFskMode(targetFsk, true);
       highlightFilmstripItem(state.num);
+      setVideoStageMode(false);
 
+      const labelName = getSceneLabel(state.num);
       if (loadingEl) {
         loadingEl.innerHTML = `
           <div class="spinner-border text-info mb-2" role="status"></div>
-          <div class="small">Hochauflösendes Coverbild wird im Studio geladen...</div>
+          <div class="ec-studio-subtext">Hochauflösendes Coverbild wird im Studio geladen...</div>
         `;
         loadingEl.classList.remove('d-none');
       }
       if (canvasContainer) canvasContainer.classList.add('d-none');
-
-      const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
-      bsModal.show();
 
       const img = new Image();
       img.crossOrigin = 'anonymous';
@@ -2619,6 +2618,60 @@ const App = {
       img.src = `${state.editorUrl}${sep}_cb=${Date.now()}`;
     };
 
+    const openStudioWithScene = (movieId, num, thumbUrl, zoomUrl, editorUrl, targetFsk = '16') => {
+      this.hideThumbZoomPopover();
+      state.movieId = String(movieId || state.movieId || '0');
+      state.shapes = [];
+      state.objects = [];
+      state.selectedObjId = null;
+      state.interaction = null;
+      applyAdjustmentValues(0, 0, 0, 0);
+
+      setTargetFskMode(targetFsk, true);
+
+      const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+      bsModal.show();
+
+      loadSceneIntoCanvas(num, thumbUrl, zoomUrl, editorUrl);
+    };
+
+    // Wenn im Header zwischen FSK 16 und FSK 18 umgeschaltet wird (und noch keine Bearbeitung aktiv ist),
+    // automatisch das aktuell aktive Bild des gewählten FSK-Modus laden
+    if (btnModeFsk16) {
+      btnModeFsk16.addEventListener('click', () => {
+        const was18 = state.targetFsk === '18';
+        setTargetFskMode('16', true);
+        if (was18 && !hasAnyEdits()) {
+          const wrap16 = document.getElementById('current-fsk16-wrap');
+          if (wrap16) {
+            loadSceneIntoCanvas(
+              wrap16.getAttribute('data-num'),
+              wrap16.getAttribute('data-thumb-url'),
+              wrap16.getAttribute('data-zoom-src'),
+              wrap16.getAttribute('data-editor-url')
+            );
+          }
+        }
+      });
+    }
+    if (btnModeFsk18) {
+      btnModeFsk18.addEventListener('click', () => {
+        const was16 = state.targetFsk === '16';
+        setTargetFskMode('18', true);
+        if (was16 && !hasAnyEdits()) {
+          const wrap18 = document.getElementById('current-fsk18-wrap');
+          if (wrap18) {
+            loadSceneIntoCanvas(
+              wrap18.getAttribute('data-num'),
+              wrap18.getAttribute('data-thumb-url'),
+              wrap18.getAttribute('data-zoom-src'),
+              wrap18.getAttribute('data-editor-url')
+            );
+          }
+        }
+      });
+    }
+
     // Filmstreifen-Klick im Studio
     modalEl.querySelectorAll('.js-studio-filmstrip-thumb').forEach(item => {
       item.addEventListener('click', () => {
@@ -2626,24 +2679,7 @@ const App = {
         const tUrl = item.getAttribute('data-thumb-url') || '';
         const zUrl = item.getAttribute('data-zoom-url') || tUrl;
         const eUrl = item.getAttribute('data-editor-url') || zUrl;
-
-        state.num = num;
-        state.thumbUrl = tUrl;
-        state.zoomUrl = zUrl;
-        state.editorUrl = eUrl;
-        highlightFilmstripItem(num);
-
-        const labelName = (num === '11' || num === '12') ? `Eigenes Bild (#${num})` : `Szene #${num}`;
-        if (loadingEl) loadingEl.classList.remove('d-none');
-        if (canvasContainer) canvasContainer.classList.add('d-none');
-
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => {
-          loadBaseImageElement(img, labelName, false);
-        };
-        const sep = eUrl.includes('?') ? '&' : '?';
-        img.src = `${eUrl}${sep}_cb=${Date.now()}`;
+        loadSceneIntoCanvas(num, tUrl, zUrl, eUrl);
       });
     });
 
@@ -2703,7 +2739,7 @@ const App = {
             const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
             bsModal.show();
           }
-          if (videoDrawer) videoDrawer.classList.add('d-none');
+          setVideoStageMode(false);
           highlightFilmstripItem('');
           const sec = Math.floor(videoEl.currentTime || 0);
           const minStr = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
@@ -2718,14 +2754,15 @@ const App = {
 
     if (btnToggleVideoDrawer && videoDrawer) {
       btnToggleVideoDrawer.addEventListener('click', () => {
-        videoDrawer.classList.toggle('d-none');
+        const isCurrentlyHidden = videoDrawer.classList.contains('d-none');
+        setVideoStageMode(isCurrentlyHidden);
       });
     }
-    if (btnCloseVideoDrawer && videoDrawer) {
-      btnCloseVideoDrawer.addEventListener('click', () => {
-        if (studioVideoEl) studioVideoEl.pause();
-        videoDrawer.classList.add('d-none');
-      });
+    if (btnCloseVideoDrawer) {
+      btnCloseVideoDrawer.addEventListener('click', () => setVideoStageMode(false));
+    }
+    if (btnCancelVideoDrawer) {
+      btnCancelVideoDrawer.addEventListener('click', () => setVideoStageMode(false));
     }
     if (btnGrabVideoFrame && studioVideoEl) {
       btnGrabVideoFrame.addEventListener('click', () => {

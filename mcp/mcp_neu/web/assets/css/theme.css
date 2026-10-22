@@ -871,10 +871,16 @@ code, kbd, samp, pre, .font-monospace {
   border: 0;
 }
 
+.ec-studio-subtext {
+  color: #CBD5E1 !important;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
 .ec-studio-header {
   background-color: #0F172A;
   border-bottom: 1px solid #1E293B;
-  padding: 0.75rem 1.25rem;
+  padding: 0.65rem 1.25rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -894,31 +900,32 @@ code, kbd, samp, pre, .font-monospace {
 .ec-studio-mode-btn {
   border: 0;
   background: transparent;
-  color: #94A3B8;
-  font-size: 0.82rem;
+  color: #CBD5E1;
+  font-size: 0.84rem;
   font-weight: 600;
-  padding: 0.4rem 0.9rem;
+  padding: 0.42rem 1rem;
   border-radius: 0.45rem;
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.45rem;
   transition: all 0.15s ease;
 }
 
 .ec-studio-mode-btn:hover {
-  color: #F8FAFC;
+  color: #FFFFFF;
+  background-color: rgba(255, 255, 255, 0.06);
 }
 
 .ec-studio-mode-btn.active-fsk16 {
   background-color: #10B981;
   color: #FFFFFF;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.4);
 }
 
 .ec-studio-mode-btn.active-fsk18 {
   background-color: #EF4444;
   color: #FFFFFF;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.35);
+  box-shadow: 0 2px 10px rgba(239, 68, 68, 0.4);
 }
 
 .ec-studio-body {
@@ -942,8 +949,8 @@ code, kbd, samp, pre, .font-monospace {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
-  overflow: auto;
+  padding: 1rem 1.25rem;
+  overflow: hidden;
   position: relative;
   min-height: 280px;
 }
@@ -963,33 +970,85 @@ code, kbd, samp, pre, .font-monospace {
 #movie-thumb-editor-canvas {
   display: block;
   max-width: 100%;
-  max-height: calc(100vh - 275px);
+  max-height: calc(100vh - 235px);
   width: auto;
   height: auto;
   touch-action: none;
   user-select: none;
 }
 
+/* Zentrierte Video-Schnappschuss-Bühne (ersetzt temporär die Canvas-Ansicht ohne Platzverlust) */
+.ec-studio-video-stage-card {
+  width: 100%;
+  max-width: 780px;
+  background-color: #0F172A;
+  border: 1px solid #334155;
+  border-radius: 0.85rem;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+}
+
+.ec-studio-video-player-box {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: calc(100vh - 360px);
+  background-color: #000;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid #334155;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ec-studio-video-player-box video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Filmstreifen unten: kompakt & ohne weißen Standard-Scrollbalken */
 .ec-studio-filmstrip {
   background-color: #0F172A;
   border-top: 1px solid #1E293B;
-  padding: 0.65rem 1rem;
+  padding: 0.55rem 0.85rem;
   display: flex;
-  align-items: center;
-  gap: 0.6rem;
+  align-items: stretch;
+  gap: 0.45rem;
   overflow-x: auto;
   flex-shrink: 0;
+  scrollbar-width: thin;
+  scrollbar-color: #334155 #0F172A;
+}
+
+.ec-studio-filmstrip::-webkit-scrollbar {
+  height: 6px;
+}
+
+.ec-studio-filmstrip::-webkit-scrollbar-track {
+  background: #0F172A;
+}
+
+.ec-studio-filmstrip::-webkit-scrollbar-thumb {
+  background-color: #334155;
+  border-radius: 3px;
 }
 
 .ec-filmstrip-item {
-  flex: 0 0 auto;
-  width: 96px;
+  flex: 1 1 0;
+  min-width: 68px;
+  max-width: 92px;
   border-radius: 0.45rem;
   overflow: hidden;
   border: 2px solid #334155;
   background-color: #1E293B;
   cursor: pointer;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   transition: all 0.15s ease;
 }
 
@@ -999,32 +1058,32 @@ code, kbd, samp, pre, .font-monospace {
 }
 
 .ec-filmstrip-item.active {
-  border-color: #0284C7;
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35);
+  border-color: #38BDF8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.4);
 }
 
 .ec-filmstrip-item img {
   width: 100%;
-  height: 54px;
+  height: 48px;
   object-fit: cover;
   display: block;
 }
 
 .ec-filmstrip-item .ec-filmstrip-label {
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 600;
   text-align: center;
-  padding: 2px 4px;
-  color: #E2E8F0;
-  background: rgba(15, 23, 42, 0.9);
+  padding: 2px 3px;
+  color: #F1F5F9;
+  background: rgba(15, 23, 42, 0.92);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .ec-studio-sidebar {
-  width: 390px;
-  flex: 0 0 390px;
+  width: 380px;
+  flex: 0 0 380px;
   background-color: #0F172A;
   border-left: 1px solid #1E293B;
   display: flex;
@@ -1060,10 +1119,10 @@ code, kbd, samp, pre, .font-monospace {
 .ec-studio-tab-btn {
   border: 0;
   background: transparent;
-  color: #94A3B8;
+  color: #CBD5E1;
   border-radius: 0.45rem;
   padding: 0.45rem 0.25rem;
-  font-size: 0.73rem;
+  font-size: 0.74rem;
   font-weight: 600;
   display: flex;
   flex-direction: column;
@@ -1077,20 +1136,20 @@ code, kbd, samp, pre, .font-monospace {
 }
 
 .ec-studio-tab-btn:hover {
-  color: #F8FAFC;
-  background-color: rgba(255, 255, 255, 0.04);
+  color: #FFFFFF;
+  background-color: rgba(255, 255, 255, 0.06);
 }
 
 .ec-studio-tab-btn.active {
   background-color: #1E293B;
   color: #38BDF8;
-  box-shadow: inset 0 0 0 1px #334155;
+  box-shadow: inset 0 0 0 1px #38BDF8;
 }
 
 .ec-studio-sidebar-content {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: 1rem;
+  padding: 0.9rem;
 }
 
 .ec-studio-panel {
@@ -1106,19 +1165,19 @@ code, kbd, samp, pre, .font-monospace {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #94A3B8;
-  margin-bottom: 0.65rem;
+  color: #F1F5F9;
+  margin-bottom: 0.6rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
 .ec-sticker-btn {
-  border: 1px solid #334155;
+  border: 1px solid #475569;
   background-color: #0F172A;
   color: #F8FAFC;
   border-radius: 0.5rem;
-  padding: 0.4rem 0.55rem;
+  padding: 0.42rem 0.58rem;
   font-size: 1.15rem;
   line-height: 1;
   cursor: pointer;
@@ -1135,7 +1194,7 @@ code, kbd, samp, pre, .font-monospace {
 }
 
 .ec-badge-preset-btn {
-  border: 1px solid #334155;
+  border: 1px solid #475569;
   background-color: #0F172A;
   color: #F8FAFC;
   border-radius: 0.45rem;
@@ -1154,7 +1213,7 @@ code, kbd, samp, pre, .font-monospace {
 .ec-studio-footer {
   background-color: #0F172A;
   border-top: 1px solid #1E293B;
-  padding: 0.75rem 1.25rem;
+  padding: 0.65rem 1.25rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
