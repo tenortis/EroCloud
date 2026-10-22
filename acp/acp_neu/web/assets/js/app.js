@@ -3998,6 +3998,132 @@ const App = {
         App.toast('Netzwerkfehler: ' + err.message, 'danger');
       }
     }
+  },
+
+  // ========================================================================
+  // 12. P4C-Merchants / Händler (#/merchants & #/merchant?id=...)
+  // ========================================================================
+  Merchants: {
+    submitFilterForm(event) {
+      if (event) event.preventDefault();
+      const form = document.getElementById('merchants-filter-form');
+      if (!form) return false;
+
+      const fd = new FormData(form);
+      const params = new URLSearchParams();
+
+      const rules = (fd.get('rules') || 'all').toString().trim();
+      const activity = (fd.get('activity') || 'all').toString().trim();
+      const sort = (fd.get('sort') || 'id_desc').toString().trim();
+      const limit = parseInt((fd.get('limit') || '50').toString(), 10) || 50;
+      const q = (fd.get('q') || '').toString().trim();
+
+      if (rules !== 'all') params.set('rules', rules);
+      if (activity !== 'all') params.set('activity', activity);
+      if (sort !== 'id_desc') params.set('sort', sort);
+      if (limit !== 50) params.set('limit', String(limit));
+      if (q !== '') params.set('q', q);
+
+      const qs = params.toString();
+      const targetHash = `#/merchants${qs ? '?' + qs : ''}`;
+      if (window.location.hash === targetHash) {
+        App.handleRoute();
+      } else {
+        window.location.hash = targetHash;
+      }
+      return false;
+    },
+
+    quickFilterTable(query) {
+      const q = String(query || '').trim().toLowerCase();
+      document.querySelectorAll('.merchant-list-row').forEach(row => {
+        const hay = row.getAttribute('data-search') || '';
+        row.classList.toggle('d-none', !(q === '' || hay.includes(q)));
+      });
+    },
+
+    filterSubTable(rowClass, query) {
+      const q = String(query || '').trim().toLowerCase();
+      document.querySelectorAll(`.${rowClass}`).forEach(row => {
+        const hay = row.getAttribute('data-search') || '';
+        row.classList.toggle('d-none', !(q === '' || hay.includes(q)));
+      });
+    },
+
+    toggleApiKeyVisibility() {
+      const inp = document.getElementById('merchant-api-key-input');
+      const icon = document.getElementById('merchant-api-key-icon');
+      if (!inp) return;
+      if (inp.type === 'password') {
+        inp.type = 'text';
+        if (icon) icon.className = 'bi bi-eye-slash';
+      } else {
+        inp.type = 'password';
+        if (icon) icon.className = 'bi bi-eye';
+      }
+    },
+
+    async copyApiKey() {
+      const inp = document.getElementById('merchant-api-key-input');
+      const val = inp?.value || '';
+      if (!val) {
+        App.toast('Kein API-Key vorhanden.', 'warning');
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(val);
+        App.toast('API-Key in die Zwischenablage kopiert.', 'success');
+      } catch (_) {
+        App.toast('Kopieren fehlgeschlagen.', 'danger');
+      }
+    },
+
+    async saveSettings(event) {
+      if (event) event.preventDefault();
+      const form = document.getElementById('merchant-settings-form');
+      const btn = document.getElementById('btn-save-merchant-settings');
+      if (!form) return false;
+
+      const fd = new FormData(form);
+      fd.set('_csrf', App.csrfToken);
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Speichere...';
+      }
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=merchants/save-settings`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.status !== 'ok') {
+          App.toast(data.message || 'Einstellungen konnten nicht gespeichert werden.', 'danger');
+          return false;
+        }
+
+        App.resetLogoutCountdown();
+        App.toast(data.message || 'Händler-Einstellungen erfolgreich gespeichert.', 'success');
+        const kpiEl = document.getElementById('merch-kpi-limit');
+        if (kpiEl && data.minimum_number_actor_profiles) {
+          kpiEl.textContent = String(data.minimum_number_actor_profiles);
+        }
+      } catch (err) {
+        App.toast('Netzwerkfehler: ' + err.message, 'danger');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-floppy-fill me-1"></i>Einstellungen speichern';
+        }
+      }
+      return false;
+    }
   }
 };
 

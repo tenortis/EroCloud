@@ -163,3 +163,13 @@ acp/acp_neu/ (später: acp/)
     * `POST ?route=actors/delete-image`: Löscht FSK16- oder FSK18-Profilbilder inkl. `actor_checksum($actorId)`.
     * `POST ?route=actors/reassign-merchant`: Reiht einen kompletten Profil-Inhaberwechsel (`actor_reassign`) in die Hintergrund-Warteschlange ein.
     * *(Hinweis: Die veralteten Bereiche **0900-Rufnummern / erocall** sowie **Chats / Neue-User-Nachrichten** wurden gemäß Vorgabe vollständig entfernt.)*
+
+---
+
+## 9. 💼 Modul „P4C-Merchants“ (`Merchants`)
+
+* **`App\Modules\Merchants` (`MerchantsController.php`, `views/list.php`, `views/detail.php`):**
+  * **`#/merchants` (`GET ?route=merchants`):** Gesamtübersicht aller Pay4Coins-Händler (`merchants`) mit 4 KPI-Kacheln (P4C-Merchants Gesamt & Aktiv 30T, Richtlinien & Multi-Profil, Angelegte Darsteller-Profile, Veröffentlichter Content & Prüfung).
+  * **N+1-Query-Eliminierung:** Statt 3 Einzel-Queries pro Händler in einer Schleife (~1.500 Queries im Legacy-AJAX `acp/includes/ajax/merchants.php`) werden alle Zähler für `actors`, `movies_online`, `movies`, `photo_albums_online` und `photo_albums` vorab in gebündelten `GROUP BY`-Abfragen geladen.
+  * **Filter & AES-Volltextsuche:** Filter nach Richtlinien-Status (`accepted` / `pending`), Aktivität & Bestand (`active_30d`, `with_actors`, `without_actors`, `with_checking`, `multi_profile`), Sortierung, Seitengröße sowie Volltextsuche über `id`, `partner_id`, `AES_DECRYPT(username/email/firstname/surname/last_ip)` und zugeordnete Profilnamen.
+  * **`#/merchant?id=...` (`GET ?route=merchant&id=...`):** Unterstützt sowohl die numerische `merchants.id` (`MID`) als auch die 10-stellige `merchants.partner_id` (`PID`), lädt alle entschlüsselten Stammdaten in 1 Query (statt 11 Einzel-Queries der Legacy-Klasse `Merchant`) und bietet ein 4-Tab-Cockpit (*1. Händler-Infos & Einstellungen*, *2. Darsteller-Profile*, *3. Filme & 18+ Nachweise*, *4. Login- & Aktivitäts-Historie aus `merchant_history`*) inkl. Speichern des Profil-Limits (`POST ?route=merchants/save-settings`).

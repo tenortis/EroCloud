@@ -126,34 +126,6 @@ final class PreviewController
         );
     }
 
-    // 8. P4C-Merchants (merchants)
-    public function merchants(): string
-    {
-        return $this->renderPlaceholder(
-            'bi-briefcase-fill',
-            'P4C-Merchants',
-            'Pay4Coins-Merchants (Händler)',
-            'Übersicht aller verknüpften Pay4Coins-Partnerkonten, API-Keys, Profil-Limits und Umsätze.',
-            'merchants',
-            '/Haendler',
-            'acp/includes/merchants.php'
-        );
-    }
-
-    public function merchant(): string
-    {
-        $id = abs((int)$this->request->get('id', 0));
-        return $this->renderPlaceholder(
-            'bi-person-workspace',
-            'P4C-Merchants',
-            'Merchant Details' . ($id > 0 ? ' (MID #' . $id . ')' : ''),
-            'Stammdaten, zugeordnete Darsteller-Profile, Mindestprofilanzahl und Historie dieses Pay4Coins-Partners.',
-            'merchant' . ($id > 0 ? '?id=' . $id : ''),
-            '/Haendler/' . ($id > 0 ? $id : ''),
-            'acp/includes/merchant.php'
-        );
-    }
-
     // 9. Cloud-User (users)
     public function users(): string
     {

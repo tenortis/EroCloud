@@ -105,6 +105,7 @@ class Router
         $contentCleanupCtrl      = 'App\\Modules\\ContentCleanup\\ContentCleanupController';
         $storageAnalyticsCtrl    = 'App\\Modules\\StorageAnalytics\\StorageAnalyticsController';
         $actorsCtrl              = 'App\\Modules\\Actors\\ActorsController';
+        $merchantsCtrl           = 'App\\Modules\\Merchants\\MerchantsController';
         $previewCtrl             = 'App\\Modules\\Preview\\PreviewController';
 
         // 1. Startseite (Echtes Admin-Dashboard, Globale Schnellsuche, Notizen & Live-Counter)
@@ -174,8 +175,9 @@ class Router
         self::register('webcams', $previewCtrl, 'webcams', 'webcams');
 
         // 8. P4C-Merchants (merchants)
-        self::register('merchants', $previewCtrl, 'merchants', 'merchants');
-        self::register('merchant', $previewCtrl, 'merchant', 'merchants');
+        self::register('merchants', $merchantsCtrl, 'list', 'merchants');
+        self::register('merchant', $merchantsCtrl, 'detail', 'merchants');
+        self::register('merchants/save-settings', $merchantsCtrl, 'saveSettings', 'merchants');
 
         // 9. Cloud-User (users)
         self::register('users', $previewCtrl, 'users', 'users');
