@@ -106,6 +106,7 @@ class Router
         $storageAnalyticsCtrl    = 'App\\Modules\\StorageAnalytics\\StorageAnalyticsController';
         $actorsCtrl              = 'App\\Modules\\Actors\\ActorsController';
         $websitesCtrl            = 'App\\Modules\\Websites\\WebsitesController';
+        $affiliateCtrl           = 'App\\Modules\\Affiliate\\AffiliateController';
         $merchantsCtrl           = 'App\\Modules\\Merchants\\MerchantsController';
         $usersCtrl               = 'App\\Modules\\Users\\UsersController';
         $systemTechCtrl          = 'App\\Modules\\SystemTech\\SystemTechController';
@@ -171,9 +172,11 @@ class Router
         self::register('sites/sync-p4c', $websitesCtrl, 'syncFromP4c', 'websites');
 
         // 6. Partnerprogramm (affiliate_program)
-        self::register('webmaster-partner', $previewCtrl, 'webmasterPartner', 'affiliate_program');
-        self::register('banners', $previewCtrl, 'banners', 'affiliate_program');
-        self::register('banners-new', $previewCtrl, 'bannersNew', 'affiliate_program');
+        self::register('webmaster-partner', $affiliateCtrl, 'webmasters', 'affiliate_program');
+        self::register('affiliate/import-conversions', $affiliateCtrl, 'importConversions', 'affiliate_program');
+        self::register('banners', $affiliateCtrl, 'banners', 'affiliate_program');
+        self::register('banners-new', $affiliateCtrl, 'bannersNew', 'affiliate_program');
+        self::register('banners/action', $affiliateCtrl, 'bannerAction', 'affiliate_program');
 
         // 7. Webcams (webcams)
         self::register('webcams', $previewCtrl, 'webcams', 'webcams');

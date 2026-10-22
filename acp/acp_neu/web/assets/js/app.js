@@ -4605,6 +4605,176 @@ const App = {
         }
       }
     }
+  },
+
+  // ===========================================================================
+  // 15. MODUL: PARTNERPROGRAMM / EROADS (#/webmaster-partner, #/banners, #/banners-new)
+  // ===========================================================================
+  Affiliate: {
+    filterWebmasters(event) {
+      if (event) event.preventDefault();
+      const month = document.getElementById('aff-period-select')?.value || '';
+      const sort  = document.getElementById('aff-sort-select')?.value || 'conversions_desc';
+      const q     = (document.getElementById('aff-search-input')?.value || '').trim();
+
+      const params = new URLSearchParams();
+      if (month !== '') params.set('month', month);
+      if (sort !== 'conversions_desc') params.set('sort', sort);
+      if (q !== '') params.set('q', q);
+
+      const qs = params.toString();
+      const targetHash = `#/webmaster-partner${qs ? '?' + qs : ''}`;
+      if (window.location.hash === targetHash) {
+        App.handleRoute();
+      } else {
+        window.location.hash = targetHash;
+      }
+      return false;
+    },
+
+    async crawlConversions(event) {
+      if (event) event.preventDefault();
+      const dateInput = document.getElementById('aff-crawl-date');
+      const btnEl     = document.getElementById('aff-crawl-btn');
+      const importDate = (dateInput?.value || '').trim();
+
+      if (!importDate) {
+        App.toast('Bitte wähle ein gültiges Datum für den Conversion-Crawler aus.', 'warning');
+        return false;
+      }
+
+      if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Crawle...';
+      }
+
+      const fd = new FormData();
+      fd.append('_csrf', App.csrfToken);
+      fd.append('import_date', importDate);
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=affiliate/import-conversions`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.status !== 'ok') {
+          App.toast(data.message || 'Conversion-Crawler konnte nicht ausgeführt werden.', 'danger');
+          if (btnEl) {
+            btnEl.disabled = false;
+            btnEl.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Abrufen';
+          }
+          return false;
+        }
+
+        App.resetLogoutCountdown();
+        App.toast(data.message || 'Conversions erfolgreich gecrawlt.', 'success');
+        App.handleRoute();
+      } catch (err) {
+        App.toast('Netzwerkfehler beim Conversion-Crawler: ' + err.message, 'danger');
+        if (btnEl) {
+          btnEl.disabled = false;
+          btnEl.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Abrufen';
+        }
+      }
+      return false;
+    },
+
+    filterBanners(event, page = 1) {
+      if (event) event.preventDefault();
+      const status = document.getElementById('ban-status-select')?.value || 'published';
+      const siteId = parseInt(document.getElementById('ban-site-select')?.value || '0', 10) || 0;
+      const dim    = document.getElementById('ban-dim-select')?.value || '';
+      const type   = document.getElementById('ban-type-select')?.value || '';
+      const q      = (document.getElementById('ban-search-input')?.value || '').trim();
+
+      const params = new URLSearchParams();
+      if (page > 1) params.set('page', String(page));
+      if (status !== 'published') params.set('status', status);
+      if (siteId > 0) params.set('site_id', String(siteId));
+      if (dim !== '') params.set('dim', dim);
+      if (type !== '') params.set('type', type);
+      if (q !== '') params.set('q', q);
+
+      const qs = params.toString();
+      const targetHash = `#/banners${qs ? '?' + qs : ''}`;
+      if (window.location.hash === targetHash) {
+        App.handleRoute();
+      } else {
+        window.location.hash = targetHash;
+      }
+      return false;
+    },
+
+    quickFilterBanners(status) {
+      const stEl = document.getElementById('ban-status-select');
+      if (stEl) stEl.value = status;
+      this.filterBanners(null, 1);
+    },
+
+    goToBannersPage(page) {
+      this.filterBanners(null, Math.max(1, parseInt(page, 10) || 1));
+    },
+
+    async handleBannerAction(fileId, action, isNewReview = false) {
+      if (!fileId || !action) return;
+
+      const confirmLabels = {
+        unlock: `Möchtest du das neue Banner (${fileId}) jetzt freischalten und für alle Webmaster sichtbar machen?`,
+        reject: `Möchtest du das neue Banner (${fileId}) wirklich ablehnen?`,
+        delete: `Möchtest du das Banner (${fileId}) wirklich unwiderruflich löschen?`
+      };
+
+      if (action === 'delete' || action === 'reject') {
+        if (!window.confirm(confirmLabels[action] || 'Aktion ausführen?')) {
+          return;
+        }
+      }
+
+      const fd = new FormData();
+      fd.append('_csrf', App.csrfToken);
+      fd.append('file_id', fileId);
+      fd.append('action', action);
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=banners/action`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.status !== 'ok') {
+          App.toast(data.message || 'Banner-Aktion fehlgeschlagen.', 'danger');
+          return;
+        }
+
+        App.resetLogoutCountdown();
+        App.toast(data.message || 'Banner-Aktion erfolgreich ausgeführt.', 'success');
+        if (typeof App.refreshSidebarCounts === 'function') {
+          App.refreshSidebarCounts();
+        }
+
+        const targetEl = document.getElementById(isNewReview ? `pending-banner-card-${fileId}` : `banner-row-${fileId}`);
+        if (targetEl) {
+          targetEl.style.transition = 'opacity 0.2s ease';
+          targetEl.style.opacity = '0';
+          setTimeout(() => App.handleRoute(), 200);
+        } else {
+          App.handleRoute();
+        }
+      } catch (err) {
+        App.toast('Netzwerkfehler bei Banner-Aktion: ' + err.message, 'danger');
+      }
+    }
   }
 };
 
