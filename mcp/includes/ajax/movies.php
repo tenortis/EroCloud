@@ -12,6 +12,7 @@ if (is_logged_in('mcp') === false) {
 }
 
 $merchant_id = abs((int)$_SESSION['merchant_id']);
+@session_write_close();
 
 #$rs_movies = p4c_query("SELECT `id`, `convert_status`, `file_id`, `filename`, `title`, `movie_checked`, `released`
 #     FROM `movies` WHERE `merchant_id`='".abs($merchant_id)."' ORDER BY `id` DESC", __FILE__, __LINE__);

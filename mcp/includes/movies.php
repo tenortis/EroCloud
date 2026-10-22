@@ -84,6 +84,7 @@ if ($count_movies == 0) {
                 //"bProcessing": true,
                 //"bDeferRender": true,
 
+                "bDeferRender": true,
                 "bProcessing": true,
                 //"bServerSide": true,
                 "sAjaxSource": "'.MCP_URL.'/includes/ajax/movies.php",

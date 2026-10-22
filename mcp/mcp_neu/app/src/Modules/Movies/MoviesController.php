@@ -43,6 +43,7 @@ class MoviesController
             return '<div class="alert alert-danger m-4">Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.</div>';
         }
         @session_write_close();
+        \App\Modules\Home\HomeController::ensureSearchIndexes();
 
         $apiUrl = defined('API_URL') ? API_URL : 'https://api.erocloud.net';
 

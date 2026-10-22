@@ -4,6 +4,7 @@ define('SAFE_INC', 1);
 
 include_once("../../../config.inc.php");
 include_once(ACP_DIR."/common.inc.php");
+@session_write_close();
 
 if (is_logged_in('acp') === false) {
     exit;

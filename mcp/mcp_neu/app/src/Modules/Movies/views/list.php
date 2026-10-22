@@ -197,7 +197,8 @@ if (!defined('SAFE_INC')) {
           </tr>
         </thead>
         <tbody id="smart-table-body">
-          <?php foreach ($movies as $m): ?>
+          <?php $lazyPlaceholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; ?>
+          <?php foreach ($movies as $rowIdx => $m): ?>
           <?php
             $movieId    = (int)$m['id'];
             $titleStr   = (string)$m['title'];
@@ -205,8 +206,12 @@ if (!defined('SAFE_INC')) {
             $statusLbl  = (string)$m['status_label'];
             $onlineStr  = (string)$m['online_at'];
             $searchText = mb_strtolower('#' . $movieId . ' ' . $movieId . ' ' . $titleStr . ' ' . $actorStr . ' ' . $statusLbl . ' ' . $onlineStr, 'UTF-8');
+            $isInitialVisible = ($rowIdx < 25);
+            $poster16Esc = htmlspecialchars((string)$m['poster_fsk16'], ENT_QUOTES, 'UTF-8');
+            $poster18Esc = htmlspecialchars((string)$m['poster_fsk18'], ENT_QUOTES, 'UTF-8');
           ?>
           <tr class="js-smart-row kkc-row-clickable"
+              <?php if (!$isInitialVisible): ?>style="display: none;"<?php endif; ?>
               data-id="<?= $movieId ?>"
               data-status="<?= htmlspecialchars((string)$m['status_key'], ENT_QUOTES, 'UTF-8') ?>"
               data-actor-id="<?= (int)$m['actor_id'] ?>"
@@ -232,7 +237,8 @@ if (!defined('SAFE_INC')) {
                    data-zoom-src="<?= htmlspecialchars((string)$m['zoom_fsk16'], ENT_QUOTES, 'UTF-8') ?>"
                    data-zoom-fsk="16"
                    data-zoom-title="<?= htmlspecialchars('#' . $movieId . ' – ' . $titleStr, ENT_QUOTES, 'UTF-8') ?>">
-                  <img src="<?= htmlspecialchars((string)$m['poster_fsk16'], ENT_QUOTES, 'UTF-8') ?>"
+                  <img src="<?= $isInitialVisible ? $poster16Esc : $lazyPlaceholder ?>"
+                       <?php if (!$isInitialVisible): ?>data-lazy-src="<?= $poster16Esc ?>"<?php endif; ?>
                        alt="FSK16"
                        class="object-fit-cover d-block"
                        style="width: 86px; height: 48px;"
@@ -247,7 +253,8 @@ if (!defined('SAFE_INC')) {
                    data-zoom-src="<?= htmlspecialchars((string)$m['zoom_fsk18'], ENT_QUOTES, 'UTF-8') ?>"
                    data-zoom-fsk="18"
                    data-zoom-title="<?= htmlspecialchars('#' . $movieId . ' – ' . $titleStr, ENT_QUOTES, 'UTF-8') ?>">
-                  <img src="<?= htmlspecialchars((string)$m['poster_fsk18'], ENT_QUOTES, 'UTF-8') ?>"
+                  <img src="<?= $isInitialVisible ? $poster18Esc : $lazyPlaceholder ?>"
+                       <?php if (!$isInitialVisible): ?>data-lazy-src="<?= $poster18Esc ?>"<?php endif; ?>
                        alt="FSK18"
                        class="object-fit-cover d-block"
                        style="width: 86px; height: 48px;"

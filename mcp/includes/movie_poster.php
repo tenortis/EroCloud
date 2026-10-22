@@ -12,6 +12,8 @@ if (is_logged_in('mcp') === false) {
 }
 
 $file_id = $_GET['id'];
+$merchant_id = abs((int)$_SESSION['merchant_id']);
+@session_write_close();
 
 $rs_movie = p4c_query("SELECT * FROM `movies` WHERE `file_id`='".p4c_escape_string($file_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;",__FILE__,__LINE__);
 if (p4c_num_rows($rs_movie) == 0) {

@@ -4,6 +4,7 @@ define('SAFE_INC', 1);
 
 include_once("../config.inc.php");
 include_once(API_DIR."/common.inc.php");
+@session_write_close();
 
 header('Access-Control-Allow-Origin: *');
 
@@ -54,9 +55,9 @@ $escaped_id = p4c_escape_string($album_param);
 $numeric_id = ctype_digit((string)$album_param) ? abs((int)$album_param) : 0;
 
 // Query photo_albums FIRST by valid columns (album_id or numeric id)
-$rs_album = p4c_query("SELECT * FROM `photo_albums` WHERE `album_id`='".$escaped_id."'" . ($numeric_id > 0 ? " OR `id`='".$numeric_id."'" : "") . " LIMIT 1;",__FILE__,__LINE__);
+$rs_album = p4c_query("SELECT `id`, `merchant_id`, `storage_location`, `album_id`, `preview_image_fsk16`, `preview_image_fsk18` FROM `photo_albums` WHERE `album_id`='".$escaped_id."'" . ($numeric_id > 0 ? " OR `id`='".$numeric_id."'" : "") . " LIMIT 1;",__FILE__,__LINE__);
 if (p4c_num_rows($rs_album) == 0) {
-    $rs_album = p4c_query("SELECT * FROM `photo_albums_online` WHERE `album_id`='".$escaped_id."'" . ($numeric_id > 0 ? " OR `id`='".$numeric_id."'" : "") . " LIMIT 1;",__FILE__,__LINE__);
+    $rs_album = p4c_query("SELECT `id`, `merchant_id`, `storage_location`, `album_id`, `preview_image_fsk16`, `preview_image_fsk18` FROM `photo_albums_online` WHERE `album_id`='".$escaped_id."'" . ($numeric_id > 0 ? " OR `id`='".$numeric_id."'" : "") . " LIMIT 1;",__FILE__,__LINE__);
 }
 
 if (p4c_num_rows($rs_album) == 0) {
@@ -110,8 +111,10 @@ if (!$filename) {
 }
 
 if (!$filename || !is_file($filename)) {
+    @p4c_close(DB_HOST);
     send_fallback_and_exit();
 }
+@p4c_close(DB_HOST);
 
 function getRequestHeaders() {
     if (function_exists("apache_request_headers")) {
@@ -157,6 +160,16 @@ function to_thumb($bild, $size = 0) {
     $prop = $hoehe / $breite;
     $neueBreite = (int)$size;
     $neueHoehe = (int)round($size * $prop);
+
+    $cacheBase = (defined('TEMP_DIR') && is_dir(TEMP_DIR)) ? rtrim((string)TEMP_DIR, '/\\') : sys_get_temp_dir();
+    $cacheDir  = $cacheBase . '/ec_poster_cache';
+    if (!is_dir($cacheDir)) {
+        @mkdir($cacheDir, 0775, true);
+    }
+    $cacheFile = $cacheDir . '/pa_' . md5($bild . '|' . (int)@filemtime($bild) . '|' . $neueBreite) . '.bin';
+    if (is_file($cacheFile) && filesize($cacheFile) > 0) {
+        output_raw_file_and_exit($cacheFile, $mime_type);
+    }
 
     $altesBild = null;
     if ($mime_type == 'image/jpeg' || $mime_type == 'image/jpg') {
@@ -209,9 +222,12 @@ function to_thumb($bild, $size = 0) {
     } else {
         imagejpeg($neuesBild, null, 90);
     }
-    $length = ob_get_length();
-    header('Content-length: '.$length);
-    ob_end_flush();
+    $binaryData = ob_get_clean();
+    if ($binaryData !== false && $binaryData !== '') {
+        @file_put_contents($cacheFile, $binaryData);
+    }
+    header('Content-length: '.strlen((string)$binaryData));
+    echo $binaryData;
 
     imagedestroy($neuesBild);
     imagedestroy($altesBild);

@@ -23,30 +23,37 @@ if (!function_exists('cleanup_get_folder_size')) {
     }
 }
 
-if (isset($_GET['recalc_size']) && $_GET['recalc_size'] == 1) {
-    $cache_file = sys_get_temp_dir() . '/erocloud_online_movies_size_cache.txt';
-    if (file_exists($cache_file)) {
-        unlink($cache_file);
-    }
-    header('Location: ' . ACP_URL . '/Filme-online');
-    exit;
-}
+$cache_dir  = (defined('TEMP_DIR') && is_dir(TEMP_DIR)) ? rtrim((string)TEMP_DIR, '/\\') : sys_get_temp_dir();
+$cache_file = $cache_dir . '/erocloud_online_movies_size_cache.txt';
+$legacy_cache_file = sys_get_temp_dir() . '/erocloud_online_movies_size_cache.txt';
 
-$cache_file = sys_get_temp_dir() . '/erocloud_online_movies_size_cache.txt';
-$cache_lifetime = 86400; // 24 hours cache
-if (file_exists($cache_file) && (time() - filemtime($cache_file) < $cache_lifetime)) {
-    $total_online_size = (float)file_get_contents($cache_file);
-} else {
+if (isset($_GET['recalc_size']) && $_GET['recalc_size'] == 1) {
+    @session_write_close();
     $total_online_size = 0;
     $rs_online = p4c_query("SELECT m.id, m.merchant_id, m.storage_location FROM movies_online mo JOIN movies m ON mo.file_id = m.file_id;", __FILE__, __LINE__);
     while ($m_row = p4c_fetch_object($rs_online)) {
         $folder = MOVIES_PATH.'/'.$m_row->storage_location.'/'.$m_row->merchant_id.'/'.$m_row->id;
         $total_online_size += cleanup_get_folder_size($folder);
     }
-    file_put_contents($cache_file, $total_online_size);
+    @file_put_contents($cache_file, (string)$total_online_size);
+    if ($legacy_cache_file !== $cache_file) {
+        @file_put_contents($legacy_cache_file, (string)$total_online_size);
+    }
+    header('Location: ' . ACP_URL . '/Filme-online');
+    exit;
 }
 
-if ($total_online_size >= 1099511627776) {
+$total_online_size = null;
+if (file_exists($cache_file)) {
+    $total_online_size = (float)file_get_contents($cache_file);
+} elseif (file_exists($legacy_cache_file)) {
+    $total_online_size = (float)file_get_contents($legacy_cache_file);
+    @file_put_contents($cache_file, (string)$total_online_size);
+}
+
+if ($total_online_size === null) {
+    $total_online_size_text = 'bitte neu berechnen';
+} elseif ($total_online_size >= 1099511627776) {
     $total_online_size_text = number_format($total_online_size / 1099511627776, 2) . ' TB';
 } elseif ($total_online_size >= 1073741824) {
     $total_online_size_text = number_format($total_online_size / 1073741824, 2) . ' GB';
@@ -116,9 +123,7 @@ $site .= '
                     "bJQueryUI": true,
                     "iDisplayLength": 50,
                     "aaSorting": [[ 6, "desc" ]],
-                    //"bProcessing": true,
-                    //"bDeferRender": true,
-                    
+                    "bDeferRender": true,
                     "bProcessing": true,
                     //"bServerSide": true,
                     "sAjaxSource": "'.ACP_URL.'/includes/ajax/movies_online.php",

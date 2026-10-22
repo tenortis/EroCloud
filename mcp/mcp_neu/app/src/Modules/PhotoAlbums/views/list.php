@@ -192,7 +192,8 @@ if (!defined('SAFE_INC')) {
           </tr>
         </thead>
         <tbody id="smart-table-body">
-          <?php foreach ($albums as $alb): ?>
+          <?php $lazyPlaceholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; ?>
+          <?php foreach ($albums as $rowIdx => $alb): ?>
             <?php
             $aId        = (int)$alb['id'];
             $aTitle     = (string)$alb['title'];
@@ -203,8 +204,12 @@ if (!defined('SAFE_INC')) {
                 ? 'pending'
                 : (in_array((string)$alb['status_key'], ['rejected', 'blocked'], true) ? 'rejected' : (string)$alb['status_key']);
             $searchText = mb_strtolower('#' . $aId . ' ' . $aId . ' ' . $aTitle . ' ' . $aActor . ' ' . $statusLbl . ' ' . $onlineStr, 'UTF-8');
+            $isInitialVisible = ($rowIdx < 25);
+            $poster16Esc = htmlspecialchars((string)$alb['poster_fsk16'], ENT_QUOTES, 'UTF-8');
+            $poster18Esc = htmlspecialchars((string)$alb['poster_fsk18'], ENT_QUOTES, 'UTF-8');
             ?>
             <tr class="js-smart-row kkc-row-clickable"
+                <?php if (!$isInitialVisible): ?>style="display: none;"<?php endif; ?>
                 data-id="<?= $aId ?>"
                 data-status="<?= htmlspecialchars($filterCat, ENT_QUOTES, 'UTF-8') ?>"
                 data-actor-id="<?= (int)$alb['actor_id'] ?>"
@@ -229,7 +234,8 @@ if (!defined('SAFE_INC')) {
                      data-zoom-src="<?= htmlspecialchars((string)$alb['zoom_fsk16'], ENT_QUOTES, 'UTF-8') ?>"
                      data-zoom-fsk="16"
                      data-zoom-title="<?= htmlspecialchars('#' . $aId . ' – ' . $aTitle, ENT_QUOTES, 'UTF-8') ?>">
-                    <img src="<?= htmlspecialchars((string)$alb['poster_fsk16'], ENT_QUOTES, 'UTF-8') ?>"
+                    <img src="<?= $isInitialVisible ? $poster16Esc : $lazyPlaceholder ?>"
+                         <?php if (!$isInitialVisible): ?>data-lazy-src="<?= $poster16Esc ?>"<?php endif; ?>
                          alt="FSK16"
                          class="object-fit-cover d-block"
                          style="width: 86px; height: 48px;"
@@ -242,7 +248,8 @@ if (!defined('SAFE_INC')) {
                      data-zoom-src="<?= htmlspecialchars((string)$alb['zoom_fsk18'], ENT_QUOTES, 'UTF-8') ?>"
                      data-zoom-fsk="18"
                      data-zoom-title="<?= htmlspecialchars('#' . $aId . ' – ' . $aTitle, ENT_QUOTES, 'UTF-8') ?>">
-                    <img src="<?= htmlspecialchars((string)$alb['poster_fsk18'], ENT_QUOTES, 'UTF-8') ?>"
+                    <img src="<?= $isInitialVisible ? $poster18Esc : $lazyPlaceholder ?>"
+                         <?php if (!$isInitialVisible): ?>data-lazy-src="<?= $poster18Esc ?>"<?php endif; ?>
                          alt="FSK18"
                          class="object-fit-cover d-block"
                          style="width: 86px; height: 48px;"

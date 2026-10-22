@@ -1299,51 +1299,75 @@ class HomeController
     }
 
     /**
-     * Prüft einmalig und legt bei Bedarf zusammengesetzte Datenbank-Indizes für schnelle Partner-Abfragen an.
+     * Prüft einmalig und legt bei Bedarf zusammengesetzte Datenbank-Indizes für schnelle Partner-Abfragen und Poster-Lookups an.
      */
-    private static function ensureSearchIndexes(): void
+    public static function ensureSearchIndexes(): void
     {
         $flagDir  = (defined('TEMP_DIR') && is_dir(TEMP_DIR)) ? rtrim((string)TEMP_DIR, '/\\') : sys_get_temp_dir();
-        $flagFile = $flagDir . '/.ec_mcp_search_idx_v1.flag';
+        $flagFile = $flagDir . '/.ec_mcp_search_idx_v2.flag';
         if (@is_file($flagFile)) {
             return;
         }
 
         $targets = [
-            'movies' => [
-                'name' => 'idx_ec_merchant_status_id',
-                'cols' => '`merchant_id`, `status`, `id`',
+            [
+                'table' => 'movies',
+                'name'  => 'idx_ec_merchant_status_id',
+                'cols'  => '`merchant_id`, `status`, `id`',
+                'check_col' => null,
             ],
-            'photo_albums' => [
-                'name' => 'idx_ec_merchant_status_id',
-                'cols' => '`merchant_id`, `status`, `id`',
+            [
+                'table' => 'movies',
+                'name'  => 'idx_ec_file_id',
+                'cols'  => '`file_id`',
+                'check_col' => 'file_id',
             ],
-            'photo_albums_online' => [
-                'name' => 'idx_ec_merchant_album',
-                'cols' => '`merchant_id`, `album_id`',
+            [
+                'table' => 'photo_albums',
+                'name'  => 'idx_ec_merchant_status_id',
+                'cols'  => '`merchant_id`, `status`, `id`',
+                'check_col' => null,
             ],
-            'actors' => [
-                'name' => 'idx_ec_merchant_status',
-                'cols' => '`merchant_id`, `status`',
+            [
+                'table' => 'photo_albums',
+                'name'  => 'idx_ec_album_id',
+                'cols'  => '`album_id`',
+                'check_col' => 'album_id',
+            ],
+            [
+                'table' => 'photo_albums_online',
+                'name'  => 'idx_ec_merchant_album',
+                'cols'  => '`merchant_id`, `album_id`',
+                'check_col' => null,
+            ],
+            [
+                'table' => 'actors',
+                'name'  => 'idx_ec_merchant_status',
+                'cols'  => '`merchant_id`, `status`',
+                'check_col' => null,
             ],
         ];
 
-        foreach ($targets as $table => $idxSpec) {
-            $hasMerchantIdx = false;
+        foreach ($targets as $idxSpec) {
+            $table    = $idxSpec['table'];
+            $idxName  = $idxSpec['name'];
+            $checkCol = $idxSpec['check_col'];
+            $exists   = false;
+
             $rsIdx = p4c_query("SHOW INDEX FROM `" . $table . "`;", __FILE__, __LINE__);
             if ($rsIdx && p4c_num_rows($rsIdx) > 0) {
                 while ($row = p4c_fetch_object($rsIdx)) {
                     $keyName = (string)($row->Key_name ?? '');
                     $colName = (string)($row->Column_name ?? '');
                     $seqIn   = abs((int)($row->Seq_in_index ?? 0));
-                    if ($keyName === $idxSpec['name'] || ($seqIn === 1 && $colName === 'merchant_id')) {
-                        $hasMerchantIdx = true;
+                    if ($keyName === $idxName || ($checkCol !== null && $seqIn === 1 && $colName === $checkCol)) {
+                        $exists = true;
                         break;
                     }
                 }
             }
-            if (!$hasMerchantIdx) {
-                p4c_query("ALTER TABLE `" . $table . "` ADD INDEX `" . $idxSpec['name'] . "` (" . $idxSpec['cols'] . ");", __FILE__, __LINE__);
+            if (!$exists) {
+                p4c_query("ALTER TABLE `" . $table . "` ADD INDEX `" . $idxName . "` (" . $idxSpec['cols'] . ");", __FILE__, __LINE__);
             }
         }
 

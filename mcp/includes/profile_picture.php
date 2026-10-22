@@ -69,6 +69,18 @@ function to_thumb($bild, $size = 0) {
     $neueBreite = max(1, (int)round($size));
     $neueHoehe  = max(1, (int)round($size * $prop));
 
+    $cacheBase = (defined('TEMP_DIR') && is_dir(TEMP_DIR)) ? rtrim((string)TEMP_DIR, '/\\') : sys_get_temp_dir();
+    $cacheDir  = $cacheBase . '/ec_poster_cache';
+    if (!is_dir($cacheDir)) {
+        @mkdir($cacheDir, 0775, true);
+    }
+    $cacheFile = $cacheDir . '/mcppp_' . md5($bild . '|' . (int)@filemtime($bild) . '|' . $neueBreite) . '.bin';
+    if (is_file($cacheFile) && filesize($cacheFile) > 0) {
+        header("Content-Length: " . filesize($cacheFile));
+        readfile($cacheFile);
+        return;
+    }
+
     if ($mime_type == 'image/jpeg') {
         $altesBild = @ImageCreateFromJPEG($bild);
         if (!$altesBild) {
@@ -79,9 +91,12 @@ function to_thumb($bild, $size = 0) {
 
         ob_start();
         ImageJPEG($neuesBild, null, 85);
-        $outSize = ob_get_length();
-        header("Content-Length: " . $outSize);
-        ob_end_flush();
+        $binaryData = ob_get_clean();
+        if ($binaryData !== false && $binaryData !== '') {
+            @file_put_contents($cacheFile, $binaryData);
+        }
+        header("Content-Length: " . strlen((string)$binaryData));
+        echo $binaryData;
         if (PHP_VERSION_ID < 80000) {
             @imagedestroy($altesBild);
             @imagedestroy($neuesBild);
@@ -92,13 +107,18 @@ function to_thumb($bild, $size = 0) {
             return;
         }
         $neuesBild = imagecreatetruecolor($neueBreite, $neueHoehe);
+        imagealphablending($neuesBild, false);
+        imagesavealpha($neuesBild, true);
         imagecopyresampled($neuesBild, $altesBild, 0, 0, 0, 0, $neueBreite, $neueHoehe, $breite, $hoehe);
 
         ob_start();
         ImagePNG($neuesBild, null);
-        $outSize = ob_get_length();
-        header("Content-Length: " . $outSize);
-        ob_end_flush();
+        $binaryData = ob_get_clean();
+        if ($binaryData !== false && $binaryData !== '') {
+            @file_put_contents($cacheFile, $binaryData);
+        }
+        header("Content-Length: " . strlen((string)$binaryData));
+        echo $binaryData;
         if (PHP_VERSION_ID < 80000) {
             @imagedestroy($altesBild);
             @imagedestroy($neuesBild);

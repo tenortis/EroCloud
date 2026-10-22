@@ -948,7 +948,18 @@ const App = {
       const visibleSet = new Set(matchedRows.slice(startIdx, endIdx));
 
       allRows.forEach(row => {
-        row.style.display = visibleSet.has(row) ? '' : 'none';
+        if (visibleSet.has(row)) {
+          row.style.display = '';
+          row.querySelectorAll('img[data-lazy-src]').forEach(img => {
+            const realSrc = img.getAttribute('data-lazy-src');
+            if (realSrc) {
+              img.src = realSrc;
+              img.removeAttribute('data-lazy-src');
+            }
+          });
+        } else {
+          row.style.display = 'none';
+        }
       });
 
       // Leerzustand bei 0 Treffern

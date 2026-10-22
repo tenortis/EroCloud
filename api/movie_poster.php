@@ -4,6 +4,7 @@ define('SAFE_INC', 1);
 
 include_once("../config.inc.php");
 include_once(API_DIR."/common.inc.php");
+@session_write_close();
 
 function send_fallback_and_exit() {
     $fallback = MCP_DIR.'/images/movie_poster_nopic.jpg';
@@ -42,14 +43,16 @@ if (isset($_GET['fsk'])) {
 
 $fsk_field = 'preview_image_fsk'.$fsk;
 
-$rs_movie = p4c_query("SELECT * FROM `movies` WHERE `file_id`='".p4c_escape_string($file_id)."' LIMIT 1;",__FILE__,__LINE__);
+$rs_movie = p4c_query("SELECT `id`, `merchant_id`, `storage_location`, `file_id`, `preview_image_fsk16`, `preview_image_fsk18` FROM `movies` WHERE `file_id`='".p4c_escape_string($file_id)."' LIMIT 1;",__FILE__,__LINE__);
 if (p4c_num_rows($rs_movie) == 0) {
+    @p4c_close(DB_HOST);
     header('HTTP/1.1 404 Not Found');
     echo 'movie id not exists';
     exit;   
 }
 
 $movie_ary = p4c_fetch_object($rs_movie);
+@p4c_close(DB_HOST);
 
 $selected_thumb = !empty($movie_ary->$fsk_field) ? $movie_ary->$fsk_field : '1';
 $base_path = MOVIES_PATH.'/'.$movie_ary->storage_location.'/'.$movie_ary->merchant_id.'/'.$movie_ary->id.'/thumb_'.$movie_ary->id.'_'.$movie_ary->file_id.'_';
@@ -120,6 +123,16 @@ function to_thumb($bild, $size = 0) {
     $neueBreite = (int)$size;
     $neueHoehe = (int)round($size * $prop);
 
+    $cacheBase = (defined('TEMP_DIR') && is_dir(TEMP_DIR)) ? rtrim((string)TEMP_DIR, '/\\') : sys_get_temp_dir();
+    $cacheDir  = $cacheBase . '/ec_poster_cache';
+    if (!is_dir($cacheDir)) {
+        @mkdir($cacheDir, 0775, true);
+    }
+    $cacheFile = $cacheDir . '/mp_' . md5($bild . '|' . (int)@filemtime($bild) . '|' . $neueBreite) . '.bin';
+    if (is_file($cacheFile) && filesize($cacheFile) > 0) {
+        output_raw_file_and_exit($cacheFile, $mime_type);
+    }
+
     $altesBild = null;
     if ($mime_type == 'image/jpeg' || $mime_type == 'image/jpg') {
         $image_data = @file_get_contents($bild);
@@ -171,9 +184,12 @@ function to_thumb($bild, $size = 0) {
     } else {
         imagejpeg($neuesBild, null, 90);
     }
-    $length = ob_get_length();
-    header('Content-length: '.$length);
-    ob_end_flush();
+    $binaryData = ob_get_clean();
+    if ($binaryData !== false && $binaryData !== '') {
+        @file_put_contents($cacheFile, $binaryData);
+    }
+    header('Content-length: '.strlen((string)$binaryData));
+    echo $binaryData;
 
     imagedestroy($neuesBild);
     imagedestroy($altesBild);

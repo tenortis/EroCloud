@@ -18,7 +18,33 @@ if (is_logged_in('acp') === false) {
     exit;
 }
 
-aic_ensure_table();
+@session_write_close();
+
+$flag_dir  = (defined('TEMP_DIR') && is_dir(TEMP_DIR)) ? rtrim((string)TEMP_DIR, '/\\') : sys_get_temp_dir();
+$aic_flag  = $flag_dir . '/.ec_aic_table_v1.flag';
+if (!@is_file($aic_flag)) {
+    aic_ensure_table();
+    @file_put_contents($aic_flag, date('Y-m-d H:i:s'));
+}
+
+// Sicherstellen, dass movies.file_id indiziert ist (verhindert Full-Table-Scan beim LEFT JOIN mit movies_online)
+$idx_flag = $flag_dir . '/.ec_movies_file_id_idx_v1.flag';
+if (!@is_file($idx_flag)) {
+    $has_file_id_idx = false;
+    $rs_idx = p4c_query("SHOW INDEX FROM `movies`;", __FILE__, __LINE__);
+    if ($rs_idx && p4c_num_rows($rs_idx) > 0) {
+        while ($idx_row = p4c_fetch_object($rs_idx)) {
+            if ((string)($idx_row->Column_name ?? '') === 'file_id' && abs((int)($idx_row->Seq_in_index ?? 0)) === 1) {
+                $has_file_id_idx = true;
+                break;
+            }
+        }
+    }
+    if (!$has_file_id_idx) {
+        p4c_query("ALTER TABLE `movies` ADD INDEX `idx_ec_file_id` (`file_id`);", __FILE__, __LINE__);
+    }
+    @file_put_contents($idx_flag, date('Y-m-d H:i:s'));
+}
 
 function safe_utf8($str) {
     if ($str === null || $str === false) return '';
@@ -30,7 +56,17 @@ function safe_utf8($str) {
 
 $sEcho = isset($_GET['sEcho']) ? intval($_GET['sEcho']) : (isset($_GET['draw']) ? intval($_GET['draw']) : 0);
 
-$rs_movies = p4c_query("SELECT mo.`id`, mo.`file_id`, mo.`quality`, mo.`merchant_id`, mo.`actor_id`, mo.`checksum`, mo.`title`, mo.`description`, mo.`online_at`, mo.`movie_language`, mo.`movie_checked`, mo.`status`, mo.`category_master`, ai.`subtitle_status`, ai.`text_check_status`, ai.`text_compliance`, ai.`text_risk_score`, ai.`text_summary` FROM `movies_online` mo LEFT JOIN `movies` m ON m.`file_id` = mo.`file_id` LEFT JOIN `movies_ai_analysis` ai ON ai.`movie_id` = m.`id` ORDER BY mo.`id` DESC", __FILE__, __LINE__);
+$rs_movies = p4c_query("SELECT
+        mo.`id`, mo.`file_id`, mo.`quality`, mo.`merchant_id`, mo.`actor_id`, mo.`checksum`,
+        mo.`title`, mo.`description`, mo.`online_at`, mo.`movie_language`, mo.`movie_checked`,
+        mo.`status`, mo.`category_master`,
+        a.`username` AS `actor_username`,
+        ai.`subtitle_status`, ai.`text_check_status`, ai.`text_compliance`, ai.`text_risk_score`, ai.`text_summary`
+    FROM `movies_online` mo
+    LEFT JOIN `actors` a ON a.`id` = mo.`actor_id` AND a.`merchant_id` = mo.`merchant_id`
+    LEFT JOIN `movies` m ON m.`file_id` = mo.`file_id`
+    LEFT JOIN `movies_ai_analysis` ai ON ai.`movie_id` = m.`id`
+    ORDER BY mo.`id` DESC", __FILE__, __LINE__);
 
 $output = array(
     "sEcho" => $sEcho,
@@ -69,13 +105,9 @@ if (p4c_num_rows($rs_movies) > 0) {
         
         $quality = isset($select_quality_ary[$movie_ary->quality]) ? $select_quality_ary[$movie_ary->quality] : '';
 
-        $rs_actors = p4c_query("SELECT `username` FROM `actors` WHERE
-            `id`='".abs((int)$movie_ary->actor_id)."' AND
-            `merchant_id` = '".abs((int)$movie_ary->merchant_id)."';",__FILE__,__LINE__);
-        
-        if (p4c_num_rows($rs_actors) > 0) {
-            $actor_name = safe_utf8(p4c_result($rs_actors, 0));
-            $actor = '<a href="'.ACP_URL.'/Actor/'.$movie_ary->actor_id.'" target="_blank">'.$actor_name.'</a>';
+        if (!empty($movie_ary->actor_username)) {
+            $actor_name = safe_utf8($movie_ary->actor_username);
+            $actor = '<a href="'.ACP_URL.'/Actor/'.abs((int)$movie_ary->actor_id).'" target="_blank">'.$actor_name.'</a>';
         } else {
             $actor = '-';
         }

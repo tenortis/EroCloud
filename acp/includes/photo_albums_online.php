@@ -66,6 +66,7 @@ $site .= '
                     //"bProcessing": true,
                     //"bDeferRender": true,
 
+                    "bDeferRender": true,
                     "bProcessing": true,
                     //"bServerSide": true,
                     "sAjaxSource": "'.ACP_URL.'/includes/ajax/photo_albums_online.php",

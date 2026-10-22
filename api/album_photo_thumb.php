@@ -4,6 +4,7 @@ define('SAFE_INC', 1);
 
 include_once("../config.inc.php");
 include_once(API_DIR."/common.inc.php");
+@session_write_close();
 
 function no_image() {
     $filename = MCP_DIR.'/images/movie_poster_nopic.jpg';
