@@ -366,7 +366,7 @@ $singleCreatorProfileName = (count($actorNamesSummary) === 1) ? $actorNamesSumma
   </div>
 
   <!-- Rechte Spalte: Darsteller-Profil(e) & Richtlinien-Box -->
-  <div class="col-lg-5">
+  <div class="col-lg-5<?= $actorsTotal > 1 ? ' position-relative' : '' ?>">
 
     <?php if (empty($actors)): ?>
     <!-- Leerzustand: Noch kein Darsteller-Profil vorhanden -->
@@ -545,78 +545,81 @@ $singleCreatorProfileName = (count($actorNamesSummary) === 1) ? $actorNamesSumma
     </div>
 
     <?php else: ?>
-    <!-- Mehrere Darsteller-Profile im Überblick -->
-    <div class="card-kkc">
-      <div class="card-kkc-header">
-        <div class="card-title">
-          <i class="bi bi-people-fill ec-text-primary"></i>
-          <span>Deine Darsteller-Profile (<?= (int)$actorsTotal ?>)</span>
+    <!-- Mehrere Darsteller-Profile im Überblick (Höhe auf linken Block begrenzt & scrollbar) -->
+    <div class="ec-actors-col-match">
+      <div class="card-kkc mb-0">
+        <div class="card-kkc-header flex-shrink-0">
+          <div class="card-title">
+            <i class="bi bi-people-fill ec-text-primary"></i>
+            <span>Deine Darsteller-Profile (<?= (int)$actorsTotal ?>)</span>
+          </div>
+          <?php if ($canCreateActor): ?>
+          <a href="#/new-actor" class="btn btn-sm btn-outline-kkc py-1" style="font-size: 0.78rem;">
+            <i class="bi bi-plus-lg me-1"></i> Profil anlegen
+          </a>
+          <?php endif; ?>
         </div>
-        <?php if ($canCreateActor): ?>
-        <a href="#/new-actor" class="btn btn-sm btn-outline-kkc py-1" style="font-size: 0.78rem;">
-          <i class="bi bi-plus-lg me-1"></i> Profil anlegen
-        </a>
-        <?php endif; ?>
-      </div>
-      <div class="card-kkc-body p-0">
-        <div class="table-responsive">
-          <table class="kkc-table">
-            <thead>
-              <tr>
-                <th>Profil</th>
-                <th>Inhalte</th>
-                <th>Status</th>
-                <th class="text-end">Aktion</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php foreach ($actors as $actor): ?>
-              <?php
-                $avatarUrl = $actor['avatar_fsk16'] !== ''
-                    ? $mcpUrl . '/ProfilePicture/' . rawurlencode($actor['avatar_fsk16'])
-                    : '';
-                $actorInitials = mb_strtoupper(mb_substr($actor['username'], 0, 2));
-                if ($actor['status'] === 'active') {
-                    $aBadge = 'badge-kkc-success';
-                    $aLabel = 'Aktiv';
-                } elseif ($actor['status'] === 'locked' || $actor['status'] === 'blocked') {
-                    $aBadge = 'badge-kkc-danger';
-                    $aLabel = 'Gesperrt';
-                } else {
-                    $aBadge = 'badge-kkc-warning';
-                    $aLabel = 'Wird geprüft';
-                }
-              ?>
-              <tr>
-                <td>
-                  <div class="d-flex align-items-center gap-2">
-                    <?php if ($avatarUrl !== ''): ?>
-                    <img src="<?= View::e($avatarUrl) ?>" alt="" class="rounded-circle object-fit-cover border" style="width: 28px; height: 28px;">
-                    <?php else: ?>
-                    <span class="sidebar-actor-avatar" style="width: 28px; height: 28px;"><?= View::e($actorInitials) ?></span>
-                    <?php endif; ?>
-                    <a href="#/actor?id=<?= (int)$actor['id'] ?>" class="fw-semibold text-decoration-none text-body"><?= View::e($actor['username']) ?></a>
-                  </div>
-                </td>
-                <td class="text-muted small">
-                  <?= (int)$actor['movies_count'] ?> Filme · <?= (int)$actor['albums_count'] ?> Alben
-                </td>
-                <td><span class="badge-kkc <?= $aBadge ?>"><?= $aLabel ?></span></td>
-                <td class="text-end">
-                  <a href="#/actor?id=<?= (int)$actor['id'] ?>" class="btn btn-sm btn-outline-kkc py-1 px-2" title="Profil bearbeiten">
-                    <i class="bi bi-pencil-square"></i>
-                  </a>
-                </td>
-              </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
+        <div class="card-kkc-body p-0 d-flex flex-column min-h-0">
+          <div class="table-responsive ec-dashboard-actors-scroll">
+            <table class="kkc-table">
+              <thead>
+                <tr>
+                  <th>Profil</th>
+                  <th>Inhalte</th>
+                  <th>Status</th>
+                  <th class="text-end">Aktion</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach ($actors as $actor): ?>
+                <?php
+                  $avatarUrl = $actor['avatar_fsk16'] !== ''
+                      ? $mcpUrl . '/ProfilePicture/' . rawurlencode($actor['avatar_fsk16'])
+                      : '';
+                  $actorInitials = mb_strtoupper(mb_substr($actor['username'], 0, 2));
+                  if ($actor['status'] === 'active') {
+                      $aBadge = 'badge-kkc-success';
+                      $aLabel = 'Aktiv';
+                  } elseif ($actor['status'] === 'locked' || $actor['status'] === 'blocked') {
+                      $aBadge = 'badge-kkc-danger';
+                      $aLabel = 'Gesperrt';
+                  } else {
+                      $aBadge = 'badge-kkc-warning';
+                      $aLabel = 'Wird geprüft';
+                  }
+                ?>
+                <tr>
+                  <td>
+                    <div class="d-flex align-items-center gap-2">
+                      <?php if ($avatarUrl !== ''): ?>
+                      <img src="<?= View::e($avatarUrl) ?>" alt="" class="rounded-circle object-fit-cover border flex-shrink-0" style="width: 28px; height: 28px;">
+                      <?php else: ?>
+                      <span class="sidebar-actor-avatar flex-shrink-0" style="width: 28px; height: 28px;"><?= View::e($actorInitials) ?></span>
+                      <?php endif; ?>
+                      <a href="#/actor?id=<?= (int)$actor['id'] ?>" class="fw-semibold text-decoration-none text-body text-truncate"><?= View::e($actor['username']) ?></a>
+                    </div>
+                  </td>
+                  <td class="text-muted small text-nowrap">
+                    <?= (int)$actor['movies_count'] ?> Filme · <?= (int)$actor['albums_count'] ?> Alben
+                  </td>
+                  <td><span class="badge-kkc <?= $aBadge ?>"><?= $aLabel ?></span></td>
+                  <td class="text-end">
+                    <a href="#/actor?id=<?= (int)$actor['id'] ?>" class="btn btn-sm btn-outline-kkc py-1 px-2" title="Profil bearbeiten">
+                      <i class="bi bi-pencil-square"></i>
+                    </a>
+                  </td>
+                </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
     <?php endif; ?>
 
-    <!-- Account-Status & Content-Richtlinien Kachel -->
+    <?php if ($actorsTotal <= 1): ?>
+    <!-- Account-Status & Content-Richtlinien Kachel (bei 0 oder 1 Profil direkt in der rechten Spalte) -->
     <div class="card-kkc mb-0">
       <div class="card-kkc-header">
         <div class="card-title">
@@ -663,6 +666,7 @@ $singleCreatorProfileName = (count($actorNamesSummary) === 1) ? $actorNamesSumma
         </div>
       </div>
     </div>
+    <?php endif; ?>
 
   </div>
 </div>
@@ -865,3 +869,61 @@ $singleCreatorProfileName = (count($actorNamesSummary) === 1) ? $actorNamesSumma
     </div>
   </div>
 </div>
+
+<?php if ($actorsTotal > 1): ?>
+<!-- Account-Status & Content-Richtlinien Kachel (bei mehreren Profilen unterhalb der Kontakt-Box) -->
+<div class="card-kkc mt-4 mb-0">
+  <div class="card-kkc-header">
+    <div class="card-title">
+      <i class="bi bi-shield-check ec-text-primary"></i>
+      <span>Account-Status &amp; Content-Richtlinien</span>
+    </div>
+    <?php if (!$needsRulesAccept): ?>
+    <span class="badge-kkc badge-kkc-success">Bestätigt</span>
+    <?php else: ?>
+    <span class="badge-kkc badge-kkc-warning">Offen</span>
+    <?php endif; ?>
+  </div>
+  <div class="card-kkc-body">
+    <div class="row g-3 align-items-center">
+      <div class="col-lg-6">
+        <div class="d-flex align-items-start gap-3">
+          <?php if (!$needsRulesAccept): ?>
+          <i class="bi bi-check-circle-fill text-success fs-4 lh-1 mt-1"></i>
+          <div>
+            <div class="fw-semibold">Content-Richtlinien akzeptiert</div>
+            <div class="text-muted small">
+              Du hast den Nutzungsrichtlinien zur Vermarktung deines Contents zugestimmt (am <?= View::e(date('d.m.Y H:i', strtotime($acceptContentRulesDate))) ?> Uhr).
+            </div>
+          </div>
+          <?php else: ?>
+          <i class="bi bi-exclamation-circle-fill text-warning fs-4 lh-1 mt-1"></i>
+          <div>
+            <div class="fw-semibold">Zustimmung zu den Content-Richtlinien ausstehend</div>
+            <div class="text-muted small">
+              Bitte bestätige oben die aktuellen Nutzungsrichtlinien zur Vermarktung deines Contents.
+            </div>
+          </div>
+          <?php endif; ?>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap">
+          <div class="d-flex align-items-start gap-3 flex-grow-1" style="min-width: 240px;">
+            <i class="bi bi-info-circle-fill ec-text-primary fs-4 lh-1 mt-1"></i>
+            <div>
+              <div class="fw-semibold">Support &amp; Hilfe bei Fragen</div>
+              <div class="text-muted small">
+                Bei Fragen zur Freischaltung deiner Darsteller-Profile oder zur Konvertierung deiner Filme steht dir unser Support jederzeit zur Verfügung.
+              </div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-kkc py-1 flex-shrink-0" data-bs-toggle="modal" data-bs-target="#modal-support">
+            <i class="bi bi-headset me-1"></i> Support kontaktieren
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<?php endif; ?>

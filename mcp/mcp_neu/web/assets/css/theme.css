@@ -1307,3 +1307,72 @@ code, kbd, samp, pre, .font-monospace {
   transform: rotate(180deg);
 }
 
+/* ==========================================================================
+   15. Startseite: Darsteller-Profile Scroll-Liste (Höhe an linken Block gekoppelt)
+   ========================================================================== */
+.min-h-0 {
+  min-height: 0 !important;
+}
+
+.ec-dashboard-actors-scroll {
+  overflow-y: auto;
+  max-height: 480px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--kkc-border-strong) transparent;
+}
+
+.ec-dashboard-actors-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.ec-dashboard-actors-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ec-dashboard-actors-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--kkc-border-strong);
+  border-radius: 999px;
+}
+
+.ec-dashboard-actors-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: var(--kkc-primary);
+}
+
+.ec-dashboard-actors-scroll .kkc-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: var(--kkc-table-th-bg);
+}
+
+.ec-dashboard-actors-scroll .kkc-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+@media (min-width: 992px) {
+  .ec-actors-col-match {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--bs-gutter-x, 1.5rem) * 0.5);
+    right: calc(var(--bs-gutter-x, 1.5rem) * 0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .ec-actors-col-match > .card-kkc {
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .ec-actors-col-match .ec-dashboard-actors-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+  }
+}
+
+
