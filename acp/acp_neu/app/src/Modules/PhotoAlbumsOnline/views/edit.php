@@ -288,6 +288,7 @@ foreach ($categoriesByType as $grpItems) {
                   $isOwner   = !empty($p['is_owner']);
                   $pStatus   = (string)($p['checked_status'] ?? 'pending_qr');
                   $isReady   = !empty($p['is_ready_for_use']);
+                  $hasDocs   = !empty($p['has_uploaded_docs']) || !empty($p['has_id_shot']) || !empty($p['face_ref_url']) || !empty($p['id_front_url']);
                   $isAiReady = !empty($p['ai_face_ready']);
 
                   $pBadgeCls = 'badge-kkc-warning';
@@ -327,6 +328,7 @@ foreach ($categoriesByType as $grpItems) {
                       <?php endif; ?>
                     </div>
 
+                    <?php if ($hasDocs): ?>
                     <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                       <?php if (!empty($p['face_ref_url'])): ?>
                         <a href="<?= View::e((string)$p['face_ref_url']) ?>" target="_blank" rel="noopener"
@@ -373,6 +375,12 @@ foreach ($categoriesByType as $grpItems) {
                         <i class="bi bi-x-lg me-1"></i> ID-Shot ablehnen
                       </button>
                     </div>
+                    <?php else: ?>
+                    <div class="alert alert-secondary py-2 px-3 mb-0 small d-flex align-items-center gap-2">
+                      <i class="bi bi-info-circle-fill ec-text-primary flex-shrink-0"></i>
+                      <span><strong>Noch kein ID-Shot hochgeladen:</strong> Übergangsphase aktiv – das Fotoalbum bleibt unabhängig davon regulär online/bearbeitbar.</span>
+                    </div>
+                    <?php endif; ?>
                   </div>
                 <?php endforeach; ?>
               </div>

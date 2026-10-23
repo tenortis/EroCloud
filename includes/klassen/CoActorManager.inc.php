@@ -518,15 +518,19 @@ class CoActorManager
         $verMethod   = trim((string)($obj->verification_method ?? 'qr_live'));
         $hasIdShot   = ($idShotImg !== '');
         $hasConsent  = ($consentDocFile !== '' || (is_array($sigData) && !empty($sigData['signed_at'])));
+        $hasAnyMedia = ($idShotImg !== '' || $faceRefImg !== '' || $idFrontImg !== '' || $idBackImg !== '' || $consentDocFile !== '');
         $isComplete  = ($hasIdShot && $hasConsent);
         $aiFaceReady = (abs((int)($obj->ai_face_ready ?? 0)) === 1) || ($verMethod === 'qr_live' && $faceRefImg !== '');
 
         $rawStatus = trim((string)($obj->checked_status ?? 'pending_qr'));
-        if (!$isComplete && $rawStatus !== 'rejected') {
+        if (!$hasAnyMedia) {
+            // Solange noch überhaupt kein ID-Shot / Dokument hochgeladen wurde, ist der Status immer 'pending_qr'
+            $rawStatus = 'pending_qr';
+        } elseif (!$isComplete && !in_array($rawStatus, ['verified', 'rejected'], true)) {
             $rawStatus = 'pending_qr';
         }
 
-        $statusLabel    = 'Wartet auf QR-Scan / ID-Shot';
+        $statusLabel    = 'Noch kein ID-Shot hochgeladen';
         $statusBadge    = 'badge-kkc-warning';
         $statusBadgeCls = 'bg-warning text-dark';
         $statusColor    = 'warning';
@@ -557,8 +561,12 @@ class CoActorManager
             $qrToken = self::regenerateQrToken($id, $merchantId);
         }
 
-        // Darf beim Film ausgewählt und eingereicht werden, sobald ID-Shot & Einverständnis vorliegen ('under_review' oder 'verified')
-        $canSelectInContent = ($isComplete && in_array($rawStatus, ['verified', 'under_review'], true));
+        // Ob bereits vollständige Dokumente/ID-Shot vorliegen ('under_review' oder 'verified')
+        $isReadyForUse = (($isComplete || ($hasAnyMedia && $rawStatus === 'verified')) && in_array($rawStatus, ['verified', 'under_review'], true));
+
+        // Übergangsphase: Creator dürfen Inhalte auch dann hochladen/einreichen, wenn noch kein ID-Shot hochgeladen wurde ('pending_qr').
+        // Blockiert wird nur, wenn ein hochgeladener ID-Shot explizit abgelehnt ('rejected') wurde.
+        $canSelectInContent = ($rawStatus !== 'rejected');
 
         $ageYears = null;
         if ($birthDate !== '' && strtotime($birthDate) !== false && !str_starts_with($birthDate, '0000')) {
@@ -610,8 +618,9 @@ class CoActorManager
             'signature_data'        => is_array($sigData) ? $sigData : null,
             'has_id_shot'           => $hasIdShot,
             'has_consent'           => $hasConsent,
+            'has_uploaded_docs'     => $hasAnyMedia,
             'is_complete'           => $isComplete,
-            'is_ready_for_use'      => $canSelectInContent,
+            'is_ready_for_use'      => $isReadyForUse,
             'ai_face_ready'         => $aiFaceReady,
             'can_select_in_content' => $canSelectInContent,
             'checked_status'        => $rawStatus,
@@ -827,22 +836,28 @@ class CoActorManager
                 $ownerEntry = $ca;
             }
         }
+        if ($ownerEntry === null && $merchantId > 0) {
+            $ownerEntry = self::ensureOwnerCoActor($merchantId);
+            if ($ownerEntry !== null) {
+                $byId[(int)$ownerEntry['id']] = $ownerEntry;
+            }
+        }
 
         $finalIds = [];
 
         if ($performerMode === 'solo_owner') {
             $ownerInContent = true;
-            if ($ownerEntry === null || empty($ownerEntry['can_select_in_content'])) {
-                $errors[] = 'Du hast angegeben, dass du selbst im Film zu sehen bist, aber dein eigener ID-Shot („Ich“) wurde noch nicht abgeschlossen. Bitte klicke bei „Mitwirkende Personen“ auf den „Ich“-Button und scanne den QR-Code kurz mit deinem Smartphone.';
-            } else {
+            if ($ownerEntry !== null && ($ownerEntry['checked_status'] ?? '') === 'rejected') {
+                $errors[] = 'Dein hochgeladener „Ich“-ID-Shot wurde von der Prüfung abgelehnt. Bitte nimm über den „Ich“-Button per Smartphone-QR-Code kurz einen neuen, gut lesbaren ID-Shot auf.';
+            } elseif ($ownerEntry !== null) {
                 $finalIds[] = (int)$ownerEntry['id'];
             }
         } else {
             // Modus: Es sind (auch) andere Personen im Film zu sehen
             if ($ownerInContent) {
-                if ($ownerEntry === null || empty($ownerEntry['can_select_in_content'])) {
-                    $errors[] = 'Du hast „Ich selbst“ als mitwirkende Person ausgewählt, aber dein eigener ID-Shot wurde noch nicht abgeschlossen. Bitte erledige zuerst deinen eigenen ID-Check per QR-Code.';
-                } else {
+                if ($ownerEntry !== null && ($ownerEntry['checked_status'] ?? '') === 'rejected') {
+                    $errors[] = 'Dein hochgeladener „Ich“-ID-Shot wurde von der Prüfung abgelehnt. Bitte nimm über den „Ich“-Button per Smartphone-QR-Code kurz einen neuen, gut lesbaren ID-Shot auf.';
+                } elseif ($ownerEntry !== null) {
                     $finalIds[] = (int)$ownerEntry['id'];
                 }
             }
@@ -858,15 +873,15 @@ class CoActorManager
                     continue;
                 }
                 $otherSelectedCount++;
-                if (empty($ca['can_select_in_content'])) {
-                    $errors[] = 'Für den ausgewählten Drehpartner „' . $ca['display_label'] . '“ fehlen noch der ID-Shot oder die unterschriebene Einverständniserklärung. Bitte schließe erst die QR-Code-Verifizierung (oder den Dokumenten-Upload) ab.';
+                if (($ca['checked_status'] ?? '') === 'rejected') {
+                    $errors[] = 'Der ID-Shot für den ausgewählten Drehpartner „' . $ca['display_label'] . '“ wurde abgelehnt. Bitte erneuere erst den ID-Shot per QR-Code.';
                 } else {
                     $finalIds[] = $cid;
                 }
             }
 
             if ($otherSelectedCount === 0) {
-                $errors[] = 'Du hast angegeben, dass noch weitere Personen im Film zu sehen sind. Bitte wähle mindestens einen weiteren Drehpartner aus (oder lege ihn über „+ Neuen Drehpartner anlegen“ an).';
+                $errors[] = 'Du hast angegeben, dass noch weitere Personen im Inhalt zu sehen sind. Bitte wähle mindestens einen weiteren Drehpartner aus (oder lege ihn über „+ Neuen Drehpartner anlegen“ an).';
             }
         }
 
@@ -1140,6 +1155,118 @@ class CoActorManager
     }
 
     /**
+     * Zentraler ACP-Review-Helfer (AJAX & Formular) zum Bestätigen, Ablehnen oder Zurücksetzen eines ID-Shots / Drehpartners.
+     *
+     * @return array{ok:bool, checked_status?:string, status_label?:string, message?:string, error?:string}
+     */
+    public static function acpReviewCoActor(
+        int $coActorId,
+        int $merchantId,
+        string $decision,
+        string $reason = '',
+        int $employeeId = 0
+    ): array {
+        self::ensureSchema();
+        $coActorId  = abs($coActorId);
+        $merchantId = abs($merchantId);
+        $employeeId = abs($employeeId);
+        $decision   = trim($decision);
+
+        if ($coActorId <= 0 || $merchantId <= 0) {
+            return ['ok' => false, 'error' => 'Ungültige Parameter für die Drehpartner-Prüfung.'];
+        }
+
+        $ca = self::getCoActorById($coActorId, $merchantId);
+        if ($ca === null) {
+            return ['ok' => false, 'error' => 'Der gewählte Drehpartner-Eintrag wurde nicht gefunden.'];
+        }
+
+        $hasDocs = !empty($ca['has_uploaded_docs']) || !empty($ca['has_id_shot']) || !empty($ca['face_ref_img']) || !empty($ca['id_front_img']);
+        $label   = (string)($ca['display_label'] ?? ('#' . $coActorId));
+        $now     = date('Y-m-d H:i:s');
+
+        if ($decision === 'verify') {
+            if (!$hasDocs) {
+                // Falls zuvor versehentlich auf 'rejected' gesetzt wurde, Status auf 'pending_qr' bereinigen
+                p4c_query("UPDATE `co_actors` SET
+                    `checked_status`   = 'pending_qr',
+                    `rejection_reason` = ''
+                    WHERE `id` = '" . $coActorId . "' AND `merchant_id` = '" . $merchantId . "'
+                    LIMIT 1;", __FILE__, __LINE__);
+
+                return [
+                    'ok'             => true,
+                    'checked_status' => 'pending_qr',
+                    'status_label'   => 'Noch kein ID-Shot hochgeladen',
+                    'message'        => 'Für „' . $label . '“ wurde noch kein ID-Shot hochgeladen. In der Übergangsphase kannst du den Film/das Fotoalbum direkt über den Haupt-Freigabe-Button veröffentlichen!',
+                ];
+            }
+
+            p4c_query("UPDATE `co_actors` SET
+                `checked_status`      = 'verified',
+                `checked_by_employee` = '" . $employeeId . "',
+                `checked_on`          = '" . $now . "',
+                `rejection_reason`    = ''
+                WHERE `id` = '" . $coActorId . "' AND `merchant_id` = '" . $merchantId . "'
+                LIMIT 1;", __FILE__, __LINE__);
+
+            return [
+                'ok'             => true,
+                'checked_status' => 'verified',
+                'status_label'   => 'Geprüft & Freigegeben',
+                'message'        => 'ID-Shot & Freigabe für „' . $label . '“ wurden als geprüft bestätigt.',
+            ];
+        }
+
+        if ($decision === 'reject') {
+            if (!$hasDocs) {
+                return [
+                    'ok'    => false,
+                    'error' => 'Für „' . $label . '“ wurde noch kein ID-Shot hochgeladen, der abgelehnt werden könnte. (Übergangsphase: Der Inhalt kann auch ohne ID-Shot freigeschaltet werden.)',
+                ];
+            }
+
+            $cleanReason = trim(strip_tags($reason));
+            if ($cleanReason === '') {
+                $cleanReason = 'Bitte nimm einen neuen, scharfen ID-Shot per Smartphone-QR-Code auf (Ausweis muss gut lesbar neben dem Gesicht gehalten werden).';
+            }
+
+            p4c_query("UPDATE `co_actors` SET
+                `checked_status`      = 'rejected',
+                `checked_by_employee` = '" . $employeeId . "',
+                `checked_on`          = '" . $now . "',
+                `rejection_reason`    = '" . p4c_escape_string($cleanReason) . "'
+                WHERE `id` = '" . $coActorId . "' AND `merchant_id` = '" . $merchantId . "'
+                LIMIT 1;", __FILE__, __LINE__);
+
+            return [
+                'ok'             => true,
+                'checked_status' => 'rejected',
+                'status_label'   => 'Abgelehnt – Korrektur nötig',
+                'message'        => 'Der ID-Shot für „' . $label . '“ wurde abgelehnt.',
+            ];
+        }
+
+        if ($decision === 'reset_review') {
+            $newStatus = $hasDocs ? 'under_review' : 'pending_qr';
+            p4c_query("UPDATE `co_actors` SET
+                `checked_status`   = '" . $newStatus . "',
+                `rejection_reason` = ''
+                WHERE `id` = '" . $coActorId . "' AND `merchant_id` = '" . $merchantId . "'
+                LIMIT 1;", __FILE__, __LINE__);
+
+            return [
+                'ok'             => true,
+                'checked_status' => $newStatus,
+                'status_label'   => $hasDocs ? 'Eingereicht (In Prüfung)' : 'Noch kein ID-Shot hochgeladen',
+                'message'        => 'Status für „' . $label . '“ wurde zurückgesetzt.',
+            ];
+        }
+
+        return ['ok' => false, 'error' => 'Unbekannte Prüf-Aktion.'];
+    }
+
+    /**
      * Verarbeitet 1-Klick-Freigaben oder Ablehnungen von Drehpartnern/ID-Shots direkt im ACP (Film prüfen / bearbeiten).
      */
     public static function handleAcpAction(int $merchantId): string
@@ -1152,46 +1279,18 @@ class CoActorManager
         $action    = trim((string)$_POST['acp_co_actor_action']);
         $coActorId = abs((int)$_POST['acp_co_actor_id']);
         $empId     = isset($_SESSION['employee_id']) ? abs((int)$_SESSION['employee_id']) : 0;
+        $reason    = (string)($_POST['acp_co_actor_reject_reason'] ?? '');
 
-        if ($coActorId <= 0 || $merchantId <= 0) {
-            return '';
+        $res = self::acpReviewCoActor($coActorId, $merchantId, $action, $reason, $empId);
+        if (empty($res['ok'])) {
+            return '<div class="ui-state-error" style="padding:8px 10px; margin-bottom:8px;">' . htmlspecialchars((string)($res['error'] ?? 'Fehler'), ENT_QUOTES, 'UTF-8') . '</div>';
         }
 
-        $ca = self::getCoActorById($coActorId, $merchantId);
-        if ($ca === null) {
-            return '<div class="ui-state-error" style="padding:8px 10px; margin-bottom:8px;">Der gewählte Drehpartner wurde nicht gefunden.</div>';
+        if (($res['checked_status'] ?? '') === 'rejected') {
+            return '<div class="ui-state-error" style="padding:8px 10px; margin-bottom:8px;">✗ ' . htmlspecialchars((string)($res['message'] ?? ''), ENT_QUOTES, 'UTF-8') . '</div>';
         }
 
-        $now   = date('Y-m-d H:i:s');
-        $label = htmlspecialchars((string)$ca['display_label'], ENT_QUOTES, 'UTF-8');
-
-        if ($action === 'verify') {
-            p4c_query("UPDATE `co_actors` SET
-                `checked_status`      = 'verified',
-                `checked_by_employee` = '" . $empId . "',
-                `checked_on`          = '" . $now . "',
-                `rejection_reason`    = ''
-                WHERE `id` = '" . $coActorId . "' AND `merchant_id` = '" . $merchantId . "'
-                LIMIT 1;", __FILE__, __LINE__);
-            return '<div class="info_box" style="padding:8px 10px; margin-bottom:8px; background:#ecfdf5; border:1px solid #10b981; color:#065f46;">✓ ID-Shot &amp; Freigabe für <b>' . $label . '</b> wurden als geprüft bestätigt.</div>';
-        }
-
-        if ($action === 'reject') {
-            $reason = trim(strip_tags((string)($_POST['acp_co_actor_reject_reason'] ?? 'Bitte nimm einen neuen, scharfen ID-Shot per Smartphone-QR-Code auf (Ausweis muss gut lesbar neben dem Gesicht gehalten werden).')));
-            if ($reason === '') {
-                $reason = 'Bitte nimm einen neuen, scharfen ID-Shot per Smartphone-QR-Code auf.';
-            }
-            p4c_query("UPDATE `co_actors` SET
-                `checked_status`      = 'rejected',
-                `checked_by_employee` = '" . $empId . "',
-                `checked_on`          = '" . $now . "',
-                `rejection_reason`    = '" . p4c_escape_string($reason) . "'
-                WHERE `id` = '" . $coActorId . "' AND `merchant_id` = '" . $merchantId . "'
-                LIMIT 1;", __FILE__, __LINE__);
-            return '<div class="ui-state-error" style="padding:8px 10px; margin-bottom:8px;">✗ Der ID-Shot für <b>' . $label . '</b> wurde abgelehnt.</div>';
-        }
-
-        return '';
+        return '<div class="info_box" style="padding:8px 10px; margin-bottom:8px; background:#ecfdf5; border:1px solid #10b981; color:#065f46;">✓ ' . htmlspecialchars((string)($res['message'] ?? ''), ENT_QUOTES, 'UTF-8') . '</div>';
     }
 
     /**
@@ -1240,6 +1339,7 @@ class CoActorManager
                 $isOwner   = !empty($p['is_owner']);
                 $status    = (string)$p['checked_status'];
                 $isReady   = !empty($p['is_ready_for_use']);
+                $hasDocs   = !empty($p['has_uploaded_docs']) || !empty($p['has_id_shot']) || !empty($p['face_ref_url']) || !empty($p['id_front_url']);
                 $isAiReady = !empty($p['ai_face_ready']);
 
                 $statusStyle = 'background:#fef3c7; color:#92400e; border:1px solid #fde68a;';
@@ -1288,42 +1388,40 @@ class CoActorManager
                     $html .= '<div style="color:#475569; margin-bottom:8px;">' . implode(' &bull; ', $metaParts) . '</div>';
                 }
 
-                // Vorschaubilder & Zertifikat-Links
-                $html .= '<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">';
-                if (!empty($p['face_ref_url'])) {
-                    $u = htmlspecialchars((string)$p['face_ref_url'], ENT_QUOTES, 'UTF-8');
-                    $html .= '<a href="' . $u . '" target="_blank" style="text-decoration:none; border:1px solid #cbd5e1; background:#fff; padding:3px; border-radius:4px; text-align:center;">
-                        <img src="' . $u . '" alt="KI-Selfie" style="width:68px; height:50px; object-fit:cover; display:block; border-radius:3px;">
-                        <span style="font-size:10px; color:#334155;">1. KI-Selfie</span>
-                    </a>';
-                }
-                if (!empty($p['id_shot_url'])) {
-                    $u = htmlspecialchars((string)$p['id_shot_url'], ENT_QUOTES, 'UTF-8');
-                    $html .= '<a href="' . $u . '" target="_blank" style="text-decoration:none; border:1px solid #cbd5e1; background:#fff; padding:3px; border-radius:4px; text-align:center;">
-                        <img src="' . $u . '" alt="ID-Shot" style="width:68px; height:50px; object-fit:cover; display:block; border-radius:3px;">
-                        <span style="font-size:10px; color:#334155;">2. ID-Shot</span>
-                    </a>';
-                }
-                if (!empty($p['id_front_url'])) {
-                    $u = htmlspecialchars((string)$p['id_front_url'], ENT_QUOTES, 'UTF-8');
-                    $html .= '<a href="' . $u . '" target="_blank" style="text-decoration:none; border:1px solid #cbd5e1; background:#fff; padding:3px; border-radius:4px; text-align:center;">
-                        <img src="' . $u . '" alt="Ausweis" style="width:68px; height:50px; object-fit:cover; display:block; border-radius:3px;">
-                        <span style="font-size:10px; color:#334155;">3. Ausweis</span>
-                    </a>';
-                }
-                if ($isReady && !empty($p['certificate_url'])) {
-                    $u = htmlspecialchars((string)$p['certificate_url'], ENT_QUOTES, 'UTF-8');
-                    $html .= '<a href="' . $u . '" target="_blank" style="display:inline-flex; align-items:center; padding:6px 10px; border-radius:4px; background:#eff6ff; border:1px solid #93c5fd; color:#1d4ed8; font-weight:bold; text-decoration:none;">
-                        📄 Unterschriebene Freigabe / PDF öffnen
-                    </a>';
-                }
-                if (!$isReady) {
-                    $html .= '<span style="color:#b91c1c; font-weight:bold;">⚠️ Noch kein ID-Shot / keine Unterschrift vom Partner eingereicht!</span>';
-                }
-                $html .= '</div>';
+                if ($hasDocs) {
+                    // Vorschaubilder & Zertifikat-Links
+                    $html .= '<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">';
+                    if (!empty($p['face_ref_url'])) {
+                        $u = htmlspecialchars((string)$p['face_ref_url'], ENT_QUOTES, 'UTF-8');
+                        $html .= '<a href="' . $u . '" target="_blank" style="text-decoration:none; border:1px solid #cbd5e1; background:#fff; padding:3px; border-radius:4px; text-align:center;">
+                            <img src="' . $u . '" alt="KI-Selfie" style="width:68px; height:50px; object-fit:cover; display:block; border-radius:3px;">
+                            <span style="font-size:10px; color:#334155;">1. KI-Selfie</span>
+                        </a>';
+                    }
+                    if (!empty($p['id_shot_url'])) {
+                        $u = htmlspecialchars((string)$p['id_shot_url'], ENT_QUOTES, 'UTF-8');
+                        $html .= '<a href="' . $u . '" target="_blank" style="text-decoration:none; border:1px solid #cbd5e1; background:#fff; padding:3px; border-radius:4px; text-align:center;">
+                            <img src="' . $u . '" alt="ID-Shot" style="width:68px; height:50px; object-fit:cover; display:block; border-radius:3px;">
+                            <span style="font-size:10px; color:#334155;">2. ID-Shot</span>
+                        </a>';
+                    }
+                    if (!empty($p['id_front_url'])) {
+                        $u = htmlspecialchars((string)$p['id_front_url'], ENT_QUOTES, 'UTF-8');
+                        $html .= '<a href="' . $u . '" target="_blank" style="text-decoration:none; border:1px solid #cbd5e1; background:#fff; padding:3px; border-radius:4px; text-align:center;">
+                            <img src="' . $u . '" alt="Ausweis" style="width:68px; height:50px; object-fit:cover; display:block; border-radius:3px;">
+                            <span style="font-size:10px; color:#334155;">3. Ausweis</span>
+                        </a>';
+                    }
+                    if ($isReady && !empty($p['certificate_url'])) {
+                        $u = htmlspecialchars((string)$p['certificate_url'], ENT_QUOTES, 'UTF-8');
+                        $html .= '<a href="' . $u . '" target="_blank" style="display:inline-flex; align-items:center; padding:6px 10px; border-radius:4px; background:#eff6ff; border:1px solid #93c5fd; color:#1d4ed8; font-weight:bold; text-decoration:none;">
+                            📄 Unterschriebene Freigabe / PDF öffnen
+                        </a>';
+                    }
+                    $html .= '</div>';
 
-                // 1-Klick Admin-Prüfbuttons
-                $html .= '
+                    // 1-Klick Admin-Prüfbuttons (nur anzeigen, wenn tatsächlich ein ID-Shot hochgeladen wurde!)
+                    $html .= '
                     <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; border-top:1px dashed #cbd5e1; padding-top:6px;">
                         <button type="button" onclick="acpVerifyCoActor(' . $pId . ')"
                                 style="background:#16a34a; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-weight:bold; cursor:pointer; font-size:11.5px;">
@@ -1333,8 +1431,15 @@ class CoActorManager
                                 style="background:#dc2626; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-weight:bold; cursor:pointer; font-size:11.5px;">
                             ✗ ID-Shot ablehnen
                         </button>
-                    </div>
-                </div>';
+                    </div>';
+                } else {
+                    $html .= '
+                    <div style="background:#f1f5f9; border:1px solid #cbd5e1; color:#334155; padding:6px 10px; border-radius:4px; font-size:11.5px;">
+                        ℹ️ <b>Noch kein ID-Shot hochgeladen:</b> Übergangsphase aktiv – dieser Film kann trotzdem regulär geprüft und veröffentlicht werden.
+                    </div>';
+                }
+
+                $html .= '</div>';
             }
         }
 

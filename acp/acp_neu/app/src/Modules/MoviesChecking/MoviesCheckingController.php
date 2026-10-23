@@ -487,6 +487,15 @@ final class MoviesCheckingController
         $playtimeSec = abs((int)($m->playtime_seconds ?? 0));
         $amountSec   = (float)($m->amount_second ?? 0.0);
 
+        $rawOnlineAt = trim((string)($m->online_at ?? ''));
+        $onlineAtTs  = ($rawOnlineAt !== '' && !str_starts_with($rawOnlineAt, '0000')) ? strtotime($rawOnlineAt) : false;
+        $onlineAtInput = $onlineAtTs !== false ? date('Y-m-d\TH:i', $onlineAtTs) : date('Y-m-d\TH:i');
+
+        $rawQuality = strtolower(trim((string)($m->quality ?? '')));
+        if (!in_array($rawQuality, ['sd', 'hd', 'fhd', '2k', '4k', '6k'], true)) {
+            $rawQuality = 'hd';
+        }
+
         $movieData = [
             'id'                  => $movieId,
             'merchant_id'         => $merchantId,
@@ -501,8 +510,8 @@ final class MoviesCheckingController
             'resolution'          => (string)($m->resolution ?? 'HD'),
             'playtime_seconds'    => $playtimeSec,
             'playtime_formatted'  => gmdate('H:i:s', $playtimeSec),
-            'quality'             => abs((int)($m->quality ?? 3)),
-            'preview'             => abs((int)($m->preview ?? 1)),
+            'quality'             => $rawQuality,
+            'preview'             => abs((int)($m->preview ?? 0)),
             'preview_image_fsk16' => abs((int)($m->preview_image_fsk16 ?: 1)),
             'preview_image_fsk18' => abs((int)($m->preview_image_fsk18 ?: 1)),
             'has_custom_fsk16'    => $hasCustomFsk16,
@@ -516,8 +525,8 @@ final class MoviesCheckingController
             'movie_language'      => strtolower(trim((string)($m->movie_language ?: 'de'))),
             'category_master'     => (string)($m->category_master ?: 'porn'),
             'selected_slaves'     => $selectedSlaves,
-            'online_at'           => (string)($m->online_at ?: date('Y-m-d')),
-            'amount_second'       => $amountSec,
+            'online_at'           => $onlineAtInput,
+            'amount_second'       => number_format($amountSec, 1, '.', ''),
             'total_coins'         => (int)round($playtimeSec * $amountSec),
             'as_download'         => abs((int)($m->as_download ?? 0)) === 1,
             'amount_download'     => abs((int)($m->amount_download ?: 10)),

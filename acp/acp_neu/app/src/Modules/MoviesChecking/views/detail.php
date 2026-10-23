@@ -340,6 +340,7 @@ $categoryGroupLabels = [
                       $isOwner   = !empty($p['is_owner']);
                       $pStatus   = (string)($p['checked_status'] ?? 'pending_qr');
                       $isReady   = !empty($p['is_ready_for_use']);
+                      $hasDocs   = !empty($p['has_uploaded_docs']) || !empty($p['has_id_shot']) || !empty($p['face_ref_url']) || !empty($p['id_front_url']);
                       $isAiReady = !empty($p['ai_face_ready']);
 
                       $pBadgeCls = 'badge-kkc-warning';
@@ -381,6 +382,7 @@ $categoryGroupLabels = [
                       <?php endif; ?>
                     </div>
 
+                    <?php if ($hasDocs): ?>
                     <!-- Dokument-Vorschaubilder & PDF-Zertifikat -->
                     <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
                       <?php if (!empty($p['face_ref_url'])): ?>
@@ -416,15 +418,9 @@ $categoryGroupLabels = [
                         <i class="bi bi-file-earmark-pdf-fill text-danger me-1"></i> Unterschriebene Freigabe / PDF
                       </a>
                       <?php endif; ?>
-
-                      <?php if (!$isReady): ?>
-                      <span class="text-danger small fw-bold">
-                        <i class="bi bi-exclamation-triangle-fill me-1"></i> Noch kein vollständiger ID-Shot / keine Unterschrift eingereicht!
-                      </span>
-                      <?php endif; ?>
                     </div>
 
-                    <!-- 1-Klick Admin-Prüfbuttons per AJAX -->
+                    <!-- 1-Klick Admin-Prüfbuttons per AJAX (nur wenn Dokumente vorliegen) -->
                     <div class="d-flex flex-wrap align-items-center gap-2 pt-2 border-top" style="border-color: var(--kkc-border) !important;">
                       <button type="button" class="btn btn-sm btn-success py-1 px-2"
                               onclick="App.reviewMovieCoActor(<?= $movieId ?>, <?= $merchantId ?>, <?= $pId ?>, 'verify')">
@@ -435,6 +431,12 @@ $categoryGroupLabels = [
                         <i class="bi bi-x-lg me-1"></i> ID-Shot ablehnen
                       </button>
                     </div>
+                    <?php else: ?>
+                    <div class="alert alert-secondary py-2 px-3 mb-0 small d-flex align-items-center gap-2">
+                      <i class="bi bi-info-circle-fill ec-text-primary flex-shrink-0"></i>
+                      <span><strong>Noch kein ID-Shot hochgeladen:</strong> Übergangsphase aktiv – du kannst den Film unten trotzdem ganz normal prüfen und veröffentlichen.</span>
+                    </div>
+                    <?php endif; ?>
                   </div>
                   <?php endforeach; ?>
                 </div>
@@ -616,7 +618,7 @@ $categoryGroupLabels = [
                 <!-- Online ab & Streaming-Preis -->
                 <div class="col-md-5">
                   <label class="form-label small fw-bold mb-1">Online ab Datum *</label>
-                  <input type="date" name="online_at" class="form-control form-control-sm"
+                  <input type="datetime-local" name="online_at" class="form-control form-control-sm"
                          value="<?= View::e((string)$movie['online_at']) ?>" required>
                 </div>
 
@@ -625,12 +627,24 @@ $categoryGroupLabels = [
                   <div class="input-group input-group-sm">
                     <select name="amount_second" id="mc-input-amount-second" class="form-select"
                             data-playtime="<?= $playtime ?>" onchange="App.updateMovieStreamingPrice()">
-                      <?php for ($i = 0; $i <= 160; $i++):
-                          $val = number_format($i / 100, 2, '.', '');
-                          $sel = (number_format((float)$movie['amount_second'], 2, '.', '') === $val) ? 'selected' : '';
+                      <?php
+                        $stepVal = 0.0;
+                        $currentAmtStr = number_format((float)$movie['amount_second'], 1, '.', '');
+                        while ($stepVal <= 100.001):
+                            $valStr = number_format($stepVal, 1, '.', '');
+                            $sel    = ($valStr === $currentAmtStr) ? 'selected' : '';
+                            $lbl    = number_format($stepVal, 1, ',', '.') . ' Coins / Sek.';
+                            if ($valStr === '0.0') {
+                                $lbl = 'kostenlos (0,0 Coins / Sek.)';
+                            } elseif ($valStr === '0.8') {
+                                $lbl = '0,8 Coins / Sek. (Empfohlen)';
+                            }
                       ?>
-                      <option value="<?= $val ?>" <?= $sel ?>><?= number_format($i / 100, 2, ',', '.') ?> Coins / Sek.</option>
-                      <?php endfor; ?>
+                      <option value="<?= $valStr ?>" <?= $sel ?>><?= View::e($lbl) ?></option>
+                      <?php
+                            $stepVal = round($stepVal + 0.1, 1);
+                        endwhile;
+                      ?>
                     </select>
                     <span class="input-group-text fw-bold ec-text-primary" id="mc-live-total-coins">
                       = <?= (int)$movie['total_coins'] ?> Coins gesamt

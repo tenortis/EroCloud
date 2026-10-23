@@ -54,10 +54,10 @@ $ownerStatus     = (string)($ownerCoActor['checked_status'] ?? 'pending_qr');
   <div class="card-header bg-white border-bottom py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
     <div>
       <h6 class="fw-bold mb-0">
-        <i class="bi bi-people-fill text-primary me-2"></i>Darsteller &amp; Drehpartner-Prüfung (Pflichtangabe vor Veröffentlichung)
+        <i class="bi bi-people-fill text-primary me-2"></i>Darsteller &amp; Drehpartner-Angabe
       </h6>
       <div class="text-muted small mt-1">
-        Gib bitte wahrheitsgemäß an, wer in diesem <?= htmlspecialchars($contentLabel, ENT_QUOTES, 'UTF-8') ?> zu sehen ist. Für alle sichtbaren Personen muss ein gültiger ID-Shot &amp; eine Freigabe vorliegen.
+        Gib bitte wahrheitsgemäß an, wer in diesem <?= htmlspecialchars($contentLabel, ENT_QUOTES, 'UTF-8') ?> zu sehen ist. Deinen eigenen ID-Shot sowie Drehpartner-Freigaben kannst du jederzeit bequem per Smartphone-QR-Code hinterlegen.
       </div>
     </div>
     <div class="d-flex align-items-center gap-2">
@@ -79,8 +79,8 @@ $ownerStatus     = (string)($ownerCoActor['checked_status'] ?? 'pending_qr');
           <div class="d-flex align-items-start gap-3">
             <i class="bi bi-person-bounding-box fs-3 text-warning flex-shrink-0"></i>
             <div class="small">
-              <strong class="d-block text-dark mb-1">Wichtig: Dein eigener „Ich“-ID-Shot fehlt noch!</strong>
-              Bevor du einen <?= htmlspecialchars($contentLabel, ENT_QUOTES, 'UTF-8') ?> hochladen kannst, in dem <strong>du selbst (<?= htmlspecialchars($ownerRealName, ENT_QUOTES, 'UTF-8') ?>)</strong> zu sehen bist, musst du einmalig deinen eigenen ID-Shot + Finger-Unterschrift per Smartphone aufnehmen.
+              <strong class="d-block text-dark mb-1">Empfehlung: Deinen eigenen „Ich“-ID-Shot hinterlegen</strong>
+              Du kannst deinen <?= htmlspecialchars($contentLabel, ENT_QUOTES, 'UTF-8') ?> während der aktuellen Übergangsphase bereits problemlos hochladen und zur Freischaltung einreichen. Wir empfehlen dir aber, deinen eigenen ID-Shot + Finger-Unterschrift für <strong><?= htmlspecialchars($ownerRealName, ENT_QUOTES, 'UTF-8') ?></strong> schon jetzt einmalig per Smartphone-QR-Code aufzunehmen.
             </div>
           </div>
           <button type="button" class="btn btn-warning fw-bold btn-sm px-3 text-dark flex-shrink-0"

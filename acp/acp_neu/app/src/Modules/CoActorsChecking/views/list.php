@@ -580,6 +580,7 @@ $curSearch = (string)($filters['q'] ?? '');
                   </div>
 
                   <!-- 1-Klick Aktionsbuttons -->
+                  <?php if ($hasAnyPhoto || !empty($actor['has_uploaded_docs'])): ?>
                   <div class="d-flex flex-column gap-1.5">
                     <button type="button" id="cac-btn-verify-<?= $caId ?>"
                             class="btn btn-sm btn-success fw-bold w-100 <?= $status === 'verified' ? 'd-none' : '' ?>"
@@ -599,6 +600,11 @@ $curSearch = (string)($filters['q'] ?? '');
                       <i class="bi bi-arrow-counterclockwise me-1"></i> Zurück auf „Offen“ setzen
                     </button>
                   </div>
+                  <?php else: ?>
+                  <div class="small text-muted p-2 rounded border" style="background: var(--kkc-surface-hover); border-color: var(--kkc-border) !important; font-size: 0.74rem;">
+                    <i class="bi bi-info-circle ec-text-primary me-1"></i> Noch kein ID-Shot eingereicht (Prüf-Buttons erscheinen nach dem Upload).
+                  </div>
+                  <?php endif; ?>
                 </td>
 
               </tr>
