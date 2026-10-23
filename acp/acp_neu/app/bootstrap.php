@@ -10,6 +10,12 @@ if (!defined('SAFE_INC')) {
  * Unterstützt sowohl den Entwicklungs-Pfad (/acp/acp_neu/app) als auch den späteren Live-Pfad (/acp/app).
  */
 
+// 0. Output-Buffering starten, damit eventuelle Leerzeilen in eingebundenen
+//    Legacy-Dateien niemals vorzeitig Header oder GZIP-Responses beschädigen
+if (ob_get_level() === 0) {
+    ob_start();
+}
+
 // 1. Zeitzone vor dem Laden der config.inc.php verbindlich setzen
 date_default_timezone_set('Europe/Berlin');
 

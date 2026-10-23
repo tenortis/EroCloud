@@ -2156,7 +2156,4 @@ function aic_get_movie_bram_and_ai_tabs_data($real_movie_id, $movie_data = array
         'tab_transcript_panel_html' => $tab_transcript_panel_html
     );
 }
-?>
-
-
 

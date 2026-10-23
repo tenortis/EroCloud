@@ -1564,7 +1564,7 @@ final class MoviesOnlineController
      */
     private static function loadMovieAiAndTranscriptData(int $movieId, int $merchantId, string $fileId, string $movieDir, array $texts): array
     {
-        $env = function_exists('aic_check_environment') ? aic_check_environment() : ['llm_ready' => false];
+        $env = ['llm_ready' => false];
 
         $rsAi = p4c_query("SELECT * FROM `movies_ai_analysis` WHERE `movie_id` = '" . $movieId . "' LIMIT 1;", __FILE__, __LINE__);
         $aiRow = ($rsAi && p4c_num_rows($rsAi) > 0) ? p4c_fetch_object($rsAi) : null;

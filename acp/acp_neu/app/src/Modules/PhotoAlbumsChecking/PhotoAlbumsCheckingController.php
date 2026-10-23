@@ -40,7 +40,7 @@ final class PhotoAlbumsCheckingController
             \CoActorManager::ensureSchema();
         }
 
-        $env = function_exists('aic_check_environment') ? aic_check_environment() : ['llm_ready' => false];
+        $env = ['llm_ready' => false];
 
         $rs = p4c_query(
             "SELECT pa.*,
@@ -1156,7 +1156,7 @@ final class PhotoAlbumsCheckingController
             ];
         }
 
-        $env = function_exists('aic_check_environment') ? aic_check_environment() : ['llm_ready' => false];
+        $env = ['llm_ready' => false];
         $rep = aic_analyze_texts($textInput, [], '', $env);
 
         return [

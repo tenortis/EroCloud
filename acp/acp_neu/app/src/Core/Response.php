@@ -25,6 +25,12 @@ class Response
 
     private static function sendCompressed(string $payload, string $contentType, int $status): void
     {
+        // Eventuelle Stray-Bytes / Whitespace aus eingebundenen Legacy-Dateien restlos verwerfen,
+        // damit der GZIP-Header (\x1f\x8b) und Content-Length niemals beschädigt werden
+        while (ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+
         if (!headers_sent()) {
             http_response_code($status);
             header('Content-Type: ' . $contentType);

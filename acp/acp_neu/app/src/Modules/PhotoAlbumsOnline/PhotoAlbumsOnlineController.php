@@ -594,7 +594,7 @@ final class PhotoAlbumsOnlineController
         }
 
         // BRAM-Textanalyse
-        $env = function_exists('aic_check_environment') ? aic_check_environment() : ['llm_ready' => false];
+        $env = ['llm_ready' => false];
         $bramReport = [
             'compliance_status' => 'green',
             'risk_score'        => 0,
