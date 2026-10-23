@@ -622,7 +622,7 @@ $curSearch = (string)($filters['q'] ?? '');
      ========================================================================== -->
 <div class="modal fade" id="cacInspectorModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-xl">
-    <div class="modal-content" style="background: var(--kkc-card-bg); border: 1px solid var(--kkc-border);">
+    <div class="modal-content" style="background: var(--kkc-surface, #ffffff); border: 1px solid var(--kkc-border);">
       <div class="modal-header py-2.5 px-3 d-flex align-items-center justify-content-between">
         <div>
           <h5 class="modal-title h6 fw-bold mb-0" id="cacInspectorTitle">18+ ID-Check &amp; Dokumenten-Inspektor</h5>
@@ -681,7 +681,7 @@ $curSearch = (string)($filters['q'] ?? '');
      ========================================================================== -->
 <div class="modal fade" id="cacRejectModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content" style="background: var(--kkc-card-bg); border: 1px solid var(--kkc-border);">
+    <div class="modal-content" style="background: var(--kkc-surface, #ffffff); border: 1px solid var(--kkc-border);">
       <div class="modal-header py-2.5 px-3 bg-danger bg-opacity-10">
         <h5 class="modal-title h6 fw-bold text-danger mb-0">
           <i class="bi bi-x-octagon-fill me-1"></i> ID-Check / Drehpartner ablehnen
@@ -729,7 +729,7 @@ $curSearch = (string)($filters['q'] ?? '');
      ========================================================================== -->
 <div class="modal fade" id="cacEditDataModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content" style="background: var(--kkc-card-bg); border: 1px solid var(--kkc-border);">
+    <div class="modal-content" style="background: var(--kkc-surface, #ffffff); border: 1px solid var(--kkc-border);">
       <div class="modal-header py-2.5 px-3">
         <h5 class="modal-title h6 fw-bold mb-0">
           <i class="bi bi-pencil-square ec-text-primary me-1"></i> Ausweis- &amp; Personendaten korrigieren
@@ -809,7 +809,7 @@ $curSearch = (string)($filters['q'] ?? '');
      ========================================================================== -->
 <div class="modal fade" id="cacQrModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content" style="background: var(--kkc-card-bg); border: 1px solid var(--kkc-border);">
+    <div class="modal-content" style="background: var(--kkc-surface, #ffffff); border: 1px solid var(--kkc-border);">
       <div class="modal-header py-2.5 px-3">
         <h5 class="modal-title h6 fw-bold mb-0">
           <i class="bi bi-qr-code-scan ec-text-primary me-1"></i> Smartphone Live-QR Verifizierung

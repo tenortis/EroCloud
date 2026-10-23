@@ -790,7 +790,7 @@ foreach ($categoriesByGroup as $grpItems) {
      ========================================================================== -->
 <div class="modal fade" id="mcImagePreviewModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content" style="background: var(--kkc-card-bg); border: 1px solid var(--kkc-border);">
+    <div class="modal-content" style="background: var(--kkc-surface, #ffffff); border: 1px solid var(--kkc-border);">
       <div class="modal-header py-2 px-3">
         <h5 class="modal-title h6 mb-0" id="mcImagePreviewTitle">Vorschaubild</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
@@ -804,7 +804,7 @@ foreach ($categoriesByGroup as $grpItems) {
 
 <div class="modal fade" id="pacGalleryModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-xl">
-    <div class="modal-content" style="background: var(--kkc-card-bg); border: 1px solid var(--kkc-border);">
+    <div class="modal-content" style="background: var(--kkc-surface, #ffffff); border: 1px solid var(--kkc-border);">
       <div class="modal-header py-2 px-3 d-flex align-items-center justify-content-between">
         <h5 class="modal-title h6 mb-0" id="pacGalleryModalTitle">Foto-Vorschau</h5>
         <div class="d-flex align-items-center gap-2">

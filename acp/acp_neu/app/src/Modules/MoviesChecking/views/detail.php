@@ -102,7 +102,7 @@ $categoryGroupLabels = [
 <!-- ==========================================================================
      NAVIGATION TABS (1. Film prüfen | 2. BRAM & KI-Analyse | 3. Audio & .vtt)
      ========================================================================== -->
-<ul class="nav nav-pills gap-2 mb-3 p-2 rounded border" style="background: var(--kkc-card-bg); border-color: var(--kkc-border) !important;" role="tablist">
+<ul class="nav nav-pills gap-2 mb-3 p-2 rounded border" style="background: var(--kkc-surface, #ffffff); border-color: var(--kkc-border) !important;" role="tablist">
   <li class="nav-item" role="presentation">
     <button class="nav-link active d-flex align-items-center gap-2 fw-semibold" id="tab-btn-review"
             data-bs-toggle="pill" data-bs-target="#mc-tab-review" type="button" role="tab">
@@ -1098,7 +1098,7 @@ $categoryGroupLabels = [
      ========================================================================== -->
 <div class="modal fade" id="mcImagePreviewModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content" style="background: var(--kkc-card-bg); border: 1px solid var(--kkc-border);">
+    <div class="modal-content" style="background: var(--kkc-surface, #ffffff); border: 1px solid var(--kkc-border);">
       <div class="modal-header py-2 px-3">
         <h5 class="modal-title h6 mb-0" id="mcImagePreviewTitle">Vorschaubild</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
@@ -1112,7 +1112,7 @@ $categoryGroupLabels = [
 
 <div class="modal fade" id="mcFileMetaModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
-    <div class="modal-content" style="background: var(--kkc-card-bg); border: 1px solid var(--kkc-border);">
+    <div class="modal-content" style="background: var(--kkc-surface, #ffffff); border: 1px solid var(--kkc-border);">
       <div class="modal-header py-2 px-3">
         <h5 class="modal-title h6 mb-0"><i class="bi bi-code-square ec-text-primary me-2"></i>Technische Datei-Metadaten (getID3) – Film #<?= $movieId ?></h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>

@@ -16,6 +16,7 @@
   --kkc-bg: #F8FAFC;
   --kkc-topbar-bg: #FFFFFF;
   --kkc-surface: #FFFFFF;
+  --kkc-card-bg: #FFFFFF;
   --kkc-surface-hover: #F1F5F9;
   --kkc-border: #E2E8F0;
   --kkc-border-strong: #CBD5E1;
@@ -69,6 +70,7 @@
   --kkc-bg: #0B0F19;
   --kkc-topbar-bg: #111625;
   --kkc-surface: #151B2B;
+  --kkc-card-bg: #151B2B;
   --kkc-surface-hover: #1C2438;
   --kkc-border: #1E293B;
   --kkc-border-strong: #334155;
