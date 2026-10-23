@@ -25,25 +25,22 @@ $sortVal   = $filters['sort'] ?? 'id_desc';
 <div class="container-fluid px-0">
 
     <!-- 1. SEITEN-HEADER -->
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
         <div>
-            <h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+            <h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
                 <i class="bi bi-globe2 ec-text-primary"></i>
                 <span>Webseiten &amp; Partner-Shops</span>
-                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 fs-6 ms-1">
-                    <?= number_format((int)$kpi['total_sites'], 0, ',', '.') ?>
-                </span>
-            </h4>
-            <div class="text-muted small">
+            </h1>
+            <p class="text-muted small mb-0">
                 Übersicht aller angeschlossenen Pay4Coins-Webseiten, EroCMS-/Eigen-Shops, EroAds-Teilnahmen, Werbebanner und Shop-Verkäufe.
-            </div>
+            </p>
         </div>
         <div class="d-flex flex-wrap align-items-center gap-2">
-            <button type="button" class="btn btn-sm btn-primary fw-semibold" id="btn-sites-sync-p4c" onclick="App.Websites.syncFromP4c(this)">
+            <button type="button" class="btn btn-sm btn-primary-kkc fw-semibold" id="btn-sites-sync-p4c" onclick="App.Websites.syncFromP4c(this)">
                 <i class="bi bi-arrow-repeat me-1"></i>Mit Pay4Coins synchronisieren
             </button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="App.Websites.resetFilters()">
-                <i class="bi bi-x-circle me-1"></i>Filter zurücksetzen
+            <button type="button" class="btn btn-sm btn-outline-kkc" onclick="App.handleRoute()">
+                <i class="bi bi-arrow-clockwise me-1"></i>Aktualisieren
             </button>
         </div>
     </div>

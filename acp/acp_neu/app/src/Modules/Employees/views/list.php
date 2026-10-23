@@ -13,10 +13,34 @@ use App\Core\View;
  * @var array<string, array<string, string>> $availableAreas
  * @var array<string, array<string, mixed>> $rolePresets
  * @var int $currentEmployeeId
+ * @var string $currentEmployeeRule
+ * @var array<string, mixed>|null $impersonator
+ * @var bool $canImpersonate
  * @var array<string, string> $filters
  */
+
+$canWrite       = (($currentEmployeeRule ?? 'write') === 'write');
+$canImpersonate = !empty($canImpersonate);
+$impersonator   = is_array($impersonator ?? null) ? $impersonator : null;
+$origAdminId    = $impersonator ? abs((int)($impersonator['id'] ?? 0)) : 0;
+$origAdminName  = $impersonator ? (string)($impersonator['username'] ?? 'Admin') : '';
 ?>
 <div class="container-fluid py-3 px-3 px-xl-4" data-page-width="full">
+
+  <?php if ($impersonator !== null): ?>
+    <div class="alert alert-warning d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4 shadow-sm">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-person-badge-fill fs-5 text-warning"></i>
+        <div class="small">
+          <strong>Session-Übernahme aktiv:</strong> Du bist aktuell in der Session von <strong><?= View::e((string)($_SESSION['employee_username'] ?? '')) ?> (#<?= (int)$currentEmployeeId ?>)</strong> eingeloggt.
+          Dein ursprünglicher Administrator-Account ist <strong><?= View::e($origAdminName) ?> (#<?= $origAdminId ?>)</strong>.
+        </div>
+      </div>
+      <button type="button" class="btn btn-sm btn-warning fw-semibold" onclick="App.Employees.stopImpersonation()">
+        <i class="bi bi-arrow-return-left me-1"></i>Zurück zu <?= View::e($origAdminName) ?>
+      </button>
+    </div>
+  <?php endif; ?>
 
   <!-- Kopfzeile -->
   <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
@@ -202,7 +226,7 @@ use App\Core\View;
             <th>Freigeschaltete ACP-Bereiche (`access_area`)</th>
             <th class="text-center" style="width: 195px;">Prüf-Bilanz (Freigaben)</th>
             <th style="width: 220px;">Letzte Aktivität &amp; Login</th>
-            <th class="text-end" style="width: 150px;">Aktionen</th>
+            <th class="text-end" style="width: 255px;">Aktionen</th>
           </tr>
         </thead>
         <tbody>
@@ -237,13 +261,17 @@ use App\Core\View;
                       <?= View::e((string)$emp['initials']) ?>
                     </div>
                     <div>
-                      <div class="d-flex align-items-center gap-1">
+                      <div class="d-flex align-items-center flex-wrap gap-1">
                         <a href="#/employee?id=<?= $eid ?>" class="fw-bold text-decoration-none text-body">
                           <?= View::e((string)$emp['username']) ?>
                         </a>
                         <?php if (!empty($emp['is_self'])): ?>
                           <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 ms-1" style="font-size: 0.68rem;">
-                            Du selbst
+                            <?= $impersonator !== null ? 'Aktive Session' : 'Du selbst' ?>
+                          </span>
+                        <?php elseif ($origAdminId > 0 && $eid === $origAdminId): ?>
+                          <span class="badge bg-warning bg-opacity-15 text-dark border border-warning border-opacity-50 ms-1" style="font-size: 0.68rem;">
+                            Dein Admin-Account
                           </span>
                         <?php endif; ?>
                       </div>
@@ -322,10 +350,35 @@ use App\Core\View;
                 <!-- Aktionen -->
                 <td class="text-end">
                   <div class="d-inline-flex align-items-center gap-1">
+                    <?php if ($canImpersonate): ?>
+                      <?php if (!empty($emp['is_self'])): ?>
+                        <button type="button"
+                                class="btn btn-sm btn-outline-secondary"
+                                disabled
+                                title="Du bist bereits in dieser Mitarbeiter-Session eingeloggt">
+                          <i class="bi bi-person-check-fill me-1"></i>Eingeloggt
+                        </button>
+                      <?php elseif ($origAdminId > 0 && $eid === $origAdminId): ?>
+                        <button type="button"
+                                class="btn btn-sm btn-warning fw-semibold"
+                                title="Zurück in deine eigene Admin-Session (<?= View::e($origAdminName) ?>) wechseln"
+                                onclick="App.Employees.stopImpersonation()">
+                          <i class="bi bi-arrow-return-left me-1"></i>Zurück
+                        </button>
+                      <?php else: ?>
+                        <button type="button"
+                                class="btn btn-sm btn-primary-kkc"
+                                title="Session übernehmen &amp; als <?= View::e((string)$emp['username']) ?> (#<?= $eid ?>) einloggen"
+                                onclick="App.Employees.impersonateEmployee(<?= $eid ?>, '<?= View::e(addslashes((string)$emp['username'])) ?>')">
+                          <i class="bi bi-box-arrow-in-right me-1"></i>Session übernehmen
+                        </button>
+                      <?php endif; ?>
+                    <?php endif; ?>
+
                     <a href="#/employee?id=<?= $eid ?>" class="btn btn-sm btn-outline-kkc" title="Mitarbeiter bearbeiten &amp; Berechtigungen anpassen">
                       <i class="bi bi-pencil-square me-1"></i>Bearbeiten
                     </a>
-                    <?php if (empty($emp['is_self'])): ?>
+                    <?php if (empty($emp['is_self']) && ($origAdminId === 0 || $eid !== $origAdminId) && $canWrite): ?>
                       <button type="button"
                               class="btn btn-sm btn-outline-danger"
                               title="Mitarbeiter-Account löschen"

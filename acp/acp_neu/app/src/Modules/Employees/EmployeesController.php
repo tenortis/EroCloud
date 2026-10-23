@@ -238,8 +238,14 @@ final class EmployeesController
         $searchQuery  = trim((string)$this->request->get('q', ''));
         $sortBy       = trim((string)$this->request->get('sort', 'id_asc'));
 
-        $currentEmployeeId = abs((int)($_SESSION['employee_id'] ?? 0));
-        $availableAreas    = self::getAvailableAccessAreas();
+        $currentEmployeeId   = abs((int)($_SESSION['employee_id'] ?? 0));
+        $currentEmployeeRule = strtolower(trim((string)($_SESSION['employee_rule'] ?? 'write')));
+        $impersonator        = isset($_SESSION['impersonator_employee']) && is_array($_SESSION['impersonator_employee'])
+            ? $_SESSION['impersonator_employee']
+            : null;
+        $canImpersonate      = ($currentEmployeeRule === 'write')
+            || (is_array($impersonator) && strtolower((string)($impersonator['rule'] ?? '')) === 'write');
+        $availableAreas      = self::getAvailableAccessAreas();
 
         // 1. Gebündelte Vorab-Aggregation der Aktivitäts- & Moderations-Kennzahlen (0 N+1 Queries!)
         $historyStats = [];
@@ -519,12 +525,15 @@ final class EmployeesController
         });
 
         return View::render('Employees', 'list', [
-            'kpi'               => $kpi,
-            'employees'         => $employees,
-            'availableAreas'    => $availableAreas,
-            'rolePresets'       => self::getRolePresets(),
-            'currentEmployeeId' => $currentEmployeeId,
-            'filters'           => [
+            'kpi'                 => $kpi,
+            'employees'           => $employees,
+            'availableAreas'      => $availableAreas,
+            'rolePresets'         => self::getRolePresets(),
+            'currentEmployeeId'   => $currentEmployeeId,
+            'currentEmployeeRule' => $currentEmployeeRule,
+            'impersonator'        => $impersonator,
+            'canImpersonate'      => $canImpersonate,
+            'filters'             => [
                 'rule'   => $ruleFilter,
                 'access' => $accessFilter,
                 'q'      => $searchQuery,
@@ -544,6 +553,11 @@ final class EmployeesController
 
         $currentEmployeeId   = abs((int)($_SESSION['employee_id'] ?? 0));
         $currentEmployeeRule = strtolower(trim((string)($_SESSION['employee_rule'] ?? 'write')));
+        $impersonator        = isset($_SESSION['impersonator_employee']) && is_array($_SESSION['impersonator_employee'])
+            ? $_SESSION['impersonator_employee']
+            : null;
+        $canImpersonate      = ($currentEmployeeRule === 'write')
+            || (is_array($impersonator) && strtolower((string)($impersonator['rule'] ?? '')) === 'write');
         $availableAreas      = self::getAvailableAccessAreas();
         $rolePresets         = self::getRolePresets();
 
@@ -580,6 +594,8 @@ final class EmployeesController
                 'historyEntries'      => [],
                 'currentEmployeeId'   => $currentEmployeeId,
                 'currentEmployeeRule' => $currentEmployeeRule,
+                'impersonator'        => $impersonator,
+                'canImpersonate'      => $canImpersonate,
             ]);
         }
 
@@ -842,6 +858,8 @@ final class EmployeesController
             'historyEntries'      => $historyEntries,
             'currentEmployeeId'   => $currentEmployeeId,
             'currentEmployeeRule' => $currentEmployeeRule,
+            'impersonator'        => $impersonator,
+            'canImpersonate'      => $canImpersonate,
         ]);
     }
 
@@ -1182,6 +1200,184 @@ final class EmployeesController
         Response::json([
             'status'  => 'ok',
             'message' => "Es wurden {$deleted} Historien-Einträge (älter als 30 Tage) von „{$targetName}“ bereinigt.",
+        ]);
+    }
+
+    // =========================================================================
+    // 6. Session eines Mitarbeiters übernehmen (POST ?route=employees/impersonate)
+    // =========================================================================
+    public function impersonate(): void
+    {
+        if (!$this->request->isPost()) {
+            Response::error('Ungültige Anfrage-Methode.', 405);
+            return;
+        }
+
+        if (!Csrf::validate($this->request->csrfToken())) {
+            Response::error('Dein Sicherheitstoken (CSRF) ist abgelaufen. Bitte lade die Seite neu.', 403);
+            return;
+        }
+
+        $currentEmployeeId   = abs((int)($_SESSION['employee_id'] ?? 0));
+        $currentEmployeeRule = strtolower(trim((string)($_SESSION['employee_rule'] ?? '')));
+        $impersonator        = isset($_SESSION['impersonator_employee']) && is_array($_SESSION['impersonator_employee'])
+            ? $_SESSION['impersonator_employee']
+            : null;
+
+        $canImpersonate = ($currentEmployeeRule === 'write')
+            || (is_array($impersonator) && strtolower((string)($impersonator['rule'] ?? '')) === 'write');
+
+        if (!$canImpersonate) {
+            Response::error('Nur Administratoren mit Schreibberechtigung (`write`) dürfen die Session eines anderen Mitarbeiters übernehmen.', 403);
+            return;
+        }
+
+        $targetId = abs((int)$this->request->post('employee_id', 0));
+        if ($targetId <= 0) {
+            Response::error('Ungültige Mitarbeiter-ID.', 400);
+            return;
+        }
+
+        if ($targetId === $currentEmployeeId) {
+            Response::error('Du bist bereits in dieser Mitarbeiter-Session eingeloggt.', 422);
+            return;
+        }
+
+        // Falls der Admin auf seinen eigenen ursprünglichen Admin-Account klickt -> Impersonation beenden
+        if (is_array($impersonator) && abs((int)($impersonator['id'] ?? 0)) === $targetId) {
+            $this->stopImpersonate();
+            return;
+        }
+
+        $rsTarget = p4c_query(
+            "SELECT `id`, `username`, `rule`, `access_area`
+             FROM `employee`
+             WHERE `id` = '" . $targetId . "'
+             LIMIT 1;",
+            __FILE__,
+            __LINE__
+        );
+
+        if (!$rsTarget || p4c_num_rows($rsTarget) === 0) {
+            Response::error('Der ausgewählte Mitarbeiter-Account wurde nicht gefunden.', 404);
+            return;
+        }
+
+        $targetObj   = p4c_fetch_object($rsTarget);
+        $targetName  = $this->toUtf8((string)($targetObj->username ?? ('Mitarbeiter #' . $targetId)));
+        $targetRule  = strtolower(trim((string)($targetObj->rule ?? 'read'))) === 'write' ? 'write' : 'read';
+        $targetAreas = $this->parseAccessAreas((string)($targetObj->access_area ?? ''));
+
+        // Ursprüngliche Admin-Session beim ersten Wechsel sicher hinterlegen
+        if (!is_array($impersonator) || empty($impersonator['id'])) {
+            $_SESSION['impersonator_employee'] = [
+                'id'          => $currentEmployeeId,
+                'username'    => (string)($_SESSION['employee_username'] ?? 'Admin'),
+                'rule'        => $currentEmployeeRule,
+                'access_area' => isset($_SESSION['employee_access_area']) && is_array($_SESSION['employee_access_area'])
+                    ? $_SESSION['employee_access_area']
+                    : ['all'],
+                'started_at'  => time(),
+            ];
+        }
+
+        $origAdminId   = abs((int)$_SESSION['impersonator_employee']['id']);
+        $origAdminName = (string)($_SESSION['impersonator_employee']['username'] ?? 'Admin');
+
+        // Noch unter der bisherigen / Admin-ID protokollieren
+        if (function_exists('log_action')) {
+            log_action("Session-Übernahme: Admin {$origAdminName} (#{$origAdminId}) hat sich in die Session von {$targetName} (#{$targetId}) eingeloggt.");
+        }
+
+        // Session auf den Ziel-Mitarbeiter umschalten
+        $_SESSION['logged_id']            = 'acp';
+        $_SESSION['employee_id']          = $targetId;
+        $_SESSION['employee_username']    = $targetName;
+        $_SESSION['employee_rule']        = $targetRule;
+        $_SESSION['employee_access_area'] = $targetAreas;
+        $_SESSION['last_activity']        = time();
+
+        if (function_exists('acp_neu_sync_auth_cookie')) {
+            acp_neu_sync_auth_cookie($targetId, $targetName);
+        }
+
+        Response::json([
+            'status'      => 'ok',
+            'employee_id' => $targetId,
+            'username'    => $targetName,
+            'message'     => "Du bist jetzt in der Session von „{$targetName}“ (#{$targetId}) eingeloggt.",
+        ]);
+    }
+
+    // =========================================================================
+    // 7. Zurück zur ursprünglichen Admin-Session wechseln (POST ?route=employees/stop-impersonate)
+    // =========================================================================
+    public function stopImpersonate(): void
+    {
+        if (!$this->request->isPost()) {
+            Response::error('Ungültige Anfrage-Methode.', 405);
+            return;
+        }
+
+        if (!Csrf::validate($this->request->csrfToken())) {
+            Response::error('Dein Sicherheitstoken (CSRF) ist abgelaufen. Bitte lade die Seite neu.', 403);
+            return;
+        }
+
+        $impersonator = isset($_SESSION['impersonator_employee']) && is_array($_SESSION['impersonator_employee'])
+            ? $_SESSION['impersonator_employee']
+            : null;
+
+        if (!is_array($impersonator) || empty($impersonator['id'])) {
+            Response::error('Es ist aktuell keine übernommene Mitarbeiter-Session aktiv.', 400);
+            return;
+        }
+
+        $origAdminId    = abs((int)$impersonator['id']);
+        $prevEmpId      = abs((int)($_SESSION['employee_id'] ?? 0));
+        $prevEmpName    = (string)($_SESSION['employee_username'] ?? ('#' . $prevEmpId));
+
+        $rsAdmin = p4c_query(
+            "SELECT `id`, `username`, `rule`, `access_area`
+             FROM `employee`
+             WHERE `id` = '" . $origAdminId . "'
+             LIMIT 1;",
+            __FILE__,
+            __LINE__
+        );
+
+        if (!$rsAdmin || p4c_num_rows($rsAdmin) === 0) {
+            Response::error('Der ursprüngliche Administrator-Account konnte nicht gefunden werden.', 404);
+            return;
+        }
+
+        $adminObj   = p4c_fetch_object($rsAdmin);
+        $adminName  = $this->toUtf8((string)($adminObj->username ?? 'Admin'));
+        $adminRule  = strtolower(trim((string)($adminObj->rule ?? 'write'))) === 'write' ? 'write' : 'read';
+        $adminAreas = $this->parseAccessAreas((string)($adminObj->access_area ?? 'all'));
+
+        unset($_SESSION['impersonator_employee']);
+
+        $_SESSION['logged_id']            = 'acp';
+        $_SESSION['employee_id']          = $origAdminId;
+        $_SESSION['employee_username']    = $adminName;
+        $_SESSION['employee_rule']        = $adminRule;
+        $_SESSION['employee_access_area'] = $adminAreas;
+        $_SESSION['last_activity']        = time();
+
+        if (function_exists('acp_neu_sync_auth_cookie')) {
+            acp_neu_sync_auth_cookie($origAdminId, $adminName);
+        }
+
+        if (function_exists('log_action')) {
+            log_action("Session-Übernahme beendet: Zurückgekehrt von {$prevEmpName} (#{$prevEmpId}) in den eigenen Admin-Account {$adminName} (#{$origAdminId}).");
+        }
+
+        Response::json([
+            'status'      => 'ok',
+            'employee_id' => $origAdminId,
+            'username'    => $adminName,
+            'message'     => "Willkommen zurück, {$adminName}! Deine eigene Admin-Session wurde wiederhergestellt.",
         ]);
     }
 }

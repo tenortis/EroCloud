@@ -23,34 +23,19 @@ $diskPct   = (float)($disk['used_percent'] ?? 0);
 $diskBarCls = $diskPct >= 85 ? 'bg-danger' : ($diskPct >= 70 ? 'bg-warning' : 'bg-primary');
 ?>
 
-<!-- Content-Online Schnellwechsel-Leiste -->
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-    <div class="d-flex flex-wrap align-items-center gap-2">
-        <a href="#/movies-online" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-film me-1"></i>Filme online
-            <span class="badge bg-secondary ms-1"><?= (int)($switcherCounts['movies_online'] ?? 0) ?></span>
-        </a>
-        <a href="#/movies-drafts" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-hourglass-split me-1"></i>Filme in Planung
-            <span class="badge bg-secondary ms-1"><?= (int)($switcherCounts['movies_drafts'] ?? 0) ?></span>
-        </a>
-        <a href="#/movies-blocked" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-slash-circle me-1"></i>Abgelehnt / Gesperrt
-            <span class="badge bg-secondary ms-1"><?= (int)($switcherCounts['movies_blocked'] ?? 0) ?></span>
-        </a>
-        <a href="#/photo-albums-online" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-images me-1"></i>Fotoalben online
-            <span class="badge bg-secondary ms-1"><?= (int)($switcherCounts['photo_albums_online'] ?? 0) ?></span>
-        </a>
-        <a href="#/content-cleanup" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-trash3 me-1"></i>Content-Bereinigung
-        </a>
-        <a href="#/storage-analytics" class="btn btn-sm btn-primary fw-semibold">
-            <i class="bi bi-hdd-network me-1"></i>Speicher &amp; Traffic
-        </a>
+<!-- Seiten-Header -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
+    <div>
+        <h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
+            <i class="bi bi-hdd-network ec-text-primary"></i>
+            <span>Speicher &amp; Traffic</span>
+        </h1>
+        <p class="text-muted small mb-0">
+            Auswertung der physischen Server-Speicherbelegung, Video-Auflösungen, Formate sowie Streaming- und Download-Traffic.
+        </p>
     </div>
 
-    <div class="d-flex align-items-center gap-2 small">
+    <div class="d-flex flex-wrap align-items-center gap-2 small">
         <span class="text-muted">
             Stand: <strong id="sa-meta-time"><?= View::e((string)($analytics['generated_at'] ?? '-')) ?></strong>
             <span id="sa-meta-cache">
@@ -61,7 +46,7 @@ $diskBarCls = $diskPct >= 85 ? 'bg-danger' : ($diskPct >= 70 ? 'bg-warning' : 'b
                 <?php endif; ?>
             </span>
         </span>
-        <button type="button" class="btn btn-sm btn-outline-primary" id="btn-sa-refresh" onclick="App.StorageAnalytics.refreshAnalytics()">
+        <button type="button" class="btn btn-sm btn-outline-kkc" id="btn-sa-refresh" onclick="App.StorageAnalytics.refreshAnalytics()">
             <i class="bi bi-arrow-clockwise me-1"></i>Jetzt live neu berechnen
         </button>
     </div>

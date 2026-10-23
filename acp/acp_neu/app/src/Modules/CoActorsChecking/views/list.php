@@ -26,51 +26,17 @@ $curSearch = (string)($filters['q'] ?? '');
 <div class="container-fluid py-3" data-page-width="full">
 
   <!-- ========================================================================
-       MODULÜBERGREIFENDE CONTENT-ÜBERSICHT (SWITCHER)
-       ======================================================================== -->
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--kkc-border) !important;">
-    <div class="d-flex flex-wrap align-items-center gap-1">
-      <a href="#/movies-checking" class="btn btn-sm btn-outline-kkc">
-        <i class="bi bi-film me-1"></i> Filme prüfen
-        <span class="badge bg-warning text-dark ms-1"><?= (int)($switcherCounts['movies_checking'] ?? 0) ?></span>
-      </a>
-      <a href="#/photo-albums-checking" class="btn btn-sm btn-outline-kkc">
-        <i class="bi bi-images me-1"></i> Fotoalben prüfen
-        <span class="badge bg-warning text-dark ms-1"><?= (int)($switcherCounts['albums_checking'] ?? 0) ?></span>
-      </a>
-      <a href="#/co-actors-checking" class="btn btn-sm btn-kkc fw-bold">
-        <i class="bi bi-person-badge-fill me-1"></i> Drehpartner &amp; ID-Check
-        <span class="badge bg-white text-dark ms-1" id="cac-switcher-open-cnt"><?= (int)($counts['under_review'] ?? 0) ?></span>
-      </a>
-      <a href="#/movies-blocked" class="btn btn-sm btn-outline-kkc">
-        <i class="bi bi-slash-circle me-1"></i> Filme abgelehnt / gesperrt
-        <span class="badge bg-danger ms-1"><?= (int)($switcherCounts['movies_blocked'] ?? 0) ?></span>
-      </a>
-      <span class="text-muted mx-1">|</span>
-      <a href="#/movies-online" class="btn btn-sm btn-outline-kkc">
-        <i class="bi bi-collection-play-fill me-1"></i> Filme online
-        <span class="badge bg-secondary ms-1"><?= (int)($switcherCounts['movies_online'] ?? 0) ?></span>
-      </a>
-      <a href="#/photo-albums-online" class="btn btn-sm btn-outline-kkc">
-        <i class="bi bi-journal-album me-1"></i> Fotoalben online
-        <span class="badge bg-secondary ms-1"><?= (int)($switcherCounts['albums_online'] ?? 0) ?></span>
-      </a>
-    </div>
-  </div>
-
-  <!-- ========================================================================
        SEITEN-HEADER
        ======================================================================== -->
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
     <div>
-      <div class="d-flex align-items-center gap-2 mb-1">
-        <span class="badge-kkc badge-kkc-info"><i class="bi bi-shield-check me-1"></i>Content prüfen</span>
-        <span class="text-muted small">18+ Altersverifikation, ID-Shot &amp; Model-Release-Verwaltung</span>
-      </div>
-      <h1 class="h3 fw-bold mb-0 d-flex align-items-center gap-2">
+      <h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
         <i class="bi bi-person-vcard-fill ec-text-primary"></i>
         <span>Drehpartner &amp; ID-Check</span>
       </h1>
+      <p class="text-muted small mb-0">
+        Prüfung und Freigabe aller 18+ Altersnachweise, ID-Shots, Ausweisdokumente und Einverständniserklärungen (Model-Release).
+      </p>
     </div>
 
     <div class="d-flex flex-wrap align-items-center gap-2">

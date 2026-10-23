@@ -19,32 +19,22 @@ if (!defined('SAFE_INC')) {
  */
 ?>
 
-<!-- Content-Online Schnellwechsel-Leiste -->
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-    <div class="d-flex flex-wrap align-items-center gap-2">
-        <a href="#/movies-online" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-film me-1"></i>Filme online
-            <span class="badge bg-secondary ms-1"><?= (int)($switcherCounts['movies_online'] ?? 0) ?></span>
-        </a>
-        <a href="#/movies-drafts" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-hourglass-split me-1"></i>Filme in Planung
-            <span class="badge bg-secondary ms-1"><?= (int)($switcherCounts['movies_drafts'] ?? 0) ?></span>
-        </a>
-        <a href="#/movies-blocked" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-slash-circle me-1"></i>Abgelehnt / Gesperrt
-            <span class="badge bg-secondary ms-1"><?= (int)($switcherCounts['movies_blocked'] ?? 0) ?></span>
-        </a>
-        <a href="#/photo-albums-online" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-images me-1"></i>Fotoalben online
-            <span class="badge bg-secondary ms-1"><?= (int)($switcherCounts['photo_albums_online'] ?? 0) ?></span>
-        </a>
-        <a href="#/content-cleanup" class="btn btn-sm btn-primary fw-semibold">
-            <i class="bi bi-trash3 me-1"></i>Content-Bereinigung
-            <span class="badge bg-danger ms-1"><?= $upcomingCount ?></span>
-        </a>
-        <a href="#/storage-analytics" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-hdd-network me-1"></i>Speicher &amp; Traffic
-        </a>
+<!-- Seiten-Header -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
+    <div>
+        <h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
+            <i class="bi bi-trash3 ec-text-primary"></i>
+            <span>Content-Bereinigung</span>
+        </h1>
+        <p class="text-muted small mb-0">
+            Automatische und manuelle Bereinigung ungenutzter, abgelehnter oder veralteter Film-Bestände nach definierten Löschregeln.
+        </p>
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+        <button type="button" class="btn btn-sm btn-outline-kkc" onclick="App.handleRoute()">
+            <i class="bi bi-arrow-clockwise me-1"></i>Aktualisieren
+        </button>
     </div>
 </div>
 

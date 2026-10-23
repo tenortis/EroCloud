@@ -175,6 +175,11 @@ endif;
 $employeeId       = abs((int)$_SESSION['employee_id']);
 $employeeUsername = (string)($_SESSION['employee_username'] ?? 'Admin');
 $employeeRule     = (string)($_SESSION['employee_rule'] ?? 'Administrator');
+$impersonator     = isset($_SESSION['impersonator_employee']) && is_array($_SESSION['impersonator_employee'])
+    ? $_SESSION['impersonator_employee']
+    : null;
+$impersonatorId   = $impersonator ? abs((int)($impersonator['id'] ?? 0)) : 0;
+$impersonatorName = $impersonator ? (string)($impersonator['username'] ?? 'Admin') : '';
 
 $initials = mb_strtoupper(mb_substr(trim($employeeUsername), 0, 2));
 if ($initials === '') {
@@ -501,6 +506,21 @@ $sessionRemainingSeconds = 1800;
 
       <!-- Quick-Actions, Auto-Logout-Countdown & Admin-Menü -->
       <div class="d-flex align-items-center gap-2 gap-md-3 ms-auto">
+        <?php if ($impersonator !== null): ?>
+        <div class="d-flex align-items-center gap-2 px-2 py-1 rounded border border-warning bg-warning bg-opacity-10 small" title="Du befindest dich aktuell in der übernommenen Mitarbeiter-Session von <?= htmlspecialchars($employeeUsername, ENT_QUOTES, 'UTF-8') ?>">
+          <span class="d-none d-lg-inline text-body">
+            <i class="bi bi-person-badge-fill text-warning me-1"></i>Session: <strong><?= htmlspecialchars($employeeUsername, ENT_QUOTES, 'UTF-8') ?></strong>
+          </span>
+          <button type="button"
+                  class="btn btn-xs btn-warning py-0 px-2 fw-semibold"
+                  style="font-size: 0.75rem;"
+                  onclick="App.Employees.stopImpersonation()"
+                  title="Zurück in deine eigene Admin-Session (<?= htmlspecialchars($impersonatorName, ENT_QUOTES, 'UTF-8') ?>) wechseln">
+            <i class="bi bi-arrow-return-left me-1"></i>Zurück zu <?= htmlspecialchars($impersonatorName, ENT_QUOTES, 'UTF-8') ?>
+          </button>
+        </div>
+        <?php endif; ?>
+
         <?php if (acp_has_access('content_check') && $countContentChecking > 0): ?>
         <a href="#/movies-checking" class="btn btn-sm btn-primary-kkc d-flex align-items-center gap-1" title="Direkt zu den offenen Content-Prüfungen">
           <i class="bi bi-shield-check"></i>
@@ -524,25 +544,40 @@ $sessionRemainingSeconds = 1800;
         <!-- Admin Dropdown -->
         <div class="dropdown">
           <button class="btn btn-sm btn-link text-decoration-none dropdown-toggle d-flex align-items-center gap-2 p-0 text-body" data-bs-toggle="dropdown">
-            <div class="rounded-circle ec-bg-primary-subtle ec-text-primary fw-bold d-flex align-items-center justify-content-center" style="width: 34px; height: 34px; font-size: 0.82rem;">
+            <div class="rounded-circle <?= $impersonator !== null ? 'bg-warning text-dark' : 'ec-bg-primary-subtle ec-text-primary' ?> fw-bold d-flex align-items-center justify-content-center" style="width: 34px; height: 34px; font-size: 0.82rem;">
               <?= htmlspecialchars($initials, ENT_QUOTES, 'UTF-8') ?>
             </div>
             <div class="text-start d-none d-md-block">
               <div class="fw-semibold lh-1" style="font-size: 0.825rem; color: var(--kkc-text);">
                 <?= htmlspecialchars($employeeUsername, ENT_QUOTES, 'UTF-8') ?>
               </div>
-              <div style="font-size: 0.7rem; color: var(--kkc-text-muted);">Eingeloggt als Admin</div>
+              <div style="font-size: 0.7rem; color: var(--kkc-text-muted);">
+                <?= $impersonator !== null ? 'Übernommen von ' . htmlspecialchars($impersonatorName, ENT_QUOTES, 'UTF-8') : ($employeeRule === 'write' ? 'Eingeloggt als Admin' : 'Eingeloggt als Moderator') ?>
+              </div>
             </div>
           </button>
           <ul class="dropdown-menu dropdown-menu-end shadow-lg border-secondary border-opacity-25">
             <li>
               <h6 class="dropdown-header">
-                Eingeloggt als: <?= htmlspecialchars($employeeUsername, ENT_QUOTES, 'UTF-8') ?>
+                Eingeloggt als: <?= htmlspecialchars($employeeUsername, ENT_QUOTES, 'UTF-8') ?> (#<?= (int)$employeeId ?>)
                 <?php if ($employeeRule !== ''): ?>
                 <div class="small text-muted fw-normal mt-1">Rolle: <?= htmlspecialchars($employeeRule, ENT_QUOTES, 'UTF-8') ?></div>
                 <?php endif; ?>
+                <?php if ($impersonator !== null): ?>
+                <div class="small text-warning fw-semibold mt-1">
+                  <i class="bi bi-person-badge-fill me-1"></i>Admin-Account: <?= htmlspecialchars($impersonatorName, ENT_QUOTES, 'UTF-8') ?> (#<?= (int)$impersonatorId ?>)
+                </div>
+                <?php endif; ?>
               </h6>
             </li>
+            <?php if ($impersonator !== null): ?>
+            <li>
+              <button type="button" class="dropdown-item fw-semibold text-warning" onclick="App.Employees.stopImpersonation()">
+                <i class="bi bi-arrow-return-left me-2"></i>Zurück zu <?= htmlspecialchars($impersonatorName, ENT_QUOTES, 'UTF-8') ?>
+              </button>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <?php endif; ?>
             <li>
               <a class="dropdown-item" href="#/startseite">
                 <i class="bi bi-speedometer2 me-2 text-muted"></i>Admin-Dashboard

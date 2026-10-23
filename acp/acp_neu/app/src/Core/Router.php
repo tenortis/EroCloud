@@ -208,5 +208,7 @@ class Router
         self::register('employees/save', $employeesCtrl, 'save', 'employees');
         self::register('employees/delete', $employeesCtrl, 'delete', 'employees');
         self::register('employees/clear-history', $employeesCtrl, 'clearHistory', 'employees');
+        self::register('employees/impersonate', $employeesCtrl, 'impersonate', 'employees');
+        self::register('employees/stop-impersonate', $employeesCtrl, 'stopImpersonate', '');
     }
 }

@@ -149,13 +149,15 @@ if (!function_exists('acp_neu_sync_auth_cookie')) {
         if (headers_sent() || $employeeId <= 0 || !defined('AES_KEY')) {
             return;
         }
+        $impId   = isset($_SESSION['impersonator_employee']['id']) ? abs((int)$_SESSION['impersonator_employee']['id']) : 0;
         $exp     = time() + 1800; // 30 Minuten analog ACP_SESSION_DURATION
-        $dataStr = $employeeId . '|' . $exp . '|' . $username;
+        $dataStr = $employeeId . '|' . $exp . '|' . $username . ($impId > 0 ? '|' . $impId : '');
         $sig     = hash_hmac('sha256', $dataStr, (string)AES_KEY);
         $token   = base64_encode((string)json_encode([
             'eid' => $employeeId,
             'exp' => $exp,
             'usr' => $username,
+            'imp' => $impId,
             'sig' => $sig,
         ]));
         $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
@@ -223,8 +225,10 @@ if (!function_exists('acp_neu_ensure_session')) {
                 $eid      = abs((int)$payload['eid']);
                 $exp      = abs((int)$payload['exp']);
                 $usr      = (string)$payload['usr'];
+                $imp      = abs((int)($payload['imp'] ?? 0));
                 $sig      = (string)$payload['sig'];
-                $expected = hash_hmac('sha256', $eid . '|' . $exp . '|' . $usr, (string)AES_KEY);
+                $dataStr  = $eid . '|' . $exp . '|' . $usr . ($imp > 0 ? '|' . $imp : '');
+                $expected = hash_hmac('sha256', $dataStr, (string)AES_KEY);
 
                 if ($eid > 0 && $exp >= time() && hash_equals($expected, $sig)) {
                     $rsCheck = p4c_query("SELECT `id`, `username`, `rule`, `access_area` FROM `employee` WHERE `id` = '" . $eid . "' LIMIT 1;", __FILE__, __LINE__);
@@ -236,6 +240,20 @@ if (!function_exists('acp_neu_ensure_session')) {
                         $_SESSION['employee_access_area'] = array_map('trim', explode(',', (string)($empObj->access_area ?? '')));
                         $_SESSION['employee_username']    = (string)($empObj->username ?? $usr);
                         $_SESSION['last_activity']        = time();
+
+                        if ($imp > 0 && $imp !== $_SESSION['employee_id']) {
+                            $rsImp = p4c_query("SELECT `id`, `username`, `rule`, `access_area` FROM `employee` WHERE `id` = '" . $imp . "' AND `rule` = 'write' LIMIT 1;", __FILE__, __LINE__);
+                            if ($rsImp && p4c_num_rows($rsImp) > 0) {
+                                $impObj = p4c_fetch_object($rsImp);
+                                $_SESSION['impersonator_employee'] = [
+                                    'id'          => abs((int)$impObj->id),
+                                    'username'    => (string)($impObj->username ?? 'Admin'),
+                                    'rule'        => (string)($impObj->rule ?? 'write'),
+                                    'access_area' => array_map('trim', explode(',', (string)($impObj->access_area ?? 'all'))),
+                                ];
+                            }
+                        }
+
                         acp_neu_sync_auth_cookie($_SESSION['employee_id'], $_SESSION['employee_username']);
                         return true;
                     }

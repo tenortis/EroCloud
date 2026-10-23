@@ -50,21 +50,26 @@ $buildPageUrl = static function (int $targetPage) use ($filters, $perPage): stri
 };
 ?>
 
-<!-- Kopfbereich -->
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+<!-- Seiten-Header -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
     <div>
-        <h4 class="fw-bold mb-0"><i class="bi bi-person-bounding-box text-primary me-2"></i>Darsteller-Profile</h4>
-        <small class="text-muted">Zentrale Übersicht, Prüfung und Verwaltung aller angelegten Darsteller-Profile in der EroCloud.</small>
+        <h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
+            <i class="bi bi-person-bounding-box ec-text-primary"></i>
+            <span>Darsteller-Profile</span>
+        </h1>
+        <p class="text-muted small mb-0">
+            Zentrale Übersicht, Prüfung und Verwaltung aller angelegten Darsteller-Profile in der EroCloud.
+        </p>
     </div>
     <div class="d-flex flex-wrap align-items-center gap-2">
         <?php if (($kpis['new_5d'] ?? 0) > 0): ?>
             <a href="#/actors?status=new_5d" class="btn btn-sm btn-warning text-dark fw-semibold">
-                <i class="bi bi-stars me-1"></i><?= (int)$kpis['new_5d'] ?> neue Profile (letzte 5 Tage) prüfen
+                <i class="bi bi-stars me-1"></i><?= (int)$kpis['new_5d'] ?> neue Profile (letzte 5 Tage) filtern
             </a>
         <?php endif; ?>
-        <a href="#/co-actors-checking" class="btn btn-sm btn-outline-primary">
-            <i class="bi bi-person-badge me-1"></i>Drehpartner &amp; 18+ ID-Check
-        </a>
+        <button type="button" class="btn btn-sm btn-outline-kkc" onclick="App.handleRoute()">
+            <i class="bi bi-arrow-clockwise me-1"></i>Aktualisieren
+        </button>
     </div>
 </div>
 

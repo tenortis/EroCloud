@@ -21,14 +21,33 @@ use App\Core\View;
  * @var string $currentEmployeeRule
  */
 
-$empId       = (int)$employee['id'];
-$isNew       = !empty($employee['is_new']);
-$isSelf      = !empty($employee['is_self']);
-$isAllAccess = !empty($employee['is_all_access']);
-$activeAreas = is_array($employee['access_areas'] ?? null) ? $employee['access_areas'] : [];
-$canWrite    = ($currentEmployeeRule === 'write');
+$empId          = (int)$employee['id'];
+$isNew          = !empty($employee['is_new']);
+$isSelf         = !empty($employee['is_self']);
+$isAllAccess    = !empty($employee['is_all_access']);
+$activeAreas    = is_array($employee['access_areas'] ?? null) ? $employee['access_areas'] : [];
+$canWrite       = ($currentEmployeeRule === 'write');
+$canImpersonate = !empty($canImpersonate);
+$impersonator   = is_array($impersonator ?? null) ? $impersonator : null;
+$origAdminId    = $impersonator ? abs((int)($impersonator['id'] ?? 0)) : 0;
+$origAdminName  = $impersonator ? (string)($impersonator['username'] ?? 'Admin') : '';
 ?>
 <div class="container-fluid py-3 px-3 px-xl-4" data-page-width="full">
+
+  <?php if ($impersonator !== null): ?>
+    <div class="alert alert-warning d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4 shadow-sm">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-person-badge-fill fs-5 text-warning"></i>
+        <div class="small">
+          <strong>Session-Übernahme aktiv:</strong> Du bist aktuell in der Session von <strong><?= View::e((string)($_SESSION['employee_username'] ?? '')) ?> (#<?= (int)$currentEmployeeId ?>)</strong> eingeloggt.
+          Dein ursprünglicher Administrator-Account ist <strong><?= View::e($origAdminName) ?> (#<?= $origAdminId ?>)</strong>.
+        </div>
+      </div>
+      <button type="button" class="btn btn-sm btn-warning fw-semibold" onclick="App.Employees.stopImpersonation()">
+        <i class="bi bi-arrow-return-left me-1"></i>Zurück zu <?= View::e($origAdminName) ?>
+      </button>
+    </div>
+  <?php endif; ?>
 
   <!-- Kopfzeile mit Navigation -->
   <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
@@ -71,6 +90,22 @@ $canWrite    = ($currentEmployeeRule === 'write');
 
     <div class="d-flex flex-wrap align-items-center gap-2">
       <?php if (!$isNew): ?>
+        <?php if ($canImpersonate && !$isSelf): ?>
+          <?php if ($origAdminId > 0 && $empId === $origAdminId): ?>
+            <button type="button"
+                    class="btn btn-sm btn-warning fw-semibold"
+                    onclick="App.Employees.stopImpersonation()">
+              <i class="bi bi-arrow-return-left me-1"></i>Zurück in deine Admin-Session (<?= View::e($origAdminName) ?>)
+            </button>
+          <?php else: ?>
+            <button type="button"
+                    class="btn btn-sm btn-primary-kkc fw-semibold"
+                    title="In die Session von <?= View::e((string)$employee['username']) ?> einloggen"
+                    onclick="App.Employees.impersonateEmployee(<?= $empId ?>, '<?= View::e(addslashes((string)$employee['username'])) ?>')">
+              <i class="bi bi-box-arrow-in-right me-1"></i>Session übernehmen (Als <?= View::e((string)$employee['username']) ?> einloggen)
+            </button>
+          <?php endif; ?>
+        <?php endif; ?>
         <a href="#/employee?id=0" class="btn btn-sm btn-outline-kkc">
           <i class="bi bi-person-plus me-1"></i>Weiteren Account anlegen
         </a>

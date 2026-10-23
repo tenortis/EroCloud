@@ -23,29 +23,20 @@ $initMovieJson = json_encode($initialMovie, JSON_UNESCAPED_UNICODE);
 $ruleCats      = $rulesData['parsed_categories']['categories'] ?? [];
 ?>
 
-<!-- Content-Prüfung Schnellwechsel-Leiste -->
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-    <div class="d-flex flex-wrap align-items-center gap-2">
-        <a href="#/movies-checking" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-film me-1"></i>Filme prüfen
-            <span class="badge bg-secondary ms-1"><?= (int)($navCounts['movies_checking'] ?? 0) ?></span>
-        </a>
-        <a href="#/photo-albums-checking" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-images me-1"></i>Fotoalben prüfen
-            <span class="badge bg-secondary ms-1"><?= (int)($navCounts['albums_checking'] ?? 0) ?></span>
-        </a>
-        <a href="#/co-actors-checking" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-person-badge me-1"></i>Drehpartner &amp; ID-Check
-            <span class="badge bg-secondary ms-1"><?= (int)($navCounts['co_actors_checking'] ?? 0) ?></span>
-        </a>
-        <a href="#/ai-compliance" class="btn btn-sm btn-primary fw-semibold">
-            <i class="bi bi-robot me-1"></i>KI-Analyse &amp; BRAM
-            <span class="badge bg-danger ms-1"><?= (int)($stats['cnt_viol'] ?? 0) ?></span>
-        </a>
+<!-- Seiten-Header -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
+    <div>
+        <h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
+            <i class="bi bi-cpu ec-text-primary"></i>
+            <span>KI-Analyse &amp; BRAM</span>
+        </h1>
+        <p class="text-muted small mb-0">
+            Automatische Whisper-Audio-Transkription (.vtt), BRAM-Keyword-Matrix und KI-gestützte Inhaltsprüfung für Filme und Textfelder.
+        </p>
     </div>
 
     <div class="d-flex align-items-center gap-2">
-        <button type="button" class="btn btn-sm btn-outline-primary" id="btn-aic-reload-dash" onclick="App.AiCompliance.reloadDashboard()">
+        <button type="button" class="btn btn-sm btn-outline-kkc" id="btn-aic-reload-dash" onclick="App.AiCompliance.reloadDashboard()">
             <i class="bi bi-arrow-clockwise me-1"></i>Daten &amp; Status aktualisieren
         </button>
     </div>

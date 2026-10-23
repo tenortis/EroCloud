@@ -26,57 +26,20 @@ $totalPages = (int)($filters['total_page'] ?? 1);
 <div class="container-fluid py-3" data-page-width="full">
 
   <!-- ========================================================================
-       MODULÜBERGREIFENDE CONTENT-GESAMTÜBERSICHT (SWITCHER)
-       ======================================================================== -->
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--kkc-border) !important;">
-    <div class="d-flex flex-wrap align-items-center gap-1">
-      <a href="#/movies-online" class="btn btn-sm btn-outline-kkc">
-        <i class="bi bi-collection-play-fill me-1"></i> Filme online
-        <span class="badge bg-secondary ms-1"><?= (int)($switcherCounts['movies_online'] ?? 0) ?></span>
-      </a>
-      <a href="#/movies-drafts" class="btn btn-sm btn-outline-kkc">
-        <i class="bi bi-clock-history me-1"></i> Filme in Planung
-        <span class="badge bg-secondary ms-1"><?= (int)($switcherCounts['movies_drafts'] ?? 0) ?></span>
-      </a>
-      <a href="#/movies-blocked" class="btn btn-sm btn-outline-kkc">
-        <i class="bi bi-slash-circle me-1"></i> Filme abgelehnt / gesperrt
-        <span class="badge bg-danger ms-1"><?= (int)($switcherCounts['movies_blocked'] ?? 0) ?></span>
-      </a>
-      <a href="#/movies-checking" class="btn btn-sm btn-outline-kkc">
-        <i class="bi bi-film me-1"></i> Filme prüfen
-        <span class="badge bg-warning text-dark ms-1"><?= (int)($switcherCounts['movies_checking'] ?? 0) ?></span>
-      </a>
-      <span class="text-muted mx-1">|</span>
-      <a href="#/photo-albums-online" class="btn btn-sm btn-kkc fw-bold">
-        <i class="bi bi-journal-album me-1"></i> Fotoalben online
-        <span class="badge bg-white text-dark ms-1"><?= (int)($switcherCounts['albums_online'] ?? 0) ?></span>
-      </a>
-      <a href="#/photo-albums-checking" class="btn btn-sm btn-outline-kkc">
-        <i class="bi bi-images me-1"></i> Fotoalben prüfen
-        <span class="badge bg-warning text-dark ms-1"><?= (int)($switcherCounts['albums_checking'] ?? 0) ?></span>
-      </a>
-    </div>
-  </div>
-
-  <!-- ========================================================================
        SEITEN-HEADER
        ======================================================================== -->
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
     <div>
-      <div class="d-flex align-items-center gap-2 mb-1">
-        <span class="badge-kkc badge-kkc-info">Content Online</span>
-        <span class="text-muted small">Fotoalben-Gesamtübersicht &amp; Verwaltung</span>
-      </div>
-      <h1 class="h3 fw-bold mb-0 d-flex align-items-center gap-2">
+      <h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
         <i class="bi bi-journal-album ec-text-primary"></i>
-        <span>Fotoalben online (<span><?= (int)$kpis['total'] ?></span>)</span>
+        <span>Fotoalben online</span>
       </h1>
+      <p class="text-muted small mb-0">
+        Gesamtübersicht und Verwaltung aller veröffentlichten Fotoalben im EroCloud-Katalog.
+      </p>
     </div>
 
     <div class="d-flex flex-wrap align-items-center gap-2">
-      <button type="button" id="pao-recalc-size-btn" class="btn btn-sm btn-outline-kkc" onclick="App.recalcOnlineAlbumsSize()">
-        <i class="bi bi-hdd-stack me-1"></i> Speichergröße neu berechnen
-      </button>
       <button type="button" class="btn btn-sm btn-outline-kkc" onclick="App.handleRoute()">
         <i class="bi bi-arrow-clockwise me-1"></i> Aktualisieren
       </button>
@@ -91,14 +54,14 @@ $totalPages = (int)($filters['total_page'] ?? 1);
       <div class="card-kkc h-100">
         <div class="card-kkc-body d-flex align-items-center justify-content-between">
           <div>
-            <div class="text-muted small fw-semibold mb-1">Fotoalben Online &amp; Speicherplatz</div>
+            <div class="text-muted small fw-semibold mb-1">Fotoalben Online Gesamt</div>
             <div class="h3 fw-bold mb-0"><?= number_format((int)$kpis['total'], 0, ',', '.') ?></div>
             <small class="text-muted">
-              Belegt: <strong id="pao-storage-size-text" class="ec-text-primary"><?= View::e((string)$kpis['storage_text']) ?></strong>
+              Mit <strong><?= number_format((int)$kpis['total_photos'], 0, ',', '.') ?></strong> Einzelfotos im Katalog
             </small>
           </div>
           <div class="rounded-3 p-3" style="background: var(--kkc-accent-Soft); color: var(--kkc-accent);">
-            <i class="bi bi-hdd-network-fill fs-3"></i>
+            <i class="bi bi-journal-album fs-3"></i>
           </div>
         </div>
       </div>

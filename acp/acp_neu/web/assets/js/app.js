@@ -5120,6 +5120,70 @@ const App = {
       } catch (err) {
         App.toast('Netzwerkfehler: ' + err.message, 'danger');
       }
+    },
+
+    async impersonateEmployee(employeeId, username) {
+      const empId = parseInt(employeeId, 10) || 0;
+      if (empId <= 0) return;
+
+      if (!window.confirm(`Möchtest du jetzt die Session von „${username}“ (#${empId}) übernehmen und dich in diesen Mitarbeiter-Account einloggen?`)) {
+        return;
+      }
+
+      const fd = new FormData();
+      fd.append('_csrf', App.csrfToken);
+      fd.append('employee_id', String(empId));
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=employees/impersonate`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.status !== 'ok') {
+          App.toast(data.message || 'Session-Übernahme fehlgeschlagen.', 'danger');
+          return;
+        }
+
+        App.toast(data.message || `Session von ${username} übernommen.`, 'success');
+        window.location.hash = '#/startseite';
+        setTimeout(() => window.location.reload(), 250);
+      } catch (err) {
+        App.toast('Netzwerkfehler bei der Session-Übernahme: ' + err.message, 'danger');
+      }
+    },
+
+    async stopImpersonation() {
+      const fd = new FormData();
+      fd.append('_csrf', App.csrfToken);
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=employees/stop-impersonate`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.status !== 'ok') {
+          App.toast(data.message || 'Rückkehr zur Admin-Session fehlgeschlagen.', 'danger');
+          return;
+        }
+
+        App.toast(data.message || 'Deine eigene Admin-Session wurde wiederhergestellt.', 'success');
+        window.location.hash = '#/employees';
+        setTimeout(() => window.location.reload(), 250);
+      } catch (err) {
+        App.toast('Netzwerkfehler: ' + err.message, 'danger');
+      }
     }
   }
 };
