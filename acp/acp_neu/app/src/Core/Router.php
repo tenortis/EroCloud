@@ -136,6 +136,7 @@ class Router
         self::register('photo-albums-checking/approve', $photoAlbumsCheckingCtrl, 'approve', 'content_check');
         self::register('photo-albums-checking/reject', $photoAlbumsCheckingCtrl, 'reject', 'content_check');
         self::register('photo-albums-checking/co-actor-action', $photoAlbumsCheckingCtrl, 'coActorAction', 'content_check,content_online');
+        self::register('photo-albums-checking/ai-action', $photoAlbumsCheckingCtrl, 'aiAction', 'content_check,content_online');
 
         self::register('co-actors-checking', $coActorsCheckingCtrl, 'list', 'content_check');
         self::register('co-actors-checking/action', $coActorsCheckingCtrl, 'action', 'content_check,content_online');
@@ -149,7 +150,8 @@ class Router
         self::register('movies-online/recalc-size', $moviesOnlineCtrl, 'recalcSize', 'content_online');
         self::register('movie-edit', $moviesOnlineCtrl, 'edit', 'content_online');
         self::register('movies-online/save', $moviesOnlineCtrl, 'save', 'content_online');
-        self::register('movies-drafts', $moviesOnlineCtrl, 'drafts', 'content_online');
+        self::register('movies-drafts', $moviesOnlineCtrl, 'drafts', 'content_check,content_online');
+        self::register('movie-draft', $moviesOnlineCtrl, 'draftDetail', 'content_check,content_online');
         self::register('photo-albums-online', $photoAlbumsOnlineCtrl, 'list', 'content_online');
         self::register('photo-albums-online/recalc-size', $photoAlbumsOnlineCtrl, 'recalcSize', 'content_online');
         self::register('photo-album-edit', $photoAlbumsOnlineCtrl, 'edit', 'content_online');

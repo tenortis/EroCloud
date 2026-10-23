@@ -10,6 +10,7 @@ use App\Core\View;
 /** @var int $employeeId */
 /** @var string $employeeUsername */
 /** @var string $employeeRule */
+/** @var bool $isAdmin */
 /** @var array<string, int> $counts */
 /** @var array<int, array<string, mixed>> $onlineUsers */
 /** @var array<int, array<string, mixed>> $onlineActors */
@@ -19,6 +20,7 @@ use App\Core\View;
 /** @var string $employeeNotes */
 /** @var array<int, array<string, mixed>> $historyItems */
 
+$isAdmin            = !empty($isAdmin);
 $countUsersOnline   = count($onlineUsers);
 $countActorsOnline  = count($onlineActors);
 $countOnlineTotal   = $countUsersOnline + $countActorsOnline;
@@ -33,7 +35,11 @@ $openTasksTotal     = (int)($counts['new_actors'] ?? 0) + (int)($counts['new_ban
       <span>Hallo <?= View::e($employeeUsername) ?>, willkommen im EroCloud ACP!</span>
     </h1>
     <p class="text-muted small mb-0">
-      Hier hast du alle offenen Content-Prüfungen, aktuell aktiven Nutzer und Darsteller, Notizen sowie das Aktions-Protokoll im direkten Überblick.
+      <?php if ($isAdmin): ?>
+        Hier hast du alle offenen Content-Prüfungen, aktuell aktiven Nutzer und Darsteller, Notizen sowie das Aktions-Protokoll im direkten Überblick.
+      <?php else: ?>
+        Hier hast du deine offenen Content-Prüfungen sowie die gemeinsamen Team-Notizen und deine persönlichen Notizen im direkten Überblick.
+      <?php endif; ?>
     </p>
   </div>
   <div class="d-flex align-items-center gap-2">
@@ -83,7 +89,8 @@ $openTasksTotal     = (int)($counts['new_actors'] ?? 0) + (int)($counts['new_ban
     </a>
   </div>
 
-  <!-- KPI 3: Jetzt Online (letzte 10 Minuten) -->
+  <?php if ($isAdmin): ?>
+  <!-- KPI 3 (Admin): Jetzt Online (letzte 10 Minuten) -->
   <div class="col-xl-3 col-md-6">
     <div class="card-kkc kpi-card h-100 mb-0">
       <div class="kpi-icon-box bg-success bg-opacity-10 text-success">
@@ -99,7 +106,7 @@ $openTasksTotal     = (int)($counts['new_actors'] ?? 0) + (int)($counts['new_ban
     </div>
   </div>
 
-  <!-- KPI 4: Offene Aufgaben & Profile -->
+  <!-- KPI 4 (Admin): Offene Aufgaben & Profile -->
   <div class="col-xl-3 col-md-6">
     <a href="#/actors" class="text-decoration-none d-block h-100">
       <div class="card-kkc kpi-card h-100 mb-0">
@@ -116,6 +123,43 @@ $openTasksTotal     = (int)($counts['new_actors'] ?? 0) + (int)($counts['new_ban
       </div>
     </a>
   </div>
+  <?php else: ?>
+  <!-- KPI 3 (Moderator): Filme in Planung -->
+  <div class="col-xl-3 col-md-6">
+    <a href="#/movies-drafts" class="text-decoration-none d-block h-100">
+      <div class="card-kkc kpi-card h-100 mb-0">
+        <div class="kpi-icon-box ec-bg-primary-subtle ec-text-primary">
+          <i class="bi bi-clock-history"></i>
+        </div>
+        <div>
+          <div class="kpi-val"><?= number_format((int)($counts['movies_drafts'] ?? 0), 0, ',', '.') ?></div>
+          <div class="kpi-label">Filme in Planung</div>
+          <small class="text-muted">
+            Noch nicht veröffentlichte Film-Entwürfe
+          </small>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <!-- KPI 4 (Moderator): Filme abgelehnt -->
+  <div class="col-xl-3 col-md-6">
+    <a href="#/movies-blocked" class="text-decoration-none d-block h-100">
+      <div class="card-kkc kpi-card h-100 mb-0">
+        <div class="kpi-icon-box bg-danger bg-opacity-10 text-danger">
+          <i class="bi bi-slash-circle"></i>
+        </div>
+        <div>
+          <div class="kpi-val"><?= number_format((int)($counts['movies_blocked'] ?? 0), 0, ',', '.') ?></div>
+          <div class="kpi-label">Filme abgelehnt / gesperrt</div>
+          <small class="text-muted">
+            Beanstandete oder gesperrte Video-Uploads
+          </small>
+        </div>
+      </div>
+    </a>
+  </div>
+  <?php endif; ?>
 </div>
 
 <!-- ==========================================================================
@@ -191,8 +235,9 @@ $openTasksTotal     = (int)($counts['new_actors'] ?? 0) + (int)($counts['new_ban
   </div>
 </div>
 
+<?php if ($isAdmin): ?>
 <!-- ==========================================================================
-     3. LIVE-ONLINE-ÜBERSICHT (Cloud-User & Darsteller in den letzten 10 Min.)
+     3. LIVE-ONLINE-ÜBERSICHT (Cloud-User & Darsteller in den letzten 10 Min. - nur für Admins)
      ========================================================================== -->
 <div class="row g-4 mb-4">
   <!-- Links: Cloud-User online -->
@@ -297,6 +342,7 @@ $openTasksTotal     = (int)($counts['new_actors'] ?? 0) + (int)($counts['new_ban
     </div>
   </div>
 </div>
+<?php endif; ?>
 
 <!-- ==========================================================================
      4. GEMEINSAME ADMIN-NOTIZEN & MEINE NOTIZEN (AJAX ohne Seiten-Reload)
@@ -377,8 +423,9 @@ $openTasksTotal     = (int)($counts['new_actors'] ?? 0) + (int)($counts['new_ban
   </div>
 </div>
 
+<?php if ($isAdmin): ?>
 <!-- ==========================================================================
-     5. LETZTE 200 AKTIONEN (employee_history mit Echtzeit-Filter & Paginierung)
+     5. LETZTE 200 AKTIONEN (employee_history mit Echtzeit-Filter & Paginierung - nur für Admins)
      ========================================================================== -->
 <div class="card-kkc mb-0">
   <div class="card-kkc-header flex-wrap gap-2">
@@ -439,3 +486,4 @@ $openTasksTotal     = (int)($counts['new_actors'] ?? 0) + (int)($counts['new_ban
     </div>
   </div>
 </div>
+<?php endif; ?>

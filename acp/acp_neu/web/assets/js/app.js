@@ -134,6 +134,7 @@ const App = {
     const routeToParentLink = {
       'movie-checking': 'movies-checking',
       'photo-album-checking': 'photo-albums-checking',
+      'movie-draft': 'movies-drafts',
       'movie-edit': 'movies-online',
       'photo-album-edit': 'photo-albums-online',
       'actor': 'actors',

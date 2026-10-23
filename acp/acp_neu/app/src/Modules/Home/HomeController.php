@@ -38,55 +38,57 @@ class HomeController
         }
         $employeeUsername = (string)($_SESSION['employee_username'] ?? 'Admin');
         $employeeRule     = (string)($_SESSION['employee_rule'] ?? 'Administrator');
+        $isAdmin          = function_exists('acp_is_admin') && acp_is_admin();
 
         // 1. Live-KPIs für Content-Prüfung & Online-Bestand laden
         $counts = $this->fetchSystemCounts();
 
-        // 2. Cloud-User in den letzten 10 Minuten online
-        $onlineUsers = [];
-        $tenMinAgoDate = date('Y-m-d H:i:s', strtotime('-10 minutes'));
-        $rsMembers = p4c_query(
-            "SELECT `id`, `username`, `lastonline`, `amount_coins`, `domain`
-             FROM `members`
-             WHERE `lastonline` >= '" . p4c_escape_string($tenMinAgoDate) . "'
-             ORDER BY `lastonline` DESC
-             LIMIT 100;",
-            __FILE__,
-            __LINE__
-        );
-        if ($rsMembers && p4c_num_rows($rsMembers) > 0) {
-            while ($m = p4c_fetch_object($rsMembers)) {
-                $onlineUsers[] = [
-                    'id'           => abs((int)$m->id),
-                    'username'     => self::decodeLegacyText((string)($m->username ?? '')),
-                    'lastonline'   => (string)($m->lastonline ?? ''),
-                    'amount_coins' => abs((int)($m->amount_coins ?? 0)),
-                    'domain'       => self::decodeLegacyText((string)($m->domain ?? '')),
-                ];
-            }
-        }
-
-        // 3. Darsteller in den letzten 10 Minuten online
+        // 2. Cloud-User & Darsteller in den letzten 10 Minuten online (nur für Administratoren)
+        $onlineUsers  = [];
         $onlineActors = [];
-        $tenMinAgoTs = strtotime('-10 minutes');
-        $rsActorsOnline = p4c_query(
-            "SELECT `id`, `username`, `lastonline`, `merchant_id`
-             FROM `actors`
-             WHERE `lastonline` >= '" . abs((int)$tenMinAgoTs) . "'
-             ORDER BY `lastonline` DESC
-             LIMIT 100;",
-            __FILE__,
-            __LINE__
-        );
-        if ($rsActorsOnline && p4c_num_rows($rsActorsOnline) > 0) {
-            while ($a = p4c_fetch_object($rsActorsOnline)) {
-                $ts = abs((int)($a->lastonline ?? 0));
-                $onlineActors[] = [
-                    'id'          => abs((int)$a->id),
-                    'username'    => self::decodeLegacyText((string)($a->username ?? '')),
-                    'lastonline'  => $ts > 0 ? date('Y-m-d H:i:s', $ts) : '-',
-                    'merchant_id' => abs((int)($a->merchant_id ?? 0)),
-                ];
+        if ($isAdmin) {
+            $tenMinAgoDate = date('Y-m-d H:i:s', strtotime('-10 minutes'));
+            $rsMembers = p4c_query(
+                "SELECT `id`, `username`, `lastonline`, `amount_coins`, `domain`
+                 FROM `members`
+                 WHERE `lastonline` >= '" . p4c_escape_string($tenMinAgoDate) . "'
+                 ORDER BY `lastonline` DESC
+                 LIMIT 100;",
+                __FILE__,
+                __LINE__
+            );
+            if ($rsMembers && p4c_num_rows($rsMembers) > 0) {
+                while ($m = p4c_fetch_object($rsMembers)) {
+                    $onlineUsers[] = [
+                        'id'           => abs((int)$m->id),
+                        'username'     => self::decodeLegacyText((string)($m->username ?? '')),
+                        'lastonline'   => (string)($m->lastonline ?? ''),
+                        'amount_coins' => abs((int)($m->amount_coins ?? 0)),
+                        'domain'       => self::decodeLegacyText((string)($m->domain ?? '')),
+                    ];
+                }
+            }
+
+            $tenMinAgoTs = strtotime('-10 minutes');
+            $rsActorsOnline = p4c_query(
+                "SELECT `id`, `username`, `lastonline`, `merchant_id`
+                 FROM `actors`
+                 WHERE `lastonline` >= '" . abs((int)$tenMinAgoTs) . "'
+                 ORDER BY `lastonline` DESC
+                 LIMIT 100;",
+                __FILE__,
+                __LINE__
+            );
+            if ($rsActorsOnline && p4c_num_rows($rsActorsOnline) > 0) {
+                while ($a = p4c_fetch_object($rsActorsOnline)) {
+                    $ts = abs((int)($a->lastonline ?? 0));
+                    $onlineActors[] = [
+                        'id'          => abs((int)$a->id),
+                        'username'    => self::decodeLegacyText((string)($a->username ?? '')),
+                        'lastonline'  => $ts > 0 ? date('Y-m-d H:i:s', $ts) : '-',
+                        'merchant_id' => abs((int)($a->merchant_id ?? 0)),
+                    ];
+                }
             }
         }
 
@@ -112,27 +114,29 @@ class HomeController
             $employeeNotes = self::decodeLegacyText((string)($empObj->notes ?? ''));
         }
 
-        // 6. Letzte 200 Aktionen aus employee_history laden
+        // 6. Letzte 200 Aktionen aus employee_history laden (nur für Administratoren)
         $historyItems = [];
-        $rsHistory = p4c_query(
-            "SELECT h.`id`, h.`employee_id`, h.`description`, h.`datetime`, h.`ip`, e.`username`
-             FROM `employee_history` h
-             INNER JOIN `employee` e ON h.`employee_id` = e.`id`
-             ORDER BY h.`id` DESC
-             LIMIT 200;",
-            __FILE__,
-            __LINE__
-        );
-        if ($rsHistory && p4c_num_rows($rsHistory) > 0) {
-            while ($h = p4c_fetch_object($rsHistory)) {
-                $historyItems[] = [
-                    'id'          => abs((int)$h->id),
-                    'employee_id' => abs((int)$h->employee_id),
-                    'username'    => self::decodeLegacyText((string)($h->username ?? '')),
-                    'datetime'    => (string)($h->datetime ?? ''),
-                    'ip'          => (string)($h->ip ?? ''),
-                    'description' => self::decodeLegacyText((string)($h->description ?? '')),
-                ];
+        if ($isAdmin) {
+            $rsHistory = p4c_query(
+                "SELECT h.`id`, h.`employee_id`, h.`description`, h.`datetime`, h.`ip`, e.`username`
+                 FROM `employee_history` h
+                 INNER JOIN `employee` e ON h.`employee_id` = e.`id`
+                 ORDER BY h.`id` DESC
+                 LIMIT 200;",
+                __FILE__,
+                __LINE__
+            );
+            if ($rsHistory && p4c_num_rows($rsHistory) > 0) {
+                while ($h = p4c_fetch_object($rsHistory)) {
+                    $historyItems[] = [
+                        'id'          => abs((int)$h->id),
+                        'employee_id' => abs((int)$h->employee_id),
+                        'username'    => self::decodeLegacyText((string)($h->username ?? '')),
+                        'datetime'    => (string)($h->datetime ?? ''),
+                        'ip'          => (string)($h->ip ?? ''),
+                        'description' => self::decodeLegacyText((string)($h->description ?? '')),
+                    ];
+                }
             }
         }
 
@@ -140,6 +144,7 @@ class HomeController
             'employeeId'           => $employeeId,
             'employeeUsername'     => $employeeUsername,
             'employeeRule'         => $employeeRule,
+            'isAdmin'              => $isAdmin,
             'counts'               => $counts,
             'onlineUsers'          => $onlineUsers,
             'onlineActors'         => $onlineActors,

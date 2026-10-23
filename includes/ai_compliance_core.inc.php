@@ -685,10 +685,15 @@ function aic_build_vtt_content($segments, $lang = 'de') {
 /**
  * Fuehrt die mehrstufige BRAM- und Rechts-Textanalyse ueber Titel, Beschreibung, Meta und Audio-Transkript aus.
  */
-function aic_analyze_texts($movie_data, $segments, $spoken_transcript, $env) {
+function aic_analyze_texts($movie_data, $segments = array(), $spoken_transcript = '', $env = array(), $content_type = 'movie') {
     $t_start = microtime(true);
     $rules_data = aic_load_keyword_rules();
     $categories = isset($rules_data['categories']) ? $rules_data['categories'] : array();
+
+    if (isset($movie_data['content_type']) && $movie_data['content_type'] !== '') {
+        $content_type = (string)$movie_data['content_type'];
+    }
+    $is_photo_album = ($content_type === 'photo_album');
 
     $title       = isset($movie_data['title']) ? aic_clean_html_text($movie_data['title']) : '';
     $description = isset($movie_data['description']) ? aic_clean_html_text($movie_data['description']) : '';
@@ -700,28 +705,30 @@ function aic_analyze_texts($movie_data, $segments, $spoken_transcript, $env) {
     $overall_status = 'ok';
 
     $sources = array(
-        array('key' => 'title',       'label' => 'Filmtitel',           'text' => $title,       'timestamp' => '-'),
-        array('key' => 'description', 'label' => 'Filmbeschreibung',    'text' => $description, 'timestamp' => '-'),
-        array('key' => 'meta',        'label' => 'SEO Meta-Angaben',    'text' => $meta_text,   'timestamp' => '-')
+        array('key' => 'title',       'label' => $is_photo_album ? 'Albumtitel'        : 'Filmtitel',        'text' => $title,       'timestamp' => '-'),
+        array('key' => 'description', 'label' => $is_photo_album ? 'Albumbeschreibung' : 'Filmbeschreibung', 'text' => $description, 'timestamp' => '-'),
+        array('key' => 'meta',        'label' => 'SEO Meta-Angaben',                                         'text' => $meta_text,   'timestamp' => '-')
     );
 
-    if (is_array($segments) && count($segments) > 0) {
-        foreach ($segments as $seg) {
-            $ts = aic_format_time(isset($seg['start']) ? $seg['start'] : 0) . ' - ' . aic_format_time(isset($seg['end']) ? $seg['end'] : 0);
+    if (!$is_photo_album) {
+        if (is_array($segments) && count($segments) > 0) {
+            foreach ($segments as $seg) {
+                $ts = aic_format_time(isset($seg['start']) ? $seg['start'] : 0) . ' - ' . aic_format_time(isset($seg['end']) ? $seg['end'] : 0);
+                $sources[] = array(
+                    'key'       => 'transcript',
+                    'label'     => 'Gesprochenes Video-Audio',
+                    'text'      => isset($seg['text']) ? (string)$seg['text'] : '',
+                    'timestamp' => $ts
+                );
+            }
+        } elseif (trim((string)$spoken_transcript) !== '') {
             $sources[] = array(
                 'key'       => 'transcript',
                 'label'     => 'Gesprochenes Video-Audio',
-                'text'      => isset($seg['text']) ? (string)$seg['text'] : '',
-                'timestamp' => $ts
+                'text'      => (string)$spoken_transcript,
+                'timestamp' => 'Gesamttext'
             );
         }
-    } elseif (trim($spoken_transcript) !== '') {
-        $sources[] = array(
-            'key'       => 'transcript',
-            'label'     => 'Gesprochenes Video-Audio',
-            'text'      => (string)$spoken_transcript,
-            'timestamp' => 'Gesamttext'
-        );
     }
 
     // Stufe 1: Deterministischer BRAM-Keyword- & Kontext-Scanner
@@ -790,12 +797,20 @@ function aic_analyze_texts($movie_data, $segments, $spoken_transcript, $env) {
     // Stufe 2: Falls lokaler llama.cpp / Ollama Server aktiv ist, semantische Tiefenpruefung ausfuehren
     if (!empty($env['llm_ready'])) {
         $sys_prompt = aic_load_system_prompt();
-        $user_prompt = "Bitte prüfe folgendes Video auf BRAM- & Rechtskonformität:\n\n"
-            . "FILMTITEL:\n" . $title . "\n\n"
-            . "FILMBESCHREIBUNG:\n" . $description . "\n\n"
-            . "SEO-META:\n" . $meta_text . "\n\n"
-            . "GESPROCHENES TRANSKRIPT IM VIDEO:\n" . ($spoken_transcript !== '' ? $spoken_transcript : '(Kein gesprochener Text vorhanden)') . "\n\n"
-            . "VORAB-TREFFER DER KEYWORD-ENGINE:\n" . json_encode($violations, JSON_UNESCAPED_UNICODE);
+        if ($is_photo_album) {
+            $user_prompt = "Bitte prüfe folgendes Fotoalbum auf BRAM- & Rechtskonformität:\n\n"
+                . "ALBUMTITEL:\n" . $title . "\n\n"
+                . "ALBUMBESCHREIBUNG:\n" . $description . "\n\n"
+                . "SEO-META:\n" . $meta_text . "\n\n"
+                . "VORAB-TREFFER DER KEYWORD-ENGINE:\n" . json_encode($violations, JSON_UNESCAPED_UNICODE);
+        } else {
+            $user_prompt = "Bitte prüfe folgendes Video auf BRAM- & Rechtskonformität:\n\n"
+                . "FILMTITEL:\n" . $title . "\n\n"
+                . "FILMBESCHREIBUNG:\n" . $description . "\n\n"
+                . "SEO-META:\n" . $meta_text . "\n\n"
+                . "GESPROCHENES TRANSKRIPT IM VIDEO:\n" . ($spoken_transcript !== '' ? $spoken_transcript : '(Kein gesprochener Text vorhanden)') . "\n\n"
+                . "VORAB-TREFFER DER KEYWORD-ENGINE:\n" . json_encode($violations, JSON_UNESCAPED_UNICODE);
+        }
 
         $ch = @curl_init($env['llm_endpoint']);
         if ($ch) {
@@ -849,7 +864,7 @@ function aic_analyze_texts($movie_data, $segments, $spoken_transcript, $env) {
         }
     }
 
-    $has_audio_transcript = (trim((string)$spoken_transcript) !== '' || !empty($segments));
+    $has_audio_transcript = (!$is_photo_album && (trim((string)$spoken_transcript) !== '' || !empty($segments)));
 
     if ($llm_summary === '') {
         $cnt_v = 0;
@@ -864,17 +879,27 @@ function aic_analyze_texts($movie_data, $segments, $spoken_transcript, $env) {
 
         if ($overall_status === 'ok') {
             $max_risk = 0;
-            if ($has_audio_transcript) {
+            if ($is_photo_album) {
+                $llm_summary = 'Alle geprüften Album-Texte (Albumtitel, Beschreibung, SEO-Daten) sind unauffällig. Es wurden keine verbotenen Begriffe oder Verstöße gegen die Visa/Mastercard BRAM-Richtlinien festgestellt.';
+            } elseif ($has_audio_transcript) {
                 $llm_summary = 'Alle geprüften Quellen (Filmtitel, Beschreibung, SEO-Daten sowie das gesprochene Video-Transkript) sind unauffällig. Es wurden keine Verstöße gegen die Visa/Mastercard BRAM-Richtlinien oder gesetzliche Vorgaben festgestellt.';
             } else {
                 $llm_summary = 'Vorab-Textprüfung unauffällig: In den geschriebenen Texten (Filmtitel, Beschreibung, SEO-Daten) wurden keine verbotenen Begriffe gefunden. HINWEIS: Die gesprochene Video-Tonspur wurde noch nicht durch den Whisper-Cronjob transkribiert (Audio-Prüfung steht noch aus).';
             }
         } elseif ($overall_status === 'warning') {
-            $audio_note = $has_audio_transcript ? ' (inkl. Audio-Transkript)' : ' (Vorab-Textcheck; Audio-Transkription steht noch aus)';
-            $llm_summary = 'Es wurden ' . $cnt_w . ' Prüfhinweis(e) (Orange) erkannt' . $audio_note . ': ' . implode(', ', $detected_topics) . '. Hinweis: Spezialfetische wie KV/NS/Poppers/Hypnose sind nur auf Portalen ohne Kreditkartenabrechnung zulässig.';
+            if ($is_photo_album) {
+                $llm_summary = 'Es wurden ' . $cnt_w . ' Prüfhinweis(e) (Orange) in den Album-Texten erkannt: ' . implode(', ', $detected_topics) . '. Hinweis: Spezialfetische wie KV/NS/Poppers/Hypnose sind nur auf Portalen ohne Kreditkartenabrechnung zulässig.';
+            } else {
+                $audio_note = $has_audio_transcript ? ' (inkl. Audio-Transkript)' : ' (Vorab-Textcheck; Audio-Transkription steht noch aus)';
+                $llm_summary = 'Es wurden ' . $cnt_w . ' Prüfhinweis(e) (Orange) erkannt' . $audio_note . ': ' . implode(', ', $detected_topics) . '. Hinweis: Spezialfetische wie KV/NS/Poppers/Hypnose sind nur auf Portalen ohne Kreditkartenabrechnung zulässig.';
+            }
         } else {
-            $audio_note = $has_audio_transcript ? ' (inkl. Audio-Transkript)' : ' (bereits in den Text-Metadaten erkannt; Audio-Transkription noch offen)';
-            $llm_summary = 'ACHTUNG: Es wurden ' . $cnt_v . ' kritische(r) BRAM-/Rechts-Verstoß/Verstöße (Rot) sowie ' . $cnt_w . ' Warnhinweis(e) erkannt' . $audio_note . '! Betroffene Bereiche: ' . implode(', ', $detected_topics) . '. Dieses Video darf auf keinem Portal freigeschaltet werden.';
+            if ($is_photo_album) {
+                $llm_summary = 'ACHTUNG: Es wurden ' . $cnt_v . ' kritische(r) BRAM-/Rechts-Verstoß/Verstöße (Rot) sowie ' . $cnt_w . ' Warnhinweis(e) in den Album-Texten erkannt! Betroffene Bereiche: ' . implode(', ', $detected_topics) . '. Dieses Fotoalbum darf auf keinem Portal freigeschaltet werden.';
+            } else {
+                $audio_note = $has_audio_transcript ? ' (inkl. Audio-Transkript)' : ' (bereits in den Text-Metadaten erkannt; Audio-Transkription noch offen)';
+                $llm_summary = 'ACHTUNG: Es wurden ' . $cnt_v . ' kritische(r) BRAM-/Rechts-Verstoß/Verstöße (Rot) sowie ' . $cnt_w . ' Warnhinweis(e) erkannt' . $audio_note . '! Betroffene Bereiche: ' . implode(', ', $detected_topics) . '. Dieses Video darf auf keinem Portal freigeschaltet werden.';
+            }
         }
     }
 

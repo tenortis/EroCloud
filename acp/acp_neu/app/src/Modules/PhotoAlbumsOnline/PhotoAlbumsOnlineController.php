@@ -41,6 +41,7 @@ final class PhotoAlbumsOnlineController
         $search  = trim((string)$this->request->get('q', ''));
         $status  = trim((string)$this->request->get('status', 'all'));
         $cat     = trim((string)$this->request->get('cat', 'all'));
+        $bram    = trim((string)$this->request->get('bram', 'all'));
         $sort    = trim((string)$this->request->get('sort', 'id_desc'));
         $page    = max(1, abs((int)$this->request->get('page', 1)));
         $perPage = abs((int)$this->request->get('per_page', 100));
@@ -183,7 +184,7 @@ final class PhotoAlbumsOnlineController
                 $metaDesc  = self::decodeText((string)($row->meta_description ?? ''));
 
                 // Live BRAM-Textanalyse für die angezeigte Seite
-                $bramComp  = 'green';
+                $bramComp  = 'ok';
                 $bramScore = 0;
                 $bramSum   = 'Unbedenklich';
                 if (function_exists('aic_analyze_texts')) {
@@ -192,10 +193,17 @@ final class PhotoAlbumsOnlineController
                         'description'      => $desc,
                         'meta_title'       => $metaTitle,
                         'meta_description' => $metaDesc,
-                    ], [], '', $env);
-                    $bramComp  = (string)($rep['compliance_status'] ?? 'green');
+                    ], [], '', $env, 'photo_album');
+                    $bramComp  = (string)($rep['compliance_status'] ?? 'ok');
                     $bramScore = abs((int)($rep['risk_score'] ?? 0));
                     $bramSum   = (string)($rep['summary_de'] ?? '');
+                }
+
+                if ($bram === 'green' && !in_array($bramComp, ['ok', 'green'], true)) {
+                    continue;
+                }
+                if ($bram === 'attention' && in_array($bramComp, ['ok', 'green'], true)) {
+                    continue;
                 }
 
                 $amountDownload = abs((int)($row->amount_download ?? 0));
@@ -237,6 +245,7 @@ final class PhotoAlbumsOnlineController
                 'q'          => $search,
                 'status'     => $status,
                 'cat'        => $cat,
+                'bram'       => $bram,
                 'sort'       => $sort,
                 'page'       => $page,
                 'per_page'   => $perPage,
@@ -596,11 +605,12 @@ final class PhotoAlbumsOnlineController
         // BRAM-Textanalyse
         $env = ['llm_ready' => false];
         $bramReport = [
-            'compliance_status' => 'green',
+            'compliance_status' => 'ok',
             'risk_score'        => 0,
-            'summary_de'        => 'Keine verbotenen Begriffe gefunden.',
+            'summary_de'        => 'Alle geprüften Album-Texte (Albumtitel, Beschreibung, SEO-Daten) sind unauffällig. Es wurden keine verbotenen Begriffe oder Verstöße gegen die Visa/Mastercard BRAM-Richtlinien festgestellt.',
             'violations'        => [],
-            'engine_used'       => 'keyword_matrix',
+            'engine_used'       => 'BRAM-Regel-Engine (JSON v1.1)',
+            'updated_at'        => date('d.m.Y H:i:s'),
         ];
         if (function_exists('aic_analyze_texts')) {
             $bramReport = aic_analyze_texts([
@@ -608,7 +618,8 @@ final class PhotoAlbumsOnlineController
                 'description'      => $description,
                 'meta_title'       => $metaTitle,
                 'meta_description' => $metaDesc,
-            ], [], '', $env);
+            ], [], '', $env, 'photo_album');
+            $bramReport['updated_at'] = date('d.m.Y H:i:s');
         }
 
         $onlineAtRaw = (string)($ao->online_at ?? '');

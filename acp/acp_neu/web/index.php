@@ -309,6 +309,11 @@ $sessionRemainingSeconds = 1800;
           <span class="text-nowrap">Drehpartner &amp; ID</span>
           <span id="sidebar-coactors-checking-count" class="sidebar-count-badge ms-auto"><?= (int)$countCoActorsChecking ?></span>
         </a>
+        <a href="#/movies-drafts" class="sidebar-link" data-route="#/movies-drafts">
+          <i class="bi bi-clock-history"></i>
+          <span class="text-nowrap">Filme in Planung</span>
+          <span id="sidebar-movies-drafts-count" class="sidebar-count-badge ms-auto"><?= (int)$countMoviesDrafts ?></span>
+        </a>
         <a href="#/movies-blocked" class="sidebar-link" data-route="#/movies-blocked">
           <i class="bi bi-slash-circle"></i>
           <span class="text-nowrap">Filme abgelehnt</span>
@@ -336,11 +341,6 @@ $sessionRemainingSeconds = 1800;
           <i class="bi bi-collection-play-fill"></i>
           <span class="text-nowrap">Filme online</span>
           <span class="sidebar-count-badge ms-auto"><?= (int)$countMoviesOnline ?></span>
-        </a>
-        <a href="#/movies-drafts" class="sidebar-link" data-route="#/movies-drafts">
-          <i class="bi bi-clock-history"></i>
-          <span class="text-nowrap">Filme in Planung</span>
-          <span class="sidebar-count-badge ms-auto"><?= (int)$countMoviesDrafts ?></span>
         </a>
         <a href="#/photo-albums-online" class="sidebar-link" data-route="#/photo-albums-online">
           <i class="bi bi-journal-album"></i>

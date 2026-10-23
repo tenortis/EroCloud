@@ -99,7 +99,7 @@ final class PhotoAlbumsCheckingController
                         'description'      => $description,
                         'meta_title'       => $metaTitle,
                         'meta_description' => $metaDesc,
-                    ], [], '', $env);
+                    ], [], '', $env, 'photo_album');
                     $bramComp    = (string)($rep['compliance_status'] ?? 'ok');
                     $bramScore   = abs((int)($rep['risk_score'] ?? 0));
                     $bramSummary = (string)($rep['summary_de'] ?? '');
@@ -1062,6 +1062,69 @@ final class PhotoAlbumsCheckingController
     }
 
     /**
+     * 7. AJAX: BRAM-Textprüfung für Fotoalbum mit aktuellen Formularwerten ausführen (POST ?route=photo-albums-checking/ai-action)
+     */
+    public function aiAction(): void
+    {
+        if (!$this->request->isPost()) {
+            Response::error('Ungültige Anfrage-Methode.', 405);
+            return;
+        }
+
+        $csrf = (string)$this->request->post('_csrf', $this->request->header('X-CSRF-Token'));
+        if (!Csrf::validate($csrf)) {
+            Response::error('Dein Sicherheitstoken ist abgelaufen. Bitte lade die Seite neu.', 403);
+            return;
+        }
+
+        require_once SOURCEDIR . '/includes/ai_compliance_core.inc.php';
+        @session_write_close();
+
+        $albumId = abs((int)$this->request->post('album_id', 0));
+        $dbTitle     = '';
+        $dbDesc      = '';
+        $dbMetaTitle = '';
+        $dbMetaDesc  = '';
+
+        if ($albumId > 0) {
+            $rsAlb = p4c_query("SELECT `title`, `description`, `meta_title`, `meta_description` FROM `photo_albums` WHERE `id` = '" . $albumId . "' LIMIT 1;", __FILE__, __LINE__);
+            if (!$rsAlb || p4c_num_rows($rsAlb) === 0) {
+                $rsAlb = p4c_query("SELECT `title`, `description`, `meta_title`, `meta_description` FROM `photo_albums_online` WHERE `id` = '" . $albumId . "' LIMIT 1;", __FILE__, __LINE__);
+            }
+            if ($rsAlb && p4c_num_rows($rsAlb) > 0) {
+                $albObj      = p4c_fetch_object($rsAlb);
+                $dbTitle     = self::decodeText((string)($albObj->title ?? ''));
+                $dbDesc      = self::decodeText((string)($albObj->description ?? ''));
+                $dbMetaTitle = self::decodeText((string)($albObj->meta_title ?? ''));
+                $dbMetaDesc  = self::decodeText((string)($albObj->meta_description ?? ''));
+            }
+        }
+
+        $customTitle     = $this->request->post('title', null);
+        $customDesc      = $this->request->post('description', null);
+        $customMetaTitle = $this->request->post('meta_title', null);
+        $customMetaDesc  = $this->request->post('meta_description', null);
+
+        $titleToCheck     = $customTitle !== null ? trim((string)$customTitle) : $dbTitle;
+        $descToCheck      = $customDesc !== null ? trim((string)$customDesc) : $dbDesc;
+        $metaTitleToCheck = $customMetaTitle !== null ? trim((string)$customMetaTitle) : $dbMetaTitle;
+        $metaDescToCheck  = $customMetaDesc !== null ? trim((string)$customMetaDesc) : $dbMetaDesc;
+
+        $aiData = $this->analyzeAlbumTexts([
+            'title'            => $titleToCheck,
+            'description'      => $descToCheck,
+            'meta_title'       => $metaTitleToCheck,
+            'meta_description' => $metaDescToCheck,
+        ]);
+
+        Response::json([
+            'status'  => 'ok',
+            'message' => 'BRAM-Compliance-Prüfung wurde mit den aktuellen Album-Texten aktualisiert.',
+            'ai_data' => $aiData,
+        ]);
+    }
+
+    /**
      * Lädt die IDs aller aktuell offenen Fotoalben in der Prüf-Warteschlange
      *
      * @return array<int, int>
@@ -1149,21 +1212,25 @@ final class PhotoAlbumsCheckingController
     {
         if (!function_exists('aic_analyze_texts')) {
             return [
-                'text_compliance' => 'ok',
-                'text_risk_score' => 0,
-                'text_summary'    => 'Keine Verstöße erkannt.',
-                'violations'      => [],
+                'text_compliance'  => 'ok',
+                'text_risk_score'  => 0,
+                'text_summary'     => 'Keine Verstöße erkannt.',
+                'text_engine_used' => 'BRAM Keyword-Scanner',
+                'updated_at'       => date('d.m.Y H:i:s'),
+                'violations'       => [],
             ];
         }
 
         $env = ['llm_ready' => false];
-        $rep = aic_analyze_texts($textInput, [], '', $env);
+        $rep = aic_analyze_texts($textInput, [], '', $env, 'photo_album');
 
         return [
-            'text_compliance' => (string)($rep['compliance_status'] ?? 'ok'),
-            'text_risk_score' => abs((int)($rep['risk_score'] ?? 0)),
-            'text_summary'    => (string)($rep['summary_de'] ?? 'Keine Verstöße erkannt.'),
-            'violations'      => is_array($rep['violations'] ?? null) ? $rep['violations'] : [],
+            'text_compliance'  => (string)($rep['compliance_status'] ?? 'ok'),
+            'text_risk_score'  => abs((int)($rep['risk_score'] ?? 0)),
+            'text_summary'     => (string)($rep['summary_de'] ?? 'Keine Verstöße erkannt.'),
+            'text_engine_used' => (string)($rep['engine_used'] ?? 'BRAM-Regel-Engine (JSON v1.1)'),
+            'updated_at'       => date('d.m.Y H:i:s'),
+            'violations'       => is_array($rep['violations'] ?? null) ? $rep['violations'] : [],
         ];
     }
 

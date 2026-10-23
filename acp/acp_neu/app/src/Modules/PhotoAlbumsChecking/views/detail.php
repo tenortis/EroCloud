@@ -98,44 +98,82 @@ foreach ($categoriesByGroup as $grpItems) {
       Nächstes (#<?= $nextAlbumId ?>) <i class="bi bi-chevron-right"></i>
     </a>
     <?php endif; ?>
-    <button type="button" class="btn btn-sm btn-outline-danger" onclick="document.getElementById('pac-reject-card')?.scrollIntoView({behavior:'smooth'})">
+    <button type="button" class="btn btn-sm btn-outline-danger" onclick="document.getElementById('tab-btn-pac-review')?.click(); document.getElementById('pac-reject-card')?.scrollIntoView({behavior:'smooth'})">
       <i class="bi bi-x-circle me-1"></i> Zum Ablehnen
     </button>
-    <button type="button" class="btn btn-sm btn-kkc" onclick="document.getElementById('pac-submit-approve-btn')?.scrollIntoView({behavior:'smooth'})">
+    <button type="button" class="btn btn-sm btn-kkc" onclick="document.getElementById('tab-btn-pac-review')?.click(); document.getElementById('pac-submit-approve-btn')?.scrollIntoView({behavior:'smooth'})">
       <i class="bi bi-check2-circle me-1"></i> Zur Freigabe
     </button>
   </div>
 </div>
 
 <!-- ==========================================================================
-     BRAM-SCHNELLSTATUS-BANNER
+     NAVIGATION TABS (1. Fotoalbum prüfen | 2. BRAM & KI-Analyse)
      ========================================================================== -->
-<div class="p-3 rounded border mb-3 <?= $bramBannerCls ?>">
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-    <div class="d-flex flex-wrap align-items-center gap-2">
-      <span class="badge-kkc <?= $bramBadgeCls ?> fs-6 py-1 px-2">
-        <i class="bi <?= $bramIcon ?> me-1"></i> <?= View::e($bramLabel) ?>
+<ul class="nav nav-pills gap-2 mb-3 p-2 rounded border" style="background: var(--kkc-surface, #ffffff); border-color: var(--kkc-border) !important;" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active d-flex align-items-center gap-2 fw-semibold" id="tab-btn-pac-review"
+            data-bs-toggle="pill" data-bs-target="#pac-tab-review" type="button" role="tab">
+      <i class="bi bi-images"></i>
+      <span>1. Fotoalbum prüfen &amp; veröffentlichen</span>
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link d-flex align-items-center gap-2 fw-semibold" id="tab-btn-pac-bram"
+            data-bs-toggle="pill" data-bs-target="#pac-tab-bram" type="button" role="tab">
+      <i class="bi bi-shield-exclamation"></i>
+      <span>2. BRAM &amp; KI-Analyse</span>
+      <span class="badge rounded-pill <?= $bramComp === 'ok' ? 'bg-success' : ($bramComp === 'violation' ? 'bg-danger' : 'bg-warning text-dark') ?>" id="pac-tab-bram-badge">
+        <?= $bramScore ?>/100
       </span>
-      <span class="badge-kkc badge-kkc-neutral font-monospace">Risiko-Score: <?= $bramScore ?> / 100</span>
-      <span class="small fw-semibold"><?= View::e((string)($aiData['text_summary'] ?? '')) ?></span>
-    </div>
-  </div>
+    </button>
+  </li>
+</ul>
 
-  <?php if (!empty($violations)): ?>
-  <div class="d-flex flex-wrap gap-2 mt-2 pt-2 border-top" style="border-color: rgba(0,0,0,0.1) !important;">
-    <?php foreach ($violations as $v):
-        $isCrit = (($v['severity'] ?? '') === 'critical');
-    ?>
-    <span class="badge <?= $isCrit ? 'bg-danger text-white' : 'bg-warning text-dark' ?> d-inline-flex align-items-center gap-1 py-1 px-2" style="font-size: 0.78rem;">
-      <i class="bi <?= $isCrit ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill' ?>"></i>
-      <strong><?= View::e((string)($v['category'] ?? 'Regel')) ?>:</strong>
-      <span>„<?= View::e((string)($v['matched_term'] ?? '')) ?>“</span>
-      <span class="opacity-75">(<?= View::e((string)($v['source'] ?? 'Text')) ?>)</span>
-    </span>
-    <?php endforeach; ?>
-  </div>
-  <?php endif; ?>
-</div>
+<div class="tab-content">
+  <!-- ========================================================================
+       TAB 1: FOTOALBUM PRÜFEN & VERÖFFENTLICHEN
+       ======================================================================== -->
+  <div class="tab-pane fade show active" id="pac-tab-review" role="tabpanel">
+
+    <!-- BRAM-SCHNELLSTATUS-BANNER -->
+    <div class="p-3 rounded border mb-3 <?= $bramBannerCls ?>" id="pac-top-bram-banner">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <span class="badge-kkc <?= $bramBadgeCls ?> fs-6 py-1 px-2" id="pac-top-bram-badge">
+            <i class="bi <?= $bramIcon ?> me-1"></i> <?= View::e($bramLabel) ?>
+          </span>
+          <span class="badge-kkc badge-kkc-neutral font-monospace" id="pac-top-bram-score">Risiko-Score: <?= $bramScore ?> / 100</span>
+          <span class="small fw-semibold" id="pac-top-bram-summary"><?= View::e((string)($aiData['text_summary'] ?? '')) ?></span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <button type="button" class="btn btn-sm btn-outline-kkc bg-body" onclick="App.runPhotoAlbumAiAction(<?= $albumDbId ?>)">
+            <i class="bi bi-arrow-repeat me-1"></i> Text-Check mit Formularwerten aktualisieren
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-kkc bg-body" onclick="document.getElementById('tab-btn-pac-bram')?.click()">
+            Details (<span id="pac-top-bram-details-cnt"><?= count($violations) ?></span>) <i class="bi bi-arrow-right ms-1"></i>
+          </button>
+        </div>
+      </div>
+
+      <div id="pac-top-bram-pills">
+        <?php if (!empty($violations)): ?>
+        <div class="d-flex flex-wrap gap-2 mt-2 pt-2 border-top" style="border-color: rgba(0,0,0,0.1) !important;">
+          <?php foreach ($violations as $v):
+              $isCrit = in_array((string)($v['severity'] ?? ''), ['violation', 'critical'], true);
+              $srcLbl = (string)($v['source_label'] ?? $v['source'] ?? 'Text');
+          ?>
+          <span class="badge <?= $isCrit ? 'bg-danger text-white' : 'bg-warning text-dark' ?> d-inline-flex align-items-center gap-1 py-1 px-2" style="font-size: 0.78rem;">
+            <i class="bi <?= $isCrit ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill' ?>"></i>
+            <strong><?= View::e((string)($v['category'] ?? 'Regel')) ?>:</strong>
+            <span>„<?= View::e((string)($v['matched_term'] ?? '')) ?>“</span>
+            <span class="opacity-75">(<?= View::e($srcLbl) ?>)</span>
+          </span>
+          <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+      </div>
+    </div>
 
 <!-- Warnhinweis falls kein gültiger Darsteller zugeordnet ist -->
 <?php if (empty($album['actor_exists'])): ?>
@@ -784,6 +822,107 @@ foreach ($categoriesByGroup as $grpItems) {
       </div>
     </div>
     <?php endif; ?>
+  </div>
+</div>
+
+  </div>
+
+  <!-- ========================================================================
+       TAB 2: BRAM & KI-ANALYSE DETAILS
+       ======================================================================== -->
+  <div class="tab-pane fade" id="pac-tab-bram" role="tabpanel">
+    <div class="card-kkc mb-4">
+      <div class="card-kkc-header flex-wrap gap-2">
+        <div class="card-title">
+          <i class="bi bi-shield-check ec-text-primary"></i>
+          <span>Detaillierter Visa / Mastercard BRAM-Compliance-Report (Fotoalbum #<?= $albumDbId ?>)</span>
+        </div>
+        <button type="button" class="btn btn-sm btn-kkc" onclick="App.runPhotoAlbumAiAction(<?= $albumDbId ?>)">
+          <i class="bi bi-arrow-repeat me-1"></i> BRAM-Textprüfung mit aktuellen Formularwerten neu ausführen
+        </button>
+      </div>
+      <div class="card-kkc-body">
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            <div class="p-3 rounded border h-100" style="background: var(--kkc-surface-hover);">
+              <div class="small text-muted mb-1">BRAM-Ampelstatus</div>
+              <div class="h5 mb-1">
+                <span class="badge-kkc <?= $bramBadgeCls ?>" id="pac-bram-tab-badge">
+                  <i class="bi <?= $bramIcon ?> me-1"></i> <?= View::e($bramLabel) ?>
+                </span>
+              </div>
+              <div class="small text-muted">Zuletzt geprüft: <span id="pac-bram-tab-updated"><?= View::e((string)($aiData['updated_at'] ?? 'Gerade eben')) ?></span></div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 rounded border h-100" style="background: var(--kkc-surface-hover);">
+              <div class="small text-muted mb-1">Risiko-Score</div>
+              <div class="h4 fw-bold font-monospace mb-1" id="pac-bram-tab-score"><?= $bramScore ?> / 100</div>
+              <div class="small text-muted">Engine: <span id="pac-bram-tab-engine"><?= View::e((string)($aiData['text_engine_used'] ?? 'BRAM-Regel-Engine (JSON v1.1)')) ?></span></div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 rounded border h-100" style="background: var(--kkc-surface-hover);">
+              <div class="small text-muted mb-1">Zusammenfassung</div>
+              <div class="small fw-semibold" id="pac-bram-tab-summary"><?= View::e((string)($aiData['text_summary'] ?? 'Keine Verstöße erkannt.')) ?></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="pac-bram-tab-body">
+          <?php if (empty($violations)): ?>
+            <div class="p-4 rounded border text-center bg-success bg-opacity-10 border-success">
+              <i class="bi bi-check-circle-fill text-success fs-2 d-block mb-2"></i>
+              <h3 class="h6 fw-bold mb-1">Keine verbotenen oder kritischen Begriffe gefunden</h3>
+              <p class="text-muted small mb-0">
+                Weder im Albumtitel, in der Albumbeschreibung noch in den SEO-Metadaten wurden BRAM-Treffer festgestellt.
+              </p>
+            </div>
+          <?php else: ?>
+            <div class="table-responsive">
+              <table class="table table-kkc align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Kategorie / Regel</th>
+                    <th>Schweregrad</th>
+                    <th>Quelle</th>
+                    <th>Erkannter Begriff</th>
+                    <th>Textstelle / Zitat &amp; Erläuterung</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($violations as $v):
+                      $isCrit = in_array((string)($v['severity'] ?? ''), ['violation', 'critical'], true);
+                      $srcLbl = (string)($v['source_label'] ?? $v['source'] ?? 'Text');
+                      $quote  = (string)($v['matched_quote'] ?? $v['quote'] ?? '');
+                      $reason = (string)($v['reason'] ?? '');
+                  ?>
+                  <tr>
+                    <td class="fw-bold"><?= View::e((string)($v['category'] ?? '')) ?></td>
+                    <td>
+                      <span class="badge-kkc <?= $isCrit ? 'badge-kkc-danger' : 'badge-kkc-warning' ?>">
+                        <?= $isCrit ? 'Kritischer Verstoß' : 'Warnhinweis' ?>
+                      </span>
+                    </td>
+                    <td><?= View::e($srcLbl) ?></td>
+                    <td><code class="fw-bold text-danger"><?= View::e((string)($v['matched_term'] ?? '')) ?></code></td>
+                    <td class="small">
+                      <?php if ($quote !== ''): ?>
+                        <div class="text-body fst-italic">„<?= View::e($quote) ?>“</div>
+                      <?php endif; ?>
+                      <?php if ($reason !== ''): ?>
+                        <div class="text-muted" style="font-size: 0.75rem;"><?= View::e($reason) ?></div>
+                      <?php endif; ?>
+                    </td>
+                  </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          <?php endif; ?>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
