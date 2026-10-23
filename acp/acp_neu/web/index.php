@@ -314,10 +314,12 @@ $sessionRemainingSeconds = 1800;
           <span class="text-nowrap">Filme abgelehnt</span>
           <span id="sidebar-movies-blocked-count" class="sidebar-count-badge ms-auto"><?= (int)$countMoviesBlocked ?></span>
         </a>
+        <?php if (function_exists('acp_is_admin') && acp_is_admin()): ?>
         <a href="#/ai-compliance" class="sidebar-link" data-route="#/ai-compliance">
           <i class="bi bi-cpu"></i>
           <span class="text-nowrap">KI-Analyse &amp; BRAM</span>
         </a>
+        <?php endif; ?>
       </div>
       <?php endif; ?>
 
@@ -345,6 +347,7 @@ $sessionRemainingSeconds = 1800;
           <span class="text-nowrap">Fotoalben online</span>
           <span class="sidebar-count-badge ms-auto"><?= (int)$countPhotoAlbumsOnline ?></span>
         </a>
+        <?php if (function_exists('acp_is_admin') && acp_is_admin()): ?>
         <a href="#/content-cleanup" class="sidebar-link" data-route="#/content-cleanup">
           <i class="bi bi-trash3"></i>
           <span class="text-nowrap">Content-Bereinigung</span>
@@ -353,6 +356,7 @@ $sessionRemainingSeconds = 1800;
           <i class="bi bi-hdd-network"></i>
           <span class="text-nowrap">Speicher &amp; Traffic</span>
         </a>
+        <?php endif; ?>
       </div>
       <?php endif; ?>
 

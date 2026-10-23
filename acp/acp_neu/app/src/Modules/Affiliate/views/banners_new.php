@@ -15,27 +15,20 @@ if (!defined('SAFE_INC')) {
 <div class="container-fluid px-0">
 
     <!-- 1. SEITEN-HEADER -->
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
         <div>
-            <h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
-                <i class="bi bi-shield-check ec-text-primary"></i>
-                <span>Partnerprogramm · Neue Banner prüfen</span>
-                <span class="badge <?= count($pendingBanners) > 0 ? 'bg-warning text-dark' : 'bg-success' ?> fs-6 ms-1">
-                    <?= number_format(count($pendingBanners), 0, ',', '.') ?>
-                </span>
-            </h4>
-            <div class="text-muted small">
+            <h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
+                <i class="bi bi-stars ec-text-primary"></i>
+                <span>Neue Banner prüfen</span>
+            </h1>
+            <p class="text-muted small mb-0">
                 Prüfe neu hochgeladene oder ausgetauschte Werbebanner von Seitenbetreibern und schalte sie frei oder lehne sie ab.
-            </div>
+            </p>
         </div>
         <div class="d-flex flex-wrap align-items-center gap-2">
-            <a href="#/webmaster-partner" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-arrow-left me-1"></i>Aktive Webmaster
-            </a>
-            <a href="#/banners" class="btn btn-sm btn-outline-primary fw-semibold">
-                <i class="bi bi-images me-1"></i>Alle Banner
-                <span class="badge bg-primary ms-1"><?= number_format((int)$totalBannersCount, 0, ',', '.') ?></span>
-            </a>
+            <button type="button" class="btn btn-sm btn-outline-kkc" onclick="App.handleRoute()">
+                <i class="bi bi-arrow-clockwise me-1"></i>Aktualisieren
+            </button>
         </div>
     </div>
 

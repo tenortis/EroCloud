@@ -50,23 +50,22 @@ $buildPageUrl = static function (int $targetPage) use ($filters): string {
 ?>
 <div class="container-fluid py-3 px-3 px-xl-4" data-page-width="full">
 
-  <!-- Kopfzeile -->
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+  <!-- Seiten-Header -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
     <div>
-      <div class="d-flex align-items-center gap-2 mb-1">
-        <span class="badge-kkc badge-kkc-info"><i class="bi bi-people-fill me-1"></i>Cloud-User</span>
-        <span class="text-muted small">Zentrale Mitglieder- &amp; Endkunden-Übersicht</span>
-      </div>
-      <h1 class="h4 fw-bold mb-0">EroCloud-User (Mitglieder)</h1>
+      <h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
+        <i class="bi bi-people ec-text-primary"></i>
+        <span>Cloud-User</span>
+      </h1>
+      <p class="text-muted small mb-0">
+        Zentrale Übersicht und Verwaltung aller registrierten EroCloud-Mitglieder, Coin-Guthaben und Endkunden-Konten.
+      </p>
     </div>
 
     <div class="d-flex flex-wrap align-items-center gap-2">
-      <a href="#/sites" class="btn btn-sm btn-outline-kkc">
-        <i class="bi bi-globe2 me-1"></i>Angeschlossene Webseiten
-      </a>
-      <a href="#/users" class="btn btn-sm btn-outline-kkc" onclick="App.handleRoute(); return false;">
+      <button type="button" class="btn btn-sm btn-outline-kkc" onclick="App.handleRoute()">
         <i class="bi bi-arrow-clockwise me-1"></i>Aktualisieren
-      </a>
+      </button>
     </div>
   </div>
 

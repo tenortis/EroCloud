@@ -17,26 +17,19 @@ use App\Core\View;
 ?>
 <div class="container-fluid py-3 px-3 px-xl-4" data-page-width="full">
 
-  <!-- Kopfzeile & System-Switcher -->
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+  <!-- Seiten-Header -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
     <div>
-      <div class="d-flex align-items-center gap-2 mb-1">
-        <span class="badge-kkc badge-kkc-info"><i class="bi bi-bug-fill me-1"></i>System &amp; Technik</span>
-        <code class="small text-muted"><?= View::e((string)$logMeta['path']) ?></code>
-      </div>
-      <h1 class="h4 fw-bold mb-0">Zentrales PHP-Error-Log</h1>
+      <h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
+        <i class="bi bi-bug-fill ec-text-primary"></i>
+        <span>PHP-Error-Log</span>
+      </h1>
+      <p class="text-muted small mb-0">
+        Zentrale Überwachung und Auswertung der PHP-Fehlerdatei (<code><?= View::e((string)$logMeta['path']) ?></code>).
+      </p>
     </div>
 
     <div class="d-flex flex-wrap align-items-center gap-2">
-      <div class="btn-group btn-group-sm">
-        <a href="#/system-settings" class="btn btn-outline-kkc">
-          <i class="bi bi-sliders me-1"></i>Impressum &amp; E-Mail
-        </a>
-        <a href="#/errors" class="btn btn-primary-kkc active">
-          <i class="bi bi-bug-fill me-1"></i>PHP-Error-Log
-        </a>
-      </div>
-
       <button type="button" class="btn btn-sm btn-outline-kkc" onclick="App.SystemTech.errorLogAction('write_test_entry')" title="Schreibt einen Test-Eintrag in .errorlog">
         <i class="bi bi-Flask me-1"></i>Test-Eintrag schreiben
       </button>

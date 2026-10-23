@@ -49,43 +49,43 @@ $origAdminName  = $impersonator ? (string)($impersonator['username'] ?? 'Admin')
     </div>
   <?php endif; ?>
 
-  <!-- Kopfzeile mit Navigation -->
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-    <div>
-      <div class="d-flex align-items-center gap-2 mb-1">
-        <a href="#/employees" class="text-decoration-none small ec-text-primary fw-semibold">
-          <i class="bi bi-arrow-left me-1"></i>Alle Mitarbeiter &amp; Admins
-        </a>
-        <span class="text-muted small">/</span>
-        <?php if ($isNew): ?>
-          <span class="badge-kkc badge-kkc-success"><i class="bi bi-person-plus-fill me-1"></i>Neuanlage</span>
-        <?php else: ?>
-          <span class="badge-kkc badge-kkc-info font-monospace">Mitarbeiter #<?= $empId ?></span>
-          <?php if ($isSelf): ?>
-            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">
-              <i class="bi bi-person-check-fill me-1"></i>Dein eigener Account
-            </span>
-          <?php endif; ?>
-        <?php endif; ?>
-      </div>
-
-      <h1 class="h4 fw-bold mb-0 d-flex flex-wrap align-items-center gap-2">
-        <?php if ($isNew): ?>
-          <i class="bi bi-person-plus-fill ec-text-primary"></i>
-          <span>Neuen Mitarbeiter / Administrator / Moderator anlegen</span>
-        <?php else: ?>
-          <i class="bi bi-person-gear ec-text-primary"></i>
-          <span><?= View::e((string)$employee['username']) ?></span>
-          <?php if ($employee['rule'] === 'write'): ?>
-            <span class="badge-kkc badge-kkc-info ms-1"><i class="bi bi-shield-lock-fill me-1"></i>Administrator (`write`)</span>
+  <!-- Seiten-Header mit Navigation -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
+    <div class="d-flex align-items-start gap-3">
+      <a href="#/employees" class="btn btn-sm btn-outline-kkc mt-1">
+        <i class="bi bi-arrow-left me-1"></i>Zur Übersicht
+      </a>
+      <div>
+        <h1 class="h4 fw-bold mb-1 d-flex flex-wrap align-items-center gap-2">
+          <?php if ($isNew): ?>
+            <i class="bi bi-person-plus-fill ec-text-primary"></i>
+            <span>Neuen Mitarbeiter / Administrator / Moderator anlegen</span>
           <?php else: ?>
-            <span class="badge-kkc badge-kkc-neutral ms-1"><i class="bi bi-person-check-fill me-1"></i>Moderator / Prüfer (`read`)</span>
+            <i class="bi bi-person-gear ec-text-primary"></i>
+            <span><?= View::e((string)$employee['username']) ?></span>
+            <?php if ($employee['rule'] === 'write'): ?>
+              <span class="badge-kkc badge-kkc-info ms-1"><i class="bi bi-shield-lock-fill me-1"></i>Administrator (`write`)</span>
+            <?php else: ?>
+              <span class="badge-kkc badge-kkc-neutral ms-1"><i class="bi bi-person-check-fill me-1"></i>Moderator / Prüfer (`read`)</span>
+            <?php endif; ?>
+            <?php if ($isAllAccess): ?>
+              <span class="badge-kkc badge-kkc-success"><i class="bi bi-check2-all me-1"></i>Vollzugriff (`all`)</span>
+            <?php endif; ?>
           <?php endif; ?>
-          <?php if ($isAllAccess): ?>
-            <span class="badge-kkc badge-kkc-success"><i class="bi bi-check2-all me-1"></i>Vollzugriff (`all`)</span>
+        </h1>
+        <div class="d-flex align-items-center gap-2">
+          <?php if ($isNew): ?>
+            <span class="badge-kkc badge-kkc-success"><i class="bi bi-person-plus-fill me-1"></i>Neuanlage</span>
+          <?php else: ?>
+            <span class="badge-kkc badge-kkc-info font-monospace">Mitarbeiter #<?= $empId ?></span>
+            <?php if ($isSelf): ?>
+              <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">
+                <i class="bi bi-person-check-fill me-1"></i>Dein eigener Account
+              </span>
+            <?php endif; ?>
           <?php endif; ?>
-        <?php endif; ?>
-      </h1>
+        </div>
+      </div>
     </div>
 
     <div class="d-flex flex-wrap align-items-center gap-2">

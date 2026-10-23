@@ -42,23 +42,25 @@ $origAdminName  = $impersonator ? (string)($impersonator['username'] ?? 'Admin')
     </div>
   <?php endif; ?>
 
-  <!-- Kopfzeile -->
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+  <!-- Seiten-Header -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
     <div>
-      <div class="d-flex align-items-center gap-2 mb-1">
-        <span class="badge-kkc badge-kkc-info"><i class="bi bi-person-gear me-1"></i>Team &amp; Zugriffsrechte</span>
-        <span class="text-muted small">Verwaltung aller Administratoren, Moderatoren &amp; Prüfer</span>
-      </div>
-      <h1 class="h4 fw-bold mb-0">Mitarbeiter, Administratoren &amp; Moderatoren</h1>
+      <h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
+        <i class="bi bi-person-gear ec-text-primary"></i>
+        <span>Mitarbeiter &amp; Admins</span>
+      </h1>
+      <p class="text-muted small mb-0">
+        Verwaltung aller Administratoren, Moderatoren, Prüfer und ihrer Zugriffsrechte im ACP.
+      </p>
     </div>
 
     <div class="d-flex flex-wrap align-items-center gap-2">
       <a href="#/employee?id=0" class="btn btn-sm btn-primary-kkc fw-semibold">
         <i class="bi bi-person-plus-fill me-1"></i>Neuen Mitarbeiter / Admin anlegen
       </a>
-      <a href="#/employees" class="btn btn-sm btn-outline-kkc" onclick="App.handleRoute(); return false;">
+      <button type="button" class="btn btn-sm btn-outline-kkc" onclick="App.handleRoute()">
         <i class="bi bi-arrow-clockwise me-1"></i>Aktualisieren
-      </a>
+      </button>
     </div>
   </div>
 

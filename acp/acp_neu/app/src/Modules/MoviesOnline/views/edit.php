@@ -66,12 +66,15 @@ $buysCount = (int)($purchasesData['total_buys'] ?? 0);
        STICKY ACTION HEADER (Navigation & Haupt-Tabs)
        ======================================================================== -->
   <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
-    <div class="d-flex align-items-center gap-3">
-      <a href="#/movies-online" class="btn btn-sm btn-outline-kkc">
+    <div class="d-flex align-items-start gap-3">
+      <a href="#/movies-online" class="btn btn-sm btn-outline-kkc mt-1">
         <i class="bi bi-arrow-left me-1"></i> Zur Übersicht
       </a>
       <div>
-        <div class="d-flex align-items-center gap-2">
+        <h1 class="h4 fw-bold mb-1 text-truncate" style="max-width: 720px;">
+          <?= View::e((string)$movie['title'] ?: '(Ohne Titel)') ?>
+        </h1>
+        <div class="d-flex flex-wrap align-items-center gap-2">
           <span class="badge-kkc badge-kkc-info font-monospace">Online-ID #<?= $onlineId ?></span>
           <span class="badge-kkc badge-kkc-neutral font-monospace">Film-ID #<?= $movieId ?></span>
           <span class="badge-kkc badge-kkc-neutral font-monospace">MID #<?= $merchantId ?></span>
@@ -83,9 +86,6 @@ $buysCount = (int)($purchasesData['total_buys'] ?? 0);
             <span class="badge-kkc badge-kkc-danger"><i class="bi bi-trash3-fill me-1"></i>Gelöscht</span>
           <?php endif; ?>
         </div>
-        <h1 class="h4 fw-bold mb-0 mt-1 text-truncate" style="max-width: 720px;">
-          <?= View::e((string)$movie['title'] ?: '(Ohne Titel)') ?>
-        </h1>
       </div>
     </div>
 

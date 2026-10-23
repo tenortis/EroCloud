@@ -43,25 +43,21 @@ $buildPageUrl = static function (int $targetPage) use ($filters): string {
 ?>
 <div class="container-fluid py-3 px-3 px-xl-4" data-page-width="full">
 
-  <!-- Kopfzeile -->
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+  <!-- Seiten-Header -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
     <div>
-      <div class="d-flex align-items-center gap-2 mb-1">
-        <span class="badge-kkc badge-kkc-info"><i class="bi bi-briefcase-fill me-1"></i>P4C-Merchants</span>
-        <span class="text-muted small">EroCloud Partner- &amp; Händlerverwaltung</span>
-      </div>
-      <h1 class="h4 fw-bold mb-0">Pay4Coins-Merchants (Händler)</h1>
+      <h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
+        <i class="bi bi-briefcase-fill ec-text-primary"></i>
+        <span>P4C-Merchants</span>
+      </h1>
+      <p class="text-muted small mb-0">
+        Verwaltung aller registrierten Pay4Coins-Merchants (Händler), Darsteller-Kontingente, Filme und Aktivitäten.
+      </p>
     </div>
     <div class="d-flex flex-wrap align-items-center gap-2">
-      <a href="#/actors" class="btn btn-sm btn-outline-kkc">
-        <i class="bi bi-person-bounding-box me-1"></i>Alle Darsteller-Profile
-      </a>
-      <a href="#/co-actors-checking" class="btn btn-sm btn-outline-kkc">
-        <i class="bi bi-person-vcard-fill me-1"></i>Drehpartner &amp; ID-Check
-      </a>
-      <a href="#/merchants" class="btn btn-sm btn-outline-kkc" onclick="App.handleRoute(); return false;">
+      <button type="button" class="btn btn-sm btn-outline-kkc" onclick="App.handleRoute()">
         <i class="bi bi-arrow-clockwise me-1"></i>Aktualisieren
-      </a>
+      </button>
     </div>
   </div>
 

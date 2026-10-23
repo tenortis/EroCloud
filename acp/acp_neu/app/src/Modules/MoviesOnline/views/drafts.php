@@ -20,12 +20,17 @@ use App\Core\View;
        ======================================================================== -->
   <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
     <div>
-      <h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
-        <i class="bi bi-clock-history ec-text-primary"></i>
-        <span>Filme in Planung</span>
-      </h1>
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+        <h1 class="h3 fw-bold mb-0 d-flex align-items-center gap-2">
+          <i class="bi bi-clock-history ec-text-primary"></i>
+          <span>Filme in Planung</span>
+        </h1>
+        <span class="badge-kkc badge-kkc-neutral">
+          <i class="bi bi-eye me-1"></i>Reine Lese-Ansicht
+        </span>
+      </div>
       <p class="text-muted small mb-0">
-        Alle Filme, die von Creatorn hochgeladen wurden oder sich in Vorbereitung befinden, aber noch nicht zur Prüfung eingereicht wurden (<code>released = 0</code>).
+        Alle Filme, die von Creatorn hochgeladen wurden oder sich noch in Vorbereitung befinden und noch nicht zur Prüfung eingereicht wurden (<code>released = 0</code>).
       </p>
     </div>
 
@@ -138,21 +143,20 @@ use App\Core\View;
       <table class="table table-kkc align-middle mb-0">
         <thead>
           <tr>
-            <th style="width: 80px;">ID / MID</th>
-            <th style="width: 135px;">Status</th>
+            <th style="width: 90px;">ID / MID</th>
+            <th style="width: 140px;">Status</th>
             <th style="width: 155px;">Vorschaubilder</th>
             <th>Filmtitel &amp; Laufzeit</th>
-            <th style="width: 170px;">Darsteller</th>
-            <th style="width: 145px;">Geplant für</th>
-            <th style="width: 115px;">Speicherplatz</th>
-            <th style="width: 120px;">Sprache / Kat.</th>
-            <th class="text-end" style="width: 115px;">Aktion</th>
+            <th style="width: 180px;">Darsteller</th>
+            <th style="width: 150px;">Geplant für</th>
+            <th style="width: 120px;">Speicherplatz</th>
+            <th style="width: 130px;">Sprache / Kat.</th>
           </tr>
         </thead>
         <tbody>
           <?php if (empty($drafts)): ?>
           <tr>
-            <td colspan="9" class="text-center py-5 text-muted">
+            <td colspan="8" class="text-center py-5 text-muted">
               <i class="bi bi-clock-history fs-2 d-block mb-2 opacity-50"></i>
               Aktuell befinden sich keine Filme in Planung.
             </td>
@@ -176,7 +180,7 @@ use App\Core\View;
             ?>
             <tr class="md-draft-row" data-state="<?= $filterState ?>" data-search="<?= View::e($searchStr) ?>">
               <td>
-                <a href="#/movie-checking?id=<?= $id ?>" class="fw-bold font-monospace ec-text-primary text-decoration-none d-block">#<?= $id ?></a>
+                <span class="fw-bold font-monospace text-body d-block">#<?= $id ?></span>
                 <a href="#/merchant?id=<?= $mid ?>" class="small text-muted text-decoration-none font-monospace">MID #<?= $mid ?></a>
               </td>
 
@@ -212,11 +216,14 @@ use App\Core\View;
               </td>
 
               <td>
-                <a href="#/movie-checking?id=<?= $id ?>" class="fw-bold text-body text-decoration-none d-block">
+                <div class="fw-bold text-body">
                   <?= View::e((string)$d['title'] ?: '(Noch kein Titel vergeben)') ?>
-                </a>
+                </div>
                 <small class="text-muted font-monospace">
                   <?= View::e((string)$d['resolution'] ?: '-') ?> &bull; <?= View::e((string)$d['playtime_str'] ?: '-') ?>
+                  <?php if ($fileId !== ''): ?>
+                    &bull; File-ID: <?= View::e($fileId) ?>
+                  <?php endif; ?>
                 </small>
               </td>
 
@@ -251,12 +258,6 @@ use App\Core\View;
                 <?php else: ?>
                   <span class="text-muted small">-</span>
                 <?php endif; ?>
-              </td>
-
-              <td class="text-end">
-                <a href="#/movie-checking?id=<?= $id ?>" class="btn btn-sm btn-outline-kkc">
-                  <i class="bi bi-eye me-1"></i> Öffnen
-                </a>
               </td>
             </tr>
             <?php endforeach; ?>

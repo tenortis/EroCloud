@@ -141,8 +141,8 @@ class Router
         self::register('co-actors-checking/action', $coActorsCheckingCtrl, 'action', 'content_check,content_online');
         self::register('co-actors-checking/update-data', $coActorsCheckingCtrl, 'updateData', 'content_check,content_online');
         self::register('movies-blocked', $moviesOnlineCtrl, 'blocked', 'content_check,content_online');
-        self::register('ai-compliance', $aiComplianceCtrl, 'index', 'content_check,content_online');
-        self::register('ai-compliance/ajax', $aiComplianceCtrl, 'ajax', 'content_check,content_online');
+        self::register('ai-compliance', $aiComplianceCtrl, 'index', 'admin');
+        self::register('ai-compliance/ajax', $aiComplianceCtrl, 'ajax', 'admin');
 
         // 3. Content Online (content_online)
         self::register('movies-online', $moviesOnlineCtrl, 'list', 'content_online');
@@ -154,11 +154,11 @@ class Router
         self::register('photo-albums-online/recalc-size', $photoAlbumsOnlineCtrl, 'recalcSize', 'content_online');
         self::register('photo-album-edit', $photoAlbumsOnlineCtrl, 'edit', 'content_online');
         self::register('photo-albums-online/save', $photoAlbumsOnlineCtrl, 'save', 'content_online');
-        self::register('content-cleanup', $contentCleanupCtrl, 'index', 'content_online');
-        self::register('content-cleanup/orphan-scan', $contentCleanupCtrl, 'orphanScan', 'content_online');
-        self::register('storage-analytics', $storageAnalyticsCtrl, 'index', 'content_online');
-        self::register('storage-analytics/scan', $storageAnalyticsCtrl, 'scan', 'content_online');
-        self::register('storage-analytics/legacy-cleanup', $storageAnalyticsCtrl, 'legacyCleanup', 'content_online');
+        self::register('content-cleanup', $contentCleanupCtrl, 'index', 'admin');
+        self::register('content-cleanup/orphan-scan', $contentCleanupCtrl, 'orphanScan', 'admin');
+        self::register('storage-analytics', $storageAnalyticsCtrl, 'index', 'admin');
+        self::register('storage-analytics/scan', $storageAnalyticsCtrl, 'scan', 'admin');
+        self::register('storage-analytics/legacy-cleanup', $storageAnalyticsCtrl, 'legacyCleanup', 'admin');
 
         // 4. Profile (actors)
         self::register('actors', $actorsCtrl, 'list', 'actors');

@@ -25,19 +25,14 @@ $countOnlineTotal   = $countUsersOnline + $countActorsOnline;
 $openTasksTotal     = (int)($counts['new_actors'] ?? 0) + (int)($counts['new_banners'] ?? 0);
 ?>
 
-<!-- Page Header & Admin Greeting -->
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+<!-- Seiten-Header & Admin-Begrüßung -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
   <div>
-    <div class="d-flex align-items-center gap-2 mb-1">
-      <span class="badge-kkc badge-kkc-info">
-        <i class="bi bi-shield-check"></i> Admin-Dashboard
-      </span>
-      <?php if ($employeeRule !== ''): ?>
-      <span class="badge-kkc badge-kkc-neutral">Rolle: <?= View::e($employeeRule) ?></span>
-      <?php endif; ?>
-    </div>
-    <h1 class="h3 mb-1">Hallo <?= View::e($employeeUsername) ?>, willkommen im neuen EroCloud ACP!</h1>
-    <p class="text-muted mb-0">
+    <h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
+      <i class="bi bi-house-door-fill ec-text-primary"></i>
+      <span>Hallo <?= View::e($employeeUsername) ?>, willkommen im EroCloud ACP!</span>
+    </h1>
+    <p class="text-muted small mb-0">
       Hier hast du alle offenen Content-Prüfungen, aktuell aktiven Nutzer und Darsteller, Notizen sowie das Aktions-Protokoll im direkten Überblick.
     </p>
   </div>
@@ -170,6 +165,7 @@ $openTasksTotal     = (int)($counts['new_actors'] ?? 0) + (int)($counts['new_ban
         </a>
       </div>
       <div class="col-xl-3 col-sm-6">
+        <?php if (function_exists('acp_is_admin') && acp_is_admin()): ?>
         <a href="#/ai-compliance" class="action-tile text-decoration-none h-100">
           <div class="action-tile-icon ec-bg-primary-subtle ec-text-primary">
             <i class="bi bi-cpu"></i>
@@ -179,6 +175,17 @@ $openTasksTotal     = (int)($counts['new_actors'] ?? 0) + (int)($counts['new_ban
             <small class="text-muted">Whisper-Transkripte, Gesichtsabgleich &amp; Compliance</small>
           </div>
         </a>
+        <?php else: ?>
+        <a href="#/movies-blocked" class="action-tile text-decoration-none h-100">
+          <div class="action-tile-icon ec-bg-primary-subtle ec-text-primary">
+            <i class="bi bi-slash-circle"></i>
+          </div>
+          <div>
+            <div class="fw-bold text-body">Filme abgelehnt (<?= (int)($counts['movies_blocked'] ?? 0) ?>)</div>
+            <small class="text-muted">Gesperrte &amp; abgelehnte Video-Uploads einsehen</small>
+          </div>
+        </a>
+        <?php endif; ?>
       </div>
     </div>
   </div>

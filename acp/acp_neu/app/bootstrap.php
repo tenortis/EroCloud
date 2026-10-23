@@ -117,6 +117,17 @@ if (!function_exists('log_action')) {
 /**
  * 8. Prüft, ob der eingeloggte Admin Zugriff auf einen bestimmten ACP-Bereich hat
  */
+if (!function_exists('acp_is_admin')) {
+    function acp_is_admin(): bool
+    {
+        $rule       = strtolower(trim((string)($_SESSION['employee_rule'] ?? '')));
+        $accessList = isset($_SESSION['employee_access_area']) && is_array($_SESSION['employee_access_area'])
+            ? $_SESSION['employee_access_area']
+            : [];
+        return $rule === 'write' || in_array('all', $accessList, true);
+    }
+}
+
 if (!function_exists('acp_has_access')) {
     function acp_has_access(string $area): bool
     {
@@ -131,6 +142,12 @@ if (!function_exists('acp_has_access')) {
         }
         foreach (explode(',', $area) as $reqArea) {
             $reqArea = trim($reqArea);
+            if ($reqArea === 'admin') {
+                if (acp_is_admin()) {
+                    return true;
+                }
+                continue;
+            }
             if ($reqArea !== '' && in_array($reqArea, $accessList, true)) {
                 return true;
             }

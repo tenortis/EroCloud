@@ -371,12 +371,15 @@ $site = '<!DOCTYPE html>
                             <a '.$navMoviesBlocked.' href="'.ACP_URL.'/gesperrte-Filme">
                                 <i class="material-symbols-outlined md-30">add_box</i>
                                 <span>Filme abgelehnt ('.$count_movies_blocked.')</span>
-                            </a>
-
-                            <a '.$navAiCompliance.' href="'.ACP_URL.'/KI-Analyse">
-                                <i class="material-symbols-outlined md-30">psychology</i>
-                                <span>KI-Analyse &amp; BRAM</span>
-                            </a>
+                            </a>';
+                            if ((isset($_SESSION['employee_rule']) && $_SESSION['employee_rule'] == 'write') || in_array('all', $_SESSION['employee_access_area'])) {
+                                $site .= '
+                                <a '.$navAiCompliance.' href="'.ACP_URL.'/KI-Analyse">
+                                    <i class="material-symbols-outlined md-30">psychology</i>
+                                    <span>KI-Analyse &amp; BRAM</span>
+                                </a>';
+                            }
+                            $site .= '
                         </div>
                         ';
                     }
@@ -403,17 +406,20 @@ $site = '<!DOCTYPE html>
                             <a '.$navFotoalbenOnline.' href="'.ACP_URL.'/Fotoalben-online">
                                 <i class="material-symbols-outlined md-30">photo_library</i>
                                 <span>Fotoalben online ('.$count_photo_albums_online.')</span>
-                            </a>
+                            </a>';
+                            if ((isset($_SESSION['employee_rule']) && $_SESSION['employee_rule'] == 'write') || in_array('all', $_SESSION['employee_access_area'])) {
+                                $site .= '
+                                <a '.$navContentCleanup.' href="'.ACP_URL.'/Content-Bereinigung">
+                                    <i class="material-symbols-outlined md-30">delete_sweep</i>
+                                    <span>Content-Bereinigung</span>
+                                </a>
 
-                            <a '.$navContentCleanup.' href="'.ACP_URL.'/Content-Bereinigung">
-                                <i class="material-symbols-outlined md-30">delete_sweep</i>
-                                <span>Content-Bereinigung</span>
-                            </a>
-
-                            <a '.$navStorageAnalytics.' href="'.ACP_URL.'/Speicher-Analyse">
-                                <i class="material-symbols-outlined md-30">storage</i>
-                                <span>Speicher &amp; Traffic</span>
-                            </a>
+                                <a '.$navStorageAnalytics.' href="'.ACP_URL.'/Speicher-Analyse">
+                                    <i class="material-symbols-outlined md-30">storage</i>
+                                    <span>Speicher &amp; Traffic</span>
+                                </a>';
+                            }
+                            $site .= '
                         </div>';
                     }
                     

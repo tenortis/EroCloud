@@ -68,26 +68,28 @@ foreach ($categoriesByType as $grpItems) {
        STICKY HEADER & SCHNELL-NAVIGATION
        ======================================================================== -->
   <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
-    <div>
-      <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-        <a href="#/photo-albums-online" class="btn btn-sm btn-outline-kkc py-0 px-2">
-          <i class="bi bi-arrow-left me-1"></i> Alle Fotoalben online
-        </a>
-        <span class="badge-kkc badge-kkc-info font-monospace">Online-ID #<?= $onlineId ?></span>
-        <span class="badge-kkc badge-kkc-neutral font-monospace">Album #<?= $albumDbId ?></span>
-        <span class="badge-kkc badge-kkc-neutral font-monospace">Hash: <?= View::e($albumIdHash) ?></span>
-        <?php if ($album['status'] === 'active'): ?>
-          <span class="badge-kkc badge-kkc-success"><i class="bi bi-check-circle-fill me-1"></i>Aktiv</span>
-        <?php elseif ($album['status'] === 'blocked'): ?>
-          <span class="badge-kkc badge-kkc-warning"><i class="bi bi-pause-circle-fill me-1"></i>Gesperrt</span>
-        <?php else: ?>
-          <span class="badge-kkc badge-kkc-danger"><i class="bi bi-trash-fill me-1"></i>Gelöscht</span>
-        <?php endif; ?>
+    <div class="d-flex align-items-start gap-3">
+      <a href="#/photo-albums-online" class="btn btn-sm btn-outline-kkc mt-1">
+        <i class="bi bi-arrow-left me-1"></i> Zur Übersicht
+      </a>
+      <div>
+        <h1 class="h4 fw-bold mb-1 text-break">
+          <i class="bi bi-journal-album ec-text-primary me-1"></i>
+          <?= View::e((string)$album['title'] ?: '(Ohne Albumtitel)') ?>
+        </h1>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <span class="badge-kkc badge-kkc-info font-monospace">Online-ID #<?= $onlineId ?></span>
+          <span class="badge-kkc badge-kkc-neutral font-monospace">Album #<?= $albumDbId ?></span>
+          <span class="badge-kkc badge-kkc-neutral font-monospace">Hash: <?= View::e($albumIdHash) ?></span>
+          <?php if ($album['status'] === 'active'): ?>
+            <span class="badge-kkc badge-kkc-success"><i class="bi bi-check-circle-fill me-1"></i>Aktiv</span>
+          <?php elseif ($album['status'] === 'blocked'): ?>
+            <span class="badge-kkc badge-kkc-warning"><i class="bi bi-pause-circle-fill me-1"></i>Gesperrt</span>
+          <?php else: ?>
+            <span class="badge-kkc badge-kkc-danger"><i class="bi bi-trash-fill me-1"></i>Gelöscht</span>
+          <?php endif; ?>
+        </div>
       </div>
-      <h1 class="h4 fw-bold mb-0 text-break">
-        <i class="bi bi-journal-album ec-text-primary me-1"></i>
-        <?= View::e((string)$album['title'] ?: '(Ohne Albumtitel)') ?>
-      </h1>
     </div>
 
     <div class="d-flex flex-wrap align-items-center gap-2">

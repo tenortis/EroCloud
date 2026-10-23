@@ -20,16 +20,16 @@ $mid = (int)$site['merchant_id'];
 <div class="container-fluid px-0">
 
     <!-- 1. SEITEN-HEADER MIT VOR/ZURÜCK-NAVIGATION -->
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
         <div class="d-flex flex-wrap align-items-center gap-2">
-            <a href="#/sites" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-arrow-left me-1"></i>Alle Webseiten
+            <a href="#/sites" class="btn btn-sm btn-outline-kkc">
+                <i class="bi bi-arrow-left me-1"></i>Zur Übersicht
             </a>
-            <h4 class="fw-bold mb-0 d-flex align-items-center gap-2">
+            <h1 class="h4 fw-bold mb-0 d-flex align-items-center gap-2">
                 <i class="bi bi-globe2 ec-text-primary"></i>
                 <span><?= View::e((string)$site['domain']) ?></span>
                 <span class="badge bg-light text-dark border font-monospace fs-6">#<?= $sid ?></span>
-            </h4>
+            </h1>
             <?php if ($site['status']): ?>
                 <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Aktiv</span>
             <?php else: ?>

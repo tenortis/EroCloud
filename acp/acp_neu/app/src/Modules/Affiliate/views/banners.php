@@ -26,29 +26,20 @@ if (!defined('SAFE_INC')) {
 <div class="container-fluid px-0">
 
     <!-- 1. SEITEN-HEADER -->
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
         <div>
-            <h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
-                <i class="bi bi-images ec-text-primary"></i>
-                <span>Partnerprogramm · Alle Werbebanner</span>
-                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 fs-6 ms-1">
-                    <?= number_format((int)($kpis['total_all'] ?? 0), 0, ',', '.') ?>
-                </span>
-            </h4>
-            <div class="text-muted small">
-                Hier sind alle EroAds-Werbebanner aufgelistet, die Webmastern für ihre Kampagnen zur Verfügung stehen.
-            </div>
+            <h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
+                <i class="bi bi-layers-fill ec-text-primary"></i>
+                <span>Aktive Banner</span>
+            </h1>
+            <p class="text-muted small mb-0">
+                Übersicht und Verwaltung aller EroAds-Werbebanner, die Webmastern für ihre Kampagnen zur Verfügung stehen.
+            </p>
         </div>
         <div class="d-flex flex-wrap align-items-center gap-2">
-            <a href="#/webmaster-partner" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-arrow-left me-1"></i>Aktive Webmaster
-            </a>
-            <a href="#/banners-new" class="btn btn-sm <?= ($kpis['pending_new_count'] ?? 0) > 0 ? 'btn-warning fw-semibold' : 'btn-outline-secondary' ?>">
-                <i class="bi bi-shield-check me-1"></i>Neue Banner prüfen
-                <span class="badge <?= ($kpis['pending_new_count'] ?? 0) > 0 ? 'bg-dark' : 'bg-secondary' ?> ms-1">
-                    <?= number_format((int)($kpis['pending_new_count'] ?? 0), 0, ',', '.') ?>
-                </span>
-            </a>
+            <button type="button" class="btn btn-sm btn-outline-kkc" onclick="App.handleRoute()">
+                <i class="bi bi-arrow-clockwise me-1"></i>Aktualisieren
+            </button>
         </div>
     </div>
 

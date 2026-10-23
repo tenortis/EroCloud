@@ -265,6 +265,9 @@ final class MoviesCheckingController
         }
 
         $m = p4c_fetch_object($rsMovie);
+        if (abs((int)($m->released ?? 0)) === 0 && (string)($m->status ?? 'active') === 'active') {
+            return $this->renderNotFound("Der Film #{$movieId} befindet sich noch in Planung beim Creator (Entwurf, released = 0) und wurde noch nicht zur Prüfung eingereicht.");
+        }
         $merchantId = abs((int)$m->merchant_id);
         $actorId    = abs((int)$m->actor_id);
         $fileId     = (string)$m->file_id;
@@ -589,6 +592,10 @@ final class MoviesCheckingController
         }
 
         $m          = p4c_fetch_object($rsMovie);
+        if (abs((int)($m->released ?? 0)) === 0 && (string)($m->status ?? 'active') === 'active') {
+            Response::error('Dieser Film befindet sich noch in Planung beim Creator (released = 0) und kann noch nicht geprüft oder bearbeitet werden.', 403);
+            return;
+        }
         $merchantId = abs((int)$m->merchant_id);
         $fileId     = (string)$m->file_id;
         $playtime   = abs((int)$m->playtime_seconds);
@@ -1118,6 +1125,10 @@ final class MoviesCheckingController
             return;
         }
         $m          = p4c_fetch_object($rsMovie);
+        if (abs((int)($m->released ?? 0)) === 0 && (string)($m->status ?? 'active') === 'active') {
+            Response::error('Dieser Film befindet sich noch in Planung beim Creator (released = 0) und kann noch nicht geprüft oder bearbeitet werden.', 403);
+            return;
+        }
         $merchantId = abs((int)$m->merchant_id);
         $fileId     = (string)$m->file_id;
         $movieDir   = rtrim((string)MOVIES_PATH, '/\\') . '/' . (string)$m->storage_location . '/' . $merchantId . '/' . $movieId;

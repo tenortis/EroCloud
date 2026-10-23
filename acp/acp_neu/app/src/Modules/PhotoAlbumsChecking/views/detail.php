@@ -66,23 +66,25 @@ foreach ($categoriesByGroup as $grpItems) {
 ?>
 
 <!-- ==========================================================================
-     TOP HEADER & WARTESCHLANGEN-NAVIGATION
+     SEITEN-HEADER & WARTESCHLANGEN-NAVIGATION
      ========================================================================== -->
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
-  <div>
-    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-      <a href="#/photo-albums-checking" class="btn btn-sm btn-outline-kkc py-0 px-2">
-        <i class="bi bi-arrow-left me-1"></i> Warteschlange
-      </a>
-      <span class="badge-kkc badge-kkc-info font-monospace">Fotoalbum #<?= $albumDbId ?></span>
-      <span class="badge-kkc badge-kkc-neutral font-monospace">Album-ID: <?= View::e($albumIdHash) ?></span>
-      <?php if ($queuePosition > 0): ?>
-      <span class="badge-kkc badge-kkc-neutral">
-        Position <?= $queuePosition ?> von <?= $queueTotal ?> in Prüfung
-      </span>
-      <?php endif; ?>
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
+  <div class="d-flex align-items-start gap-3">
+    <a href="#/photo-albums-checking" class="btn btn-sm btn-outline-kkc mt-1">
+      <i class="bi bi-arrow-left me-1"></i> Warteschlange
+    </a>
+    <div>
+      <h1 class="h4 fw-bold mb-1 text-break"><?= View::e((string)$album['title'] ?: '(Ohne Albumtitel)') ?></h1>
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="badge-kkc badge-kkc-info font-monospace">Fotoalbum #<?= $albumDbId ?></span>
+        <span class="badge-kkc badge-kkc-neutral font-monospace">Album-ID: <?= View::e($albumIdHash) ?></span>
+        <?php if ($queuePosition > 0): ?>
+        <span class="badge-kkc badge-kkc-neutral">
+          Position <?= $queuePosition ?> von <?= $queueTotal ?> in Prüfung
+        </span>
+        <?php endif; ?>
+      </div>
     </div>
-    <h1 class="h4 mb-0 text-break"><?= View::e((string)$album['title'] ?: '(Ohne Albumtitel)') ?></h1>
   </div>
 
   <div class="d-flex flex-wrap align-items-center gap-2">

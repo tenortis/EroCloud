@@ -36,16 +36,16 @@ $statusBadge = match ($actor['status']) {
 };
 ?>
 
-<!-- Kopfbereich & Schnell-Navigation -->
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+<!-- Seiten-Header & Schnell-Navigation -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
     <div class="d-flex align-items-center gap-2 flex-wrap">
-        <a href="#/actors" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-arrow-left me-1"></i>Alle Profile
+        <a href="#/actors" class="btn btn-sm btn-outline-kkc">
+            <i class="bi bi-arrow-left me-1"></i>Zur Übersicht
         </a>
-        <h4 class="fw-bold mb-0">
-            Profil <span class="text-primary"><?= View::e((string)$actor['username']) ?></span>
+        <h1 class="h4 fw-bold mb-0">
+            Profil <span class="ec-text-primary"><?= View::e((string)$actor['username']) ?></span>
             <small class="text-muted font-monospace">#<?= $aid ?></small>
-        </h4>
+        </h1>
         <?= $statusBadge ?>
     </div>
 

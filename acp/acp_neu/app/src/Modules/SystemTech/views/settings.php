@@ -22,25 +22,19 @@ $sandboxRecipient = (string)$smtpConfig['sandbox_recipient'];
 ?>
 <div class="container-fluid py-3 px-3 px-xl-4" data-page-width="full">
 
-  <!-- Kopfzeile & System-Switcher -->
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+  <!-- Seiten-Header -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
     <div>
-      <div class="d-flex align-items-center gap-2 mb-1">
-        <span class="badge-kkc badge-kkc-info"><i class="bi bi-sliders me-1"></i>System &amp; Technik</span>
-        <span class="text-muted small">Zentrales Impressum, PHPMailer &amp; Server-Umgebung</span>
-      </div>
-      <h1 class="h4 fw-bold mb-0">Impressum, Support &amp; E-Mail-System</h1>
+      <h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
+        <i class="bi bi-sliders ec-text-primary"></i>
+        <span>Impressum &amp; E-Mail</span>
+      </h1>
+      <p class="text-muted small mb-0">
+        Verwaltung des zentralen Impressums sowie der PHPMailer- und SMTP-Konfiguration.
+      </p>
     </div>
 
     <div class="d-flex flex-wrap align-items-center gap-2">
-      <div class="btn-group btn-group-sm">
-        <a href="#/system-settings" class="btn btn-primary-kkc active">
-          <i class="bi bi-sliders me-1"></i>Impressum &amp; E-Mail
-        </a>
-        <a href="#/errors" class="btn btn-outline-kkc">
-          <i class="bi bi-bug-fill me-1"></i>PHP-Error-Log (<?= View::e((string)$envInfo['error_log_size_fmt']) ?>)
-        </a>
-      </div>
       <button type="button" class="btn btn-sm btn-outline-kkc" onclick="App.handleRoute()">
         <i class="bi bi-arrow-clockwise me-1"></i>Aktualisieren
       </button>

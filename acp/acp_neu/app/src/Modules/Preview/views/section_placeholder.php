@@ -18,24 +18,18 @@ use App\Core\View;
 
 $acpUrl = defined('ACP_URL') ? (string)ACP_URL : 'https://acp.erocloud.net';
 ?>
-<!-- Section Header -->
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+<!-- Seiten-Header -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
   <div>
-    <div class="d-flex align-items-center gap-2 mb-1">
-      <span class="badge-kkc badge-kkc-info">
-        <i class="bi <?= View::e($icon) ?>"></i> <?= View::e($badge) ?>
-      </span>
-      <span class="badge-kkc badge-kkc-neutral font-monospace">Route: #/<?= View::e($routeKey) ?></span>
-    </div>
-    <h1 class="h3 mb-1"><?= View::e($title) ?></h1>
-    <p class="text-muted mb-0"><?= View::e($subtitle) ?></p>
+    <h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
+      <i class="bi <?= View::e($icon) ?> ec-text-primary"></i>
+      <span><?= View::e($title) ?></span>
+    </h1>
+    <p class="text-muted small mb-0"><?= View::e($subtitle) ?></p>
   </div>
   <div class="d-flex align-items-center gap-2">
     <a href="<?= View::e($acpUrl . $legacyRoute) ?>" target="_blank" rel="noopener" class="btn btn-sm btn-outline-kkc" title="Ansicht im bisherigen ACP zum Vergleich öffnen">
       <i class="bi bi-box-arrow-up-right me-1"></i> Im alten ACP öffnen
-    </a>
-    <a href="#/startseite" class="btn btn-sm btn-primary-kkc">
-      <i class="bi bi-arrow-left me-1"></i> Zurück zur Startseite
     </a>
   </div>
 </div>

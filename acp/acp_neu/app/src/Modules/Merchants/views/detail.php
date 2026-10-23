@@ -25,25 +25,26 @@ $curLimit  = max($minLimit, (int)$merchant['min_profiles_limit']);
 ?>
 <div class="container-fluid py-3 px-3 px-xl-4" data-page-width="full">
 
-  <!-- Kopfzeile mit Vor/Zurück-Navigation -->
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-    <div>
-      <div class="d-flex align-items-center gap-2 mb-1">
-        <a href="#/merchants" class="text-decoration-none small ec-text-primary fw-semibold">
-          <i class="bi bi-arrow-left me-1"></i>Alle P4C-Merchants
-        </a>
-        <span class="text-muted small">/</span>
-        <span class="badge-kkc badge-kkc-info font-monospace">MID #<?= $mid ?></span>
-        <?php if ($partnerId !== ''): ?>
-          <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 font-monospace">
-            PID: <?= View::e($partnerId) ?>
-          </span>
-        <?php endif; ?>
+  <!-- Seiten-Header mit Vor/Zurück-Navigation -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
+    <div class="d-flex align-items-start gap-3">
+      <a href="#/merchants" class="btn btn-sm btn-outline-kkc mt-1">
+        <i class="bi bi-arrow-left me-1"></i>Zur Übersicht
+      </a>
+      <div>
+        <h1 class="h4 fw-bold mb-1 d-flex align-items-center gap-2">
+          <i class="bi bi-person-workspace ec-text-primary"></i>
+          <span><?= View::e($merchant['username'] !== '' ? (string)$merchant['username'] : ('Merchant #' . $mid)) ?></span>
+        </h1>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge-kkc badge-kkc-info font-monospace">MID #<?= $mid ?></span>
+          <?php if ($partnerId !== ''): ?>
+            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 font-monospace">
+              PID: <?= View::e($partnerId) ?>
+            </span>
+          <?php endif; ?>
+        </div>
       </div>
-      <h1 class="h4 fw-bold mb-0 d-flex align-items-center gap-2">
-        <i class="bi bi-person-workspace ec-text-primary"></i>
-        <span><?= View::e($merchant['username'] !== '' ? (string)$merchant['username'] : ('Merchant #' . $mid)) ?></span>
-      </h1>
     </div>
 
     <div class="d-flex flex-wrap align-items-center gap-2">

@@ -48,15 +48,15 @@ final class EmployeesController
                 'icon'        => 'bi-shield-check',
                 'badge_color' => 'primary',
                 'description' => 'Warteschlangen für neue Uploads, 18+ Ausweise & Compliance-Prüfung',
-                'sub_items'   => 'Filme prüfen, Fotoalben prüfen, Drehpartner & ID-Check, Filme abgelehnt, KI-Analyse & BRAM',
+                'sub_items'   => 'Filme prüfen, Fotoalben prüfen, Drehpartner & ID-Check, Filme abgelehnt (KI-Analyse & BRAM nur für Admins)',
             ],
             'content_online' => [
                 'key'         => 'content_online',
                 'title'       => 'Content Online',
                 'icon'        => 'bi-cloud-check-fill',
                 'badge_color' => 'success',
-                'description' => 'Veröffentlichter Katalog, Entwürfe, Bereinigung & Speicher-Analyse',
-                'sub_items'   => 'Filme online, Filme in Planung, Fotoalben online, Content-Bereinigung, Speicher & Traffic',
+                'description' => 'Veröffentlichter Katalog & geplante Entwürfe',
+                'sub_items'   => 'Filme online, Filme in Planung, Fotoalben online (Content-Bereinigung & Speicher/Traffic nur für Admins)',
             ],
             'actors' => [
                 'key'         => 'actors',

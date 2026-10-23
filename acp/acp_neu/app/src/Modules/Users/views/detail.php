@@ -19,30 +19,31 @@ $uid = (int)$user['id'];
 ?>
 <div class="container-fluid py-3 px-3 px-xl-4" data-page-width="full">
 
-  <!-- Kopfzeile mit Vor/Zurück-Navigation -->
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-    <div>
-      <div class="d-flex align-items-center gap-2 mb-1">
-        <a href="#/users" class="text-decoration-none small ec-text-primary fw-semibold">
-          <i class="bi bi-arrow-left me-1"></i>Alle Cloud-User
-        </a>
-        <span class="text-muted small">/</span>
-        <span class="badge-kkc badge-kkc-info font-monospace">User #<?= $uid ?></span>
-        <?php if (!empty($user['remote_member_id'])): ?>
-          <span class="badge bg-secondary bg-opacity-10 text-body border font-monospace">
-            Remote-ID: <?= View::e((string)$user['remote_member_id']) ?>
-          </span>
-        <?php endif; ?>
+  <!-- Seiten-Header mit Vor/Zurück-Navigation -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
+    <div class="d-flex align-items-start gap-3">
+      <a href="#/users" class="btn btn-sm btn-outline-kkc mt-1">
+        <i class="bi bi-arrow-left me-1"></i>Zur Übersicht
+      </a>
+      <div>
+        <h1 class="h4 fw-bold mb-1 d-flex align-items-center gap-2">
+          <i class="bi bi-person-lines-fill ec-text-primary"></i>
+          <span><?= View::e($user['username'] !== '' ? (string)$user['username'] : ('User #' . $uid)) ?></span>
+          <?php if ($user['locked']): ?>
+            <span class="badge-kkc badge-kkc-danger ms-1"><i class="bi bi-lock-fill me-1"></i>Konto gesperrt</span>
+          <?php else: ?>
+            <span class="badge-kkc badge-kkc-success ms-1">Aktiv</span>
+          <?php endif; ?>
+        </h1>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge-kkc badge-kkc-info font-monospace">User #<?= $uid ?></span>
+          <?php if (!empty($user['remote_member_id'])): ?>
+            <span class="badge bg-secondary bg-opacity-10 text-body border font-monospace">
+              Remote-ID: <?= View::e((string)$user['remote_member_id']) ?>
+            </span>
+          <?php endif; ?>
+        </div>
       </div>
-      <h1 class="h4 fw-bold mb-0 d-flex align-items-center gap-2">
-        <i class="bi bi-person-lines-fill ec-text-primary"></i>
-        <span><?= View::e($user['username'] !== '' ? (string)$user['username'] : ('User #' . $uid)) ?></span>
-        <?php if ($user['locked']): ?>
-          <span class="badge-kkc badge-kkc-danger ms-1"><i class="bi bi-lock-fill me-1"></i>Konto gesperrt</span>
-        <?php else: ?>
-          <span class="badge-kkc badge-kkc-success ms-1">Aktiv</span>
-        <?php endif; ?>
-      </h1>
     </div>
 
     <div class="d-flex flex-wrap align-items-center gap-2">
