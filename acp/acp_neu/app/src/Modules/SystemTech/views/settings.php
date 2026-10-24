@@ -11,6 +11,7 @@ use App\Core\View;
  * @var array<string, string> $imprint
  * @var array<string, string> $defaults
  * @var array<string, mixed> $smtpConfig
+ * @var string $ownAdminEmail
  * @var array<string, array<string, mixed>> $eventCatalog
  * @var array<int, array<string, string>> $triggerCatalog
  * @var array<string, array{total_merchants: int, opted_out: int, active: int}> $optInStats
@@ -20,11 +21,13 @@ use App\Core\View;
  * @var array{subject: string, html: string, text: string} $initialPreview
  */
 
-$isSandbox = !empty($smtpConfig['is_sandbox']);
+$isSandbox        = !empty($smtpConfig['is_sandbox']);
 $sandboxRecipient = (string)($smtpConfig['sandbox_recipient'] ?? 'erocms@gmail.com');
-$smtpSecure = strtolower((string)($smtpConfig['smtp_secure'] ?? 'tls'));
+$smtpSecure       = strtolower((string)($smtpConfig['smtp_secure'] ?? 'tls'));
+$ownEmail         = !empty($ownAdminEmail) ? (string)$ownAdminEmail : $sandboxRecipient;
+$supportEmail     = (string)($imprint['imprint_support_email'] ?? 'support@pay4coins.com');
 ?>
-<div class="container-fluid py-3 px-3 px-xl-4" data-page-width="full">
+<div class="container-fluid py-3 px-3 px-xl-4" data-page-width="full" data-own-admin-email="<?= View::e($ownEmail) ?>">
 
   <!-- Seiten-Header -->
   <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
@@ -34,11 +37,31 @@ $smtpSecure = strtolower((string)($smtpConfig['smtp_secure'] ?? 'tls'));
         <span>E-Mail-System, Postfach &amp; Impressum</span>
       </h1>
       <p class="text-muted small mb-0">
-        Konfiguration des Versand-Postfachs (SMTP &amp; Sandbox), Übersicht aller E-Mail-Auslöser, lückenloses Versand-Tracking sowie zentrale Impressumsdaten.
+        Konfiguration des Versand-Postfachs (SMTP &amp; Sandbox), Übersicht aller E-Mail-Auslöser inkl. Direkt-Testversand, lückenloses Versand-Tracking sowie zentrale Impressumsdaten.
       </p>
     </div>
 
     <div class="d-flex flex-wrap align-items-center gap-2">
+      <div class="input-group input-group-sm" style="width: auto; max-width: 430px;">
+        <span class="input-group-text bg-transparent text-muted small" title="Empfänger für Test-E-Mails (eigene oder beliebige andere Adresse)">
+          <i class="bi bi-envelope-at me-1 ec-text-primary"></i>Test an:
+        </span>
+        <input type="email"
+               id="sys-header-test-recipient"
+               class="form-control form-control-sm font-monospace"
+               style="min-width: 195px;"
+               value="<?= View::e($ownEmail) ?>"
+               placeholder="E-Mail-Adresse eingeben..."
+               oninput="App.SystemTech.syncTestRecipient(this.value, 'header')">
+        <button type="button"
+                id="btn-header-send-testmail"
+                class="btn btn-success fw-semibold"
+                onclick="App.SystemTech.quickSendTestMail('movie_converted', this)"
+                title="Sendet sofort eine Test-E-Mail an die eingegebene Adresse">
+          <i class="bi bi-send-check-fill me-1"></i>Test-Mail senden
+        </button>
+      </div>
+
       <button type="button" class="btn btn-sm btn-outline-kkc" onclick="App.handleRoute()">
         <i class="bi bi-arrow-clockwise me-1"></i>Aktualisieren
       </button>
@@ -48,55 +71,66 @@ $smtpSecure = strtolower((string)($smtpConfig['smtp_secure'] ?? 'tls'));
   <!-- 4 KPI-Kacheln -->
   <div class="row g-3 mb-4">
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card-kkc h-100 p-3">
-        <div class="d-flex align-items-center justify-content-between mb-2">
-          <span class="text-muted small fw-semibold">Versand-Postfach &amp; Modus</span>
-          <span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 34px; height: 34px; background: rgba(2,132,199,0.12); color: #0284c7;">
-            <i class="bi bi-hdd-network-fill"></i>
+      <div class="card-kkc h-100 p-3 d-flex flex-column justify-content-between">
+        <div>
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="text-muted small fw-semibold">Versand-Postfach &amp; Modus</span>
+            <span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 34px; height: 34px; background: rgba(2,132,199,0.12); color: #0284c7;">
+              <i class="bi bi-hdd-network-fill"></i>
+            </span>
+          </div>
+          <div class="h5 fw-bold mb-1 text-truncate font-monospace" id="kpi-smtp-host-line" title="<?= View::e((string)$smtpConfig['smtp_user']) ?> @ <?= View::e((string)$smtpConfig['smtp_host']) ?>:<?= (int)$smtpConfig['smtp_port'] ?>">
+            <?= View::e((string)$smtpConfig['smtp_host']) ?>:<?= (int)$smtpConfig['smtp_port'] ?>
+          </div>
+        </div>
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-1 pt-1">
+          <div id="kpi-smtp-mode-badge">
+            <?php if ($isSandbox): ?>
+              <span class="badge-kkc badge-kkc-warning"><i class="bi bi-shield-lock-fill"></i>Sandbox (&rarr; <?= View::e($sandboxRecipient) ?>)</span>
+            <?php else: ?>
+              <span class="badge-kkc badge-kkc-success"><i class="bi bi-broadcast"></i>Live-Versand aktiv</span>
+            <?php endif; ?>
+          </div>
+          <span class="small text-muted font-monospace text-truncate" style="max-width: 150px;" title="Absender: <?= View::e((string)$smtpConfig['from_address']) ?>">
+            <?= View::e((string)$smtpConfig['from_address']) ?>
           </span>
-        </div>
-        <div class="mb-1" id="kpi-smtp-mode-badge">
-          <?php if ($isSandbox): ?>
-            <span class="badge bg-warning text-dark"><i class="bi bi-shield-lock-fill me-1"></i>Sandbox aktiv (&rarr; <?= View::e($sandboxRecipient) ?>)</span>
-          <?php else: ?>
-            <span class="badge bg-success"><i class="bi bi-broadcast me-1"></i>Live-Versand an Partner aktiv</span>
-          <?php endif; ?>
-        </div>
-        <div class="small text-muted text-truncate font-monospace" id="kpi-smtp-host-line">
-          <?= View::e((string)$smtpConfig['smtp_user']) ?> @ <?= View::e((string)$smtpConfig['smtp_host']) ?>:<?= (int)$smtpConfig['smtp_port'] ?>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card-kkc h-100 p-3">
-        <div class="d-flex align-items-center justify-content-between mb-2">
-          <span class="text-muted small fw-semibold">E-Mail-Versandbilanz (`notification_log`)</span>
-          <span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 34px; height: 34px; background: rgba(16,185,129,0.12); color: #10b981;">
-            <i class="bi bi-send-check-fill"></i>
-          </span>
-        </div>
-        <div class="h3 fw-bold mb-1">
-          <?= number_format($mailStats['total_sent'] + $mailStats['total_sandbox'], 0, ',', '.') ?>
+      <div class="card-kkc h-100 p-3 d-flex flex-column justify-content-between">
+        <div>
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="text-muted small fw-semibold">E-Mail-Versandbilanz <code class="small ms-1">notification_log</code></span>
+            <span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 34px; height: 34px; background: rgba(16,185,129,0.12); color: #10b981;">
+              <i class="bi bi-send-check-fill"></i>
+            </span>
+          </div>
+          <div class="h3 fw-bold mb-1" id="kpi-mail-total">
+            <?= number_format($mailStats['total_sent'] + $mailStats['total_sandbox'], 0, ',', '.') ?>
+          </div>
         </div>
         <div class="d-flex align-items-center justify-content-between small">
-          <span class="text-muted">Heute: <strong><?= number_format($mailStats['sent_today'], 0, ',', '.') ?></strong> (Sandbox: <?= number_format($mailStats['total_sandbox'], 0, ',', '.') ?>)</span>
+          <span class="text-muted">Heute: <strong id="kpi-mail-today"><?= number_format($mailStats['sent_today'], 0, ',', '.') ?></strong> (Sandbox: <span id="kpi-mail-sandbox"><?= number_format($mailStats['total_sandbox'], 0, ',', '.') ?></span>)</span>
           <span class="<?= $mailStats['total_failed'] > 0 ? 'text-danger fw-semibold' : 'text-muted' ?>">
-            Fehler: <?= number_format($mailStats['total_failed'], 0, ',', '.') ?>
+            Fehler: <span id="kpi-mail-failed"><?= number_format($mailStats['total_failed'], 0, ',', '.') ?></span>
           </span>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card-kkc h-100 p-3">
-        <div class="d-flex align-items-center justify-content-between mb-2">
-          <span class="text-muted small fw-semibold">Strategische E-Mail-Auslöser</span>
-          <span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 34px; height: 34px; background: rgba(139,92,246,0.12); color: #8b5cf6;">
-            <i class="bi bi-bell-fill"></i>
-          </span>
+      <div class="card-kkc h-100 p-3 d-flex flex-column justify-content-between">
+        <div>
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="text-muted small fw-semibold">Strategische E-Mail-Auslöser</span>
+            <span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 34px; height: 34px; background: rgba(139,92,246,0.12); color: #8b5cf6;">
+              <i class="bi bi-bell-fill"></i>
+            </span>
+          </div>
+          <div class="h3 fw-bold mb-1"><?= count($triggerCatalog) ?> Auslöser</div>
         </div>
-        <div class="h3 fw-bold mb-1"><?= count($triggerCatalog) ?> Auslöser</div>
         <div class="d-flex align-items-center justify-content-between small text-muted">
           <span>In <?= count($eventCatalog) ?> Opt-Out-Kategorien</span>
           <span>Individuelle Regeln: <strong><?= number_format($mailStats['prefs_count'], 0, ',', '.') ?></strong></span>
@@ -105,14 +139,16 @@ $smtpSecure = strtolower((string)($smtpConfig['smtp_secure'] ?? 'tls'));
     </div>
 
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card-kkc h-100 p-3">
-        <div class="d-flex align-items-center justify-content-between mb-2">
-          <span class="text-muted small fw-semibold">Server &amp; PHP-Laufzeit</span>
-          <span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 34px; height: 34px; background: rgba(245,158,11,0.12); color: #f59e0b;">
-            <i class="bi bi-hdd-rack-fill"></i>
-          </span>
+      <div class="card-kkc h-100 p-3 d-flex flex-column justify-content-between">
+        <div>
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="text-muted small fw-semibold">Server &amp; PHP-Laufzeit</span>
+            <span class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 34px; height: 34px; background: rgba(245,158,11,0.12); color: #f59e0b;">
+              <i class="bi bi-hdd-rack-fill"></i>
+            </span>
+          </div>
+          <div class="h4 fw-bold mb-1 font-monospace">PHP <?= View::e((string)$envInfo['php_version']) ?></div>
         </div>
-        <div class="h4 fw-bold mb-1 font-monospace">PHP <?= View::e((string)$envInfo['php_version']) ?></div>
         <div class="d-flex align-items-center justify-content-between small text-muted">
           <span class="text-truncate"><?= View::e((string)$envInfo['server_hostname']) ?></span>
           <a href="#/errors" class="text-decoration-none fw-semibold ec-text-primary">Error-Log &rarr;</a>
@@ -137,7 +173,7 @@ $smtpSecure = strtolower((string)($smtpConfig['smtp_secure'] ?? 'tls'));
     <li class="nav-item" role="presentation">
       <button class="nav-link fw-semibold" id="tab-btn-sys-logs" data-bs-toggle="tab" data-bs-target="#tab-sys-logs" type="button" role="tab">
         <i class="bi bi-journal-check me-1"></i>3. Versand-Tracking (Wer / Wann / Für was)
-        <span class="badge bg-secondary rounded-pill ms-1"><?= count($deliveryLogs) ?></span>
+        <span class="badge bg-secondary rounded-pill ms-1" id="tab-badge-sys-logs"><?= count($deliveryLogs) ?></span>
       </button>
     </li>
     <li class="nav-item" role="presentation">
@@ -175,7 +211,7 @@ $smtpSecure = strtolower((string)($smtpConfig['smtp_secure'] ?? 'tls'));
               <div class="row g-2.5">
                 <div class="col-sm-6">
                   <label class="form-label small fw-semibold mb-1">SMTP-Server (Host)</label>
-                  <input type="text" class="form-control form-control-sm font-monospace" name="smtp_host" value="<?= View::e((string)$smtpConfig['smtp_host']) ?>" placeholder="t199.nlserver.net" required>
+                  <input type="text" class="form-control form-control-sm font-monospace" name="smtp_host" value="<?= View::e((string)$smtpConfig['smtp_host']) ?>" placeholder="mail.erocloud.net" required>
                 </div>
                 <div class="col-sm-3">
                   <label class="form-label small fw-semibold mb-1">Port</label>
@@ -218,21 +254,24 @@ $smtpSecure = strtolower((string)($smtpConfig['smtp_secure'] ?? 'tls'));
                     <div class="form-check form-switch mb-2">
                       <input class="form-check-input" type="checkbox" role="switch" id="smtp-sandbox-switch" name="sandbox_mode" value="1" <?= $isSandbox ? 'checked' : '' ?> onchange="App.SystemTech.debouncedPreviewMail()">
                       <label class="form-check-label small fw-bold" for="smtp-sandbox-switch">
-                        Sandbox-Testmodus aktivieren (Alle ausgehenden Partner-Mails abfangen)
+                        Sandbox-Testmodus aktivieren (Automatische Partner-Mails abfangen)
                       </label>
                     </div>
                     <div class="small text-muted mb-2">
-                      Solange der Sandbox-Modus aktiv ist, geht <strong>keine einzige E-Mail an echte Partner raus</strong>, sondern alle Mails werden sicher inkl. Hinweis-Banner an die unten stehende Test-Adresse umgeleitet.
+                      Solange der Sandbox-Modus aktiv ist, geht im regulären Systembetrieb <strong>keine einzige E-Mail an echte Partner raus</strong>, sondern alle Mails werden sicher an das unten stehende Test-Postfach umgeleitet.
                     </div>
                     <div>
                       <label class="form-label small fw-semibold mb-1">Sandbox-Empfängeradresse (Test-Postfach)</label>
-                      <input type="email" class="form-control form-control-sm font-monospace" name="sandbox_recipient" value="<?= View::e($sandboxRecipient) ?>" placeholder="erocms@gmail.com">
+                      <input type="email" class="form-control form-control-sm font-monospace" name="sandbox_recipient" id="smtp-sandbox-recipient-input" value="<?= View::e($sandboxRecipient) ?>" placeholder="erocms@gmail.com">
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div class="mt-3 d-flex justify-content-end">
+              <div class="mt-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <button type="button" class="btn btn-sm btn-outline-kkc" onclick="App.SystemTech.quickSendTestMail(null, this)">
+                  <i class="bi bi-send-check me-1 ec-text-primary"></i>Postfach mit Test-Mail prüfen
+                </button>
                 <button type="submit" id="btn-save-smtp" class="btn btn-sm btn-primary-kkc px-3">
                   <i class="bi bi-floppy-fill me-1"></i>Postfach- &amp; SMTP-Einstellungen speichern
                 </button>
@@ -242,14 +281,75 @@ $smtpSecure = strtolower((string)($smtpConfig['smtp_secure'] ?? 'tls'));
 
           <!-- Card 2: Interaktiver Test-Versand & Vorlagen-Labor -->
           <div class="card-kkc p-4">
-            <h2 class="h6 fw-bold mb-1">
-              <i class="bi bi-send-fill me-1 ec-text-primary"></i>Vorlagen-Labor &amp; Live-Testversand
-            </h2>
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+              <h2 class="h6 fw-bold mb-0">
+                <i class="bi bi-send-fill me-1 ec-text-primary"></i>Vorlagen-Labor &amp; Live-Testversand
+              </h2>
+              <span class="badge-kkc badge-kkc-info" id="sys-testmail-recip-badge">
+                <i class="bi bi-person-check-fill"></i>Eigene E-Mail aktiv
+              </span>
+            </div>
             <p class="small text-muted mb-3">
-              Wähle eine der 10 System-Vorlagen aus, um sie rechts live in der Vorschau zu prüfen oder eine echte Test-E-Mail über das konfigurierte Postfach zu senden.
+              Wähle eine der 10 System-Vorlagen aus und sende eine echte Test-E-Mail an <strong>deine eigene E-Mail-Adresse</strong> oder optional an eine <strong>beliebige andere E-Mail-Adresse</strong>.
             </p>
 
             <form id="sys-testmail-form" onsubmit="return App.SystemTech.sendOrPreviewTestMail(event, 'send');">
+              <!-- Hervorgehobene Empfänger-Box (Eigene E-Mail oder andere E-Mail) -->
+              <div class="p-3 rounded border mb-3" style="background: rgba(2, 132, 199, 0.05); border-color: rgba(2, 132, 199, 0.28) !important;">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-1 mb-1.5">
+                  <label class="form-label small fw-bold mb-0" for="sys-testmail-recipient">
+                    <i class="bi bi-envelope-at-fill me-1 ec-text-primary"></i>Test-E-Mail senden an (Empfänger-Adresse)
+                  </label>
+                  <span class="small text-muted" style="font-size: 0.72rem;">Direktversand (unabhängig vom Sandbox-Modus)</span>
+                </div>
+
+                <div class="input-group input-group-sm mb-2">
+                  <input type="email"
+                         class="form-control font-monospace fw-semibold"
+                         name="to_email"
+                         id="sys-testmail-recipient"
+                         value="<?= View::e($ownEmail) ?>"
+                         placeholder="Deine E-Mail oder eine andere Zieladresse..."
+                         required
+                         oninput="App.SystemTech.syncTestRecipient(this.value, 'lab'); App.SystemTech.debouncedPreviewMail();">
+                  <button type="button"
+                          class="btn btn-outline-kkc"
+                          onclick="App.SystemTech.setTestRecipient('<?= View::e($ownEmail) ?>')"
+                          title="Auf eigene Standard-E-Mail-Adresse zurücksetzen">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Eigene E-Mail
+                  </button>
+                </div>
+
+                <!-- 1-Klick Schnellwahl-Pills -->
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                  <div class="d-flex flex-wrap align-items-center gap-1">
+                    <span class="text-muted" style="font-size: 0.72rem;">Schnellwahl:</span>
+                    <button type="button"
+                            class="btn btn-xs btn-outline-kkc py-0 px-2 font-monospace"
+                            style="font-size: 0.72rem;"
+                            onclick="App.SystemTech.setTestRecipient('<?= View::e($ownEmail) ?>')">
+                      <i class="bi bi-person-fill me-1"></i><?= View::e($ownEmail) ?>
+                    </button>
+                    <?php if ($supportEmail !== '' && strtolower($supportEmail) !== strtolower($ownEmail)): ?>
+                      <button type="button"
+                              class="btn btn-xs btn-outline-kkc py-0 px-2 font-monospace"
+                              style="font-size: 0.72rem;"
+                              onclick="App.SystemTech.setTestRecipient('<?= View::e($supportEmail) ?>')">
+                        <i class="bi bi-headset me-1"></i><?= View::e($supportEmail) ?>
+                      </button>
+                    <?php endif; ?>
+                  </div>
+
+                  <button type="button"
+                          class="btn btn-link btn-sm p-0 text-decoration-none small ec-text-primary"
+                          style="font-size: 0.73rem;"
+                          onclick="App.SystemTech.saveDefaultTestRecipient()"
+                          title="Speichert die aktuell eingegebene E-Mail-Adresse dauerhaft als deine Standard-Testadresse">
+                    <i class="bi bi-star me-1"></i>Als meine Standard-Adresse merken
+                  </button>
+                </div>
+              </div>
+
               <div class="row g-2 mb-3">
                 <div class="col-12">
                   <label class="form-label small fw-semibold mb-1">E-Mail-Vorlage / Auslöser wählen</label>
@@ -293,17 +393,13 @@ $smtpSecure = strtolower((string)($smtpConfig['smtp_secure'] ?? 'tls'));
                   <label class="form-label small fw-semibold mb-1">Auflösung</label>
                   <input type="text" class="form-control form-control-sm" name="resolution" value="1920x1080 (Full-HD)" oninput="App.SystemTech.debouncedPreviewMail()">
                 </div>
-                <div class="col-12">
-                  <label class="form-label small fw-semibold mb-1">Intendierte Partner-Ziel-E-Mail</label>
-                  <input type="email" class="form-control form-control-sm font-monospace" name="to_email" value="creator-beispiel@domain.tld" oninput="App.SystemTech.debouncedPreviewMail()">
-                </div>
               </div>
 
               <div class="d-flex flex-wrap gap-2">
                 <button type="button" class="btn btn-sm btn-outline-kkc" onclick="App.SystemTech.sendOrPreviewTestMail(null, 'preview')">
                   <i class="bi bi-eye me-1"></i>Vorschau aktualisieren
                 </button>
-                <button type="submit" id="btn-send-testmail" class="btn btn-sm btn-success flex-grow-1">
+                <button type="submit" id="btn-send-testmail" class="btn btn-sm btn-success fw-semibold flex-grow-1">
                   <i class="bi bi-send-check-fill me-1"></i>Ausgewählte Vorlage als Test-E-Mail senden
                 </button>
               </div>
@@ -358,21 +454,36 @@ $smtpSecure = strtolower((string)($smtpConfig['smtp_secure'] ?? 'tls'));
         <div class="row g-3">
           <?php foreach ($eventCatalog as $evKey => $evMeta): ?>
             <?php
-              $stat = $optInStats[$evKey] ?? ['total_merchants' => 0, 'opted_out' => 0, 'active' => 0];
+              $stat       = $optInStats[$evKey] ?? ['total_merchants' => 0, 'opted_out' => 0, 'active' => 0];
+              $totalM     = max(1, (int)$stat['total_merchants']);
+              $activeM    = (int)$stat['active'];
+              $optedOutM  = (int)$stat['opted_out'];
+              $activePct  = min(100, max(0, (int)round(($activeM / $totalM) * 100)));
+              $evIcon     = (string)($evMeta['icon'] ?? 'bi-bell');
             ?>
             <div class="col-12 col-md-6 col-xl-3">
               <div class="border rounded p-3 h-100 d-flex flex-column justify-content-between" style="border-color: var(--kkc-border) !important; background: var(--kkc-surface-hover);">
                 <div>
-                  <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 font-monospace"><?= View::e($evKey) ?></span>
-                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">Standard: Aktiv</span>
+                  <div class="d-flex align-items-center justify-content-between gap-2 mb-2.5">
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="rounded d-inline-flex align-items-center justify-content-center" style="width: 30px; height: 30px; background: rgba(2,132,199,0.12); color: var(--kkc-primary);">
+                        <i class="bi <?= View::e($evIcon) ?>"></i>
+                      </span>
+                      <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 font-monospace"><?= View::e($evKey) ?></span>
+                    </div>
+                    <span class="badge-kkc badge-kkc-success" style="font-size: 0.68rem;">Standard: Aktiv</span>
                   </div>
                   <div class="fw-bold mb-1"><?= View::e((string)$evMeta['title']) ?></div>
                   <p class="small text-muted mb-3"><?= View::e((string)$evMeta['description']) ?></p>
                 </div>
-                <div class="pt-2 border-top d-flex align-items-center justify-content-between small" style="border-color: var(--kkc-border) !important;">
-                  <span class="text-success fw-semibold"><i class="bi bi-check-circle-fill me-1"></i><?= (int)$stat['active'] ?> aktiv</span>
-                  <span class="text-muted"><i class="bi bi-slash-circle me-1"></i><?= (int)$stat['opted_out'] ?> abgemeldet</span>
+                <div class="pt-2 border-top" style="border-color: var(--kkc-border) !important;">
+                  <div class="progress mb-1.5" style="height: 5px; background: rgba(148,163,184,0.2);">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: <?= $activePct ?>%;" aria-valuenow="<?= $activePct ?>" aria-valuemin="0" aria-valuemax="100"></div>
+                  </div>
+                  <div class="d-flex align-items-center justify-content-between small">
+                    <span class="text-success fw-semibold"><i class="bi bi-check-circle-fill me-1"></i><?= $activeM ?> aktiv (<?= $activePct ?>%)</span>
+                    <span class="text-muted"><i class="bi bi-slash-circle me-1"></i><?= $optedOutM ?> abgemeldet</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -380,14 +491,38 @@ $smtpSecure = strtolower((string)($smtpConfig['smtp_secure'] ?? 'tls'));
         </div>
       </div>
 
-      <!-- Sektion B: Alle 10 strategischen E-Mail-Auslöser im Detail -->
+      <!-- Sektion B: Alle 10 strategischen E-Mail-Auslöser im Detail + Direkt-Testversand -->
       <div class="card-kkc overflow-hidden">
-        <div class="p-3 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-2" style="border-color: var(--kkc-border) !important;">
+        <div class="p-3 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3" style="border-color: var(--kkc-border) !important;">
           <div>
-            <h2 class="h6 fw-bold mb-0">
+            <h2 class="h6 fw-bold mb-0.5">
               <i class="bi bi-lightning-charge-fill me-1 ec-text-primary"></i>Vollständiges Verzeichnis aller automatischen System-E-Mails (<?= count($triggerCatalog) ?> Auslöser)
             </h2>
-            <small class="text-muted">Hier kannst du jederzeit nachlesen, an welchen strategischen Punkten im System E-Mails an Partner versendet werden (Werbebanner-Prüfungen versenden wunschgemäß keine E-Mail).</small>
+            <small class="text-muted">
+              Hier kannst du nachlesen, wann welche System-E-Mail ausgelöst wird, und <strong>jede Vorlage direkt als Test-Mail an deine eigene oder eine andere E-Mail-Adresse senden</strong>.
+            </small>
+          </div>
+
+          <!-- Direkt-Testversand-Leiste für Tab 2 -->
+          <div class="d-flex flex-wrap align-items-center gap-2 p-2 rounded border" style="background: rgba(2, 132, 199, 0.05); border-color: rgba(2, 132, 199, 0.25) !important;">
+            <span class="small fw-semibold text-nowrap ps-1">
+              <i class="bi bi-envelope-paper-fill me-1 ec-text-primary"></i>Test-Mail Empfänger:
+            </span>
+            <div class="input-group input-group-sm" style="width: auto;">
+              <input type="email"
+                     id="sys-trigger-test-recipient"
+                     class="form-control form-control-sm font-monospace fw-semibold"
+                     style="min-width: 220px;"
+                     value="<?= View::e($ownEmail) ?>"
+                     placeholder="Deine oder eine andere E-Mail..."
+                     oninput="App.SystemTech.syncTestRecipient(this.value, 'triggers')">
+              <button type="button"
+                      class="btn btn-outline-kkc"
+                      onclick="App.SystemTech.setTestRecipient('<?= View::e($ownEmail) ?>')"
+                      title="Auf eigene E-Mail-Adresse (<?= View::e($ownEmail) ?>) setzen">
+                <i class="bi bi-person-check me-1"></i>Eigene E-Mail
+              </button>
+            </div>
           </div>
         </div>
 
@@ -396,22 +531,32 @@ $smtpSecure = strtolower((string)($smtpConfig['smtp_secure'] ?? 'tls'));
             <thead class="table-light small text-uppercase text-muted">
               <tr>
                 <th style="width: 24%;">E-Mail-Anlass / Ereignis</th>
-                <th style="width: 34%;">Wann &amp; wodurch wird die E-Mail ausgelöst?</th>
-                <th style="width: 18%;">Opt-Out-Kategorie</th>
-                <th style="width: 14%;">Magic-Link Ziel (Auto-Login)</th>
-                <th class="text-end" style="width: 10%;">Vorlage</th>
+                <th style="width: 31%;">Wann &amp; wodurch wird die E-Mail ausgelöst?</th>
+                <th style="width: 16%;">Opt-Out-Kategorie</th>
+                <th style="width: 15%;">Magic-Link Ziel (Auto-Login)</th>
+                <th class="text-end" style="width: 14%;">Vorschau &amp; Test-Mail</th>
               </tr>
             </thead>
             <tbody>
               <?php foreach ($triggerCatalog as $trig): ?>
                 <?php
-                  $evKey = (string)$trig['event_key'];
-                  $evTitle = isset($eventCatalog[$evKey]) ? (string)$eventCatalog[$evKey]['title'] : $evKey;
+                  $evKey    = (string)$trig['event_key'];
+                  $evTitle  = isset($eventCatalog[$evKey]) ? (string)$eventCatalog[$evKey]['title'] : $evKey;
+                  $pVariant = (string)$trig['preview_variant'];
+                  $rawMagic = (string)$trig['magic_link_target'];
+                  $magicRoute = $rawMagic;
+                  $magicDesc  = '';
+                  if (preg_match('/^([^\s]+)\s+\((.+)\)$/', $rawMagic, $mMag)) {
+                      $magicRoute = $mMag[1];
+                      $magicDesc  = $mMag[2];
+                  }
                 ?>
                 <tr>
                   <td>
-                    <div class="d-flex align-items-start gap-2">
-                      <i class="bi <?= View::e((string)$trig['icon']) ?> fs-5 ec-text-primary mt-0.5"></i>
+                    <div class="d-flex align-items-start gap-2.5">
+                      <span class="rounded d-inline-flex align-items-center justify-content-center flex-shrink-0 mt-0.5" style="width: 32px; height: 32px; background: rgba(2,132,199,0.10); color: var(--kkc-primary);">
+                        <i class="bi <?= View::e((string)$trig['icon']) ?>"></i>
+                      </span>
                       <div>
                         <div class="fw-bold"><?= View::e((string)$trig['title']) ?></div>
                         <span class="badge <?= View::e((string)$trig['badge_cls']) ?> mt-1"><?= View::e((string)$trig['badge_label']) ?></span>
@@ -425,13 +570,31 @@ $smtpSecure = strtolower((string)($smtpConfig['smtp_secure'] ?? 'tls'));
                     <div class="fw-semibold"><?= View::e($evTitle) ?></div>
                     <code class="small text-muted"><?= View::e($evKey) ?></code>
                   </td>
-                  <td class="small font-monospace text-muted">
-                    <?= View::e((string)$trig['magic_link_target']) ?>
+                  <td class="small">
+                    <div class="mb-0.5">
+                      <span class="badge bg-secondary bg-opacity-10 text-body border font-monospace">
+                        <i class="bi bi-magic me-1 ec-text-primary"></i><?= View::e($magicRoute) ?>
+                      </span>
+                    </div>
+                    <?php if ($magicDesc !== ''): ?>
+                      <div class="text-muted" style="font-size: 0.74rem;"><?= View::e($magicDesc) ?></div>
+                    <?php endif; ?>
                   </td>
                   <td class="text-end">
-                    <button type="button" class="btn btn-xs btn-outline-kkc py-1 px-2 small" onclick="App.SystemTech.openTriggerPreview('<?= View::e((string)$trig['preview_variant']) ?>')">
-                      <i class="bi bi-eye me-1"></i>Vorschau
-                    </button>
+                    <div class="d-inline-flex align-items-center justify-content-end gap-1.5 flex-wrap">
+                      <button type="button"
+                              class="btn btn-xs btn-outline-kkc py-1 px-2 small"
+                              onclick="App.SystemTech.openTriggerPreviewModal('<?= View::e($pVariant) ?>')"
+                              title="Vorschau dieser E-Mail-Vorlage öffnen">
+                        <i class="bi bi-eye me-1"></i>Vorschau
+                      </button>
+                      <button type="button"
+                              class="btn btn-xs btn-success py-1 px-2 small fw-semibold"
+                              onclick="App.SystemTech.quickSendTestMail('<?= View::e($pVariant) ?>', this)"
+                              title="Diese Vorlage jetzt als Test-Mail an die oben eingetragene E-Mail-Adresse senden">
+                        <i class="bi bi-send-check me-1"></i>Test-Mail
+                      </button>
+                    </div>
                   </td>
                 </tr>
               <?php endforeach; ?>
@@ -450,7 +613,7 @@ $smtpSecure = strtolower((string)($smtpConfig['smtp_secure'] ?? 'tls'));
         <div class="p-3 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-2" style="border-color: var(--kkc-border) !important;">
           <div>
             <h2 class="h6 fw-bold mb-0">
-              <i class="bi bi-list-check me-1 ec-text-primary"></i>Versand-Tracking &amp; Historie (`notification_log`)
+              <i class="bi bi-list-check me-1 ec-text-primary"></i>Versand-Tracking &amp; Historie <code class="small ms-1">notification_log</code>
             </h2>
             <small class="text-muted">Lückenloser Nachweis, <strong>wer</strong> (Partner) <strong>wann</strong> (Datum/Uhrzeit) <strong>welche E-Mail</strong> <strong>für was</strong> (Auslöser &amp; Objekt-ID) erhalten hat.</small>
           </div>
@@ -466,7 +629,7 @@ $smtpSecure = strtolower((string)($smtpConfig['smtp_secure'] ?? 'tls'));
             <select id="sys-notif-filter-status" class="form-select form-select-sm" style="width: 160px;" onchange="App.SystemTech.filterNotificationLog()">
               <option value="">Alle Status</option>
               <option value="sent">Live gesendet</option>
-              <option value="sandbox">Sandbox-Test</option>
+              <option value="sandbox">Sandbox / Test</option>
               <option value="failed">Fehler</option>
             </select>
 
@@ -486,10 +649,10 @@ $smtpSecure = strtolower((string)($smtpConfig['smtp_secure'] ?? 'tls'));
                 <th class="text-end">Aktion</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="sys-notif-log-tbody">
               <?php if (empty($deliveryLogs)): ?>
-                <tr>
-                  <td colspan="6" class="text-center text-muted py-4">Noch keine Einträge im Versand-Tracking (`notification_log`) vorhanden.</td>
+                <tr id="sys-notif-log-empty">
+                  <td colspan="6" class="text-center text-muted py-4">Noch keine Einträge im Versand-Tracking (<code>notification_log</code>) vorhanden.</td>
                 </tr>
               <?php else: ?>
                 <?php foreach ($deliveryLogs as $log): ?>
@@ -578,7 +741,7 @@ $smtpSecure = strtolower((string)($smtpConfig['smtp_secure'] ?? 'tls'));
                       <?php if ($statusRaw === 'sent'): ?>
                         <span class="badge-kkc badge-kkc-success">Live gesendet</span>
                       <?php elseif (in_array($statusRaw, ['sandbox', 'sandbox_sent'], true)): ?>
-                        <span class="badge-kkc badge-kkc-warning">Sandbox</span>
+                        <span class="badge-kkc badge-kkc-warning">Sandbox / Test</span>
                       <?php elseif ($statusRaw === 'failed'): ?>
                         <span class="badge-kkc badge-kkc-danger">Fehler</span>
                       <?php else: ?>
@@ -770,7 +933,62 @@ $smtpSecure = strtolower((string)($smtpConfig['smtp_secure'] ?? 'tls'));
   </div>
 </div>
 
-<!-- Modal: Gesendete E-Mail aus dem Tracking-Protokoll im Detail ansehen -->
+<!-- Modal 1: Auslöser-Vorschau & Direkt-Testversand (aus Tab 2) -->
+<div class="modal fade" id="sysTriggerPreviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title fw-bold mb-0" id="sysTriggerPreviewModalTitle">E-Mail-Vorlage Vorschau</h5>
+          <div class="small text-muted">Betreff: <strong id="sysTriggerPreviewModalSubject"></strong></div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <div class="btn-group btn-group-sm">
+            <button type="button" class="btn btn-primary-kkc" id="btn-modal-view-html" onclick="App.SystemTech.switchModalPreviewMode('html')">HTML-Ansicht</button>
+            <button type="button" class="btn btn-outline-kkc" id="btn-modal-view-text" onclick="App.SystemTech.switchModalPreviewMode('text')">Plaintext</button>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+        </div>
+      </div>
+      <div class="modal-body p-0 bg-light" style="min-height: 540px;">
+        <iframe id="sysTriggerPreviewModalIframe" title="E-Mail-Vorlage Vorschau" class="w-100 border-0" style="min-height: 540px; height: 65vh;"></iframe>
+        <div id="sysTriggerPreviewModalText" class="d-none p-3 bg-dark text-light font-monospace small overflow-auto" style="min-height: 540px; height: 65vh; white-space: pre-wrap;"></div>
+      </div>
+      <div class="modal-footer d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <span class="small fw-semibold"><i class="bi bi-envelope-at me-1 ec-text-primary"></i>Test-Mail senden an:</span>
+          <div class="input-group input-group-sm" style="width: auto;">
+            <input type="email"
+                   id="sys-modal-test-recipient"
+                   class="form-control form-control-sm font-monospace fw-semibold"
+                   style="min-width: 220px;"
+                   value="<?= View::e($ownEmail) ?>"
+                   placeholder="E-Mail-Adresse..."
+                   oninput="App.SystemTech.syncTestRecipient(this.value, 'modal')">
+            <button type="button" class="btn btn-outline-kkc" onclick="App.SystemTech.setTestRecipient('<?= View::e($ownEmail) ?>')">
+              Eigene E-Mail
+            </button>
+          </div>
+          <button type="button"
+                  id="btn-modal-send-testmail"
+                  class="btn btn-sm btn-success fw-semibold"
+                  onclick="App.SystemTech.quickSendTestMail(App.SystemTech.currentModalTemplateKey, this)">
+            <i class="bi bi-send-check-fill me-1"></i>Jetzt als Test-Mail senden
+          </button>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+          <button type="button" class="btn btn-sm btn-outline-kkc" onclick="App.SystemTech.openInLabFromModal()">
+            <i class="bi bi-sliders me-1"></i>Im Vorlagen-Labor anpassen
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-kkc" data-bs-dismiss="modal">Schließen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 2: Gesendete E-Mail aus dem Tracking-Protokoll im Detail ansehen -->
 <div class="modal fade" id="sysSentMailModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">

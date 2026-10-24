@@ -453,17 +453,18 @@ class EroCloudMailer
 
         if (is_file($layoutFile)) {
             $layoutVars = [
-                'subject'         => $emailSubject,
-                'preheader'       => $emailPreheader,
-                'content_html'    => $emailHtmlContent,
-                'content_text'    => $emailTextContent,
-                'unsubscribe_url' => (string)($vars['unsubscribe_url'] ?? ''),
-                'intended_email'  => (string)($vars['intended_email'] ?? $vars['recipient_email'] ?? $vars['to_email'] ?? ''),
-                'creator_name'    => (string)($vars['creator_name'] ?? 'Creator'),
-                'merchant_id'     => isset($vars['merchant_id']) ? abs((int)$vars['merchant_id']) : 0,
-                'imprint'         => $imprint,
-                'movie_edit_url'  => (string)($vars['movie_edit_url'] ?? ''),
-                'action_url'      => (string)($vars['action_url'] ?? $vars['movie_edit_url'] ?? ''),
+                'subject'          => $emailSubject,
+                'preheader'        => $emailPreheader,
+                'content_html'     => $emailHtmlContent,
+                'content_text'     => $emailTextContent,
+                'unsubscribe_url'  => (string)($vars['unsubscribe_url'] ?? ''),
+                'intended_email'   => (string)($vars['intended_email'] ?? $vars['recipient_email'] ?? $vars['to_email'] ?? ''),
+                'actual_recipient' => (string)($vars['actual_recipient'] ?? ''),
+                'creator_name'     => (string)($vars['creator_name'] ?? 'Creator'),
+                'merchant_id'      => isset($vars['merchant_id']) ? abs((int)$vars['merchant_id']) : 0,
+                'imprint'          => $imprint,
+                'movie_edit_url'   => (string)($vars['movie_edit_url'] ?? ''),
+                'action_url'       => (string)($vars['action_url'] ?? $vars['movie_edit_url'] ?? ''),
             ];
             include $layoutFile;
         }
@@ -503,7 +504,12 @@ class EroCloudMailer
         }
 
         $intendedRecipient = trim($toEmail);
-        $actualRecipient   = $isSandbox ? $sandboxTarget : $intendedRecipient;
+        $overrideRecipient = !empty($options['override_recipient']) ? trim((string)$options['override_recipient']) : '';
+        if ($overrideRecipient !== '' && filter_var($overrideRecipient, FILTER_VALIDATE_EMAIL)) {
+            $actualRecipient = $overrideRecipient;
+        } else {
+            $actualRecipient = $isSandbox ? $sandboxTarget : $intendedRecipient;
+        }
         $actualSubject     = $subject;
 
         self::$lastStaticRecipient = $actualRecipient;
@@ -700,16 +706,19 @@ class EroCloudMailer
             $unsubscribeUrl = \EroCloudNotificationCenter::createUnsubscribeUrl($merchantId, $eventKey);
         }
 
+        $overrideRecip = !empty($data['override_recipient']) ? trim((string)$data['override_recipient']) : '';
+
         $rendered = self::renderTemplate('movie_converted', [
-            'merchant_id'     => $merchantId,
-            'intended_email'  => $intendedEmail,
-            'creator_name'    => (string)($data['creator_name'] ?? 'Creator'),
-            'movie_id'        => $movieId,
-            'upload_datetime' => (string)($data['upload_datetime'] ?? date('d.m.Y \u\m H:i \U\h\r')),
-            'playtime'        => (string)($data['playtime'] ?? '-'),
-            'resolution'      => (string)($data['resolution'] ?? 'HD'),
-            'movie_edit_url'  => $editUrl,
-            'unsubscribe_url' => $unsubscribeUrl,
+            'merchant_id'      => $merchantId,
+            'intended_email'   => $intendedEmail,
+            'actual_recipient' => $overrideRecip,
+            'creator_name'     => (string)($data['creator_name'] ?? 'Creator'),
+            'movie_id'         => $movieId,
+            'upload_datetime'  => (string)($data['upload_datetime'] ?? date('d.m.Y \u\m H:i \U\h\r')),
+            'playtime'         => (string)($data['playtime'] ?? '-'),
+            'resolution'       => (string)($data['resolution'] ?? 'HD'),
+            'movie_edit_url'   => $editUrl,
+            'unsubscribe_url'  => $unsubscribeUrl,
         ]);
 
         $sendResult = self::send(
@@ -718,7 +727,10 @@ class EroCloudMailer
             $rendered['subject'],
             $rendered['html'],
             $rendered['text'],
-            ['unsubscribe_url' => $unsubscribeUrl]
+            [
+                'unsubscribe_url'    => $unsubscribeUrl,
+                'override_recipient' => $overrideRecip,
+            ]
         );
 
         // 4. Versand in `notification_log` protokollieren
@@ -804,9 +816,12 @@ class EroCloudMailer
             $unsubscribeUrl = \EroCloudNotificationCenter::createUnsubscribeUrl($merchantId, $eventKey);
         }
 
+        $overrideRecip = !empty($data['override_recipient']) ? trim((string)$data['override_recipient']) : '';
+
         $rendered = self::renderTemplate('content_reviewed', [
             'merchant_id'      => $merchantId,
             'intended_email'   => $intendedEmail,
+            'actual_recipient' => $overrideRecip,
             'creator_name'     => $creatorName,
             'content_type'     => $contentType,
             'content_id'       => $contentId,
@@ -826,7 +841,10 @@ class EroCloudMailer
             $rendered['subject'],
             $rendered['html'],
             $rendered['text'],
-            ['unsubscribe_url' => $unsubscribeUrl]
+            [
+                'unsubscribe_url'    => $unsubscribeUrl,
+                'override_recipient' => $overrideRecip,
+            ]
         );
 
         if (class_exists('EroCloudNotificationCenter')) {
@@ -902,19 +920,22 @@ class EroCloudMailer
 
         $refCode = !empty($data['ref_code']) ? (string)$data['ref_code'] : sprintf('DP-%d-%03d', $merchantId, $coActorId);
 
+        $overrideRecip = !empty($data['override_recipient']) ? trim((string)$data['override_recipient']) : '';
+
         $rendered = self::renderTemplate('co_actor_status', [
-            'merchant_id'     => $merchantId,
-            'intended_email'  => $intendedEmail,
-            'creator_name'    => $creatorName,
-            'co_actor_id'     => $coActorId,
-            'ref_code'        => $refCode,
-            'role_label'      => (string)($data['role_label'] ?? 'Drehpartner'),
-            'alias_label'     => (string)($data['alias_label'] ?? ('Eintrag #' . $coActorId)),
-            'status_type'     => $statusType,
-            'event_datetime'  => (string)($data['event_datetime'] ?? date('d.m.Y \u\m H:i \U\h\r')),
-            'reason_text'     => (string)($data['reason_text'] ?? ''),
-            'action_url'      => $actionUrl,
-            'unsubscribe_url' => $unsubscribeUrl,
+            'merchant_id'      => $merchantId,
+            'intended_email'   => $intendedEmail,
+            'actual_recipient' => $overrideRecip,
+            'creator_name'     => $creatorName,
+            'co_actor_id'      => $coActorId,
+            'ref_code'         => $refCode,
+            'role_label'       => (string)($data['role_label'] ?? 'Drehpartner'),
+            'alias_label'      => (string)($data['alias_label'] ?? ('Eintrag #' . $coActorId)),
+            'status_type'      => $statusType,
+            'event_datetime'   => (string)($data['event_datetime'] ?? date('d.m.Y \u\m H:i \U\h\r')),
+            'reason_text'      => (string)($data['reason_text'] ?? ''),
+            'action_url'       => $actionUrl,
+            'unsubscribe_url'  => $unsubscribeUrl,
         ]);
 
         $sendResult = self::send(
@@ -923,7 +944,10 @@ class EroCloudMailer
             $rendered['subject'],
             $rendered['html'],
             $rendered['text'],
-            ['unsubscribe_url' => $unsubscribeUrl]
+            [
+                'unsubscribe_url'    => $unsubscribeUrl,
+                'override_recipient' => $overrideRecip,
+            ]
         );
 
         if (class_exists('EroCloudNotificationCenter')) {

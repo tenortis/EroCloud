@@ -4505,6 +4505,302 @@ const App = {
   // ========================================================================
   SystemTech: {
     previewDebounceTimer: null,
+    currentModalTemplateKey: 'movie_converted',
+
+    getOwnAdminEmail() {
+      const wrap = document.querySelector('[data-own-admin-email]');
+      return (wrap?.getAttribute('data-own-admin-email') || 'erocms@gmail.com').trim();
+    },
+
+    getActiveTestRecipient() {
+      const ids = ['sys-testmail-recipient', 'sys-trigger-test-recipient', 'sys-header-test-recipient', 'sys-modal-test-recipient'];
+      for (const id of ids) {
+        const el = document.getElementById(id);
+        if (el && el.value.trim() !== '') {
+          return el.value.trim();
+        }
+      }
+      return this.getOwnAdminEmail();
+    },
+
+    syncTestRecipient(value, source = '') {
+      const val = String(value || '').trim();
+      const map = {
+        header: 'sys-header-test-recipient',
+        lab: 'sys-testmail-recipient',
+        triggers: 'sys-trigger-test-recipient',
+        modal: 'sys-modal-test-recipient'
+      };
+      Object.entries(map).forEach(([key, id]) => {
+        if (key !== source) {
+          const el = document.getElementById(id);
+          if (el && el.value !== val) {
+            el.value = val;
+          }
+        }
+      });
+
+      const badge = document.getElementById('sys-testmail-recip-badge');
+      if (badge) {
+        const own = this.getOwnAdminEmail().toLowerCase();
+        if (val.toLowerCase() === own || val === '') {
+          badge.className = 'badge-kkc badge-kkc-info';
+          badge.innerHTML = '<i class="bi bi-person-check-fill"></i>Eigene E-Mail aktiv';
+        } else {
+          badge.className = 'badge-kkc badge-kkc-warning';
+          badge.innerHTML = '<i class="bi bi-envelope-arrow-up-fill"></i>Abweichende Ziel-Adresse';
+        }
+      }
+    },
+
+    setTestRecipient(email) {
+      const clean = String(email || this.getOwnAdminEmail()).trim();
+      this.syncTestRecipient(clean, '');
+      this.debouncedPreviewMail();
+    },
+
+    async saveDefaultTestRecipient() {
+      const email = this.getActiveTestRecipient();
+      if (!email || !email.includes('@')) {
+        App.toast('Bitte gib zuerst eine gültige E-Mail-Adresse ein.', 'warning');
+        return;
+      }
+
+      const fd = new FormData();
+      fd.set('_csrf', App.csrfToken);
+      fd.set('mode', 'save_default_recipient');
+      fd.set('test_recipient', email);
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=system-settings/send-test-mail`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+        if (!res.ok || data.status !== 'ok') {
+          App.toast(data.message || 'Standard-Adresse konnte nicht gespeichert werden.', 'danger');
+          return;
+        }
+        const wrap = document.querySelector('[data-own-admin-email]');
+        if (wrap && data.own_admin_mail) {
+          wrap.setAttribute('data-own-admin-email', data.own_admin_mail);
+        }
+        this.syncTestRecipient(email, '');
+        App.toast(data.message || `Standard-Testadresse auf ${email} gesetzt.`, 'success');
+      } catch (err) {
+        App.toast('Netzwerkfehler: ' + err.message, 'danger');
+      }
+    },
+
+    recordSentLogInUi(data) {
+      if (!data) return;
+
+      const incCounter = (id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const raw = parseInt(el.textContent.replace(/\./g, '').trim(), 10);
+        if (!isNaN(raw)) {
+          el.textContent = (raw + 1).toLocaleString('de-DE');
+        }
+      };
+
+      incCounter('kpi-mail-total');
+      incCounter('kpi-mail-today');
+      incCounter('tab-badge-sys-logs');
+
+      if (data.latest_log && data.latest_log.status && data.latest_log.status.includes('sandbox')) {
+        incCounter('kpi-mail-sandbox');
+      }
+
+      const tbody = document.getElementById('sys-notif-log-tbody');
+      const log = data.latest_log;
+      if (tbody && log && log.id) {
+        const emptyRow = document.getElementById('sys-notif-log-empty');
+        if (emptyRow) emptyRow.remove();
+
+        const statusNorm = (log.status === 'sandbox' || log.status === 'sandbox_sent') ? 'sandbox' : (log.status || 'sent');
+        const statusBadge = statusNorm === 'sandbox'
+          ? '<span class="badge-kkc badge-kkc-warning">Sandbox / Test</span>'
+          : '<span class="badge-kkc badge-kkc-success">Live gesendet</span>';
+
+        const esc = (str) => String(str || '').replace(/[&<>"']/g, (m) => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[m]));
+
+        const hay = `${log.id} ${log.merchant_id || ''} ${log.event_key || ''} ${log.trigger_label || ''} ${log.recipient || ''} ${log.subject || ''}`.toLowerCase();
+        const tr = document.createElement('tr');
+        tr.className = 'sys-notif-log-row';
+        tr.setAttribute('data-search', hay);
+        tr.setAttribute('data-event', log.event_key || '');
+        tr.setAttribute('data-status', statusNorm);
+        tr.innerHTML = `
+          <td class="small">
+            <div class="font-monospace fw-bold">#${Number(log.id)}</div>
+            <div class="text-muted" style="font-size: 0.74rem;">${esc(log.created_at_de)}</div>
+          </td>
+          <td class="small">
+            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">Test-Versand (ACP)</span>
+          </td>
+          <td class="small">
+            <div><span class="badge ${esc(log.trigger_badge_cls || 'badge-kkc badge-kkc-info')}">${esc(log.trigger_label)}</span></div>
+          </td>
+          <td class="small">
+            <div class="fw-semibold text-truncate" style="max-width: 360px;">${esc(log.subject)}</div>
+            <div class="font-monospace text-muted" style="font-size: 0.74rem;">An: <strong>${esc(log.recipient)}</strong></div>
+          </td>
+          <td>${statusBadge}</td>
+          <td class="text-end">
+            <button type="button" class="btn btn-xs btn-outline-kkc py-1 px-2 small" onclick="App.SystemTech.viewSentMail(${Number(log.id)})">
+              <i class="bi bi-envelope-open me-1"></i>E-Mail ansehen
+            </button>
+          </td>
+        `;
+        tbody.prepend(tr);
+      }
+    },
+
+    async quickSendTestMail(templateKey = null, btnEl = null) {
+      const sel = document.getElementById('sys-testmail-template');
+      const tpl = templateKey || (sel?.value || 'movie_converted');
+      const recipient = this.getActiveTestRecipient();
+
+      if (!recipient || !recipient.includes('@')) {
+        App.toast('Bitte gib eine gültige Empfänger-E-Mail-Adresse für den Testversand ein.', 'warning');
+        return false;
+      }
+
+      const form = document.getElementById('sys-testmail-form');
+      const fd = form ? new FormData(form) : new FormData();
+      fd.set('_csrf', App.csrfToken);
+      fd.set('mode', 'send');
+      fd.set('template_key', tpl);
+      fd.set('to_email', recipient);
+      fd.set('test_recipient', recipient);
+
+      const origHtml = btnEl ? btnEl.innerHTML : '';
+      if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sende...';
+      }
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=system-settings/send-test-mail`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.status !== 'ok') {
+          App.toast(data.message || 'Test-E-Mail konnte nicht gesendet werden.', 'danger');
+          return false;
+        }
+
+        App.resetLogoutCountdown();
+        App.toast(data.message || `Test-E-Mail erfolgreich an ${recipient} gesendet!`, 'success');
+        this.recordSentLogInUi(data);
+      } catch (err) {
+        App.toast('Netzwerkfehler: ' + err.message, 'danger');
+      } finally {
+        if (btnEl) {
+          btnEl.disabled = false;
+          btnEl.innerHTML = origHtml;
+        }
+      }
+      return false;
+    },
+
+    async openTriggerPreviewModal(templateKey) {
+      const tpl = templateKey || 'movie_converted';
+      this.currentModalTemplateKey = tpl;
+
+      const modalEl = document.getElementById('sysTriggerPreviewModal');
+      const titleEl = document.getElementById('sysTriggerPreviewModalTitle');
+      const subjEl = document.getElementById('sysTriggerPreviewModalSubject');
+      const iframeEl = document.getElementById('sysTriggerPreviewModalIframe');
+      const textEl = document.getElementById('sysTriggerPreviewModalText');
+
+      if (!modalEl || !iframeEl) {
+        this.openTriggerPreview(tpl);
+        return;
+      }
+
+      this.switchModalPreviewMode('html');
+      if (titleEl) titleEl.textContent = 'Lade E-Mail-Vorlage...';
+      if (subjEl) subjEl.textContent = '...';
+      iframeEl.srcdoc = '<div style="padding:32px;font-family:sans-serif;color:#64748B;">Rendere Live-Vorschau...</div>';
+
+      const recipient = this.getActiveTestRecipient();
+      this.syncTestRecipient(recipient, '');
+
+      if (window.bootstrap?.Modal) {
+        window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      }
+
+      const form = document.getElementById('sys-testmail-form');
+      const fd = form ? new FormData(form) : new FormData();
+      fd.set('_csrf', App.csrfToken);
+      fd.set('mode', 'preview');
+      fd.set('template_key', tpl);
+      fd.set('to_email', recipient);
+      fd.set('test_recipient', recipient);
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=system-settings/send-test-mail`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+        if (!res.ok || data.status !== 'ok') {
+          iframeEl.srcdoc = `<div style="padding:32px;font-family:sans-serif;color:#DC2626;">${data.message || 'Fehler beim Laden der Vorschau.'}</div>`;
+          return;
+        }
+        if (titleEl) titleEl.textContent = data.trigger_title || `Vorlage: ${tpl}`;
+        if (subjEl) subjEl.textContent = data.subject || '';
+        if (typeof data.html === 'string') iframeEl.srcdoc = data.html;
+        if (textEl && typeof data.text === 'string') textEl.textContent = data.text;
+      } catch (err) {
+        iframeEl.srcdoc = `<div style="padding:32px;font-family:sans-serif;color:#DC2626;">Netzwerkfehler: ${err.message}</div>`;
+      }
+    },
+
+    switchModalPreviewMode(mode) {
+      const iframeEl = document.getElementById('sysTriggerPreviewModalIframe');
+      const textEl = document.getElementById('sysTriggerPreviewModalText');
+      const btnHtml = document.getElementById('btn-modal-view-html');
+      const btnText = document.getElementById('btn-modal-view-text');
+
+      if (mode === 'text') {
+        if (iframeEl) iframeEl.classList.add('d-none');
+        if (textEl) textEl.classList.remove('d-none');
+        if (btnHtml) btnHtml.className = 'btn btn-outline-kkc';
+        if (btnText) btnText.className = 'btn btn-primary-kkc';
+      } else {
+        if (iframeEl) iframeEl.classList.remove('d-none');
+        if (textEl) textEl.classList.add('d-none');
+        if (btnHtml) btnHtml.className = 'btn btn-primary-kkc';
+        if (btnText) btnText.className = 'btn btn-outline-kkc';
+      }
+    },
+
+    openInLabFromModal() {
+      const modalEl = document.getElementById('sysTriggerPreviewModal');
+      if (modalEl && window.bootstrap?.Modal) {
+        window.bootstrap.Modal.getInstance(modalEl)?.hide();
+      }
+      this.openTriggerPreview(this.currentModalTemplateKey);
+    },
 
     updateLiveFooterPreview() {
       const val = (id) => (document.getElementById(id)?.value || '').trim();
@@ -4693,8 +4989,11 @@ const App = {
       if (!form) return false;
 
       const fd = new FormData(form);
+      const activeRecip = this.getActiveTestRecipient();
       fd.set('_csrf', App.csrfToken);
       fd.set('mode', mode);
+      fd.set('to_email', activeRecip);
+      fd.set('test_recipient', activeRecip);
 
       if (mode === 'send' && btn) {
         btn.disabled = true;
@@ -4735,6 +5034,7 @@ const App = {
         if (mode === 'send') {
           App.resetLogoutCountdown();
           App.toast(data.message || 'Test-E-Mail erfolgreich gesendet.', 'success');
+          this.recordSentLogInUi(data);
         }
       } catch (err) {
         if (mode === 'send') {

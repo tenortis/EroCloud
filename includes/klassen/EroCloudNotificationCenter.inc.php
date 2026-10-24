@@ -108,7 +108,7 @@ class EroCloudNotificationCenter
                 'recipient'         => 'Partner / Creator (Account-Inhaber)',
                 'magic_link_target' => '#/movie?id={ID} (Direkt-Login in die Film-Bearbeitung & Cover-Studio)',
                 'badge_label'       => 'Automatisch (Cronjob)',
-                'badge_cls'         => 'bg-info bg-opacity-10 text-info border border-info border-opacity-25',
+                'badge_cls'         => 'badge-kkc badge-kkc-info',
                 'icon'              => 'bi-film',
             ],
             [

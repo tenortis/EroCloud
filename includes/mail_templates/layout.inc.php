@@ -33,7 +33,9 @@ $impExternalUrl = htmlspecialchars((string)($imprint['imprint_external_url'] ?? 
 
 $smtpCfg          = class_exists('EroCloudMailer') ? EroCloudMailer::getSmtpConfig() : [];
 $isSandboxMode    = isset($smtpCfg['sandbox_mode']) ? (bool)$smtpCfg['sandbox_mode'] : (!defined('MAIL_SANDBOX_MODE') || MAIL_SANDBOX_MODE === true);
-$sandboxRecipient = !empty($smtpCfg['sandbox_recipient']) ? (string)$smtpCfg['sandbox_recipient'] : (defined('MAIL_SANDBOX_RECIPIENT') ? (string)MAIL_SANDBOX_RECIPIENT : 'erocms@gmail.com');
+$sandboxRecipient = !empty($layoutVars['actual_recipient'])
+    ? (string)$layoutVars['actual_recipient']
+    : (!empty($smtpCfg['sandbox_recipient']) ? (string)$smtpCfg['sandbox_recipient'] : (defined('MAIL_SANDBOX_RECIPIENT') ? (string)MAIL_SANDBOX_RECIPIENT : 'erocms@gmail.com'));
 
 $sandboxBannerHtml = '';
 if ($isSandboxMode && ($tplIntendedTo !== '' || $tplMerchantId > 0)) {
