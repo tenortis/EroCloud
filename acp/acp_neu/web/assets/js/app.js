@@ -1187,6 +1187,200 @@ const App = {
     }
   },
 
+  async runPhotoAlbumAiAction(albumId) {
+    const title = document.getElementById('pac-input-title')?.value ?? '';
+    const description = document.getElementById('pac-input-description')?.value ?? '';
+    const metaTitle = document.getElementById('pac-input-meta-title')?.value ?? '';
+    const metaDescription = document.getElementById('pac-input-meta-desc')?.value ?? '';
+
+    this.toast('Starte BRAM Text-Scan mit aktuellen Formularwerten...', 'info');
+    try {
+      const res = await fetch(`${this.basePath}/api.php?route=photo-albums-checking/ai-action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          album_id: Number(albumId),
+          title,
+          description,
+          meta_title: metaTitle,
+          meta_description: metaDescription,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.status !== 'ok') {
+        this.toast(data.message || 'BRAM Text-Check fehlgeschlagen.', 'danger');
+        return;
+      }
+
+      this.resetLogoutCountdown();
+      this.toast(data.message || 'BRAM Text-Check abgeschlossen.', 'success');
+
+      const report = data.bram_report;
+      if (!report) return;
+
+      const cStatus = String(report.compliance_status || 'pending');
+      const rScore = Math.max(0, Number(report.risk_score || 0));
+      const summary = String(report.summary || '');
+      const violations = Array.isArray(report.violations) ? report.violations : [];
+      const engine = String(report.ai_engine || 'local_rules');
+      const updatedAt = String(report.updated_at || '');
+
+      let bgClass = 'bg-secondary bg-opacity-10 border-secondary';
+      let badgeClass = 'badge-kkc-muted';
+      let label = 'Prüfung ausstehend';
+      let icon = 'bi-hourglass-split';
+
+      if (cStatus === 'ok' || cStatus === 'green') {
+        bgClass = 'bg-success bg-opacity-10 border-success';
+        badgeClass = 'badge-kkc-success';
+        label = 'BRAM Konform (Keine Treffer)';
+        icon = 'bi-shield-check';
+      } else if (cStatus === 'warning' || cStatus === 'yellow') {
+        bgClass = 'bg-warning bg-opacity-10 border-warning';
+        badgeClass = 'badge-kkc-warning';
+        label = 'Manuelle Prüfung empfohlen (Hinweis)';
+        icon = 'bi-exclamation-triangle-fill';
+      } else if (cStatus === 'violation' || cStatus === 'red') {
+        bgClass = 'bg-danger bg-opacity-10 border-danger';
+        badgeClass = 'badge-kkc-danger';
+        label = 'BRAM / Compliance Treffer erkannt!';
+        icon = 'bi-shield-fill-exclamation';
+      }
+
+      const topBanner = document.getElementById('pac-top-bram-banner');
+      if (topBanner) {
+        topBanner.className = `card card-kkc mb-4 border ${bgClass}`;
+      }
+
+      const topBadge = document.getElementById('pac-top-bram-badge');
+      if (topBadge) {
+        topBadge.className = `badge-kkc ${badgeClass}`;
+        topBadge.innerHTML = `<i class="bi ${icon} me-1"></i>${this.escapeHtml(label)}`;
+      }
+
+      const topScore = document.getElementById('pac-top-bram-score');
+      if (topScore) {
+        topScore.textContent = `Risk-Score: ${rScore}/100`;
+      }
+
+      const topSummary = document.getElementById('pac-top-bram-summary');
+      if (topSummary) {
+        topSummary.textContent = summary;
+      }
+
+      const topDetailsCnt = document.getElementById('pac-top-bram-details-cnt');
+      if (topDetailsCnt) {
+        topDetailsCnt.textContent = `Details (${violations.length})`;
+      }
+
+      const topPills = document.getElementById('pac-top-bram-pills');
+      if (topPills) {
+        if (violations.length > 0) {
+          topPills.classList.remove('d-none');
+          topPills.innerHTML = violations.map(v => {
+            const vSev = String(v.severity || 'warning');
+            const vBadge = (vSev === 'violation' || vSev === 'critical') ? 'badge-kkc-danger' : 'badge-kkc-warning';
+            const vTerm = String(v.matched_term || v.matched_quote || v.term || '');
+            const vCat = String(v.category || 'BRAM');
+            const vSrc = String(v.source_label || v.source || 'Text');
+            const vReason = String(v.reason || '');
+            return `<span class="badge-kkc ${vBadge}" title="${this.escapeHtml(vReason)}"><strong>${this.escapeHtml(vCat)}:</strong> "${this.escapeHtml(vTerm)}" <span class="opacity-75">(${this.escapeHtml(vSrc)})</span></span>`;
+          }).join('');
+        } else {
+          topPills.classList.add('d-none');
+          topPills.innerHTML = '';
+        }
+      }
+
+      const tabNavBadge = document.getElementById('pac-tab-bram-badge');
+      if (tabNavBadge) {
+        tabNavBadge.className = `badge-kkc ${badgeClass} ms-1`;
+        tabNavBadge.textContent = `${rScore}/100`;
+      }
+
+      const tabKpiBadge = document.getElementById('pac-bram-tab-badge');
+      if (tabKpiBadge) {
+        tabKpiBadge.className = `badge-kkc ${badgeClass} fs-6`;
+        tabKpiBadge.innerHTML = `<i class="bi ${icon} me-1"></i>${this.escapeHtml(label)}`;
+      }
+
+      const tabKpiScore = document.getElementById('pac-bram-tab-score');
+      if (tabKpiScore) {
+        const scoreColor = rScore >= 70 ? 'text-danger' : (rScore >= 30 ? 'text-warning' : 'text-success');
+        tabKpiScore.className = `fs-4 fw-bold ${scoreColor}`;
+        tabKpiScore.innerHTML = `${rScore} <span class="fs-6 text-muted fw-normal">/ 100</span>`;
+      }
+
+      const tabKpiEngine = document.getElementById('pac-bram-tab-engine');
+      if (tabKpiEngine) {
+        tabKpiEngine.textContent = engine;
+      }
+
+      const tabKpiUpdated = document.getElementById('pac-bram-tab-updated');
+      if (tabKpiUpdated && updatedAt) {
+        tabKpiUpdated.textContent = `Stand: ${updatedAt}`;
+      }
+
+      const tabSummary = document.getElementById('pac-bram-tab-summary');
+      if (tabSummary) {
+        tabSummary.textContent = summary;
+      }
+
+      const tabBody = document.getElementById('pac-bram-tab-body');
+      if (tabBody) {
+        if (violations.length === 0) {
+          tabBody.innerHTML = `
+            <div class="p-4 text-center text-success">
+              <i class="bi bi-check-circle-fill fs-2 d-block mb-2"></i>
+              <strong>Keine BRAM- oder Compliance-Auffälligkeiten in Titel, Beschreibung oder SEO-Feldern gefunden.</strong>
+            </div>
+          `;
+        } else {
+          const rowsHtml = violations.map(v => {
+            const vSev = String(v.severity || 'warning');
+            const isCrit = (vSev === 'violation' || vSev === 'critical');
+            const vCat = String(v.category || 'Allgemein');
+            const vSrc = String(v.source_label || v.source || 'Text');
+            const vQuote = String(v.matched_quote || v.matched_term || v.term || '');
+            const vReason = String(v.reason || '');
+            const sevHtml = isCrit
+              ? '<span class="badge-kkc badge-kkc-danger">KRITISCH (Verstoß)</span>'
+              : '<span class="badge-kkc badge-kkc-warning">WARNUNG (Prüfen)</span>';
+            return `
+              <tr>
+                <td>${sevHtml}</td>
+                <td class="fw-semibold small">${this.escapeHtml(vCat)}</td>
+                <td><span class="badge-kkc badge-kkc-muted">${this.escapeHtml(vSrc)}</span></td>
+                <td><code class="text-danger fw-bold">"${this.escapeHtml(vQuote)}"</code></td>
+                <td class="small text-muted">${this.escapeHtml(vReason)}</td>
+              </tr>
+            `;
+          }).join('');
+
+          tabBody.innerHTML = `
+            <div class="table-responsive">
+              <table class="table table-kkc align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Schweregrad</th>
+                    <th>Kategorie</th>
+                    <th>Fundort</th>
+                    <th>Erkannter Begriff / Textstelle</th>
+                    <th>Erklärung / Richtlinie</th>
+                  </tr>
+                </thead>
+                <tbody>${rowsHtml}</tbody>
+              </table>
+            </div>
+          `;
+        }
+      }
+    } catch (err) {
+      this.toast('Verbindungsfehler: ' + err.message, 'danger');
+    }
+  },
+
   // ========================================================================
   // 3c. Film- & Fotoalben-Gesamtübersicht (MoviesOnline & PhotoAlbumsOnline)
   // ========================================================================
@@ -1453,6 +1647,7 @@ const App = {
   applyPhotoAlbumsOnlineFilters(pageOverride) {
     const q = (document.getElementById('pao-filter-q')?.value || '').trim();
     const status = document.getElementById('pao-filter-status')?.value || 'all';
+    const bram = document.getElementById('pao-filter-bram')?.value || 'all';
     const cat = document.getElementById('pao-filter-cat')?.value || 'all';
     const sort = document.getElementById('pao-filter-sort')?.value || 'id_desc';
     const perPage = document.getElementById('pao-filter-per-page')?.value || '100';
@@ -1461,6 +1656,7 @@ const App = {
     const params = new URLSearchParams();
     if (q !== '') params.set('q', q);
     if (status !== 'all') params.set('status', status);
+    if (bram !== 'all') params.set('bram', bram);
     if (cat !== 'all') params.set('cat', cat);
     if (sort !== 'id_desc') params.set('sort', sort);
     if (perPage !== '100') params.set('per_page', perPage);
@@ -4144,6 +4340,52 @@ const App = {
         }
       }
       return false;
+    },
+
+    async impersonateMerchant(merchantId, username, targetRoute = 'startseite') {
+      if (!window.confirm(
+        `Möchtest du dich jetzt als Partner „${username}“ (#${merchantId}) im Partner-Backend (MCP) einloggen?\n\n` +
+        `Das Partner-Dashboard wird in einem neuen Tab geöffnet. Der Zugriff wird im Mitarbeiter-Audit-Log protokolliert.`
+      )) {
+        return;
+      }
+
+      const newWin = window.open('about:blank', '_blank');
+
+      const fd = new FormData();
+      fd.append('_csrf', App.csrfToken);
+      fd.append('merchant_id', String(merchantId));
+      fd.append('target_route', String(targetRoute || 'startseite'));
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=merchants/impersonate`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.status !== 'ok' || !data.redirect_url) {
+          if (newWin && !newWin.closed) newWin.close();
+          App.toast(data.message || 'Partner-Session konnte nicht übernommen werden.', 'danger');
+          return;
+        }
+
+        App.resetLogoutCountdown();
+        App.toast(data.message || `Session von Partner ${username} geöffnet.`, 'success');
+
+        if (newWin && !newWin.closed) {
+          newWin.location.href = data.redirect_url;
+        } else {
+          window.location.href = data.redirect_url;
+        }
+      } catch (err) {
+        if (newWin && !newWin.closed) newWin.close();
+        App.toast('Netzwerkfehler bei Partner-Session-Übernahme: ' + err.message, 'danger');
+      }
     }
   },
 

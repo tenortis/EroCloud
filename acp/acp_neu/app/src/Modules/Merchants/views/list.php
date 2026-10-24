@@ -14,8 +14,11 @@ use App\Core\View;
  * @var int $page
  * @var int $perPage
  * @var int $totalPages
+ * @var bool $canImpersonate
  * @var array<string, mixed> $filters
  */
+
+$canImpersonate = !empty($canImpersonate);
 
 $buildPageUrl = static function (int $targetPage) use ($filters): string {
     $params = [];
@@ -228,7 +231,7 @@ $buildPageUrl = static function (int $targetPage) use ($filters): string {
             <th class="text-center" style="width: 135px;">Fotoalben</th>
             <th style="width: 170px;">Letzter Login &amp; IP</th>
             <th style="width: 165px;">Richtlinien</th>
-            <th class="text-end" style="width: 130px;">Aktionen</th>
+            <th class="text-end" style="width: <?= $canImpersonate ? '265px' : '130px' ?>;">Aktionen</th>
           </tr>
         </thead>
         <tbody>
@@ -320,11 +323,19 @@ $buildPageUrl = static function (int $targetPage) use ($filters): string {
                   <?php endif; ?>
                 </td>
                 <td class="text-end">
-                  <div class="btn-group btn-group-sm">
-                    <a href="#/merchant?id=<?= (int)$m['id'] ?>" class="btn btn-primary-kkc" title="Merchant-Details &amp; Einstellungen öffnen">
+                  <div class="d-inline-flex align-items-center gap-1">
+                    <?php if ($canImpersonate): ?>
+                      <button type="button"
+                              class="btn btn-sm btn-primary-kkc"
+                              title="Session übernehmen &amp; als Partner <?= View::e((string)$m['username']) ?> (MID #<?= (int)$m['id'] ?>) im MCP einloggen"
+                              onclick="App.Merchants.impersonateMerchant(<?= (int)$m['id'] ?>, '<?= View::e(addslashes((string)$m['username'])) ?>')">
+                        <i class="bi bi-box-arrow-in-right me-1"></i>Session übernehmen
+                      </button>
+                    <?php endif; ?>
+                    <a href="#/merchant?id=<?= (int)$m['id'] ?>" class="btn btn-sm <?= $canImpersonate ? 'btn-outline-kkc' : 'btn-primary-kkc' ?>" title="Merchant-Details &amp; Einstellungen öffnen">
                       <i class="bi bi-person-workspace me-1"></i>Details
                     </a>
-                    <a href="#/actors?merchant_id=<?= (int)$m['id'] ?>" class="btn btn-outline-kkc" title="Darsteller-Profile dieses Händlers anzeigen">
+                    <a href="#/actors?merchant_id=<?= (int)$m['id'] ?>" class="btn btn-sm btn-outline-kkc" title="Darsteller-Profile dieses Händlers anzeigen">
                       <i class="bi bi-person-bounding-box"></i>
                     </a>
                   </div>

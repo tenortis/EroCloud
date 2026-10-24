@@ -103,6 +103,7 @@ class Router
         self::register('home/feedback-send', $homeCtrl, 'sendFeedback');
         self::register('home/feedback-history', $homeCtrl, 'feedbackHistory');
         self::register('home/feedback-mark-read', $homeCtrl, 'markFeedbackRead');
+        self::register('home/feedback-mark-unread', $homeCtrl, 'markFeedbackUnread');
         self::register('home/feedback-reply', $homeCtrl, 'replyFeedback');
 
         // 2. Content hochladen (Filme & Foto-Alben in 3 Schritten)

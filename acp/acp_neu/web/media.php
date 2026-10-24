@@ -21,7 +21,7 @@ if (!function_exists('is_logged_in') || is_logged_in('acp') !== true || empty($_
 
 $type    = isset($_GET['type']) ? trim((string)$_GET['type']) : 'thumb';
 $fileId  = isset($_GET['file_id']) ? preg_replace('/[^a-zA-Z0-9_-]/', '', (string)$_GET['file_id']) : '';
-$movieId = isset($_GET['movie_id']) ? abs((int)$_GET['movie_id']) : 0;
+$movieId = isset($_GET['movie_id']) ? abs((int)$_GET['movie_id']) : (isset($_GET['id']) ? abs((int)$_GET['id']) : 0);
 
 /**
  * Hilfsfunktion: Lädt Film-Pfad-Metadaten (mit Session-Cache für schnelle Range-Requests & Thumbnail-Grids)
@@ -134,7 +134,7 @@ if ($type === 'video') {
         exit;
     }
 
-    require_once KLASSEN_DIR . '/VideoStream.inc.php';
+    require_once (defined('KLASSEN_DIR') ? KLASSEN_DIR : (SOURCEDIR . '/includes/klassen')) . '/VideoStream.inc.php';
     p4c_close(DB_HOST);
     $stream = new \VideoStream($videoPath);
     $stream->start();

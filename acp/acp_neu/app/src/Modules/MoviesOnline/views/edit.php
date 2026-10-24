@@ -41,11 +41,11 @@ $detLang        = strtoupper((string)($aiData['detected_language'] ?? ''));
 $bramBannerClass = 'alert-success border-success';
 $bramIconClass   = 'bi-shield-check text-success';
 $bramTitle       = 'BRAM-Status: Unbedenklich (Grün)';
-if ($textCompliance === 'red') {
+if (in_array($textCompliance, ['violation', 'red'], true)) {
     $bramBannerClass = 'alert-danger border-danger';
     $bramIconClass   = 'bi-shield-fill-exclamation text-danger';
     $bramTitle       = 'BRAM-Status: Kritischer Verstoß erkannt (Rot)';
-} elseif ($textCompliance === 'yellow') {
+} elseif (in_array($textCompliance, ['warning', 'yellow'], true)) {
     $bramBannerClass = 'alert-warning border-warning';
     $bramIconClass   = 'bi-exclamation-triangle-fill text-warning';
     $bramTitle       = 'BRAM-Status: Manuelle Prüfung empfohlen (Gelb)';
@@ -125,7 +125,7 @@ $buysCount = (int)($purchasesData['total_buys'] ?? 0);
               data-bs-toggle="pill" data-bs-target="#tab-me-bram" type="button" role="tab">
         <i class="bi bi-shield-exclamation"></i>
         <span>2. BRAM &amp; KI-Analyse</span>
-        <span class="badge <?= $textCompliance === 'red' ? 'bg-danger' : ($textCompliance === 'yellow' ? 'bg-warning text-dark' : 'bg-success') ?>">
+        <span class="badge <?= in_array($textCompliance, ['violation', 'red'], true) ? 'bg-danger' : (in_array($textCompliance, ['warning', 'yellow'], true) ? 'bg-warning text-dark' : 'bg-success') ?>">
           Score: <?= $textRiskScore ?>
         </span>
       </button>
@@ -177,7 +177,8 @@ $buysCount = (int)($purchasesData['total_buys'] ?? 0);
         <div class="d-flex flex-wrap align-items-center gap-1">
           <?php if (!empty($violations)): ?>
             <?php foreach (array_slice($violations, 0, 5) as $v):
-                $vTerm = (string)($v['term'] ?? '');
+                $vTerm = (string)($v['matched_term'] ?? $v['term'] ?? '');
+                $vSrc  = (string)($v['source_label'] ?? $v['source'] ?? 'Text');
                 $vTime = isset($v['timestamp_sec']) && $v['timestamp_sec'] !== null ? (float)$v['timestamp_sec'] : null;
             ?>
               <?php if ($vTime !== null): ?>
@@ -186,7 +187,7 @@ $buysCount = (int)($purchasesData['total_buys'] ?? 0);
                   <i class="bi bi-play-fill"></i> „<?= View::e($vTerm) ?>“ (<?= gmdate('i:s', (int)$vTime) ?>)
                 </button>
               <?php else: ?>
-                <span class="badge bg-danger">„<?= View::e($vTerm) ?>“ (<?= View::e((string)($v['source'] ?? 'Text')) ?>)</span>
+                <span class="badge bg-danger">„<?= View::e($vTerm) ?>“ (<?= View::e($vSrc) ?>)</span>
               <?php endif; ?>
             <?php endforeach; ?>
           <?php endif; ?>
@@ -846,8 +847,8 @@ $buysCount = (int)($purchasesData['total_buys'] ?? 0);
             <div class="col-md-4">
               <div class="p-3 rounded border h-100" style="background: var(--kkc-surface-hover);">
                 <div class="text-muted small mb-1">Compliance-Status</div>
-                <div class="h4 fw-bold mb-1 <?= $textCompliance === 'red' ? 'text-danger' : ($textCompliance === 'yellow' ? 'text-warning' : 'text-success') ?>">
-                  <?= $textCompliance === 'red' ? 'Kritischer Verstoß (Rot)' : ($textCompliance === 'yellow' ? 'Warnung / Prüfen (Gelb)' : 'Unbedenklich (Grün)') ?>
+                <div class="h4 fw-bold mb-1 <?= in_array($textCompliance, ['violation', 'red'], true) ? 'text-danger' : (in_array($textCompliance, ['warning', 'yellow'], true) ? 'text-warning' : 'text-success') ?>">
+                  <?= in_array($textCompliance, ['violation', 'red'], true) ? 'Kritischer Verstoß (Rot)' : (in_array($textCompliance, ['warning', 'yellow'], true) ? 'Warnung / Prüfen (Gelb)' : 'Unbedenklich (Grün)') ?>
                 </div>
                 <small class="text-muted"><?= View::e($textSummary) ?></small>
               </div>
@@ -892,17 +893,21 @@ $buysCount = (int)($purchasesData['total_buys'] ?? 0);
                 <tbody>
                   <?php foreach ($violations as $v):
                       $sev   = (string)($v['severity'] ?? 'warning');
+                      $isCrit = in_array($sev, ['violation', 'critical'], true);
                       $vTime = isset($v['timestamp_sec']) && $v['timestamp_sec'] !== null ? (float)$v['timestamp_sec'] : null;
+                      $vTerm = (string)($v['matched_term'] ?? $v['term'] ?? '');
+                      $vSrc  = (string)($v['source_label'] ?? $v['source'] ?? 'Text');
+                      $vQuote = (string)($v['matched_quote'] ?? $v['snippet'] ?? $v['quote'] ?? '');
                   ?>
                   <tr>
-                    <td class="fw-bold text-danger">„<?= View::e((string)($v['term'] ?? '')) ?>“</td>
+                    <td class="fw-bold text-danger">„<?= View::e($vTerm) ?>“</td>
                     <td><span class="badge-kkc badge-kkc-neutral"><?= View::e((string)($v['category_label'] ?? $v['category'] ?? '')) ?></span></td>
                     <td>
-                      <span class="badge-kkc <?= $sev === 'critical' ? 'badge-kkc-danger' : 'badge-kkc-warning' ?>">
-                        <?= $sev === 'critical' ? 'Kritisch' : 'Warnung' ?>
+                      <span class="badge-kkc <?= $isCrit ? 'badge-kkc-danger' : 'badge-kkc-warning' ?>">
+                        <?= $isCrit ? 'Kritisch' : 'Warnung' ?>
                       </span>
                     </td>
-                    <td><?= View::e((string)($v['source'] ?? 'Text')) ?></td>
+                    <td><?= View::e($vSrc) ?></td>
                     <td>
                       <?php if ($vTime !== null): ?>
                         <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 font-monospace"
@@ -910,10 +915,10 @@ $buysCount = (int)($purchasesData['total_buys'] ?? 0);
                           <i class="bi bi-play-fill"></i> <?= gmdate('i:s', (int)$vTime) ?>
                         </button>
                       <?php else: ?>
-                        <span class="text-muted">-</span>
+                        <span class="text-muted"><?= View::e((string)($v['timestamp'] ?? '-')) ?></span>
                       <?php endif; ?>
                     </td>
-                    <td class="small text-muted font-monospace"><?= View::e((string)($v['snippet'] ?? '')) ?></td>
+                    <td class="small text-muted font-monospace"><?= View::e($vQuote) ?></td>
                   </tr>
                   <?php endforeach; ?>
                 </tbody>

@@ -95,8 +95,8 @@ final class MoviesOnlineController
                 SUM(CASE WHEN mo.`status` = 'deleted' THEN 1 ELSE 0 END) AS `deleted_cnt`,
                 SUM(CASE WHEN mo.`category_master` = 'porn' THEN 1 ELSE 0 END) AS `porn_cnt`,
                 SUM(CASE WHEN mo.`category_master` = 'fetish' THEN 1 ELSE 0 END) AS `fetish_cnt`,
-                SUM(CASE WHEN ai.`text_check_status` = 2 AND ai.`text_compliance` = 'green' THEN 1 ELSE 0 END) AS `bram_green_cnt`,
-                SUM(CASE WHEN ai.`text_check_status` = 2 AND ai.`text_compliance` IN ('yellow', 'red') THEN 1 ELSE 0 END) AS `bram_att_cnt`
+                SUM(CASE WHEN ai.`text_check_status` = 2 AND ai.`text_compliance` IN ('ok', 'green') THEN 1 ELSE 0 END) AS `bram_green_cnt`,
+                SUM(CASE WHEN ai.`text_check_status` = 2 AND ai.`text_compliance` IN ('warning', 'violation', 'yellow', 'red') THEN 1 ELSE 0 END) AS `bram_att_cnt`
              FROM `movies_online` mo
              LEFT JOIN `movies` m ON m.`file_id` = mo.`file_id`
              LEFT JOIN `movies_ai_analysis` ai ON ai.`movie_id` = m.`id`;",
@@ -155,9 +155,9 @@ final class MoviesOnlineController
             $where[] = "mo.`movie_language` = '" . p4c_escape_string($lang) . "'";
         }
         if ($bram === 'green') {
-            $where[] = "(ai.`text_check_status` = 2 AND ai.`text_compliance` = 'green')";
+            $where[] = "(ai.`text_check_status` = 2 AND ai.`text_compliance` IN ('ok', 'green'))";
         } elseif ($bram === 'attention') {
-            $where[] = "(ai.`text_check_status` = 2 AND ai.`text_compliance` IN ('yellow', 'red'))";
+            $where[] = "(ai.`text_check_status` = 2 AND ai.`text_compliance` IN ('warning', 'violation', 'yellow', 'red'))";
         } elseif ($bram === 'unchecked') {
             $where[] = "(ai.`text_check_status` IS NULL OR ai.`text_check_status` != 2)";
         }
@@ -1187,6 +1187,384 @@ final class MoviesOnlineController
             'drafts'         => $drafts,
             'kpis'           => $kpis,
             'switcherCounts' => $switcherCounts,
+        ]);
+    }
+
+    /**
+     * 5b. Film in Planung – Reine Lese-Detailansicht (#/movie-draft?id=...)
+     */
+    public function draftDetail(): string
+    {
+        self::ensureIndexesAndTables();
+
+        $movieId = abs((int)$this->request->get('id', 0));
+        if ($movieId <= 0) {
+            return '<div class="alert alert-danger m-3"><i class="bi bi-exclamation-triangle-fill me-2"></i>Ungültige Film-ID übergeben. <a href="#/movies-drafts" class="alert-link ms-2">Zurück zu Filme in Planung</a></div>';
+        }
+
+        $rsM = p4c_query("SELECT * FROM `movies` WHERE `id` = '" . $movieId . "' LIMIT 1;", __FILE__, __LINE__);
+        if (!$rsM || p4c_num_rows($rsM) === 0) {
+            return '<div class="alert alert-warning m-3"><i class="bi bi-info-circle-fill me-2"></i>Der angeforderte Film wurde nicht in der Datenbank gefunden. <a href="#/movies-drafts" class="alert-link ms-2">Zurück zu Filme in Planung</a></div>';
+        }
+
+        $m          = p4c_fetch_object($rsM);
+        $movieDbId  = abs((int)$m->id);
+        $fileId     = (string)($m->file_id ?? '');
+        $merchantId = abs((int)($m->merchant_id ?? 0));
+        $actorId    = abs((int)($m->actor_id ?? 0));
+
+        // Vorheriger / Nächster Entwurf (Liste ist nach id DESC sortiert)
+        $prevDraftId = 0;
+        $rsPrev = p4c_query(
+            "SELECT `id` FROM `movies` WHERE `released` = '0' AND `status` != 'deleted' AND `id` > '" . $movieDbId . "' ORDER BY `id` ASC LIMIT 1;",
+            __FILE__,
+            __LINE__
+        );
+        if ($rsPrev && p4c_num_rows($rsPrev) > 0) {
+            $prevDraftId = abs((int)p4c_fetch_object($rsPrev)->id);
+        }
+
+        $nextDraftId = 0;
+        $rsNext = p4c_query(
+            "SELECT `id` FROM `movies` WHERE `released` = '0' AND `status` != 'deleted' AND `id` < '" . $movieDbId . "' ORDER BY `id` DESC LIMIT 1;",
+            __FILE__,
+            __LINE__
+        );
+        if ($rsNext && p4c_num_rows($rsNext) > 0) {
+            $nextDraftId = abs((int)p4c_fetch_object($rsNext)->id);
+        }
+
+        // Merchant-Infos laden (exakt wie in edit())
+        $merchantPartnerId = 0;
+        $merchantUsername  = 'Unbekannt';
+        if (class_exists('Merchant')) {
+            global $mysql;
+            $merchantObj       = new \Merchant($mysql, $merchantId);
+            $merchantPartnerId = abs((int)$merchantObj->partner_id());
+            $merchantUsername  = self::decodeText((string)$merchantObj->username('aes_decrypt'));
+        }
+
+        // Darsteller-Profile des Merchants laden
+        $merchantActors = [];
+        $currentActorName = '';
+        $rsActors = p4c_query(
+            "SELECT `id`, `username`, `actor_categories`, `status`
+             FROM `actors`
+             WHERE `merchant_id` = '" . $merchantId . "'
+             ORDER BY `username` ASC;",
+            __FILE__,
+            __LINE__
+        );
+        if ($rsActors && p4c_num_rows($rsActors) > 0) {
+            while ($a = p4c_fetch_object($rsActors)) {
+                $aid   = abs((int)$a->id);
+                $aname = self::decodeText((string)($a->username ?? ''));
+                if ($aid === $actorId) {
+                    $currentActorName = $aname;
+                }
+                $merchantActors[] = [
+                    'id'               => $aid,
+                    'username'         => $aname,
+                    'actor_categories' => (string)($a->actor_categories ?? ''),
+                    'status'           => (string)($a->status ?? ''),
+                ];
+            }
+        }
+
+        // Bearbeiter-Mitarbeiter auflösen
+        $lastUpdatedByName = '-';
+        $lastUpdatedById   = abs((int)($m->last_updated_by ?? 0));
+        if ($lastUpdatedById > 0) {
+            $rsEmp2 = p4c_query("SELECT `username` FROM `employee` WHERE `id` = '" . $lastUpdatedById . "' LIMIT 1;", __FILE__, __LINE__);
+            if ($rsEmp2 && p4c_num_rows($rsEmp2) > 0) {
+                $lastUpdatedByName = self::decodeText((string)(p4c_fetch_object($rsEmp2)->username ?? '-'));
+            }
+        }
+
+        // Partner-Domains laden
+        $merchantDomains = [];
+        if ($merchantPartnerId > 0) {
+            $rsSites = p4c_query(
+                "SELECT `domain` FROM `sites` WHERE `partner_id` = '" . $merchantPartnerId . "' AND `status` = '1' ORDER BY `domain` ASC;",
+                __FILE__,
+                __LINE__
+            );
+            if ($rsSites && p4c_num_rows($rsSites) > 0) {
+                while ($s = p4c_fetch_object($rsSites)) {
+                    $dom = trim((string)($s->domain ?? ''));
+                    if ($dom !== '') {
+                        $merchantDomains[] = $dom;
+                    }
+                }
+            }
+        }
+
+        // Dateipfad & technische Details
+        $storageLoc    = (string)($m->storage_location ?? '');
+        $filename      = (string)($m->filename ?? '');
+        $movieDir      = rtrim((string)MOVIES_PATH, '/\\') . '/' . $storageLoc . '/' . $merchantId . '/' . $movieDbId;
+        $videoFilePath = $movieDir . '/' . $filename;
+        $fileExists    = ($filename !== '' && is_file($videoFilePath));
+        $fileSizeBytes = $fileExists ? (int)@filesize($videoFilePath) : self::getFolderSize($movieDir);
+        $fileSizeText  = $fileSizeBytes > 0 ? self::formatBytes($fileSizeBytes) : 'Datei existiert nicht auf dem Server';
+
+        $hasCustomFsk16 = is_file($movieDir . '/thumb_' . $movieDbId . '_' . $fileId . '_11.jpg');
+        $hasCustomFsk18 = is_file($movieDir . '/thumb_' . $movieDbId . '_' . $fileId . '_12.jpg');
+
+        $convertStatusVal = abs((int)($m->convert_status ?? 0));
+        $convertStatusMap = [
+            0 => 'Warteschlange (nicht konvertiert)',
+            1 => 'In Konvertierung',
+            2 => 'Erfolgreich konvertiert',
+            3 => 'Fehler (Konvertierung fehlgeschlagen)',
+        ];
+        $convertStatusText = $convertStatusMap[$convertStatusVal] ?? ('Status #' . $convertStatusVal);
+
+        $convertDurationText = '-';
+        $cStart = (string)($m->convert_starttime ?? '');
+        $cEnd   = (string)($m->convert_endtime ?? '');
+        if ($cStart !== '' && $cStart !== '0000-00-00 00:00:00' && $cEnd !== '' && $cEnd !== '0000-00-00 00:00:00') {
+            $diffSec = strtotime($cEnd) - strtotime($cStart);
+            if ($diffSec > 0) {
+                $hrs  = (int)floor($diffSec / 3600);
+                $mins = (int)floor(($diffSec % 3600) / 60);
+                $secs = (int)($diffSec % 60);
+                $parts = [];
+                if ($hrs > 0) {
+                    $parts[] = $hrs . ' Std.';
+                }
+                if ($mins > 0) {
+                    $parts[] = $mins . ' Min.';
+                }
+                if ($secs > 0 || empty($parts)) {
+                    $parts[] = $secs . ' Sek.';
+                }
+                $convertDurationText = implode(' ', $parts);
+            }
+        }
+
+        // Auflösung & Auto-Qualitäts-Erkennung
+        $resolution = (string)($m->resolution ?? '');
+        $resParts   = explode('x', $resolution);
+        $resW       = isset($resParts[0]) ? abs((int)$resParts[0]) : 0;
+        $resH       = isset($resParts[1]) ? abs((int)$resParts[1]) : 0;
+        $maxDim     = max($resW, $resH);
+        $minDim     = min($resW, $resH);
+        if ($maxDim >= 5500 || $minDim >= 2800) {
+            $detectedQuality = '6k';
+        } elseif ($maxDim >= 3200 || $minDim >= 1800) {
+            $detectedQuality = '4k';
+        } elseif ($maxDim >= 2000 || $minDim >= 1300) {
+            $detectedQuality = '2k';
+        } elseif ($maxDim >= 1600 || $minDim >= 900) {
+            $detectedQuality = 'fhd';
+        } elseif ($maxDim >= 1000 || $minDim >= 650) {
+            $detectedQuality = 'hd';
+        } else {
+            $detectedQuality = 'sd';
+        }
+
+        $currentQuality = strtolower(trim((string)($m->quality ?? '')));
+        if (!isset(self::QUALITY_LABELS[$currentQuality])) {
+            $currentQuality = $detectedQuality;
+        }
+
+        // Texte dekodieren
+        $title       = self::decodeText((string)($m->title ?? ''));
+        $description = self::decodeText((string)($m->description ?? ''));
+        $metaTitle   = self::decodeText((string)($m->meta_title ?? ''));
+        $metaDesc    = self::decodeText((string)($m->meta_description ?? ''));
+        $seoUrl      = self::decodeText((string)($m->seo_url ?? ''));
+        $adminInfos  = self::decodeText((string)($m->admin_infos ?? ''));
+
+        // Kategorien aus movie_categories laden
+        $selectedSlaves = array_values(array_filter(array_map('trim', explode(',', (string)($m->category_slave ?? '')))));
+        $categoriesByType = [
+            'number_of_people' => [],
+            'look_and_body'    => [],
+            'fetish'           => [],
+            'porn'             => [],
+        ];
+        $searchHaystack = mb_strtolower($title . ' ' . strip_tags($description), 'UTF-8');
+        $rsCats = p4c_query("SELECT * FROM `movie_categories` ORDER BY `category_group` ASC, `name_id` ASC;", __FILE__, __LINE__);
+        if ($rsCats && p4c_num_rows($rsCats) > 0) {
+            while ($c = p4c_fetch_object($rsCats)) {
+                $cType  = (string)($c->category_group ?? 'porn');
+                $idName = (string)($c->name_id ?? '');
+                $deName = self::decodeText((string)($c->de_name_value ?? ''));
+                $deText = self::decodeText((string)($c->de_name_text ?? ''));
+                $moreSw = self::decodeText((string)($c->more_search_words ?? ''));
+
+                $inText = false;
+                if ($idName !== '' && mb_strpos($searchHaystack, mb_strtolower($idName, 'UTF-8')) !== false) {
+                    $inText = true;
+                } elseif ($deName !== '' && mb_strpos($searchHaystack, mb_strtolower($deName, 'UTF-8')) !== false) {
+                    $inText = true;
+                } elseif ($moreSw !== '') {
+                    foreach (explode(',', $moreSw) as $sw) {
+                        $swTrim = trim(mb_strtolower($sw, 'UTF-8'));
+                        if ($swTrim !== '' && mb_strpos($searchHaystack, $swTrim) !== false) {
+                            $inText = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!isset($categoriesByType[$cType])) {
+                    $categoriesByType[$cType] = [];
+                }
+                $categoriesByType[$cType][] = [
+                    'id_name'  => $idName,
+                    'de'       => $deName,
+                    'de_text'  => $deText,
+                    'selected' => in_array($idName, $selectedSlaves, true),
+                    'in_text'  => $inText,
+                ];
+            }
+        }
+
+        // Ablehnungs-Historie laden
+        $rejectionHistory = [];
+        if ($fileId !== '') {
+            $rsHist = p4c_query(
+                "SELECT h.*, r.`de_short`, e.`username` AS `employee_name`
+                 FROM `rejection_reason_movie_history` h
+                 LEFT JOIN `rejection_reason_movie` r ON r.`id_name` = h.`id_name`
+                 LEFT JOIN `employee` e ON e.`id` = h.`employee_id`
+                 WHERE h.`movie_file_id` = '" . p4c_escape_string($fileId) . "'
+                 ORDER BY h.`datetime` DESC;",
+                __FILE__,
+                __LINE__
+            );
+            if ($rsHist && p4c_num_rows($rsHist) > 0) {
+                while ($h = p4c_fetch_object($rsHist)) {
+                    $rejectionHistory[] = [
+                        'id_name'       => (string)($h->id_name ?? ''),
+                        'short_title'   => self::decodeText((string)($h->de_short ?? $h->id_name ?? 'Ablehnung')),
+                        'text'          => self::decodeText((string)($h->text ?? '')),
+                        'datetime'      => (string)($h->datetime ?? ''),
+                        'employee_name' => self::decodeText((string)($h->employee_name ?? '-unbekannt-')),
+                    ];
+                }
+            }
+        }
+
+        // 18+ Mitwirkende / ID-Shot Daten laden
+        $performersData = [
+            'performer_mode'     => 'solo_owner',
+            'merchant_full_name' => $merchantUsername,
+            'persons'            => [],
+        ];
+        if (class_exists('CoActorManager')) {
+            \CoActorManager::ensureSchema();
+            $perfRaw = \CoActorManager::getContentPerformers('movie', $movieDbId, $merchantId);
+            $performersData['performer_mode']     = (string)($perfRaw['performer_mode'] ?? 'solo_owner');
+            $performersData['merchant_full_name'] = self::decodeText((string)($perfRaw['merchant_full_name'] ?? $merchantUsername));
+
+            foreach ($perfRaw['performers'] ?? [] as $p) {
+                $performersData['persons'][] = [
+                    'id'                  => abs((int)($p['id'] ?? 0)),
+                    'is_owner'            => !empty($p['is_owner']),
+                    'display_label'       => self::decodeText((string)($p['display_label'] ?? '')),
+                    'stage_name'          => self::decodeText((string)($p['stage_name'] ?? '')),
+                    'birth_date_de'       => (string)($p['birth_date_de'] ?? ''),
+                    'age'                 => $p['age'] ?? null,
+                    'id_doc_number'       => self::decodeText((string)($p['id_doc_number'] ?? '')),
+                    'city'                => self::decodeText((string)($p['city'] ?? '')),
+                    'checked_status'      => (string)($p['checked_status'] ?? 'pending_qr'),
+                    'status_label'        => self::decodeText((string)($p['status_label'] ?? '')),
+                    'is_ready_for_use'    => !empty($p['is_ready_for_use']),
+                    'ai_face_ready'       => !empty($p['ai_face_ready']),
+                    'verification_method' => (string)($p['verification_method'] ?? ''),
+                    'rejection_reason'    => self::decodeText((string)($p['rejection_reason'] ?? '')),
+                    'face_ref_url'        => (string)($p['face_ref_url'] ?? ''),
+                    'id_shot_url'         => (string)($p['id_shot_url'] ?? ''),
+                    'id_front_url'        => (string)($p['id_front_url'] ?? ''),
+                    'certificate_url'     => (string)($p['certificate_url'] ?? ''),
+                ];
+            }
+        }
+
+        // BRAM & KI-Analyse + VTT-Transkript laden
+        $aiData = self::loadMovieAiAndTranscriptData($movieDbId, $merchantId, $fileId, $movieDir, [
+            'title'            => $title,
+            'description'      => $description,
+            'meta_title'       => $metaTitle,
+            'meta_description' => $metaDesc,
+        ]);
+
+        $playtimeSeconds = abs((int)($m->playtime_seconds ?? 0));
+        $amountSecond    = (float)($m->amount_second ?? 0);
+        $totalCoins      = (int)round($playtimeSeconds * $amountSecond);
+
+        $onlineAtRaw = (string)($m->online_at ?? '');
+        $onlineAtFormatted = ($onlineAtRaw !== '' && $onlineAtRaw !== '0000-00-00 00:00:00')
+            ? date('Y-m-d\TH:i', strtotime($onlineAtRaw))
+            : '';
+
+        return View::render('MoviesOnline', 'draft_detail', [
+            'movie' => [
+                'movie_id'             => $movieDbId,
+                'file_id'              => $fileId,
+                'merchant_id'          => $merchantId,
+                'merchant_partner_id'  => $merchantPartnerId,
+                'merchant_username'    => $merchantUsername,
+                'actor_id'             => $actorId,
+                'actor_name'           => $currentActorName,
+                'filename'             => $filename,
+                'storage_location'     => $storageLoc,
+                'video_path'           => $videoFilePath,
+                'file_exists'          => $fileExists,
+                'file_size_text'       => $fileSizeText,
+                'resolution'           => $resolution,
+                'detected_quality'     => self::QUALITY_LABELS[$detectedQuality] ?? strtoupper($detectedQuality),
+                'playtime_seconds'     => $playtimeSeconds,
+                'playtime_formatted'   => (string)($m->playtime_string ?? gmdate('H:i:s', $playtimeSeconds)),
+                'quality'              => $currentQuality,
+                'preview'              => abs((int)($m->preview ?? 0)),
+                'preview_image_fsk16'  => abs((int)($m->preview_image_fsk16 ?? 1)) ?: 1,
+                'preview_image_fsk18'  => abs((int)($m->preview_image_fsk18 ?? 1)) ?: 1,
+                'has_custom_fsk16'     => $hasCustomFsk16,
+                'has_custom_fsk18'     => $hasCustomFsk18,
+                'title'                => $title,
+                'description'          => $description,
+                'meta_title'           => $metaTitle,
+                'meta_description'     => $metaDesc,
+                'seo_url'              => $seoUrl,
+                'movie_language'       => (string)($m->movie_language ?? 'de'),
+                'category_master'      => (string)($m->category_master ?? 'porn') ?: 'porn',
+                'selected_slaves'      => $selectedSlaves,
+                'online_at_input'      => $onlineAtFormatted,
+                'online_at_raw'        => $onlineAtRaw,
+                'amount_second'        => number_format($amountSecond, 1, '.', ''),
+                'total_coins'          => $totalCoins,
+                'as_download'          => abs((int)($m->as_download ?? 0)),
+                'amount_download'      => abs((int)($m->amount_download ?? 0)),
+                'status'               => (string)($m->status ?? 'active'),
+                'released'             => abs((int)($m->released ?? 0)),
+                'convert_status'       => $convertStatusVal,
+                'convert_status_text'  => $convertStatusText,
+                'convert_starttime'    => $cStart,
+                'convert_endtime'      => $cEnd,
+                'convert_duration'     => $convertDurationText,
+                'visible_for_website'  => (string)($m->visible_for_website ?? 'public'),
+                'admin_infos'          => $adminInfos,
+                'create_datetime'      => (string)($m->create_datetime ?? ''),
+                'movie_checked'        => (string)($m->movie_checked ?? ''),
+                'last_updated_date'    => (string)($m->last_updated_datetime ?? ''),
+                'last_updated_by_name' => $lastUpdatedByName,
+                'checksum'             => (string)($m->checksum ?? ''),
+            ],
+            'prevDraftId'      => $prevDraftId,
+            'nextDraftId'      => $nextDraftId,
+            'merchantActors'   => $merchantActors,
+            'merchantDomains'  => $merchantDomains,
+            'categoriesByType' => $categoriesByType,
+            'rejectionHistory' => $rejectionHistory,
+            'performersData'   => $performersData,
+            'aiData'           => $aiData,
+            'languages'        => self::LANGUAGE_LABELS,
+            'qualities'        => self::QUALITY_LABELS,
         ]);
     }
 

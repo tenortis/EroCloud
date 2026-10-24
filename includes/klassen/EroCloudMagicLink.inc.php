@@ -159,7 +159,8 @@ class EroCloudMagicLink
         string $channel = 'email',
         string $context = '',
         int $ttlSeconds = self::DEFAULT_TTL_EMAIL,
-        int $maxUses = self::DEFAULT_MAX_USES
+        int $maxUses = self::DEFAULT_MAX_USES,
+        ?bool $forcePublicDomain = null
     ): string {
         $merchantId  = abs((int)$merchantId);
         $safeRoute   = self::sanitizeTargetRoute($targetRoute);
@@ -168,7 +169,8 @@ class EroCloudMagicLink
         $ttlSeconds  = max(60, min(2592000, abs((int)$ttlSeconds))); // 1 Min. bis max. 30 Tage
         $maxUses     = max(1, min(50, abs((int)$maxUses)));
 
-        $baseUrl = self::getMcpEntryUrl(true);
+        $usePublicDomain = $forcePublicDomain ?? ($safeChannel !== 'acp_impersonate');
+        $baseUrl = self::getMcpEntryUrl($usePublicDomain);
 
         if ($merchantId <= 0) {
             return $baseUrl . '#/' . $safeRoute;
@@ -435,8 +437,11 @@ class EroCloudMagicLink
                 `last_used_ip` = '" . p4c_escape_string($userIp) . "';", __FILE__, __LINE__);
         }
 
+        $isAdminImpersonation = ($channel === 'acp_impersonate');
+
         // 7. Sichere Session-Initialisierung (Session Fixation Schutz)
-        if (session_status() === PHP_SESSION_ACTIVE && !headers_sent()) {
+        // Bei lokaler Admin-Übernahme auf demselben Host (localhost) bestehende ACP-Session-ID nicht zerstören
+        if (!$isAdminImpersonation && session_status() === PHP_SESSION_ACTIVE && !headers_sent()) {
             @session_regenerate_id(true);
         }
 
@@ -447,38 +452,56 @@ class EroCloudMagicLink
         $_SESSION['merchant_username'] = $username;
         $_SESSION['last_activity']     = time();
 
+        if ($isAdminImpersonation) {
+            $adminId   = 0;
+            $adminName = 'Admin';
+            if (str_starts_with($context, 'admin:')) {
+                $ctxParts  = explode(':', $context, 3);
+                $adminId   = abs((int)($ctxParts[1] ?? 0));
+                $adminName = trim((string)($ctxParts[2] ?? 'Admin')) ?: 'Admin';
+            }
+            $_SESSION['mcp_impersonated_by_admin'] = [
+                'id'         => $adminId,
+                'username'   => $adminName,
+                'started_at' => time(),
+            ];
+        } else {
+            unset($_SESSION['mcp_impersonated_by_admin']);
+        }
+
         // 8. HMAC-gesichertes 3-Stunden-Cookie für mcp_neu synchronisieren
         if (function_exists('mcp_neu_sync_auth_cookie')) {
             mcp_neu_sync_auth_cookie($merchantId, $username);
         }
 
-        // 9. Bestehendes EroCloud-Cookie aktualisieren (für Kompatibilität)
-        if (!headers_sent() && $partnerId !== '' && defined('MCP_DOMAIN')) {
-            $cookiePayload = base64_encode((string)json_encode([
-                'pid' => $partnerId,
-                'sid' => session_id(),
-            ]));
-            @setcookie('erocloud', $cookiePayload, [
-                'expires'  => strtotime('+3 month'),
-                'path'     => '/',
-                'domain'   => '.' . ltrim((string)MCP_DOMAIN, '.'),
-                'secure'   => true,
-                'httponly' => true,
-                'samesite' => 'Lax',
-            ]);
-        }
+        // 9. Bestehendes EroCloud-Cookie, letzte IP & Partner-Historie NUR bei echtem Partner-Login aktualisieren
+        if (!$isAdminImpersonation) {
+            if (!headers_sent() && $partnerId !== '' && defined('MCP_DOMAIN')) {
+                $cookiePayload = base64_encode((string)json_encode([
+                    'pid' => $partnerId,
+                    'sid' => session_id(),
+                ]));
+                @setcookie('erocloud', $cookiePayload, [
+                    'expires'  => strtotime('+3 month'),
+                    'path'     => '/',
+                    'domain'   => '.' . ltrim((string)MCP_DOMAIN, '.'),
+                    'secure'   => true,
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                ]);
+            }
 
-        // 10. Letzte IP & Login-Historie aktualisieren
-        if (defined('AES_KEY')) {
-            p4c_query("UPDATE `merchants` SET
-                `last_ip`          = AES_ENCRYPT('" . p4c_escape_string($userIp) . "', '" . AES_KEY . "'),
-                `last_ip_datetime` = '" . $now . "'
-                WHERE `id` = '" . $merchantId . "' LIMIT 1;", __FILE__, __LINE__);
-        }
+            if (defined('AES_KEY')) {
+                p4c_query("UPDATE `merchants` SET
+                    `last_ip`          = AES_ENCRYPT('" . p4c_escape_string($userIp) . "', '" . AES_KEY . "'),
+                    `last_ip_datetime` = '" . $now . "'
+                    WHERE `id` = '" . $merchantId . "' LIMIT 1;", __FILE__, __LINE__);
+            }
 
-        if (function_exists('log_action')) {
-            $logLabel = $context !== '' ? "{$channel}: {$context}" : $channel;
-            log_action("Am System angemeldet (Direkt-Link / {$logLabel}).");
+            if (function_exists('log_action')) {
+                $logLabel = $context !== '' ? "{$channel}: {$context}" : $channel;
+                log_action("Am System angemeldet (Direkt-Link / {$logLabel}).");
+            }
         }
 
         // 11. Sauberer Redirect ohne Token in der URL auf die SPA-Zielroute
@@ -592,7 +615,23 @@ class EroCloudMagicLink
         if ($forcePublicDomain) {
             $mcpBase = 'https://erocloud.net';
         } else {
-            $mcpBase = defined('MCP_URL') ? rtrim((string)MCP_URL, '/') : 'https://erocloud.net';
+            $host = strtolower(trim((string)($_SERVER['HTTP_HOST'] ?? '')));
+            $scriptName = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+            if (($host === 'localhost' || str_starts_with($host, 'localhost:') || $host === '127.0.0.1' || str_starts_with($host, '127.0.0.1:'))
+                && (str_contains($scriptName, '/acp/') || str_contains($scriptName, '/mcp/'))
+            ) {
+                $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                    || ((int)($_SERVER['SERVER_PORT'] ?? 80) === 443);
+                $scheme = $isHttps ? 'https' : 'http';
+                $pos    = strpos($scriptName, '/acp/');
+                if ($pos === false) {
+                    $pos = strpos($scriptName, '/mcp/');
+                }
+                $rootPrefix = $pos !== false ? substr($scriptName, 0, $pos) : '';
+                $mcpBase    = $scheme . '://' . $host . $rootPrefix . '/mcp';
+            } else {
+                $mcpBase = defined('MCP_URL') ? rtrim((string)MCP_URL, '/') : 'https://erocloud.net';
+            }
         }
 
         if (defined('MCP_DIR') && is_dir(MCP_DIR . '/mcp_neu/web')) {

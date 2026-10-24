@@ -15,14 +15,39 @@ use App\Core\Csrf;
 
 global $mysql;
 
-// 1. Logout verarbeiten (analog mcp/index.php)
+// 1. Logout verarbeiten (analog mcp/index.php, mit Sonderschutz bei Admin-Session-Übernahme)
 if (isset($_GET['logout'])) {
-    if (isset($_SESSION['merchant_id'])) {
+    $isAdminImp = !empty($_SESSION['mcp_impersonated_by_admin']) && is_array($_SESSION['mcp_impersonated_by_admin']);
+
+    if (!$isAdminImp && isset($_SESSION['merchant_id'])) {
         if ($_GET['logout'] === 'auto') {
             log_action('Vom System abgemeldet. (auto)');
         } else {
             log_action('Vom System abgemeldet. (manuell)');
         }
+    }
+
+    if (function_exists('mcp_neu_clear_auth_cookie')) {
+        mcp_neu_clear_auth_cookie();
+    }
+
+    if ($isAdminImp) {
+        // Nur MCP-spezifische Session-Keys entfernen, damit eine parallele ACP-Session unberührt bleibt
+        unset(
+            $_SESSION['merchant_id'],
+            $_SESSION['merchant_username'],
+            $_SESSION['logged_in_as'],
+            $_SESSION['mcp_impersonated_by_admin']
+        );
+        if (!empty($_SESSION['employee_id'])) {
+            $_SESSION['logged_id'] = 'acp';
+        } else {
+            $_SESSION = [];
+            @session_destroy();
+        }
+        $acpTarget = (defined('ACP_URL') ? rtrim((string)ACP_URL, '/') : 'https://acp.erocloud.net') . '/acp_neu/web/Startseite#/merchants';
+        header('Location: ' . $acpTarget);
+        exit;
     }
 
     $logoutUrl = (isset($_SESSION['logged_in_as']) && $_SESSION['logged_in_as'] === 'merchant')
@@ -31,9 +56,6 @@ if (isset($_GET['logout'])) {
 
     $_SESSION = [];
     @session_destroy();
-    if (function_exists('mcp_neu_clear_auth_cookie')) {
-        mcp_neu_clear_auth_cookie();
-    }
     header('Location: ' . $logoutUrl);
     exit;
 }
@@ -365,6 +387,24 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
 
       <!-- Quick-Actions & Partner-Menü -->
       <div class="d-flex align-items-center gap-2 gap-md-3 ms-auto">
+        <?php if (!empty($_SESSION['mcp_impersonated_by_admin']) && is_array($_SESSION['mcp_impersonated_by_admin'])): ?>
+        <?php
+          $impAdminName = (string)($_SESSION['mcp_impersonated_by_admin']['username'] ?? 'Admin');
+        ?>
+        <div class="d-flex align-items-center gap-2 px-2 py-1 rounded border border-warning bg-warning bg-opacity-10 small"
+             title="Du bist als Admin (<?= htmlspecialchars($impAdminName, ENT_QUOTES, 'UTF-8') ?>) in der Partner-Session von <?= htmlspecialchars($merchantUsername, ENT_QUOTES, 'UTF-8') ?> (MID #<?= (int)$merchantId ?>) eingeloggt">
+          <span class="d-none d-lg-inline text-body">
+            <i class="bi bi-shield-lock-fill text-warning me-1"></i>Admin-Ansicht: <strong><?= htmlspecialchars($merchantUsername, ENT_QUOTES, 'UTF-8') ?> (#<?= (int)$merchantId ?>)</strong>
+          </span>
+          <a href="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>/index.php?logout=admin"
+             class="btn btn-xs btn-warning py-0 px-2 fw-semibold text-decoration-none"
+             style="font-size: 0.75rem;"
+             title="Partner-Session beenden und zurück ins ACP wechseln">
+            <i class="bi bi-box-arrow-left me-1"></i>Session beenden
+          </a>
+        </div>
+        <?php endif; ?>
+
         <?php if ($countActors > 0): ?>
         <a href="#/movie-upload" class="btn btn-sm btn-primary-kkc d-flex align-items-center gap-1">
           <i class="bi bi-cloud-arrow-up-fill"></i>

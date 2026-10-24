@@ -48,7 +48,7 @@ function is_logged_in($area) {
     **/    
     
     if ($area == 'acp') {
-        if (isset($_SESSION['logged_id']) AND $_SESSION['logged_id'] == 'acp')  {
+        if ((isset($_SESSION['logged_id']) AND $_SESSION['logged_id'] == 'acp') OR !empty($_SESSION['employee_id']))  {
             if (isset($_SESSION['last_activity']) AND $_SESSION['last_activity'] >= ACP_SESSION_DURATION) {
                 $_SESSION['last_activity'] = time();            
                 return true;
@@ -62,7 +62,7 @@ function is_logged_in($area) {
             }
         } 
     } else if ($area == 'mcp') {
-        if (isset($_SESSION['logged_id']) AND $_SESSION['logged_id'] == 'mcp')  {
+        if ((isset($_SESSION['logged_id']) AND $_SESSION['logged_id'] == 'mcp') OR !empty($_SESSION['merchant_id']))  {
             if (isset($_SESSION['last_activity']) AND $_SESSION['last_activity'] >= MCP_SESSION_DURATION) {
                 $_SESSION['last_activity'] = time();            
                 return true;

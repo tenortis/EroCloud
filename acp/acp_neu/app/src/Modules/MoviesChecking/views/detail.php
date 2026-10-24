@@ -163,7 +163,7 @@ $categoryGroupLabels = [
       <?php if (!empty($violations)): ?>
       <div class="d-flex flex-wrap gap-2 mt-2 pt-2 border-top" style="border-color: rgba(0,0,0,0.1) !important;">
         <?php foreach ($violations as $v):
-            $isCrit = (($v['severity'] ?? '') === 'critical');
+            $isCrit = in_array((string)($v['severity'] ?? ''), ['violation', 'critical'], true);
             $tsStr  = (string)($v['timestamp'] ?? '-');
             $secJump = 0;
             if (preg_match('/^(\d+):(\d+)$/', $tsStr, $mTs)) {
@@ -176,7 +176,7 @@ $categoryGroupLabels = [
           <i class="bi <?= $isCrit ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill' ?>"></i>
           <strong><?= View::e((string)($v['category'] ?? 'Regel')) ?>:</strong>
           <span>„<?= View::e((string)($v['matched_term'] ?? '')) ?>“</span>
-          <span class="opacity-75">(<?= View::e((string)($v['source'] ?? 'Text')) ?><?= $tsStr !== '-' && $tsStr !== '' ? ' @ ' . View::e($tsStr) : '' ?>)</span>
+          <span class="opacity-75">(<?= View::e((string)($v['source_label'] ?? $v['source'] ?? 'Text')) ?><?= $tsStr !== '-' && $tsStr !== '' ? ' @ ' . View::e($tsStr) : '' ?>)</span>
         </span>
         <?php endforeach; ?>
       </div>
@@ -1002,7 +1002,7 @@ $categoryGroupLabels = [
               </thead>
               <tbody>
                 <?php foreach ($violations as $v):
-                    $isCrit = (($v['severity'] ?? '') === 'critical');
+                    $isCrit = in_array((string)($v['severity'] ?? ''), ['violation', 'critical'], true);
                 ?>
                 <tr>
                   <td class="fw-bold"><?= View::e((string)($v['category'] ?? '')) ?></td>
@@ -1011,10 +1011,10 @@ $categoryGroupLabels = [
                       <?= $isCrit ? 'Kritischer Verstoß' : 'Warnhinweis' ?>
                     </span>
                   </td>
-                  <td><?= View::e((string)($v['source'] ?? 'Text')) ?></td>
+                  <td><?= View::e((string)($v['source_label'] ?? $v['source'] ?? 'Text')) ?></td>
                   <td class="font-monospace"><?= View::e((string)($v['timestamp'] ?? '-')) ?></td>
                   <td><code class="fw-bold text-danger"><?= View::e((string)($v['matched_term'] ?? '')) ?></code></td>
-                  <td class="small text-muted">„<?= View::e((string)($v['quote'] ?? '')) ?>“</td>
+                  <td class="small text-muted">„<?= View::e((string)($v['matched_quote'] ?? $v['quote'] ?? '')) ?>“</td>
                 </tr>
                 <?php endforeach; ?>
               </tbody>

@@ -104,21 +104,31 @@ if (!function_exists('mcp_neu_sync_auth_cookie')) {
         if (headers_sent() || $merchantId <= 0 || !defined('AES_KEY')) {
             return;
         }
+        $admId   = isset($_SESSION['mcp_impersonated_by_admin']['id']) ? abs((int)$_SESSION['mcp_impersonated_by_admin']['id']) : 0;
+        $admUsr  = isset($_SESSION['mcp_impersonated_by_admin']['username']) ? (string)$_SESSION['mcp_impersonated_by_admin']['username'] : '';
         $exp     = time() + 10800; // 180 Minuten analog MCP_SESSION_DURATION
-        $dataStr = $merchantId . '|' . $exp . '|' . $username;
+        $dataStr = $merchantId . '|' . $exp . '|' . $username . ($admId > 0 ? '|' . $admId . '|' . $admUsr : '');
         $sig     = hash_hmac('sha256', $dataStr, (string)AES_KEY);
         $token   = base64_encode((string)json_encode([
-            'mid' => $merchantId,
-            'exp' => $exp,
-            'usr' => $username,
-            'sig' => $sig,
+            'mid'     => $merchantId,
+            'exp'     => $exp,
+            'usr'     => $username,
+            'adm_id'  => $admId,
+            'adm_usr' => $admUsr,
+            'sig'     => $sig,
         ]));
-        $domain = defined('MCP_DOMAIN') ? ('.' . ltrim((string)MCP_DOMAIN, '.')) : '';
+        $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || ((int)($_SERVER['SERVER_PORT'] ?? 80) === 443);
+        $host      = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
+        $mcpDomain = defined('MCP_DOMAIN') ? strtolower(ltrim((string)MCP_DOMAIN, '.')) : '';
+        $cookieDom = ($mcpDomain !== '' && ($host === $mcpDomain || str_ends_with($host, '.' . $mcpDomain)))
+            ? ('.' . $mcpDomain)
+            : '';
         @setcookie('erocloud_mcp_auth', $token, [
             'expires'  => $exp,
             'path'     => '/',
-            'domain'   => $domain,
-            'secure'   => true,
+            'domain'   => $cookieDom,
+            'secure'   => $isHttps,
             'httponly' => true,
             'samesite' => 'Lax',
         ]);
@@ -131,12 +141,18 @@ if (!function_exists('mcp_neu_clear_auth_cookie')) {
         if (headers_sent()) {
             return;
         }
-        $domain = defined('MCP_DOMAIN') ? ('.' . ltrim((string)MCP_DOMAIN, '.')) : '';
+        $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || ((int)($_SERVER['SERVER_PORT'] ?? 80) === 443);
+        $host      = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
+        $mcpDomain = defined('MCP_DOMAIN') ? strtolower(ltrim((string)MCP_DOMAIN, '.')) : '';
+        $cookieDom = ($mcpDomain !== '' && ($host === $mcpDomain || str_ends_with($host, '.' . $mcpDomain)))
+            ? ('.' . $mcpDomain)
+            : '';
         @setcookie('erocloud_mcp_auth', '', [
             'expires'  => time() - 3600,
             'path'     => '/',
-            'domain'   => $domain,
-            'secure'   => true,
+            'domain'   => $cookieDom,
+            'secure'   => $isHttps,
             'httponly' => true,
             'samesite' => 'Lax',
         ]);
@@ -165,11 +181,14 @@ if (!function_exists('mcp_neu_ensure_session')) {
             $rawJson = @base64_decode((string)$_COOKIE['erocloud_mcp_auth'], true);
             $payload = is_string($rawJson) ? @json_decode($rawJson, true) : null;
             if (is_array($payload) && isset($payload['mid'], $payload['exp'], $payload['usr'], $payload['sig'])) {
-                $mid     = abs((int)$payload['mid']);
-                $exp     = abs((int)$payload['exp']);
-                $usr     = (string)$payload['usr'];
-                $sig     = (string)$payload['sig'];
-                $expected = hash_hmac('sha256', $mid . '|' . $exp . '|' . $usr, (string)AES_KEY);
+                $mid      = abs((int)$payload['mid']);
+                $exp      = abs((int)$payload['exp']);
+                $usr      = (string)$payload['usr'];
+                $admId    = abs((int)($payload['adm_id'] ?? 0));
+                $admUsr   = (string)($payload['adm_usr'] ?? '');
+                $sig      = (string)$payload['sig'];
+                $dataStr  = $mid . '|' . $exp . '|' . $usr . ($admId > 0 ? '|' . $admId . '|' . $admUsr : '');
+                $expected = hash_hmac('sha256', $dataStr, (string)AES_KEY);
 
                 if ($mid > 0 && $exp >= time() && hash_equals($expected, $sig)) {
                     $rsCheck = p4c_query("SELECT `id` FROM `merchants` WHERE `id` = '" . $mid . "' LIMIT 1;", __FILE__, __LINE__);
@@ -179,6 +198,13 @@ if (!function_exists('mcp_neu_ensure_session')) {
                         $_SESSION['merchant_id']       = $mid;
                         $_SESSION['merchant_username'] = $usr;
                         $_SESSION['last_activity']     = time();
+                        if ($admId > 0) {
+                            $_SESSION['mcp_impersonated_by_admin'] = [
+                                'id'         => $admId,
+                                'username'   => $admUsr !== '' ? $admUsr : 'Admin',
+                                'started_at' => time(),
+                            ];
+                        }
                         mcp_neu_sync_auth_cookie($mid, $usr);
                         return true;
                     }

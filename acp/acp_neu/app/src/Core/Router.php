@@ -188,6 +188,7 @@ class Router
         self::register('merchants', $merchantsCtrl, 'list', 'merchants');
         self::register('merchant', $merchantsCtrl, 'detail', 'merchants');
         self::register('merchants/save-settings', $merchantsCtrl, 'saveSettings', 'merchants');
+        self::register('merchants/impersonate', $merchantsCtrl, 'impersonate', 'merchants');
 
         // 9. Cloud-User (users)
         self::register('users', $usersCtrl, 'list', 'users');

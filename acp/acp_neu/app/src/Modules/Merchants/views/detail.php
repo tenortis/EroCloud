@@ -16,12 +16,15 @@ use App\Core\View;
  * @var array<int, array<string, mixed>> $recentMovies
  * @var array<int, array<string, mixed>> $coActors
  * @var array<int, array<string, mixed>> $history
+ * @var bool $canImpersonate
  */
 
-$mid       = (int)$merchant['id'];
-$partnerId = (string)$merchant['partner_id'];
-$minLimit  = max(1, (int)$merchant['actors_count']);
-$curLimit  = max($minLimit, (int)$merchant['min_profiles_limit']);
+$mid            = (int)$merchant['id'];
+$partnerId      = (string)$merchant['partner_id'];
+$minLimit       = max(1, (int)$merchant['actors_count']);
+$curLimit       = max($minLimit, (int)$merchant['min_profiles_limit']);
+$canImpersonate = !empty($canImpersonate);
+$merchDisplay   = $merchant['username'] !== '' ? (string)$merchant['username'] : ('Merchant #' . $mid);
 ?>
 <div class="container-fluid py-3 px-3 px-xl-4" data-page-width="full">
 
@@ -48,6 +51,14 @@ $curLimit  = max($minLimit, (int)$merchant['min_profiles_limit']);
     </div>
 
     <div class="d-flex flex-wrap align-items-center gap-2">
+      <?php if ($canImpersonate): ?>
+        <button type="button"
+                class="btn btn-sm btn-primary-kkc fw-semibold"
+                title="In die Partner-Session (MCP) von <?= View::e($merchDisplay) ?> (MID #<?= $mid ?>) einloggen"
+                onclick="App.Merchants.impersonateMerchant(<?= $mid ?>, '<?= View::e(addslashes($merchDisplay)) ?>')">
+          <i class="bi bi-box-arrow-in-right me-1"></i>Session übernehmen (Als Partner einloggen)
+        </button>
+      <?php endif; ?>
       <?php if (!empty($merchant['p4c_acp_url'])): ?>
         <a href="<?= View::e((string)$merchant['p4c_acp_url']) ?>" target="_blank" rel="noopener" class="btn btn-sm btn-outline-kkc">
           <i class="bi bi-box-arrow-up-right me-1"></i>In Pay4Coins öffnen
@@ -278,6 +289,13 @@ $curLimit  = max($minLimit, (int)$merchant['min_profiles_limit']);
 
             <h3 class="small fw-bold text-uppercase text-muted mb-2">Schnellzugriffe für diesen Händler</h3>
             <div class="d-grid gap-2">
+              <?php if ($canImpersonate): ?>
+                <button type="button"
+                        class="btn btn-sm btn-primary-kkc text-start fw-semibold"
+                        onclick="App.Merchants.impersonateMerchant(<?= $mid ?>, '<?= View::e(addslashes($merchDisplay)) ?>')">
+                  <i class="bi bi-box-arrow-in-right me-2"></i>In die Partner-Session (MCP) von <?= View::e($merchDisplay) ?> einloggen
+                </button>
+              <?php endif; ?>
               <a href="#/actors?merchant_id=<?= $mid ?>" class="btn btn-sm btn-outline-kkc text-start">
                 <i class="bi bi-person-bounding-box me-2 ec-text-primary"></i>Alle Darsteller-Profile von MID #<?= $mid ?> im Profil-Manager öffnen
               </a>

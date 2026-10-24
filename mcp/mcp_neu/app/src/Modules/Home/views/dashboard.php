@@ -63,6 +63,36 @@ $singleCreatorProfileName = (count($actorNamesSummary) === 1) ? $actorNamesSumma
 <!-- Benachrichtigungs-Banner oben bei neuen Antworten von Martin aus der Entwicklung -->
 <div id="ec-feedback-top-alert-container" class="d-none mb-4"></div>
 
+<?php if (empty($hasSentFeedback)): ?>
+<!-- Hinweis-Banner für den neuen Partnerbereich im Testlauf (verschwindet automatisch, sobald die erste Nachricht gesendet wurde) -->
+<div id="ec-testphase-top-banner" class="alert border-0 shadow-sm rounded-4 mb-4 p-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-3" style="cursor: pointer; background: linear-gradient(135deg, rgba(66, 151, 215, 0.14) 0%, rgba(2, 132, 199, 0.06) 100%); border-left: 4px solid var(--kkc-primary) !important;">
+  <div class="d-flex align-items-center gap-3" style="max-width: 820px;">
+    <div class="position-relative flex-shrink-0">
+      <img src="assets/img/ceo-150x150.jpg"
+           onerror="this.onerror=null;this.src='https://erocms.net/images/ceo-150x150.jpg';"
+           alt="Martin Zimmermann"
+           class="rounded-circle border border-2 border-white shadow-sm object-fit-cover"
+           style="width: 48px; height: 48px;">
+      <span class="position-absolute" style="bottom: -2px; right: -2px; font-size: 1rem; line-height: 1;">👋</span>
+    </div>
+    <div>
+      <div class="fw-bold text-body" style="font-size: 0.96rem;">
+        <span class="badge ec-bg-primary-subtle ec-text-primary border border-primary border-opacity-25 me-1">
+          <i class="bi bi-stars me-1"></i>Neuer Partnerbereich im Testlauf
+        </span>
+        Dir fällt ein Fehler auf oder du hast Wünsche, Ideen oder Feedback?
+      </div>
+      <div class="text-muted small mt-1" style="line-height: 1.45;">
+        Dieser neue Partnerbereich befindet sich aktuell noch im Test – daher kann es vereinzelt noch zu kleinen Fehlern kommen. Wenn etwas nicht funktioniert oder du mir Ideen, Wünsche oder Feedback mitteilen möchtest, kannst du mir ganz unten auf dieser Seite direkt schreiben!
+      </div>
+    </div>
+  </div>
+  <button type="button" class="btn btn-sm btn-primary-kkc rounded-pill px-3 py-2 fw-semibold shadow-sm flex-shrink-0" id="ec-testphase-scroll-btn">
+    <i class="bi bi-arrow-down-circle-fill me-1"></i>Nach unten zum Feedback
+  </button>
+</div>
+<?php endif; ?>
+
 <?php if ($needsRulesAccept): ?>
 <!-- Wichtiger Hinweis: Nutzungsrichtlinien noch nicht bestätigt -->
 <div class="card-kkc border-primary mb-4" style="border-width: 2px;">

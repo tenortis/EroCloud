@@ -151,12 +151,13 @@ use App\Core\View;
             <th style="width: 150px;">Geplant für</th>
             <th style="width: 120px;">Speicherplatz</th>
             <th style="width: 130px;">Sprache / Kat.</th>
+            <th class="text-end" style="width: 145px;">Aktion</th>
           </tr>
         </thead>
         <tbody>
           <?php if (empty($drafts)): ?>
           <tr>
-            <td colspan="8" class="text-center py-5 text-muted">
+            <td colspan="9" class="text-center py-5 text-muted">
               <i class="bi bi-clock-history fs-2 d-block mb-2 opacity-50"></i>
               Aktuell befinden sich keine Filme in Planung.
             </td>
@@ -180,7 +181,7 @@ use App\Core\View;
             ?>
             <tr class="md-draft-row" data-state="<?= $filterState ?>" data-search="<?= View::e($searchStr) ?>">
               <td>
-                <span class="fw-bold font-monospace text-body d-block">#<?= $id ?></span>
+                <a href="#/movie-draft?id=<?= $id ?>" class="fw-bold font-monospace ec-text-primary text-decoration-none d-block">#<?= $id ?></a>
                 <a href="#/merchant?id=<?= $mid ?>" class="small text-muted text-decoration-none font-monospace">MID #<?= $mid ?></a>
               </td>
 
@@ -216,9 +217,9 @@ use App\Core\View;
               </td>
 
               <td>
-                <div class="fw-bold text-body">
+                <a href="#/movie-draft?id=<?= $id ?>" class="fw-bold text-body text-decoration-none d-block">
                   <?= View::e((string)$d['title'] ?: '(Noch kein Titel vergeben)') ?>
-                </div>
+                </a>
                 <small class="text-muted font-monospace">
                   <?= View::e((string)$d['resolution'] ?: '-') ?> &bull; <?= View::e((string)$d['playtime_str'] ?: '-') ?>
                   <?php if ($fileId !== ''): ?>
@@ -258,6 +259,12 @@ use App\Core\View;
                 <?php else: ?>
                   <span class="text-muted small">-</span>
                 <?php endif; ?>
+              </td>
+
+              <td class="text-end">
+                <a href="#/movie-draft?id=<?= $id ?>" class="btn btn-sm btn-outline-kkc" title="Film-Entwurf im Nur-Lesen-Modus ansehen">
+                  <i class="bi bi-eye me-1"></i> Ansehen
+                </a>
               </td>
             </tr>
             <?php endforeach; ?>

@@ -17,6 +17,7 @@ use App\Core\View;
 $curSearch  = (string)($filters['q'] ?? '');
 $curStatus  = (string)($filters['status'] ?? 'all');
 $curCat     = (string)($filters['cat'] ?? 'all');
+$curBram    = (string)($filters['bram'] ?? 'all');
 $curSort    = (string)($filters['sort'] ?? 'id_desc');
 $curPage    = (int)($filters['page'] ?? 1);
 $curPerPage = (int)($filters['per_page'] ?? 100);
@@ -127,7 +128,7 @@ $totalPages = (int)($filters['total_page'] ?? 1);
   <div class="card-kkc mb-3">
     <div class="card-kkc-body py-3">
       <form id="pao-filter-form" onsubmit="event.preventDefault(); App.applyPhotoAlbumsOnlineFilters();" class="row g-2 align-items-end">
-        <div class="col-xl-4 col-md-6">
+        <div class="col-xl-3 col-md-6">
           <label class="form-label small text-muted mb-1">Server-Suche (Titel, Album-Hash, Darsteller, ID, Merchant-ID)</label>
           <div class="input-group input-group-sm">
             <span class="input-group-text bg-transparent"><i class="bi bi-search"></i></span>
@@ -150,16 +151,25 @@ $totalPages = (int)($filters['total_page'] ?? 1);
           </select>
         </div>
 
-        <div class="col-xl-2 col-md-3 col-6">
-          <label class="form-label small text-muted mb-1">Hauptkategorie</label>
+        <div class="col-xl-1 col-md-3 col-6">
+          <label class="form-label small text-muted mb-1">Kategorie</label>
           <select id="pao-filter-cat" class="form-select form-select-sm" onchange="App.applyPhotoAlbumsOnlineFilters()">
-            <option value="all" <?= $curCat === 'all' ? 'selected' : '' ?>>Alle Kategorien</option>
+            <option value="all" <?= $curCat === 'all' ? 'selected' : '' ?>>Alle</option>
             <option value="porn" <?= $curCat === 'porn' ? 'selected' : '' ?>>Porno (<?= (int)$kpis['porn'] ?>)</option>
             <option value="fetish" <?= $curCat === 'fetish' ? 'selected' : '' ?>>Fetisch (<?= (int)$kpis['fetish'] ?>)</option>
           </select>
         </div>
 
-        <div class="col-xl-2 col-md-4 col-6">
+        <div class="col-xl-2 col-md-3 col-6">
+          <label class="form-label small text-muted mb-1">BRAM-Status</label>
+          <select id="pao-filter-bram" class="form-select form-select-sm" onchange="App.applyPhotoAlbumsOnlineFilters()">
+            <option value="all" <?= $curBram === 'all' ? 'selected' : '' ?>>Alle BRAM-Status</option>
+            <option value="green" <?= $curBram === 'green' ? 'selected' : '' ?>>Unbedenklich (Grün)</option>
+            <option value="attention" <?= $curBram === 'attention' ? 'selected' : '' ?>>Hinweis / Verstoß</option>
+          </select>
+        </div>
+
+        <div class="col-xl-2 col-md-3 col-6">
           <label class="form-label small text-muted mb-1">Sortierung</label>
           <select id="pao-filter-sort" class="form-select form-select-sm" onchange="App.applyPhotoAlbumsOnlineFilters()">
             <option value="id_desc" <?= $curSort === 'id_desc' ? 'selected' : '' ?>>Online-ID (Neueste zuerst)</option>
@@ -263,11 +273,11 @@ $totalPages = (int)($filters['total_page'] ?? 1);
                   $statusBadge = '<span class="badge-kkc badge-kkc-danger"><i class="bi bi-trash-fill me-1"></i>Gelöscht</span>';
               }
 
-              $bramBadge = '<span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-shield-check me-1"></i>OK</span>';
-              if ($a['bram_compliance'] === 'red') {
-                  $bramBadge = '<span class="badge bg-danger text-white" title="' . View::e((string)$a['bram_summary']) . '"><i class="bi bi-shield-exclamation me-1"></i>STOP (' . (int)$a['bram_score'] . ')</span>';
-              } elseif ($a['bram_compliance'] === 'yellow') {
-                  $bramBadge = '<span class="badge bg-warning text-dark" title="' . View::e((string)$a['bram_summary']) . '"><i class="bi bi-exclamation-triangle me-1"></i>WARN (' . (int)$a['bram_score'] . ')</span>';
+              $bramBadge = '<span class="badge-kkc badge-kkc-success" title="' . View::e((string)$a['bram_summary']) . '"><i class="bi bi-shield-check me-1"></i>Grün (' . (int)$a['bram_score'] . ')</span>';
+              if (in_array((string)$a['bram_compliance'], ['violation', 'red'], true)) {
+                  $bramBadge = '<span class="badge-kkc badge-kkc-danger" title="' . View::e((string)$a['bram_summary']) . '"><i class="bi bi-shield-exclamation me-1"></i>Verstoß (' . (int)$a['bram_score'] . ')</span>';
+              } elseif (in_array((string)$a['bram_compliance'], ['warning', 'yellow'], true)) {
+                  $bramBadge = '<span class="badge-kkc badge-kkc-warning" title="' . View::e((string)$a['bram_summary']) . '"><i class="bi bi-exclamation-triangle me-1"></i>Hinweis (' . (int)$a['bram_score'] . ')</span>';
               }
 
               $posterAlbumId = (int)$a['album_db_id'] > 0 ? (int)$a['album_db_id'] : (int)$a['id'];

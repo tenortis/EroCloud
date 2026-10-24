@@ -4345,6 +4345,27 @@ const App = {
     const successTitle = document.getElementById('ec-feedback-success-title');
     const successText = document.getElementById('ec-feedback-success-text');
     const resetBtn = document.getElementById('ec-feedback-reset-btn');
+    const testphaseBanner = document.getElementById('ec-testphase-top-banner');
+    const feedbackCard = document.getElementById('ec-creator-feedback-card');
+
+    // Klick auf das obere Testlauf-Hinweis-Banner -> Scrollt weich nach unten zur Feedback-Box
+    if (testphaseBanner) {
+      testphaseBanner.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        const scrollTarget = feedbackCard || formEl;
+        scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (feedbackCard) {
+          feedbackCard.classList.remove('ec-fb-read-pulse');
+          void feedbackCard.offsetWidth;
+          feedbackCard.classList.add('ec-fb-read-pulse');
+        }
+        setTimeout(() => {
+          if (messageEl && !formEl.classList.contains('d-none')) {
+            messageEl.focus({ preventScroll: true });
+          }
+        }, 450);
+      });
+    }
 
     let selectedFiles = [];
     const maxFiles = 3;
@@ -4618,15 +4639,18 @@ const App = {
 
       const actionFooterHtml = `
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-2 pt-2 border-top" style="border-color: var(--kkc-border) !important;">
-          <div>
+          <div class="d-flex align-items-center flex-wrap gap-2">
             ${isUnreadReply ? `
-              <button type="button" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-semibold ec-fb-mark-read-btn" data-id="${ticketId}" style="font-size: 0.78rem;">
+              <button type="button" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-semibold shadow-sm ec-fb-mark-read-btn" data-id="${ticketId}" style="font-size: 0.78rem;">
                 <i class="bi bi-check2-circle me-1"></i>Gelesen &amp; verstanden – Danke!
               </button>
             ` : (hasReply ? `
               <span class="text-success small fw-semibold" style="font-size: 0.76rem;">
                 <i class="bi bi-check2-all me-1"></i>Von dir gelesen${item.reply_read_formatted ? ` am ${this.escapeHtml(item.reply_read_formatted)} Uhr` : ''}
               </span>
+              <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-1 ec-fb-mark-unread-btn" data-id="${ticketId}" style="font-size: 0.72rem;" title="Nachricht wieder als ungelesen markieren und nach oben in die aktive Liste holen">
+                <i class="bi bi-arrow-counterclockwise me-1"></i>Als ungelesen markieren
+              </button>
             ` : `
               <span class="text-muted small" style="font-size: 0.75rem;">
                 <i class="bi bi-hourglass-split me-1"></i>Sobald Martin geantwortet hat, wirst du hier benachrichtigt.
@@ -4674,13 +4698,14 @@ const App = {
       `;
 
       return `
-        <div class="p-3 rounded-3 border shadow-sm ec-fb-history-item" data-item-id="${ticketId}" style="background-color: var(--kkc-surface); border-color: ${isUnreadReply ? '#10B981' : 'var(--kkc-border)'} !important;">
+        <div class="p-3 rounded-3 border shadow-sm ec-fb-history-item" id="ec-fb-history-item-${ticketId}" data-item-id="${ticketId}" style="background-color: var(--kkc-surface); border-color: ${isUnreadReply ? '#10B981' : 'var(--kkc-border)'} !important; ${isUnreadReply ? 'border-width: 2px !important;' : ''}">
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
             <div class="d-flex align-items-center flex-wrap gap-2">
               <span class="badge bg-secondary bg-opacity-10 text-secondary border font-monospace">#${ticketId}</span>
               ${catBadge}
               ${statusBadge}
               ${msgCount > 1 ? `<span class="badge bg-primary bg-opacity-10 ec-text-primary border border-primary border-opacity-25"><i class="bi bi-chat-dots me-1"></i>${msgCount} Nachrichten</span>` : ''}
+              ${isUnreadReply ? '<span class="badge rounded-pill bg-danger px-2 py-1"><i class="bi bi-stars me-1"></i>NEUE ANTWORT</span>' : ''}
             </div>
             <span class="text-muted" style="font-size: 0.76rem;"><i class="bi bi-clock me-1"></i>Erstellt am ${this.escapeHtml(item.created_at_formatted || '')} Uhr</span>
           </div>
@@ -4761,11 +4786,43 @@ const App = {
 
         if (resp.items.length === 0) {
           historyWrap.classList.add('d-none');
-          if (topAlertContainer) topAlertContainer.innerHTML = '';
+          if (topAlertContainer) {
+            topAlertContainer.innerHTML = '';
+            topAlertContainer.classList.add('d-none');
+          }
           return;
         }
 
-        const unreadCount = parseInt(resp.unread_count ?? resp.unread_replies ?? 0, 10);
+        // Sobald mindestens eine gesendete Nachricht vorliegt, das obere Testlauf-Hinweis-Banner ausblenden
+        if (testphaseBanner) {
+          testphaseBanner.classList.add('d-none');
+        }
+
+        const activeHtmlParts = [];
+        const readHtmlParts = [];
+        const unreadItemIds = [];
+
+        resp.items.forEach(item => {
+          const hasAdminInThread = Array.isArray(item.messages) && item.messages.some(m => m && m.sender === 'admin' && String(m.message || '').trim() !== '');
+          const hasReply = Boolean(item.has_reply || (item.admin_reply && String(item.admin_reply).trim() !== '') || hasAdminInThread);
+          const isUnreadReply = hasReply && (typeof item.is_unread_reply !== 'undefined' ? Boolean(item.is_unread_reply) : !item.reply_read_at);
+          if (isUnreadReply) {
+            unreadItemIds.push(parseInt(item.id, 10));
+          }
+          const lastSender = String(item.last_sender || (hasReply ? 'admin' : 'creator'));
+          const isReadArchived = (item.status === 'resolved' && !isUnreadReply) || (hasReply && !isUnreadReply && lastSender === 'admin');
+          const cardHtml = renderFeedbackItemCard({ ...item, has_reply: hasReply }, isUnreadReply);
+
+          if (isReadArchived) {
+            readHtmlParts.push(cardHtml);
+          } else {
+            activeHtmlParts.push(cardHtml);
+          }
+        });
+
+        const unreadCount = Math.max(parseInt(resp.unread_count ?? resp.unread_replies ?? 0, 10) || 0, unreadItemIds.length);
+        const firstUnreadId = unreadItemIds[0] || 0;
+
         if (unreadBadge) {
           if (unreadCount > 0) {
             unreadBadge.textContent = unreadCount === 1 ? '1 neue Antwort' : `${unreadCount} neue Antworten`;
@@ -4779,53 +4836,52 @@ const App = {
         if (topAlertContainer) {
           if (unreadCount > 0) {
             topAlertContainer.innerHTML = `
-              <div class="alert border-0 shadow-sm rounded-4 mb-4 p-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-3" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.14) 0%, rgba(2, 132, 199, 0.12) 100%); border-left: 4px solid #10B981 !important;">
+              <div class="alert border-0 shadow-sm rounded-4 mb-0 p-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-3" id="ec-feedback-top-banner-click" data-target-id="${firstUnreadId}" style="cursor: pointer; background: linear-gradient(135deg, rgba(16, 185, 129, 0.14) 0%, rgba(2, 132, 199, 0.12) 100%); border-left: 4px solid #10B981 !important;">
                 <div class="d-flex align-items-center gap-3">
                   <div class="position-relative flex-shrink-0">
-                    <img src="assets/img/ceo-150x150.jpg" onerror="this.onerror=null;this.src='https://erocms.net/images/ceo-150x150.jpg';" alt="Martin Zimmermann" class="rounded-circle border border-2 border-white shadow-sm object-fit-cover" style="width: 46px; height: 46px;">
-                    <span class="position-absolute bottom-0 end-0 bg-success border border-white rounded-circle" style="width: 12px; height: 12px;"></span>
+                    <img src="assets/img/ceo-150x150.jpg" onerror="this.onerror=null;this.src='https://erocms.net/images/ceo-150x150.jpg';" alt="Martin Zimmermann" class="rounded-circle border border-2 border-white shadow-sm object-fit-cover" style="width: 48px; height: 48px;">
+                    <span class="position-absolute bottom-0 end-0 bg-success border border-white rounded-circle" style="width: 13px; height: 13px;"></span>
                   </div>
                   <div>
-                    <div class="fw-bold text-body">
-                      <span class="badge bg-success me-1">Neu</span>
-                      Du hast ${unreadCount === 1 ? 'eine persönliche Antwort' : `${unreadCount} persönliche Antworten`} von Martin Zimmermann erhalten!
+                    <div class="fw-bold text-body" style="font-size: 0.98rem;">
+                      <span class="badge bg-success me-1"><i class="bi bi-envelope-paper-heart-fill me-1"></i>Neue Nachricht</span>
+                      ${unreadCount === 1
+                        ? 'Du hast eine neue Antwort auf deine Nachricht erhalten!'
+                        : `Du hast ${unreadCount} neue Antworten auf deine Nachrichten erhalten!`}
                     </div>
-                    <div class="text-muted small">Zu deiner Meldung aus dem EroCloud-Testlauf liegt eine Rückmeldung vor.</div>
+                    <div class="text-muted small mt-1">
+                      Martin Zimmermann hat dir auf deine Meldung geantwortet. Klicke hier, um direkt nach unten zu deiner Antwort zu springen.
+                    </div>
                   </div>
                 </div>
-                <button type="button" class="btn btn-sm btn-success rounded-pill px-3 py-2 fw-semibold shadow-sm" id="ec-jump-to-feedback-reply-btn">
-                  <i class="bi bi-chat-dots-fill me-1"></i>Antwort jetzt lesen
+                <button type="button" class="btn btn-sm btn-success rounded-pill px-3 py-2 fw-semibold shadow-sm flex-shrink-0" id="ec-jump-to-feedback-reply-btn">
+                  <i class="bi bi-arrow-down-circle-fill me-1"></i>Antwort jetzt lesen
                 </button>
               </div>
             `;
+            topAlertContainer.classList.remove('d-none');
 
-            const jumpBtn = document.getElementById('ec-jump-to-feedback-reply-btn');
-            if (jumpBtn) {
-              jumpBtn.addEventListener('click', () => {
-                historyWrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const bannerEl = document.getElementById('ec-feedback-top-banner-click');
+            if (bannerEl) {
+              bannerEl.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                const targetCard = firstUnreadId
+                  ? document.getElementById(`ec-fb-history-item-${firstUnreadId}`)
+                  : null;
+                const scrollTarget = targetCard || historyWrap;
+                scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (targetCard) {
+                  targetCard.classList.remove('ec-fb-read-pulse');
+                  void targetCard.offsetWidth;
+                  targetCard.classList.add('ec-fb-read-pulse');
+                }
               });
             }
           } else {
             topAlertContainer.innerHTML = '';
+            topAlertContainer.classList.add('d-none');
           }
         }
-
-        const activeHtmlParts = [];
-        const readHtmlParts = [];
-
-        resp.items.forEach(item => {
-          const hasReply = Boolean(item.has_reply || (item.admin_reply && String(item.admin_reply).trim() !== ''));
-          const isUnreadReply = hasReply && (typeof item.is_unread_reply !== 'undefined' ? Boolean(item.is_unread_reply) : !item.reply_read_at);
-          const lastSender = String(item.last_sender || (hasReply ? 'admin' : 'creator'));
-          const isReadArchived = (item.status === 'resolved' && !isUnreadReply) || (hasReply && !isUnreadReply && lastSender === 'admin');
-          const cardHtml = renderFeedbackItemCard(item, isUnreadReply);
-
-          if (isReadArchived) {
-            readHtmlParts.push(cardHtml);
-          } else {
-            activeHtmlParts.push(cardHtml);
-          }
-        });
 
         historyList.innerHTML = activeHtmlParts.join('');
         readList.innerHTML = readHtmlParts.join('');
@@ -5002,6 +5058,37 @@ const App = {
             }
           });
         });
+
+        // Klick-Handler für „Als ungelesen markieren"
+        historyWrap.querySelectorAll('.ec-fb-mark-unread-btn').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const fbId = parseInt(btn.getAttribute('data-id') || '0', 10);
+            if (!fbId) return;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Wird zurückgesetzt...';
+
+            try {
+              const fd = new FormData();
+              fd.append('feedback_id', String(fbId));
+              fd.append('csrf_token', this.csrfToken);
+
+              const r = await fetch(`${this.basePath}/api.php?route=home/feedback-mark-unread`, {
+                method: 'POST',
+                body: fd
+              });
+              const resUnread = await r.json();
+              if (resUnread && resUnread.success) {
+                loadCreatorFeedbackHistory();
+              } else {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-arrow-counterclockwise me-1"></i>Als ungelesen markieren';
+              }
+            } catch (_) {
+              btn.disabled = false;
+              btn.innerHTML = '<i class="bi bi-arrow-counterclockwise me-1"></i>Als ungelesen markieren';
+            }
+          });
+        });
       } catch (_) {
         // Silent fail on history fetch
       }
@@ -5048,6 +5135,9 @@ const App = {
         const resp = await res.json();
 
         if (res.ok && resp && resp.success) {
+          if (testphaseBanner) {
+            testphaseBanner.classList.add('d-none');
+          }
           formEl.classList.add('d-none');
           if ((resp.title || resp.creator_title) && successTitle) {
             successTitle.textContent = resp.title || resp.creator_title;

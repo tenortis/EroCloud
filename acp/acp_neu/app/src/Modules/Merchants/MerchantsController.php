@@ -39,6 +39,21 @@ final class MerchantsController
     }
 
     /**
+     * Prüft, ob der eingeloggte Mitarbeiter ein Administrator ist (rule === 'write' bzw. ursprünglicher Admin bei Mitarbeiter-Session-Übernahme)
+     * und somit die Berechtigung hat, sich in die Session eines Partners einzuloggen.
+     */
+    private function canImpersonateMerchant(): bool
+    {
+        $currentEmployeeRule = strtolower(trim((string)($_SESSION['employee_rule'] ?? '')));
+        $impersonator        = isset($_SESSION['impersonator_employee']) && is_array($_SESSION['impersonator_employee'])
+            ? $_SESSION['impersonator_employee']
+            : null;
+
+        return ($currentEmployeeRule === 'write')
+            || (is_array($impersonator) && strtolower((string)($impersonator['rule'] ?? '')) === 'write');
+    }
+
+    /**
      * Konvertiert potenziell ISO-8859-1-codierte DB-Strings sicher nach UTF-8
      */
     private function toUtf8(?string $str): string
@@ -389,13 +404,14 @@ final class MerchantsController
         }
 
         return View::render('Merchants', 'list', [
-            'kpi'           => $kpi,
-            'merchants'     => $merchants,
-            'totalFiltered' => $totalFiltered,
-            'page'          => $page,
-            'perPage'       => $perPage,
-            'totalPages'    => $totalPages,
-            'filters'       => [
+            'kpi'            => $kpi,
+            'merchants'      => $merchants,
+            'totalFiltered'  => $totalFiltered,
+            'page'           => $page,
+            'perPage'        => $perPage,
+            'totalPages'     => $totalPages,
+            'canImpersonate' => $this->canImpersonateMerchant(),
+            'filters'        => [
                 'rules'    => $rulesFilter,
                 'activity' => $activityFilter,
                 'q'        => $searchQuery,
@@ -684,14 +700,15 @@ final class MerchantsController
         ];
 
         return View::render('Merchants', 'detail', [
-            'merchant'     => $merchant,
-            'prevId'       => $prevId,
-            'nextId'       => $nextId,
-            'actors'       => $actors,
-            'movieSummary' => $movieSummary,
-            'recentMovies' => $recentMovies,
-            'coActors'     => $coActors,
-            'history'      => $history,
+            'merchant'       => $merchant,
+            'prevId'         => $prevId,
+            'nextId'         => $nextId,
+            'actors'         => $actors,
+            'movieSummary'   => $movieSummary,
+            'recentMovies'   => $recentMovies,
+            'coActors'       => $coActors,
+            'history'        => $history,
+            'canImpersonate' => $this->canImpersonateMerchant(),
         ]);
     }
 
@@ -751,6 +768,114 @@ final class MerchantsController
             'status'                        => 'ok',
             'message'                       => 'Händler-Einstellungen (Max. ' . $finalLimit . ' Darsteller-Profile) erfolgreich gespeichert.',
             'minimum_number_actor_profiles' => $finalLimit,
+        ]);
+    }
+
+    // =========================================================================
+    // 4. Session eines Partners (Merchants) übernehmen (POST ?route=merchants/impersonate)
+    // =========================================================================
+    public function impersonate(): void
+    {
+        if (!$this->request->isPost()) {
+            Response::error('Ungültige Anfrage-Methode.', 405);
+            return;
+        }
+
+        if (!Csrf::validate($this->request->csrfToken())) {
+            Response::error('Dein Sicherheitstoken (CSRF) ist abgelaufen. Bitte lade die Seite neu.', 403);
+            return;
+        }
+
+        if (!$this->canImpersonateMerchant()) {
+            Response::error('Nur Administratoren mit Schreibberechtigung (`write`) dürfen sich in die Session eines Partners einloggen.', 403);
+            return;
+        }
+
+        $merchantId  = abs((int)$this->request->post('merchant_id', 0));
+        $targetRoute = trim((string)$this->request->post('target_route', 'startseite')) ?: 'startseite';
+
+        if ($merchantId <= 0) {
+            Response::error('Ungültige Partner-ID (MID).', 400);
+            return;
+        }
+
+        $aesKeyEsc = defined('AES_KEY') ? p4c_escape_string((string)AES_KEY) : '';
+        $rsMerch   = p4c_query(
+            "SELECT
+                m.`id`,
+                m.`partner_id`,
+                AES_DECRYPT(m.`username`, '" . $aesKeyEsc . "') AS `dec_username`
+             FROM `merchants` m
+             WHERE m.`id` = '" . $merchantId . "'
+             LIMIT 1;",
+            __FILE__,
+            __LINE__
+        );
+
+        if (!$rsMerch || p4c_num_rows($rsMerch) === 0) {
+            Response::error('Der ausgewählte Partner-Account wurde nicht gefunden.', 404);
+            return;
+        }
+
+        $mRow         = p4c_fetch_object($rsMerch);
+        $partnerId    = $this->toUtf8((string)($mRow->partner_id ?? ''));
+        $merchantName = $this->toUtf8((string)($mRow->dec_username ?? ''));
+        if ($merchantName === '') {
+            $merchantName = 'Merchant #' . $merchantId;
+        }
+
+        $impersonator = isset($_SESSION['impersonator_employee']) && is_array($_SESSION['impersonator_employee'])
+            ? $_SESSION['impersonator_employee']
+            : null;
+        $adminId   = is_array($impersonator) && !empty($impersonator['id'])
+            ? abs((int)$impersonator['id'])
+            : abs((int)($_SESSION['employee_id'] ?? 0));
+        $adminName = is_array($impersonator) && !empty($impersonator['username'])
+            ? (string)$impersonator['username']
+            : (string)($_SESSION['employee_username'] ?? 'Admin');
+
+        if (!class_exists('EroCloudMagicLink') && defined('SOURCEDIR') && file_exists(SOURCEDIR . '/includes/klassen/EroCloudMagicLink.inc.php')) {
+            include_once SOURCEDIR . '/includes/klassen/EroCloudMagicLink.inc.php';
+        }
+
+        if (!class_exists('EroCloudMagicLink')) {
+            Response::error('Das Magic-Link-System für den Partner-Auto-Login konnte nicht geladen werden.', 500);
+            return;
+        }
+
+        $context  = 'admin:' . $adminId . ':' . $adminName;
+        $magicUrl = \EroCloudMagicLink::createUrl(
+            $merchantId,
+            $targetRoute,
+            'acp_impersonate',
+            $context,
+            120,
+            3,
+            false
+        );
+
+        // Falls ACP & MCP auf demselben Host (z. B. localhost) dieselbe PHP-Session nutzen,
+        // bereits jetzt die Partner-Session-Variablen setzen, ohne die ACP-Session zu überschreiben
+        $_SESSION['logged_in_as']      = 'merchant';
+        $_SESSION['merchant_id']       = $merchantId;
+        $_SESSION['merchant_username'] = $merchantName;
+        $_SESSION['mcp_impersonated_by_admin'] = [
+            'id'         => $adminId,
+            'username'   => $adminName,
+            'started_at' => time(),
+        ];
+
+        if (function_exists('log_action')) {
+            log_action("Partner-Session übernommen: Admin {$adminName} (#{$adminId}) hat sich in die MCP-Session von Partner {$merchantName} (MID #{$merchantId}, PID: {$partnerId}) eingeloggt.");
+        }
+
+        Response::json([
+            'status'       => 'ok',
+            'merchant_id'  => $merchantId,
+            'partner_id'   => $partnerId,
+            'username'     => $merchantName,
+            'redirect_url' => $magicUrl,
+            'message'      => "Partner-Session für „{$merchantName}“ (MID #{$merchantId}) wird geöffnet...",
         ]);
     }
 }

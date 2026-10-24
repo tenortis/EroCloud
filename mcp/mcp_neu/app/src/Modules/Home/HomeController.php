@@ -291,6 +291,16 @@ class HomeController
 
         $contentPending = $moviesPending + $albumsPending;
 
+        // 7. Prüfen, ob der Partner bereits mindestens eine Feedback-/Testlauf-Meldung gesendet hat
+        $hasSentFeedback = false;
+        $rsFbSent = p4c_query("SELECT `id` FROM `merchant_history`
+            WHERE `merchant_id` = '" . $merchantId . "'
+              AND `description` LIKE 'Feedback / Meldung an Entwicklung gesendet%'
+            LIMIT 1;", __FILE__, __LINE__);
+        if ($rsFbSent && p4c_num_rows($rsFbSent) > 0) {
+            $hasSentFeedback = true;
+        }
+
         // Darsteller-Profile nach aktuellstem Film-Upload sortieren (aktiv genutzte Profile zuerst, sonst alphabetisch)
         $sortedActors = array_values($actors);
         usort($sortedActors, static function (array $a, array $b): int {
@@ -310,6 +320,7 @@ class HomeController
             'surname'                   => $surname,
             'needsRulesAccept'          => $needsRulesAccept,
             'acceptContentRulesDate'    => $acceptContentRules,
+            'hasSentFeedback'           => $hasSentFeedback,
             'hasInactiveOrBlockedActor' => $hasInactiveOrBlockedActor,
             'canCreateActor'            => count($actors) < $minActorProfiles,
             'actors'                    => $sortedActors,
@@ -737,6 +748,50 @@ class HomeController
             'success'              => true,
             'feedback_id'          => $feedbackId,
             'reply_read_formatted' => date('d.m.Y \u\m H:i'),
+        ]);
+    }
+
+    /**
+     * Markiert eine bereits gelesene Entwickler-Antwort wieder als ungelesen
+     */
+    public function markFeedbackUnread(): void
+    {
+        if (!$this->request->isPost()) {
+            Response::json(['success' => false], 405);
+        }
+
+        $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
+        if ($merchantId <= 0) {
+            Response::json(['success' => false], 401);
+        }
+        @session_write_close();
+
+        $feedbackId = abs((int)$this->request->post('feedback_id', 0));
+        $now        = time();
+        $domain     = 'erocloud.net';
+        $creatorKey = 'ec_merchant_' . $merchantId;
+        $secret     = 'erocms_creator_feedback_v1_secret_2026';
+        $signature  = hash_hmac('sha256', 'mark_reply_unread|' . $domain . '|' . $feedbackId . '|' . $now, $secret);
+
+        $payload = [
+            'action'      => 'mark_reply_unread',
+            'domain'      => $domain,
+            'creator_key' => $creatorKey,
+            'feedback_id' => $feedbackId,
+            'timestamp'   => $now,
+            'signature'   => $signature,
+        ];
+
+        $result = $this->callFeedbackApi($payload, $signature, 6);
+        if (!empty($result['success'])) {
+            Response::json($result);
+        }
+
+        Response::json([
+            'success'              => true,
+            'feedback_id'          => $feedbackId,
+            'reply_read_at'        => null,
+            'reply_read_formatted' => '',
         ]);
     }
 

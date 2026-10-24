@@ -309,10 +309,10 @@ $totalPages = (int)($filters['total_page'] ?? 1);
                 $bramCls   = 'badge-kkc-neutral';
                 $bramText  = 'Offen';
                 if ($bramSt === 2) {
-                    if ($bramComp === 'green') {
+                    if (in_array($bramComp, ['ok', 'green'], true)) {
                         $bramCls  = 'badge-kkc-success';
                         $bramText = 'Grün (' . $bramScore . ')';
-                    } elseif ($bramComp === 'yellow') {
+                    } elseif (in_array($bramComp, ['warning', 'yellow'], true)) {
                         $bramCls  = 'badge-kkc-warning';
                         $bramText = 'Hinweis (' . $bramScore . ')';
                     } else {
