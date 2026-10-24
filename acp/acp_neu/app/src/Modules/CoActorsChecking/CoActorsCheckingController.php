@@ -504,6 +504,24 @@ final class CoActorsCheckingController
                 log_action('hat den 18+ ID-Check / Drehpartner #' . $coActorId . ' (' . $displayLabel . ', Merchant #' . $merchantId . ') als geprüft bestätigt');
             }
 
+            if ($merchantId > 0 && class_exists('EroCloudMailer')) {
+                try {
+                    $refCode   = (string)($ca['ref_code'] ?? sprintf('DP-%d-%03d', $merchantId, $coActorId));
+                    $roleLabel = !empty($ca['is_owner']) ? 'Account-Inhaber („Ich“)' : 'Drehpartner';
+                    $aliasName = trim((string)($ca['creator_name'] ?? ''));
+                    \EroCloudMailer::sendCoActorStatusNotification([
+                        'merchant_id' => $merchantId,
+                        'co_actor_id' => $coActorId,
+                        'status_type' => 'verified',
+                        'ref_code'    => $refCode,
+                        'role_label'  => $roleLabel,
+                        'alias_label' => $aliasName !== '' ? $aliasName : $refCode,
+                    ]);
+                } catch (\Throwable $e) {
+                    // Nicht-kritischer Fehler beim E-Mail-Versand
+                }
+            }
+
             Response::success([
                 'co_actor_id'    => $coActorId,
                 'checked_status' => 'verified',
@@ -535,6 +553,25 @@ final class CoActorsCheckingController
             );
             if (function_exists('log_action')) {
                 log_action('hat den 18+ ID-Check / Drehpartner #' . $coActorId . ' (' . $displayLabel . ', Merchant #' . $merchantId . ') abgelehnt: ' . $reason);
+            }
+
+            if ($merchantId > 0 && class_exists('EroCloudMailer')) {
+                try {
+                    $refCode   = (string)($ca['ref_code'] ?? sprintf('DP-%d-%03d', $merchantId, $coActorId));
+                    $roleLabel = !empty($ca['is_owner']) ? 'Account-Inhaber („Ich“)' : 'Drehpartner';
+                    $aliasName = trim((string)($ca['creator_name'] ?? ''));
+                    \EroCloudMailer::sendCoActorStatusNotification([
+                        'merchant_id' => $merchantId,
+                        'co_actor_id' => $coActorId,
+                        'status_type' => 'rejected',
+                        'ref_code'    => $refCode,
+                        'role_label'  => $roleLabel,
+                        'alias_label' => $aliasName !== '' ? $aliasName : $refCode,
+                        'reason_text' => $reason,
+                    ]);
+                } catch (\Throwable $e) {
+                    // Nicht-kritischer Fehler beim E-Mail-Versand
+                }
             }
 
             Response::success([

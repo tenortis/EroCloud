@@ -31,15 +31,21 @@ $impCeo         = htmlspecialchars((string)($imprint['imprint_ceo'] ?? 'Christin
 $impSupportMail = htmlspecialchars((string)($imprint['imprint_support_email'] ?? 'support@pay4coins.com'), ENT_QUOTES, 'UTF-8');
 $impExternalUrl = htmlspecialchars((string)($imprint['imprint_external_url'] ?? 'https://pay4coins.com/de/impressum'), ENT_QUOTES, 'UTF-8');
 
-$isSandboxMode = (!defined('MAIL_SANDBOX_MODE') || MAIL_SANDBOX_MODE === true);
+$smtpCfg          = class_exists('EroCloudMailer') ? EroCloudMailer::getSmtpConfig() : [];
+$isSandboxMode    = isset($smtpCfg['sandbox_mode']) ? (bool)$smtpCfg['sandbox_mode'] : (!defined('MAIL_SANDBOX_MODE') || MAIL_SANDBOX_MODE === true);
+$sandboxRecipient = !empty($smtpCfg['sandbox_recipient']) ? (string)$smtpCfg['sandbox_recipient'] : (defined('MAIL_SANDBOX_RECIPIENT') ? (string)MAIL_SANDBOX_RECIPIENT : 'erocms@gmail.com');
 
 $sandboxBannerHtml = '';
 if ($isSandboxMode && ($tplIntendedTo !== '' || $tplMerchantId > 0)) {
-    $safeIntended = htmlspecialchars($tplIntendedTo !== '' ? $tplIntendedTo : 'unbekannt', ENT_QUOTES, 'UTF-8');
-    $safeCreator  = htmlspecialchars($tplCreatorName !== '' ? $tplCreatorName : 'Creator', ENT_QUOTES, 'UTF-8');
-    $localTestUrl = '';
-    if (!empty($layoutVars['movie_edit_url'])) {
-        $localCandidate = str_replace('https://erocloud.net', 'https://erocloud.local', (string)$layoutVars['movie_edit_url']);
+    $safeIntended     = htmlspecialchars($tplIntendedTo !== '' ? $tplIntendedTo : 'unbekannt', ENT_QUOTES, 'UTF-8');
+    $safeCreator      = htmlspecialchars($tplCreatorName !== '' ? $tplCreatorName : 'Creator', ENT_QUOTES, 'UTF-8');
+    $safeSandboxRecip = htmlspecialchars($sandboxRecipient, ENT_QUOTES, 'UTF-8');
+    $localTestUrl     = '';
+    $directActionUrl  = !empty($layoutVars['action_url'])
+        ? (string)$layoutVars['action_url']
+        : (!empty($layoutVars['movie_edit_url']) ? (string)$layoutVars['movie_edit_url'] : '');
+    if ($directActionUrl !== '') {
+        $localCandidate = str_replace('https://erocloud.net', 'https://erocloud.local', $directActionUrl);
         $localTestUrl  .= '<br><span style="font-size: 11px;">Lokaler XAMPP Direkt-Login-Test: <a href="' . htmlspecialchars($localCandidate, ENT_QUOTES, 'UTF-8') . '" style="color: #B45309; font-weight: 600;">Hier klicken (erocloud.local)</a></span>';
     }
     if ($tplUnsubUrl !== '') {
@@ -52,7 +58,7 @@ if ($isSandboxMode && ($tplIntendedTo !== '' || $tplMerchantId > 0)) {
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #FEF3C7; border: 1px solid #F59E0B; border-radius: 8px;">
                 <tr>
                     <td style="padding: 10px 14px; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif; font-size: 12px; line-height: 18px; color: #92400E;">
-                        <strong>Test-/Sandbox-Modus aktiv:</strong> Diese E-Mail wurde zu Testzwecken an <strong>erocms@gmail.com</strong> zugestellt.<br>
+                        <strong>Test-/Sandbox-Modus aktiv:</strong> Diese E-Mail wurde zu Testzwecken an <strong>' . $safeSandboxRecip . '</strong> zugestellt.<br>
                         Regulärer Empfänger im Live-Betrieb wäre: <strong>' . $safeCreator . '</strong> (' . $safeIntended . ($tplMerchantId > 0 ? ', Partner-ID #' . $tplMerchantId : '') . ')' . $localTestUrl . '
                     </td>
                 </tr>
@@ -68,10 +74,10 @@ if ($tplUnsubUrl !== '') {
     <tr>
         <td style="padding: 18px 28px; background-color: #F8FAFC; border-top: 1px solid #E2E8F0; text-align: center;">
             <p style="margin: 0 0 10px 0; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif; font-size: 12px; line-height: 18px; color: #64748B;">
-                Du möchtest keine automatischen E-Mail-Benachrichtigungen mehr erhalten, sobald deine Videos fertig konvertiert sind?
+                Du möchtest diese automatischen E-Mail-Benachrichtigungen nicht mehr erhalten oder deine Einstellungen anpassen?
             </p>
             <a href="' . $safeUnsubUrl . '" target="_blank" style="display: inline-block; padding: 7px 16px; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif; font-size: 12px; font-weight: 600; color: #475569; background-color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 6px; text-decoration: none;">
-                Diese E-Mail-Benachrichtigungen nicht mehr erhalten
+                Benachrichtigungen verwalten / abbestellen
             </a>
         </td>
     </tr>';

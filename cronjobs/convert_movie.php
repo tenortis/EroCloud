@@ -241,7 +241,7 @@ if (isset($db_settings_ary['videothek_ffmpeg_on_off']) AND $db_settings_ary['vid
                                                 'resolution'      => (string)$post_resolution,
                                             ]);
 
-                                            if ($mailOk) {
+                                            if ((is_array($mailOk) && !empty($mailOk['success'])) || $mailOk === true) {
                                                 p4c_query("UPDATE `movies` SET `notify_sent_at` = '" . date('Y-m-d H:i:s') . "' WHERE `id` = '" . $notifyMovieId . "' LIMIT 1;", __FILE__, __LINE__);
                                             }
                                         }

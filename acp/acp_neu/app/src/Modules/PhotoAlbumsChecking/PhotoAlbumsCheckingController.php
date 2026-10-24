@@ -786,7 +786,7 @@ final class PhotoAlbumsCheckingController
             $perfCheck = \CoActorManager::getContentPerformers('photo_album', $albumDbId, $merchantId);
             foreach ($perfCheck['performers'] ?? [] as $pAuto) {
                 if (!empty($pAuto['is_ready_for_use']) && ($pAuto['checked_status'] ?? '') === 'under_review') {
-                    \CoActorManager::acpReviewCoActor((int)$pAuto['id'], $merchantId, 'verify', '', $employeeId);
+                    \CoActorManager::acpReviewCoActor((int)$pAuto['id'], $merchantId, 'verify', '', $employeeId, false);
                 }
             }
         }
@@ -924,6 +924,22 @@ final class PhotoAlbumsCheckingController
 
         log_action("Fotoalbum geprüft & gespeichert (ID: #{$albumDbId}, Album-ID: {$albumIdHash}, Status: {$albumStatus}).");
 
+        // Partner per E-Mail über die Freigabe des Foto-Albums informieren
+        if ($albumStatus === 'active' && $merchantId > 0 && class_exists('EroCloudMailer')) {
+            try {
+                \EroCloudMailer::sendContentReviewNotification([
+                    'merchant_id'      => $merchantId,
+                    'content_type'     => 'photo_album',
+                    'content_id'       => $albumDbId,
+                    'review_status'    => 'approved',
+                    'extra_meta_label' => 'Umfang',
+                    'extra_meta_value' => $numberOfPhotos . ' Fotos',
+                ]);
+            } catch (\Throwable $e) {
+                // Nicht-kritischer Fehler beim E-Mail-Versand
+            }
+        }
+
         $remainingQueue = $this->fetchUncheckedQueueIds();
         $nextId = $remainingQueue[0] ?? 0;
 
@@ -968,17 +984,31 @@ final class PhotoAlbumsCheckingController
             return;
         }
 
-        $rsAlbum = p4c_query("SELECT `id`, `album_id`, `title` FROM `photo_albums` WHERE `id` = '" . $albumDbId . "' LIMIT 1;", __FILE__, __LINE__);
+        $rsAlbum = p4c_query("SELECT `id`, `merchant_id`, `album_id`, `title` FROM `photo_albums` WHERE `id` = '" . $albumDbId . "' LIMIT 1;", __FILE__, __LINE__);
         if (!$rsAlbum || p4c_num_rows($rsAlbum) === 0) {
             Response::error('Das Fotoalbum wurde nicht in der Datenbank gefunden.', 404);
             return;
         }
 
         $a           = p4c_fetch_object($rsAlbum);
+        $merchantId  = abs((int)($a->merchant_id ?? 0));
         $albumIdHash = (string)$a->album_id;
         $title       = self::decodeText((string)($a->title ?? ''));
         $now         = date('Y-m-d H:i:s');
         $employeeId  = abs((int)($_SESSION['employee_id'] ?? 0));
+
+        $reasonShort = $reasonCode;
+        $rsReason = p4c_query(
+            "SELECT `de_short` FROM `rejection_reason_photo_album` WHERE `id_name` = '" . p4c_escape_string($reasonCode) . "' LIMIT 1;",
+            __FILE__,
+            __LINE__
+        );
+        if ($rsReason && p4c_num_rows($rsReason) > 0) {
+            $rObj = p4c_fetch_object($rsReason);
+            if (!empty($rObj->de_short)) {
+                $reasonShort = self::decodeText((string)$rObj->de_short);
+            }
+        }
 
         p4c_query(
             "INSERT INTO `rejection_reason_photo_album_history` SET
@@ -1002,6 +1032,22 @@ final class PhotoAlbumsCheckingController
         );
 
         log_action("Fotoalbum abgelehnt (ID: #{$albumDbId}, Album-ID: {$albumIdHash}, Grund: {$reasonCode}).");
+
+        // Partner per E-Mail über die Ablehnung / Korrekturbitte des Foto-Albums informieren
+        if ($merchantId > 0 && class_exists('EroCloudMailer')) {
+            try {
+                \EroCloudMailer::sendContentReviewNotification([
+                    'merchant_id'   => $merchantId,
+                    'content_type'  => 'photo_album',
+                    'content_id'    => $albumDbId,
+                    'review_status' => 'rejected',
+                    'reason_title'  => $reasonShort,
+                    'reason_text'   => $reasonText,
+                ]);
+            } catch (\Throwable $e) {
+                // Nicht-kritischer Fehler beim E-Mail-Versand
+            }
+        }
 
         $remainingQueue = $this->fetchUncheckedQueueIds();
         $nextId = $remainingQueue[0] ?? 0;

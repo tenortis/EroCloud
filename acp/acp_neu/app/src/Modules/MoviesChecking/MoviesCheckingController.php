@@ -762,7 +762,7 @@ final class MoviesCheckingController
             $perfCheck = \CoActorManager::getContentPerformers('movie', $movieId, $merchantId);
             foreach ($perfCheck['performers'] ?? [] as $pAuto) {
                 if (!empty($pAuto['is_ready_for_use']) && ($pAuto['checked_status'] ?? '') === 'under_review') {
-                    \CoActorManager::acpReviewCoActor((int)$pAuto['id'], $merchantId, 'verify', '', $employeeId);
+                    \CoActorManager::acpReviewCoActor((int)$pAuto['id'], $merchantId, 'verify', '', $employeeId, false);
                 }
             }
         }
@@ -950,6 +950,22 @@ final class MoviesCheckingController
 
         log_action("Film geprüft & gespeichert (ID: #{$movieId}, File-ID: {$fileId}, Status: {$movieStatus}).");
 
+        // Partner per E-Mail über die Freigabe informieren (inkl. 1-Klick Magic-Link & Opt-out Check)
+        if ($movieStatus === 'active' && $merchantId > 0 && class_exists('EroCloudMailer')) {
+            try {
+                \EroCloudMailer::sendContentReviewNotification([
+                    'merchant_id'      => $merchantId,
+                    'content_type'     => 'movie',
+                    'content_id'       => $movieId,
+                    'review_status'    => 'approved',
+                    'extra_meta_label' => 'Laufzeit & Qualität',
+                    'extra_meta_value' => gmdate('i:s', $playtime) . ' Min. • ' . strtoupper($quality),
+                ]);
+            } catch (\Throwable $e) {
+                // Nicht-kritischer Fehler beim E-Mail-Versand
+            }
+        }
+
         $remainingQueue = $this->fetchUncheckedQueueIds();
         $nextId = $remainingQueue[0] ?? 0;
 
@@ -994,17 +1010,31 @@ final class MoviesCheckingController
             return;
         }
 
-        $rsMovie = p4c_query("SELECT `id`, `file_id`, `title` FROM `movies` WHERE `id` = '" . $movieId . "' LIMIT 1;", __FILE__, __LINE__);
+        $rsMovie = p4c_query("SELECT `id`, `merchant_id`, `file_id`, `title` FROM `movies` WHERE `id` = '" . $movieId . "' LIMIT 1;", __FILE__, __LINE__);
         if (!$rsMovie || p4c_num_rows($rsMovie) === 0) {
             Response::error('Der Film wurde nicht in der Datenbank gefunden.', 404);
             return;
         }
 
         $m          = p4c_fetch_object($rsMovie);
+        $merchantId = abs((int)($m->merchant_id ?? 0));
         $fileId     = (string)$m->file_id;
         $title      = self::decodeText((string)($m->title ?? ''));
         $now        = date('Y-m-d H:i:s');
         $employeeId = abs((int)($_SESSION['employee_id'] ?? 0));
+
+        $reasonShort = $reasonCode;
+        $rsReason = p4c_query(
+            "SELECT `de_short` FROM `rejection_reason_movie` WHERE `id_name` = '" . p4c_escape_string($reasonCode) . "' LIMIT 1;",
+            __FILE__,
+            __LINE__
+        );
+        if ($rsReason && p4c_num_rows($rsReason) > 0) {
+            $rObj = p4c_fetch_object($rsReason);
+            if (!empty($rObj->de_short)) {
+                $reasonShort = self::decodeText((string)$rObj->de_short);
+            }
+        }
 
         p4c_query(
             "INSERT INTO `rejection_reason_movie_history`
@@ -1032,6 +1062,22 @@ final class MoviesCheckingController
         );
 
         log_action("Film abgelehnt (ID: #{$movieId}, File-ID: {$fileId}, Grund: {$reasonCode}).");
+
+        // Partner per E-Mail über die Ablehnung / Korrekturbitte informieren
+        if ($merchantId > 0 && class_exists('EroCloudMailer')) {
+            try {
+                \EroCloudMailer::sendContentReviewNotification([
+                    'merchant_id'   => $merchantId,
+                    'content_type'  => 'movie',
+                    'content_id'    => $movieId,
+                    'review_status' => 'rejected',
+                    'reason_title'  => $reasonShort,
+                    'reason_text'   => $reasonText,
+                ]);
+            } catch (\Throwable $e) {
+                // Nicht-kritischer Fehler beim E-Mail-Versand
+            }
+        }
 
         $remainingQueue = $this->fetchUncheckedQueueIds();
         $nextId = $remainingQueue[0] ?? 0;

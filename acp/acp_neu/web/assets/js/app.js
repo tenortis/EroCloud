@@ -4592,6 +4592,72 @@ const App = {
       this.saveImprint(null, true);
     },
 
+    async saveSmtp(event) {
+      if (event) event.preventDefault();
+      const form = document.getElementById('sys-smtp-form');
+      const btn = document.getElementById('btn-save-smtp');
+      if (!form) return false;
+
+      const fd = new FormData(form);
+      fd.set('_csrf', App.csrfToken);
+      const sbSwitch = document.getElementById('smtp-sandbox-switch');
+      fd.set('sandbox_mode', sbSwitch && sbSwitch.checked ? '1' : '0');
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Speichere...';
+      }
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=system-settings/save-smtp`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': App.csrfToken
+          },
+          body: fd
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.status !== 'ok') {
+          App.toast(data.message || 'Fehler beim Speichern der SMTP-Einstellungen.', 'danger');
+          return false;
+        }
+
+        App.resetLogoutCountdown();
+        App.toast(data.message || 'Postfach- & SMTP-Einstellungen gespeichert.', 'success');
+
+        const passInput = form.querySelector('input[name="smtp_pass"]');
+        if (passInput) {
+          passInput.value = '';
+        }
+
+        this.sendOrPreviewTestMail(null, 'preview');
+      } catch (err) {
+        App.toast('Netzwerkfehler: ' + err.message, 'danger');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-floppy-fill me-1"></i>Postfach- & SMTP-Einstellungen speichern';
+        }
+      }
+      return false;
+    },
+
+    openTriggerPreview(templateKey) {
+      const sel = document.getElementById('sys-testmail-template');
+      if (sel && templateKey) {
+        sel.value = templateKey;
+      }
+      const tabBtn = document.getElementById('tab-btn-sys-mailtest');
+      if (tabBtn && window.bootstrap?.Tab) {
+        window.bootstrap.Tab.getOrCreateInstance(tabBtn).show();
+      } else if (tabBtn) {
+        tabBtn.click();
+      }
+      this.sendOrPreviewTestMail(null, 'preview');
+    },
+
     debouncedPreviewMail() {
       if (this.previewDebounceTimer) {
         clearTimeout(this.previewDebounceTimer);
@@ -4677,18 +4743,80 @@ const App = {
       } finally {
         if (mode === 'send' && btn) {
           btn.disabled = false;
-          btn.innerHTML = '<i class="bi bi-send-check-fill me-1"></i>Test-E-Mail („Video konvertiert“) jetzt absenden';
+          btn.innerHTML = '<i class="bi bi-send-check-fill me-1"></i>Ausgewählte Vorlage als Test-E-Mail senden';
         }
       }
       return false;
     },
 
-    filterNotificationLog(query) {
-      const q = String(query || '').trim().toLowerCase();
+    filterNotificationLog(queryOverride) {
+      const qInput = document.getElementById('sys-notif-filter-query');
+      const evSelect = document.getElementById('sys-notif-filter-event');
+      const stSelect = document.getElementById('sys-notif-filter-status');
+
+      const q = String(queryOverride !== undefined ? queryOverride : (qInput?.value || '')).trim().toLowerCase();
+      const ev = String(evSelect?.value || '').trim();
+      const st = String(stSelect?.value || '').trim();
+
       document.querySelectorAll('.sys-notif-log-row').forEach(row => {
         const hay = row.getAttribute('data-search') || '';
-        row.classList.toggle('d-none', !(q === '' || hay.includes(q)));
+        const rowEv = row.getAttribute('data-event') || '';
+        const rowSt = row.getAttribute('data-status') || '';
+
+        const matchQ = (q === '' || hay.includes(q));
+        const matchEv = (ev === '' || rowEv === ev);
+        const matchSt = (st === '' || rowSt === st);
+
+        row.classList.toggle('d-none', !(matchQ && matchEv && matchSt));
       });
+    },
+
+    async viewSentMail(logId) {
+      const id = parseInt(logId, 10) || 0;
+      if (id <= 0) return;
+
+      const modalEl = document.getElementById('sysSentMailModal');
+      const titleEl = document.getElementById('sysSentMailModalTitle');
+      const metaEl = document.getElementById('sysSentMailModalMeta');
+      const iframeEl = document.getElementById('sysSentMailModalIframe');
+
+      if (!modalEl || !iframeEl) return;
+
+      if (titleEl) titleEl.textContent = `Lade E-Mail #${id}...`;
+      if (metaEl) metaEl.textContent = '';
+      iframeEl.srcdoc = '<div style="padding:32px;font-family:sans-serif;color:#64748B;">Lade gespeicherten E-Mail-Inhalt...</div>';
+
+      if (window.bootstrap?.Modal) {
+        window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      }
+
+      try {
+        const res = await fetch(`${App.basePath}/api.php?route=system-settings/log-detail&id=${id}`, {
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const data = await res.json();
+        if (!res.ok || data.status !== 'ok' || !data.log) {
+          iframeEl.srcdoc = `<div style="padding:32px;font-family:sans-serif;color:#DC2626;">${data.message || 'Fehler beim Laden der E-Mail.'}</div>`;
+          return;
+        }
+
+        const log = data.log;
+        if (titleEl) {
+          titleEl.textContent = log.subject || `E-Mail #${log.id}`;
+        }
+        if (metaEl) {
+          const who = log.merchant_username
+            ? `${log.merchant_username} (MID #${log.merchant_id})`
+            : (log.merchant_id > 0 ? `MID #${log.merchant_id}` : 'System/Test');
+          const recip = (log.intended_recipient && log.intended_recipient !== log.recipient)
+            ? `Ziel: ${log.intended_recipient} (Sandbox -> ${log.recipient})`
+            : `Empfänger: ${log.recipient}`;
+          metaEl.textContent = `#${log.id} • ${log.created_at_de} • Partner: ${who} • ${recip}`;
+        }
+        iframeEl.srcdoc = log.body_html || '<div style="padding:32px;font-family:sans-serif;color:#64748B;">Kein HTML-Inhalt für diesen älteren Eintrag gespeichert.</div>';
+      } catch (err) {
+        iframeEl.srcdoc = `<div style="padding:32px;font-family:sans-serif;color:#DC2626;">Netzwerkfehler: ${err.message}</div>`;
+      }
     },
 
     setErrorFilterSeverity(severity) {

@@ -92,6 +92,7 @@ class Router
         $coActorsCtrl    = 'App\\Modules\\CoActors\\CoActorsController';
         $moviesCtrl      = 'App\\Modules\\Movies\\MoviesController';
         $photoAlbumsCtrl = 'App\\Modules\\PhotoAlbums\\PhotoAlbumsController';
+        $webmasterCtrl   = 'App\\Modules\\Webmaster\\WebmasterController';
         $previewCtrl     = 'App\\Modules\\Preview\\PreviewController';
 
         // 1. Startseite (Echtes Partner-Dashboard, Richtlinien-Bestätigung, Globale Schnellsuche & Entwickler-Feedback)
@@ -149,11 +150,21 @@ class Router
         self::register('co-actors/poll-status', $coActorsCtrl, 'pollStatus');
         self::register('co-actors/delete', $coActorsCtrl, 'delete');
 
-        // 5. Partnerprogramm (Webmaster)
-        self::register('webmaster-ads', $previewCtrl, 'webmasterAds');
-        self::register('webmaster-newads', $previewCtrl, 'webmasterNewAds');
-        self::register('webmaster-stats', $previewCtrl, 'webmasterStats');
-        self::register('webmaster-advertise-partner', $previewCtrl, 'webmasterAdvertisePartner');
+        // 5. Partnerprogramm (Webmaster / EroAds)
+        self::register('webmaster-ads', $webmasterCtrl, 'ads');
+        self::register('webmaster-ads-domain', $webmasterCtrl, 'adsDomain');
+        self::register('webmaster-new-campaign', $webmasterCtrl, 'newCampaign');
+        self::register('webmaster-edit-campaign', $webmasterCtrl, 'editCampaign');
+        self::register('webmaster-newads', $webmasterCtrl, 'newAds');
+        self::register('webmaster-stats', $webmasterCtrl, 'stats');
+        self::register('webmaster-advertise-partner', $webmasterCtrl, 'advertisePartner');
+        self::register('webmaster/create-campaign', $webmasterCtrl, 'createCampaign');
+        self::register('webmaster/update-campaign', $webmasterCtrl, 'updateCampaign');
+        self::register('webmaster/delete-campaign', $webmasterCtrl, 'deleteCampaign');
+        self::register('webmaster/origin-details', $webmasterCtrl, 'originDetails');
+        self::register('webmaster/my-site-banners', $webmasterCtrl, 'mySiteBanners');
+        self::register('webmaster/upload-my-banners', $webmasterCtrl, 'uploadMyBanners');
+        self::register('webmaster/upload-my-banner-replace', $webmasterCtrl, 'uploadMyBannerReplace');
 
         // 6. FAQ
         self::register('faq', $previewCtrl, 'faq');

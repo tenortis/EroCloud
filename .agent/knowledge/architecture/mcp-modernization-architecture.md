@@ -158,6 +158,27 @@ mcp_neu/ (später: mcp/)
    * **Mobile-First QR-Code-Workflow:** Statt Papierformularen scannt der Drehpartner (oder der Partner für sich selbst) einen lokal per `QrCodeSvg` erzeugten QR-Code, nimmt am Smartphone ein unverdecktes KI-Referenz-Selfie (`face_ref_image`), einen ID-Shot mit Ausweis neben dem Gesicht (`id_shot_image`) sowie Ausweis-Vorder-/Rückseite auf und unterschreibt mit dem Finger direkt auf dem Smartphone-Display (`verify_co_actor.php`).
    * Während das QR-Modal im MCP geöffnet ist, prüft ein **4-Sekunden-Live-Polling** (`co-actors/get`) den Status und schaltet bei erfolgreichem Abschluss am Handy sofort live auf Grün um.
    * Alle Details zu Tabellen (`co_actors`, `content_co_actors`), AES-Verschlüsselung, Kategorie-Plausibilitätsprüfung, Zertifikats-Generierung und ACP-Prüfung sind verbindlich dokumentiert in `@co-actor-verification-and-model-release.md`.
+7. **Partnerprogramm / Webmaster-Modul (`App\Modules\Webmaster\WebmasterController`):**
+   * Freigeschaltet für die Partner-IDs `['ABPP2HNMDG', 'KJDJEEESAX', 'CCRVWMVD67', '9SN2XTH2TU']`.
+   * **Kunden werben (`#/webmaster-ads`):** 4 Reiter (*Websites*, *Kampagnen*, sowie bei eigenen aktiven EroAds-Websites *Eigene Banner verwalten* inkl. Standardgrößen-Prüfung & Grafik-Upload/Ersetzen und *Deine Kunden*).
+   * **Werbemittel & Kampagnen (`#/webmaster-ads-domain`, `#/webmaster-new-campaign`, `#/webmaster-edit-campaign`):** Direkte Tracking-URLs (`ADS_URL/l/...`), HTML-Textlinks, XML-API-Endpoints, Bannercodes (`ADS_URL/bc/...`), Ersatzanzeigen (`blank`, `image`, `color`) sowie kampagnenbezogene Auswertungen (Conversions, Klicks & Impressionen inkl. Referer-Detail-Modal).
+   * **Alle Banner (`#/webmaster-newads`):** Übersicht aller freigegebenen Werbebanner aktiver EroAds-Websites mit Live-Filterung nach Website, Format und Bannergröße.
+   * **Statistiken (`#/webmaster-stats`):** Monats- und Jahres-Auswertungen für Klicks, Impressionen und Conversions inkl. Herkunfts-/Referer-Details (`webmaster/origin-details`).
+   * **Darsteller werben (`#/webmaster-advertise-partner`):** Übersicht der persönlichen 3%-Partner-Werbelinks (`https://pay4coins.com/wm/{partner_id}` sowie `https://ad5.tv/wm/{actor_username}`).
+
+---
+
+## 5. 🚀 Go-Live & Cutover-Checkliste (`mcp/` $\rightarrow$ `mcp_neu/`)
+
+Beim Umschalten der Hauptdomain `https://erocloud.net` auf `mcp_neu` sind folgende Punkte verbindlich einzuhalten:
+1. **Medien- & Streaming-Endpunkte im Root erhalten:**
+   * `/thumb.php`, `/ProfilePicture/{filename}`, `/AlbumPhoto/{file_id}`, `/Player/{file_id}`, `/PlayerPoster/{file_id}` sowie `/erocloud_logo.png` und `/favicon/*` müssen im neuen Web-Root erreichbar bleiben, da sowohl MCP als auch ACP ihre Medien-URLs über `MCP_URL` (`https://erocloud.net`) auflösen.
+2. **Rückwärtskompatibilität für QR-Codes & E-Mail-Links:**
+   * `.htaccess`-Regel `RewriteRule ^mcp_neu/web/(.*)$ /$1 [R=301,L,QSA]`, damit bereits gedruckte Co-Actor-QR-Codes und versendete Magic-/Unsubscribe-Links nahtlos weiterfunktionieren.
+   * Bereinigung des Subpfads `/mcp_neu/web/` in `EroCloudMailer.inc.php`, `movie_converted.inc.php`, `CoActorManager.inc.php`, `EroCloudMagicLink.inc.php` und `SystemTechController.php`.
+3. **Produktiv-Schaltung des Mail-Versands:**
+   * In `config.inc.php` `define('MAIL_SANDBOX_MODE', false);` setzen.
+
 
 
 

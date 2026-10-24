@@ -87,7 +87,7 @@ class SendSMTPmail
             ['attachments' => $attachments]
         );
 
-        if (!$ok) {
+        if ((is_array($ok) && empty($ok['success'])) || $ok === false) {
             return $mailer->lastError;
         }
 

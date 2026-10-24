@@ -758,14 +758,17 @@ final class ActorsController
             return;
         }
 
-        $rsExists = \p4c_query("SELECT `id`, `username`, `status` FROM `actors` WHERE `id` = '" . $actorId . "' LIMIT 1;", __FILE__, __LINE__);
+        $rsExists = \p4c_query("SELECT `id`, `merchant_id`, `username`, `status`, `admin_infos` FROM `actors` WHERE `id` = '" . $actorId . "' LIMIT 1;", __FILE__, __LINE__);
         if (!$rsExists || \p4c_num_rows($rsExists) === 0) {
             Response::error('Das Darsteller-Profil #' . $actorId . ' existiert nicht.', 404);
             return;
         }
 
-        $existingRow = \p4c_fetch_object($rsExists);
-        $defs        = self::getFieldDefinitions();
+        $existingRow   = \p4c_fetch_object($rsExists);
+        $merchantId    = abs((int)($existingRow->merchant_id ?? 0));
+        $oldStatus     = (string)($existingRow->status ?? 'inactive');
+        $oldAdminInfos = trim($this->cleanUtf8((string)($existingRow->admin_infos ?? '')));
+        $defs          = self::getFieldDefinitions();
 
         // 1. Benutzernamen bereinigen & auf Duplikate prüfen (exakt wie in acp/includes/actor.php)
         $rawUsername  = trim((string)$this->request->post('username', ''));
@@ -987,6 +990,37 @@ final class ActorsController
 
         if (function_exists('log_action')) {
             \log_action("Darsteller-Profil #{$actorId} ({$postUsername}) im ACP aktualisiert (Status: {$status}).");
+        }
+
+        // Partner per E-Mail informieren, wenn das Profil neu freigeschaltet oder gesperrt wurde
+        if ($merchantId > 0 && class_exists('EroCloudMailer')) {
+            try {
+                if ($status === 'active' && $oldStatus !== 'active') {
+                    \EroCloudMailer::sendContentReviewNotification([
+                        'merchant_id'      => $merchantId,
+                        'content_type'     => 'actor',
+                        'content_id'       => $actorId,
+                        'review_status'    => 'approved',
+                        'extra_meta_label' => 'Profilname',
+                        'extra_meta_value' => '@' . $postUsername,
+                    ]);
+                } elseif ($status === 'blocked' && ($oldStatus !== 'blocked' || ($adminInfos !== '' && $adminInfos !== $oldAdminInfos))) {
+                    \EroCloudMailer::sendContentReviewNotification([
+                        'merchant_id'      => $merchantId,
+                        'content_type'     => 'actor',
+                        'content_id'       => $actorId,
+                        'review_status'    => 'rejected',
+                        'reason_title'     => 'Darsteller-Profil prüfen / anpassen',
+                        'reason_text'      => $adminInfos !== ''
+                            ? $adminInfos
+                            : 'Bitte überprüfe die Angaben und Profilbilder (FSK16 / FSK18) deines Darsteller-Profils.',
+                        'extra_meta_label' => 'Profilname',
+                        'extra_meta_value' => '@' . $postUsername,
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                // Nicht-kritischer Fehler beim E-Mail-Versand
+            }
         }
 
         Response::json([

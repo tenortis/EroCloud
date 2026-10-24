@@ -3,39 +3,347 @@
 if (!defined('SAFE_INC'))
     die ("Hacking attempt...");
 
-require_once SOURCEDIR . '/includes/klassen/phpmailer/src/Exception.php';
-require_once SOURCEDIR . '/includes/klassen/phpmailer/src/PHPMailer.php';
-require_once SOURCEDIR . '/includes/klassen/phpmailer/src/SMTP.php';
+require_once __DIR__ . '/phpmailer/src/Exception.php';
+require_once __DIR__ . '/phpmailer/src/PHPMailer.php';
+require_once __DIR__ . '/phpmailer/src/SMTP.php';
+require_once __DIR__ . '/EroCloudMagicLink.inc.php';
+require_once __DIR__ . '/EroCloudNotificationCenter.inc.php';
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception as PHPMailerException;
 
 /**
- * EroCloudMailer - Globaler, zentraler E-Mail-Service für EroCloud (ACP, MCP, API & CLI-Cronjobs).
- * Nutzt PHPMailer v7.1+ über SMTP (mail.erocloud.net) mit vollem Anti-Spam-Header-Set (SPF/DKIM/DMARC-konform),
- * Multipart-MIME (HTML + Plaintext AltBody), RFC 8058 List-Unsubscribe, zentralem Datenbank-Impressum
- * und integriertem Sandbox-Schutz.
+ * Zentrale E-Mail-Versandklasse für EroCloud (MCP, ACP & Cronjobs)
+ *
+ * Funktionen:
+ * - Authentifizierter SMTP-Versand über `t199.nlserver.net` (TLS/SPF/DKIM-konform)
+ * - Konfigurierbare Postfach- & Sandbox-Einstellungen direkt über das ACP (`settings`-Tabelle mit Fallback auf `config.inc.php`)
+ * - Multipart-E-Mails (HTML + Plaintext-Fallback für SpamAssassin / T-Online / GMX / Gmail)
+ * - Dynamisches Laden der offiziellen Impressumsdaten aus der `settings`-Tabelle
+ * - Vollständiges Versand-Tracking in `notification_log` (inkl. Ziel-Empfänger, Betreff, Auslöser & HTML-Inhalt)
+ * - Kompatibel mit PHP 8.0.30 und PHP 8.4.27
  */
 class EroCloudMailer
 {
-    /** @var string */
-    public $lastError = '';
+    /** @var array<string, string>|null */
+    private static ?array $imprintCache = null;
 
-    /** @var string */
-    public $lastMessageId = '';
+    /** @var array<string, mixed>|null */
+    private static ?array $smtpConfigCache = null;
 
-    /** @var string */
-    public $effectiveRecipient = '';
+    private static string $lastStaticError = '';
+    private static string $lastStaticRecipient = '';
+    private static string $lastStaticMessageId = '';
 
-    /** @var array|null */
-    private static $cachedImprint = null;
+    public function __get(string $name): mixed
+    {
+        return match ($name) {
+            'lastError'          => self::$lastStaticError,
+            'effectiveRecipient' => self::$lastStaticRecipient,
+            'lastMessageId'      => self::$lastStaticMessageId,
+            default              => null,
+        };
+    }
 
     /**
-     * Liefert die Standard-Impressums- und Supportdaten (analog https://pay4coins.com/de/impressum).
-     *
-     * @return array
+     * Stellt sicher, dass die Benachrichtigungs-Spalten in `movies` sowie die Tabellen im NotificationCenter existieren.
      */
-    public static function getDefaultImprintData()
+    public static function ensureNotificationColumns(): void
+    {
+        if (class_exists('EroCloudNotificationCenter')) {
+            \EroCloudNotificationCenter::ensureTablesExist();
+        }
+
+        $rs1 = @p4c_query("SHOW COLUMNS FROM `movies` LIKE 'notify_on_convert';", __FILE__, __LINE__);
+        if ($rs1 && p4c_num_rows($rs1) === 0) {
+            @p4c_query("ALTER TABLE `movies` ADD COLUMN `notify_on_convert` TINYINT(1) NOT NULL DEFAULT 1;", __FILE__, __LINE__);
+        }
+
+        $rs2 = @p4c_query("SHOW COLUMNS FROM `movies` LIKE 'notify_sent_at';", __FILE__, __LINE__);
+        if ($rs2 && p4c_num_rows($rs2) === 0) {
+            @p4c_query("ALTER TABLE `movies` ADD COLUMN `notify_sent_at` DATETIME NULL DEFAULT NULL;", __FILE__, __LINE__);
+        }
+    }
+
+    /**
+     * Gibt zurück, ob der Partner die Benachrichtigung für fertig konvertierte Videos aktiviert hat (1 = Ja, 0 = Nein).
+     */
+    public static function getMerchantNotifyPreference(int $merchantId): int
+    {
+        $merchantId = abs($merchantId);
+        if ($merchantId <= 0) {
+            return 1;
+        }
+        return \EroCloudNotificationCenter::isEnabled($merchantId, \EroCloudNotificationCenter::EVENT_MOVIE_CONVERTED) ? 1 : 0;
+    }
+
+    /**
+     * Speichert die Einstellung des Partners für fertig konvertierte Videos.
+     */
+    public static function setMerchantNotifyPreference(int $merchantId, int $notifyOnConvert): void
+    {
+        $merchantId = abs($merchantId);
+        if ($merchantId <= 0) {
+            return;
+        }
+        \EroCloudNotificationCenter::setPreference(
+            $merchantId,
+            \EroCloudNotificationCenter::EVENT_MOVIE_CONVERTED,
+            $notifyOnConvert === 1,
+            'upload_step2'
+        );
+    }
+
+    /**
+     * Generiert die signierte 1-Klick-Abmelde-URL (RFC 8058).
+     */
+    public static function getUnsubscribeUrl(int $merchantId, string $eventKey = 'movie_converted'): string
+    {
+        return \EroCloudNotificationCenter::createUnsubscribeUrl(abs($merchantId), $eventKey);
+    }
+
+    /**
+     * Ermittelt die Basis-URL zum MCP-Webverzeichnis (unterstützt /mcp_neu/web sowie nach Cutover das Root-Verzeichnis).
+     */
+    public static function getMcpWebUrl(): string
+    {
+        $mcpBase = defined('MCP_URL') ? rtrim((string)MCP_URL, '/') : 'https://erocloud.net';
+        $subPath = (defined('MCP_DIR') && is_dir(MCP_DIR . '/mcp_neu/web')) ? '/mcp_neu/web' : '';
+        return $mcpBase . $subPath;
+    }
+
+    /**
+     * Lädt die aktuelle SMTP- & Sandbox-Konfiguration aus der Datenbank (`settings`),
+     * mit Fallback auf die Konstanten aus `includes/config.inc.php`.
+     *
+     * @return array{
+     *   smtp_host: string,
+     *   smtp_port: int,
+     *   smtp_secure: string,
+     *   smtp_user: string,
+     *   smtp_pass: string,
+     *   has_password: bool,
+     *   from_address: string,
+     *   from_name: string,
+     *   sandbox_mode: bool,
+     *   sandbox_recipient: string
+     * }
+     */
+    public static function getSmtpConfig(bool $forceReload = false): array
+    {
+        if (self::$smtpConfigCache !== null && !$forceReload) {
+            return self::$smtpConfigCache;
+        }
+
+        $defaults = [
+            'smtp_host'         => defined('MAIL_SMTP_HOST') ? (string)MAIL_SMTP_HOST : 'mail.erocloud.net',
+            'smtp_port'         => defined('MAIL_SMTP_PORT') ? abs((int)MAIL_SMTP_PORT) : 587,
+            'smtp_secure'       => defined('MAIL_SMTP_SECURE') ? strtolower(trim((string)MAIL_SMTP_SECURE)) : 'tls',
+            'smtp_user'         => defined('MAIL_SMTP_USER') ? (string)MAIL_SMTP_USER : 'noreply@erocloud.net',
+            'smtp_pass'         => defined('MAIL_SMTP_PASS') ? (string)MAIL_SMTP_PASS : '',
+            'from_address'      => defined('MAIL_FROM_ADDRESS') ? (string)MAIL_FROM_ADDRESS : 'noreply@erocloud.net',
+            'from_name'         => defined('MAIL_FROM_NAME') ? (string)MAIL_FROM_NAME : 'EroCloud',
+            'sandbox_mode'      => (!defined('MAIL_SANDBOX_MODE') || MAIL_SANDBOX_MODE === true),
+            'sandbox_recipient' => defined('MAIL_SANDBOX_RECIPIENT') ? (string)MAIL_SANDBOX_RECIPIENT : 'erocms@gmail.com',
+        ];
+
+        $keys = [
+            'mail_smtp_host',
+            'mail_smtp_port',
+            'mail_smtp_secure',
+            'mail_smtp_user',
+            'mail_smtp_pass_enc',
+            'mail_from_address',
+            'mail_from_name',
+            'mail_sandbox_mode',
+            'mail_sandbox_recipient',
+        ];
+
+        $inList = "'" . implode("','", $keys) . "'";
+        $rs = p4c_query(
+            "SELECT `variable`, `value`,
+                    CASE WHEN `variable` = 'mail_smtp_pass_enc' AND `value` != ''
+                         THEN CAST(AES_DECRYPT(UNHEX(`value`), '" . p4c_escape_string((string)AES_KEY) . "') AS CHAR)
+                         ELSE NULL
+                    END AS `decrypted_pass`
+             FROM `settings`
+             WHERE `variable` IN ($inList);",
+            __FILE__,
+            __LINE__
+        );
+
+        $dbVals = [];
+        $decPass = null;
+        if ($rs && p4c_num_rows($rs) > 0) {
+            while ($row = p4c_fetch_object($rs)) {
+                $varName = (string)($row->variable ?? '');
+                $valStr  = trim((string)($row->value ?? ''));
+                $dbVals[$varName] = $valStr;
+                if ($varName === 'mail_smtp_pass_enc' && !empty($row->decrypted_pass)) {
+                    $decPass = (string)$row->decrypted_pass;
+                }
+            }
+        }
+
+        $host = (!empty($dbVals['mail_smtp_host'])) ? $dbVals['mail_smtp_host'] : $defaults['smtp_host'];
+        $port = (!empty($dbVals['mail_smtp_port']) && abs((int)$dbVals['mail_smtp_port']) > 0)
+            ? abs((int)$dbVals['mail_smtp_port'])
+            : $defaults['smtp_port'];
+        $sec  = (!empty($dbVals['mail_smtp_secure']) && in_array(strtolower($dbVals['mail_smtp_secure']), ['tls', 'ssl', 'none'], true))
+            ? strtolower($dbVals['mail_smtp_secure'])
+            : $defaults['smtp_secure'];
+        $user = (!empty($dbVals['mail_smtp_user'])) ? $dbVals['mail_smtp_user'] : $defaults['smtp_user'];
+        $pass = ($decPass !== null && $decPass !== '') ? $decPass : $defaults['smtp_pass'];
+        $fromAddr = (!empty($dbVals['mail_from_address'])) ? $dbVals['mail_from_address'] : $defaults['from_address'];
+        $fromName = (!empty($dbVals['mail_from_name'])) ? $dbVals['mail_from_name'] : $defaults['from_name'];
+
+        $sandboxMode = array_key_exists('mail_sandbox_mode', $dbVals)
+            ? ($dbVals['mail_sandbox_mode'] === '1' || strtolower($dbVals['mail_sandbox_mode']) === 'true')
+            : $defaults['sandbox_mode'];
+
+        $sandboxRecipient = (!empty($dbVals['mail_sandbox_recipient']))
+            ? $dbVals['mail_sandbox_recipient']
+            : $defaults['sandbox_recipient'];
+
+        self::$smtpConfigCache = [
+            'smtp_host'         => $host,
+            'smtp_port'         => $port,
+            'smtp_secure'       => $sec,
+            'smtp_user'         => $user,
+            'smtp_pass'         => $pass,
+            'has_password'      => ($pass !== ''),
+            'from_address'      => $fromAddr,
+            'from_name'         => $fromName,
+            'sandbox_mode'      => $sandboxMode,
+            'sandbox_recipient' => $sandboxRecipient,
+        ];
+
+        return self::$smtpConfigCache;
+    }
+
+    /**
+     * Speichert die Postfach- & Sandbox-Konfiguration aus dem ACP in der Tabelle `settings`.
+     * Das SMTP-Passwort wird AES-verschlüsselt (HEX) in `mail_smtp_pass_enc` abgelegt.
+     *
+     * @param array<string, mixed> $input
+     */
+    public static function saveSmtpConfig(array $input): bool
+    {
+        $current = self::getSmtpConfig(true);
+
+        $host      = trim((string)($input['smtp_host'] ?? $current['smtp_host']));
+        $port      = abs((int)($input['smtp_port'] ?? $current['smtp_port']));
+        if ($port <= 0 || $port > 65535) {
+            $port = 587;
+        }
+        $secure    = strtolower(trim((string)($input['smtp_secure'] ?? $current['smtp_secure'])));
+        if (!in_array($secure, ['tls', 'ssl', 'none'], true)) {
+            $secure = 'tls';
+        }
+        $user      = trim((string)($input['smtp_user'] ?? $current['smtp_user']));
+        $fromAddr  = trim((string)($input['from_address'] ?? $current['from_address']));
+        $fromName  = trim((string)($input['from_name'] ?? $current['from_name']));
+        $sandbox   = !empty($input['sandbox_mode']) ? '1' : '0';
+        $sbRecip   = trim((string)($input['sandbox_recipient'] ?? $current['sandbox_recipient']));
+
+        $pairs = [
+            'mail_smtp_host'         => $host,
+            'mail_smtp_port'         => (string)$port,
+            'mail_smtp_secure'       => $secure,
+            'mail_smtp_user'         => $user,
+            'mail_from_address'      => $fromAddr,
+            'mail_from_name'         => $fromName,
+            'mail_sandbox_mode'      => $sandbox,
+            'mail_sandbox_recipient' => $sbRecip,
+        ];
+
+        foreach ($pairs as $var => $val) {
+            $varEsc = p4c_escape_string($var);
+            $valEsc = p4c_escape_string($val);
+            p4c_query(
+                "INSERT INTO `settings` (`variable`, `value`) VALUES ('{$varEsc}', '{$valEsc}')
+                 ON DUPLICATE KEY UPDATE `value` = '{$valEsc}';",
+                __FILE__,
+                __LINE__
+            );
+        }
+
+        $newPass = isset($input['smtp_pass']) ? trim((string)$input['smtp_pass']) : '';
+        if ($newPass !== '' && $newPass !== '********') {
+            $passEsc = p4c_escape_string($newPass);
+            $aesKey  = p4c_escape_string((string)AES_KEY);
+            p4c_query(
+                "INSERT INTO `settings` (`variable`, `value`)
+                 VALUES ('mail_smtp_pass_enc', HEX(AES_ENCRYPT('{$passEsc}', '{$aesKey}')))
+                 ON DUPLICATE KEY UPDATE `value` = HEX(AES_ENCRYPT('{$passEsc}', '{$aesKey}'));",
+                __FILE__,
+                __LINE__
+            );
+        }
+
+        self::$smtpConfigCache = null;
+        return true;
+    }
+
+    /**
+     * Ermittelt die entschlüsselte E-Mail-Adresse sowie den Anzeigenamen eines Partners (`merchants`).
+     *
+     * @return array{merchant_id: int, partner_id: string, email: string, creator_name: string, username: string, first_name: string}
+     */
+    public static function getMerchantRecipientInfo(int $merchantId): array
+    {
+        $merchantId = abs($merchantId);
+        $info = [
+            'merchant_id'  => $merchantId,
+            'partner_id'   => '',
+            'email'        => '',
+            'creator_name' => 'Creator',
+            'username'     => '',
+            'first_name'   => '',
+        ];
+
+        if ($merchantId <= 0) {
+            return $info;
+        }
+
+        $aesKey = p4c_escape_string((string)AES_KEY);
+        $rs = p4c_query(
+            "SELECT `id`, `partner_id`,
+                    CAST(AES_DECRYPT(`email`, '{$aesKey}') AS CHAR) AS `dec_email`,
+                    CAST(AES_DECRYPT(`username`, '{$aesKey}') AS CHAR) AS `dec_username`,
+                    CAST(AES_DECRYPT(`firstname`, '{$aesKey}') AS CHAR) AS `dec_firstname`
+             FROM `merchants`
+             WHERE `id` = '{$merchantId}'
+             LIMIT 1;",
+            __FILE__,
+            __LINE__
+        );
+
+        if ($rs && p4c_num_rows($rs) > 0) {
+            $m = p4c_fetch_object($rs);
+            $email     = trim(self::cleanUtf8((string)($m->dec_email ?? '')));
+            $username  = trim(self::cleanUtf8((string)($m->dec_username ?? '')));
+            $firstName = trim(self::cleanUtf8((string)($m->dec_firstname ?? '')));
+            $partnerId = trim((string)($m->partner_id ?? ''));
+
+            $creatorName = $username !== '' ? $username : ($firstName !== '' ? $firstName : ('Partner #' . $merchantId));
+
+            $info['partner_id']   = $partnerId;
+            $info['email']        = $email;
+            $info['username']     = $username;
+            $info['first_name']   = $firstName;
+            $info['creator_name'] = $creatorName;
+        }
+
+        return $info;
+    }
+
+    /**
+     * Gibt die offiziellen Pay4Coins / EroCloud Standard-Impressumsdaten zurück.
+     *
+     * @return array<string, string>
+     */
+    public static function getDefaultImprintData(): array
     {
         return [
             'imprint_company_name'     => 'CIPA Media S.L.U.',
@@ -45,8 +353,8 @@ class EroCloudMailer
             'imprint_register_details' => 'Tomo: 3368, Folio: 43, Sección: 8, Hoja: TF-54807, Inscripción: 8',
             'imprint_vat_id'           => 'CIF: B76659168',
             'imprint_ceo'              => 'Christina Toepel',
-            'imprint_phone'            => '+34 616 571 860',
-            'imprint_whatsapp_url'     => 'https://wa.me/34616571860',
+            'imprint_phone'            => '+34 641 25 22 08',
+            'imprint_whatsapp_url'     => 'https://wa.me/34641252208',
             'imprint_support_email'    => 'support@pay4coins.com',
             'imprint_website_url'      => 'https://pay4coins.com',
             'imprint_external_url'     => 'https://pay4coins.com/de/impressum',
@@ -54,593 +362,110 @@ class EroCloudMailer
     }
 
     /**
-     * Lädt die zentralen Impressums- und Supportdaten aus der Datenbank-Tabelle `settings`
-     * (mit automatischem Fallback auf die Pay4Coins-Standardwerte).
+     * Lädt die Impressums- und Support-Kontaktdaten aus der `settings`-Tabelle
+     * (mit sauberen Fallbacks, falls ein Feld leer ist).
      *
-     * @param bool $forceReload
-     * @return array
+     * @return array<string, string>
      */
-    public static function getImprintData($forceReload = false)
+    public static function getImprintData(bool $forceReload = false): array
     {
-        if (self::$cachedImprint !== null && !$forceReload) {
-            return self::$cachedImprint;
+        if (self::$imprintCache !== null && !$forceReload) {
+            return self::$imprintCache;
         }
 
-        $data = self::getDefaultImprintData();
+        $defaults = self::getDefaultImprintData();
 
-        global $mysql;
-        if (function_exists('p4c_query') && isset($mysql) && is_object($mysql)) {
-            $keys = array_keys($data);
-            $escapedKeys = [];
-            foreach ($keys as $k) {
-                $escapedKeys[] = "'" . p4c_escape_string($k) . "'";
-            }
-            $sql = "SELECT `variable`, `value` FROM `settings` WHERE `variable` IN (" . implode(',', $escapedKeys) . ");";
-            $rs  = @p4c_query($sql, __FILE__, __LINE__);
-            if ($rs && p4c_num_rows($rs) > 0) {
-                while ($row = p4c_fetch_object($rs)) {
-                    $varName = (string)($row->variable ?? '');
-                    $varVal  = trim((string)($row->value ?? ''));
-                    if ($varName !== '' && array_key_exists($varName, $data) && $varVal !== '') {
-                        $data[$varName] = $varVal;
-                    }
+        $keys = "'" . implode("','", array_keys($defaults)) . "'";
+        $rs   = p4c_query("SELECT `variable`, `value` FROM `settings` WHERE `variable` IN ($keys);", __FILE__, __LINE__);
+        if ($rs && p4c_num_rows($rs) > 0) {
+            while ($row = p4c_fetch_object($rs)) {
+                $var = (string)($row->variable ?? '');
+                $val = trim((string)($row->value ?? ''));
+                if ($var !== '' && $val !== '' && array_key_exists($var, $defaults)) {
+                    $defaults[$var] = $val;
                 }
             }
         }
 
-        self::$cachedImprint = $data;
-        return $data;
+        $defaults['support_email'] = $defaults['imprint_support_email'];
+
+        self::$imprintCache = $defaults;
+        return self::$imprintCache;
     }
 
     /**
-     * Speichert die zentralen Impressums- und Supportdaten in der Datenbank-Tabelle `settings`.
+     * Speichert die zentralen Impressums- und Support-Daten in der Tabelle `settings`.
      *
-     * @param array $input
-     * @return bool
+     * @param array<string, string> $input
      */
-    public static function saveImprintData(array $input)
+    public static function saveImprintData(array $input): bool
     {
-        if (!function_exists('p4c_query')) {
-            return false;
-        }
-
         $defaults = self::getDefaultImprintData();
-        foreach ($defaults as $key => $defaultVal) {
-            $val = isset($input[$key]) ? trim((string)$input[$key]) : $defaultVal;
-            if ($val === '') {
-                $val = $defaultVal;
-            }
-            $sql = "INSERT INTO `settings` (`variable`, `value`)
-                    VALUES ('" . p4c_escape_string($key) . "', '" . p4c_escape_string($val) . "')
-                    ON DUPLICATE KEY UPDATE `value` = '" . p4c_escape_string($val) . "';";
-            p4c_query($sql, __FILE__, __LINE__);
+        foreach ($defaults as $key => $fallback) {
+            $val = isset($input[$key]) && trim((string)$input[$key]) !== ''
+                ? trim((string)$input[$key])
+                : $fallback;
+            $keyEsc = p4c_escape_string($key);
+            $valEsc = p4c_escape_string($val);
+            p4c_query(
+                "INSERT INTO `settings` (`variable`, `value`) VALUES ('{$keyEsc}', '{$valEsc}')
+                 ON DUPLICATE KEY UPDATE `value` = '{$valEsc}';",
+                __FILE__,
+                __LINE__
+            );
         }
 
-        self::$cachedImprint = null;
+        self::$imprintCache = null;
         return true;
     }
 
     /**
-     * Erzeugt einen kryptografisch signierten HMAC-SHA256 Token für den 1-Klick-Abmeldelink ohne Login-Zwang.
+     * Baut aus einem Template in `includes/mail_templates/<template>.inc.php`
+     * Betreff, HTML-Body (im edlen EroCloud Layout) und Plaintext-Body zusammen.
      *
-     * @param int    $merchantId
-     * @param string $notificationType z.B. 'movie_converted'
-     * @return string
+     * @param string               $templateName Name des Templates (z.B. 'movie_converted', 'content_reviewed', 'co_actor_status')
+     * @param array<string, mixed> $vars         Variablen für das Template
+     * @return array{subject: string, html: string, text: string}
      */
-    public static function generateUnsubscribeToken($merchantId, $notificationType = 'movie_converted')
+    public static function renderTemplate(string $templateName, array $vars = []): array
     {
-        $mid  = abs((int)$merchantId);
-        $type = trim((string)$notificationType);
-        $key  = defined('AES_KEY') ? (string)AES_KEY : 'erocloud_fallback_key';
-        $data = $mid . '|' . $type;
-        $sig  = hash_hmac('sha256', $data, $key);
+        $safeName     = preg_replace('/[^a-zA-Z0-9_-]/', '', $templateName);
+        $templateFile = dirname(__DIR__) . '/mail_templates/' . $safeName . '.inc.php';
+        $layoutFile   = dirname(__DIR__) . '/mail_templates/layout.inc.php';
 
-        return rtrim(strtr(base64_encode($data . '|' . $sig), '+/', '-_'), '=');
-    }
-
-    /**
-     * Prüft einen 1-Klick-Abmelde-Token und gibt bei Gültigkeit ['merchant_id' => int, 'type' => string] zurück.
-     *
-     * @param string $token
-     * @return array|null
-     */
-    public static function verifyUnsubscribeToken($token)
-    {
-        $rawToken = trim((string)$token);
-        if ($rawToken === '') {
-            return null;
+        if (!is_file($templateFile)) {
+            throw new \RuntimeException('E-Mail-Template nicht gefunden: ' . $safeName);
         }
 
-        $b64 = strtr($rawToken, '-_', '+/');
-        $pad = strlen($b64) % 4;
-        if ($pad > 0) {
-            $b64 .= str_repeat('=', 4 - $pad);
-        }
+        $imprint = self::getImprintData();
 
-        $decoded = @base64_decode($b64, true);
-        if (!is_string($decoded) || $decoded === '') {
-            return null;
-        }
-
-        $parts = explode('|', $decoded);
-        if (count($parts) !== 3) {
-            return null;
-        }
-
-        $mid  = abs((int)$parts[0]);
-        $type = trim((string)$parts[1]);
-        $sig  = trim((string)$parts[2]);
-
-        if ($mid <= 0 || $type === '' || $sig === '') {
-            return null;
-        }
-
-        $key      = defined('AES_KEY') ? (string)AES_KEY : 'erocloud_fallback_key';
-        $expected = hash_hmac('sha256', $mid . '|' . $type, $key);
-
-        if (!hash_equals($expected, $sig)) {
-            return null;
-        }
-
-        return [
-            'merchant_id' => $mid,
-            'type'        => $type,
-        ];
-    }
-
-    /**
-     * Stellt sicher, dass die zentralen Benachrichtigungs-Tabellen (`EroCloudNotificationCenter`)
-     * sowie die Spalten in `merchants` und `movies` existieren.
-     * Wird idempotent beim ersten Aufruf pro Request geprüft.
-     */
-    public static function ensureNotificationColumns(): void
-    {
-        static $checked = false;
-        if ($checked) {
-            return;
-        }
-        $checked = true;
-
-        if (!class_exists('EroCloudNotificationCenter') && defined('SOURCEDIR') && file_exists(SOURCEDIR . '/includes/klassen/EroCloudNotificationCenter.inc.php')) {
-            include_once SOURCEDIR . '/includes/klassen/EroCloudNotificationCenter.inc.php';
-        }
-        if (class_exists('EroCloudNotificationCenter')) {
-            EroCloudNotificationCenter::ensureTablesExist();
-        }
-
-        $rsM = p4c_query("SHOW COLUMNS FROM `merchants` LIKE 'notify_movie_converted';", __FILE__, __LINE__);
-        if ($rsM && p4c_num_rows($rsM) === 0) {
-            p4c_query("SET SESSION sql_mode = '';", __FILE__, __LINE__);
-            p4c_query("ALTER TABLE `merchants` ADD COLUMN `notify_movie_converted` TINYINT(1) NOT NULL DEFAULT 1;", __FILE__, __LINE__);
-        }
-
-        $rsMov1 = p4c_query("SHOW COLUMNS FROM `movies` LIKE 'notify_on_convert';", __FILE__, __LINE__);
-        if ($rsMov1 && p4c_num_rows($rsMov1) === 0) {
-            p4c_query("SET SESSION sql_mode = '';", __FILE__, __LINE__);
-            p4c_query("ALTER TABLE `movies` ADD COLUMN `notify_on_convert` TINYINT(1) NOT NULL DEFAULT 1;", __FILE__, __LINE__);
-        }
-
-        $rsMov2 = p4c_query("SHOW COLUMNS FROM `movies` LIKE 'notify_sent_at';", __FILE__, __LINE__);
-        if ($rsMov2 && p4c_num_rows($rsMov2) === 0) {
-            p4c_query("SET SESSION sql_mode = '';", __FILE__, __LINE__);
-            p4c_query("ALTER TABLE `movies` ADD COLUMN `notify_sent_at` DATETIME NULL DEFAULT NULL;", __FILE__, __LINE__);
-        }
-    }
-
-    /**
-     * Liest die gespeicherte Standard-Präferenz des Creators für Konvertierungs-E-Mails (1 = aktiv, 0 = aus)
-     * über das zentrale `EroCloudNotificationCenter`.
-     */
-    public static function getMerchantNotifyPreference(int $merchantId): int
-    {
-        $merchantId = abs((int)$merchantId);
-        if ($merchantId <= 0) {
-            return 1;
-        }
-
-        self::ensureNotificationColumns();
-
-        if (class_exists('EroCloudNotificationCenter')) {
-            return EroCloudNotificationCenter::isEnabled(
-                $merchantId,
-                EroCloudNotificationCenter::EVENT_MOVIE_CONVERTED,
-                EroCloudNotificationCenter::CHANNEL_EMAIL
-            ) ? 1 : 0;
-        }
-
-        $rs = p4c_query("SELECT `notify_movie_converted` FROM `merchants` WHERE `id` = '" . $merchantId . "' LIMIT 1;", __FILE__, __LINE__);
-        if ($rs && p4c_num_rows($rs) > 0) {
-            $row = p4c_fetch_object($rs);
-            return isset($row->notify_movie_converted) ? (abs((int)$row->notify_movie_converted) === 1 ? 1 : 0) : 1;
-        }
-
-        return 1;
-    }
-
-    /**
-     * Speichert die Präferenz des Creators für Konvertierungs-E-Mails (1 = aktiv, 0 = deaktiviert)
-     * im zentralen `EroCloudNotificationCenter` (und synchron in `merchants`).
-     */
-    public static function setMerchantNotifyPreference(int $merchantId, int $enabled, string $updatedVia = 'upload_checkbox'): void
-    {
-        $merchantId = abs((int)$merchantId);
-        $flag       = ($enabled === 1) ? 1 : 0;
-        if ($merchantId <= 0) {
-            return;
-        }
-
-        self::ensureNotificationColumns();
-
-        if (class_exists('EroCloudNotificationCenter')) {
-            EroCloudNotificationCenter::setPreference(
-                $merchantId,
-                EroCloudNotificationCenter::EVENT_MOVIE_CONVERTED,
-                EroCloudNotificationCenter::CHANNEL_EMAIL,
-                $flag === 1,
-                $updatedVia
-            );
-            return;
-        }
-
-        p4c_query("UPDATE `merchants` SET `notify_movie_converted` = '" . $flag . "' WHERE `id` = '" . $merchantId . "' LIMIT 1;", __FILE__, __LINE__);
-    }
-
-    /**
-     * Verarbeitet den 1-Klick-Abmeldelink (`route=email-unsubscribe&token=...`) OHNE Login-Zwang.
-     * Unterstützt:
-     * - RFC 8058 One-Click POST Requests (Gmail/Apple Mail)
-     * - Browser-Aufrufe (GET) zum Abbestellen des geklickten Themas
-     * - Sofort-Wiederaktivierung (`&action=resubscribe`)
-     * - Komplett-Abmeldung aller E-Mails (`&action=unsubscribe_all`)
-     * - Granulares Speichern einzelner Themen (`POST action=save_preferences`)
-     */
-    public static function handleUnsubscribeRequest(string $token, string $action = 'unsubscribe', bool $isOneClickPost = false): void
-    {
-        header('Referrer-Policy: no-referrer');
-        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-
-        self::ensureNotificationColumns();
-
-        $verified = self::verifyUnsubscribeToken($token);
-        if (!is_array($verified) || empty($verified['merchant_id'])) {
-            if ($isOneClickPost) {
-                http_response_code(400);
-                header('Content-Type: text/plain; charset=utf-8');
-                echo 'Invalid token';
-                exit;
-            }
-            self::renderUnsubscribePage(false, 0, $token, 'invalid', '');
-            exit;
-        }
-
-        $merchantId = abs((int)$verified['merchant_id']);
-        $eventKey   = trim((string)($verified['type'] ?? EroCloudNotificationCenter::EVENT_MOVIE_CONVERTED));
-        $catalog    = class_exists('EroCloudNotificationCenter') ? EroCloudNotificationCenter::getEventCatalog() : [];
-        if (!isset($catalog[$eventKey])) {
-            $eventKey = EroCloudNotificationCenter::EVENT_MOVIE_CONVERTED;
-        }
-
-        $act = strtolower(trim($action));
-
-        if ($isOneClickPost) {
-            if (class_exists('EroCloudNotificationCenter')) {
-                EroCloudNotificationCenter::setPreference($merchantId, $eventKey, EroCloudNotificationCenter::CHANNEL_EMAIL, false, 'rfc8058_one_click');
-            } else {
-                self::setMerchantNotifyPreference($merchantId, 0, 'rfc8058_one_click');
-            }
-            if ($eventKey === EroCloudNotificationCenter::EVENT_MOVIE_CONVERTED) {
-                p4c_query("UPDATE `movies` SET `notify_on_convert` = '0'
-                    WHERE `merchant_id` = '" . $merchantId . "'
-                      AND `convert_status` IN ('0', '1')
-                      AND `notify_sent_at` IS NULL;", __FILE__, __LINE__);
-            }
-            http_response_code(200);
-            header('Content-Type: text/plain; charset=utf-8');
-            echo 'OK';
-            exit;
-        }
-
-        $statusMode = 'unsubscribed_single';
-
-        if ($act === 'save_preferences' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-            $enabledEvents = isset($_POST['email_events']) && is_array($_POST['email_events']) ? $_POST['email_events'] : [];
-            foreach (array_keys($catalog) as $evKey) {
-                $isOn = in_array($evKey, $enabledEvents, true);
-                EroCloudNotificationCenter::setPreference($merchantId, $evKey, EroCloudNotificationCenter::CHANNEL_EMAIL, $isOn, 'unsubscribe_page_matrix');
-                if ($evKey === EroCloudNotificationCenter::EVENT_MOVIE_CONVERTED) {
-                    $flag = $isOn ? 1 : 0;
-                    p4c_query("UPDATE `movies` SET `notify_on_convert` = '" . $flag . "'
-                        WHERE `merchant_id` = '" . $merchantId . "'
-                          AND `convert_status` IN ('0', '1')
-                          AND `notify_sent_at` IS NULL;", __FILE__, __LINE__);
-                }
-            }
-            $statusMode = 'saved_matrix';
-        } elseif ($act === 'unsubscribe_all') {
-            if (class_exists('EroCloudNotificationCenter')) {
-                EroCloudNotificationCenter::unsubscribeAllEmail($merchantId, 'one_click_unsubscribe_all');
-            }
-            p4c_query("UPDATE `movies` SET `notify_on_convert` = '0'
-                WHERE `merchant_id` = '" . $merchantId . "'
-                  AND `convert_status` IN ('0', '1')
-                  AND `notify_sent_at` IS NULL;", __FILE__, __LINE__);
-            $statusMode = 'unsubscribed_all';
-        } elseif ($act === 'resubscribe') {
-            if (class_exists('EroCloudNotificationCenter')) {
-                EroCloudNotificationCenter::setPreference($merchantId, $eventKey, EroCloudNotificationCenter::CHANNEL_EMAIL, true, 'one_click_resubscribe');
-            }
-            if ($eventKey === EroCloudNotificationCenter::EVENT_MOVIE_CONVERTED) {
-                p4c_query("UPDATE `movies` SET `notify_on_convert` = '1'
-                    WHERE `merchant_id` = '" . $merchantId . "'
-                      AND `convert_status` IN ('0', '1')
-                      AND `notify_sent_at` IS NULL;", __FILE__, __LINE__);
-            }
-            $statusMode = 'resubscribed_single';
-        } else {
-            if (class_exists('EroCloudNotificationCenter')) {
-                EroCloudNotificationCenter::setPreference($merchantId, $eventKey, EroCloudNotificationCenter::CHANNEL_EMAIL, false, 'one_click_unsubscribe');
-            } else {
-                self::setMerchantNotifyPreference($merchantId, 0, 'one_click_unsubscribe');
-            }
-            if ($eventKey === EroCloudNotificationCenter::EVENT_MOVIE_CONVERTED) {
-                p4c_query("UPDATE `movies` SET `notify_on_convert` = '0'
-                    WHERE `merchant_id` = '" . $merchantId . "'
-                      AND `convert_status` IN ('0', '1')
-                      AND `notify_sent_at` IS NULL;", __FILE__, __LINE__);
-            }
-            $statusMode = 'unsubscribed_single';
-        }
-
-        if (function_exists('log_action')) {
-            $oldSessionMid = $_SESSION['merchant_id'] ?? null;
-            $_SESSION['merchant_id'] = $merchantId;
-            log_action("E-Mail-Präferenzen über Abmelde-Link geändert ({$statusMode}: {$eventKey}).");
-            if ($oldSessionMid === null) {
-                unset($_SESSION['merchant_id']);
-            } else {
-                $_SESSION['merchant_id'] = $oldSessionMid;
-            }
-        }
-
-        self::renderUnsubscribePage(true, $merchantId, $token, $statusMode, $eventKey);
-        exit;
-    }
-
-    /**
-     * Rendert das öffentliche 1-Klick-E-Mail-Präferenz-Center (ohne Login-Zwang).
-     */
-    private static function renderUnsubscribePage(bool $isValid, int $merchantId, string $token, string $statusMode, string $eventKey): void
-    {
-        $imprint        = self::getImprintData();
-        $impCompany     = htmlspecialchars((string)($imprint['imprint_company_name'] ?? 'CIPA Media S.L.U.'), ENT_QUOTES, 'UTF-8');
-        $impStreet      = htmlspecialchars((string)($imprint['imprint_address_street'] ?? 'Av. Emilio Luque Moreno 19 Oficina 6'), ENT_QUOTES, 'UTF-8');
-        $impCity        = htmlspecialchars((string)($imprint['imprint_address_city'] ?? 'ES-38300 La Orotava (S/C de Tenerife)'), ENT_QUOTES, 'UTF-8');
-        $impSupportMail = htmlspecialchars((string)($imprint['imprint_support_email'] ?? 'support@pay4coins.com'), ENT_QUOTES, 'UTF-8');
-        $impExternalUrl = htmlspecialchars((string)($imprint['imprint_external_url'] ?? 'https://pay4coins.com/de/impressum'), ENT_QUOTES, 'UTF-8');
-
-        $mcpUrl = defined('MCP_URL') ? rtrim((string)MCP_URL, '/') : 'https://erocloud.net';
-        if (defined('MCP_DIR') && is_dir(MCP_DIR . '/mcp_neu/web')) {
-            $dashboardUrl = $mcpUrl . '/mcp_neu/web/index.php';
-            $apiBaseUrl   = $mcpUrl . '/mcp_neu/web/api.php';
-        } else {
-            $dashboardUrl = $mcpUrl . '/index.php';
-            $apiBaseUrl   = $mcpUrl . '/api.php';
-        }
-
-        $safeToken       = rawurlencode($token);
-        $formActionUrl   = htmlspecialchars($apiBaseUrl . '?route=email-unsubscribe&token=' . $safeToken, ENT_QUOTES, 'UTF-8');
-        $unsubAllHref    = htmlspecialchars($apiBaseUrl . '?route=email-unsubscribe&token=' . $safeToken . '&action=unsubscribe_all', ENT_QUOTES, 'UTF-8');
-        $safeDashUrl     = htmlspecialchars($dashboardUrl, ENT_QUOTES, 'UTF-8');
-
-        $matrix     = ($isValid && class_exists('EroCloudNotificationCenter')) ? EroCloudNotificationCenter::getPreferencesMatrix($merchantId) : [];
-        $eventTitle = isset($matrix[$eventKey]['title']) ? (string)$matrix[$eventKey]['title'] : 'Video fertig konvertiert & Vorschaubilder bereit';
-
-        header('Content-Type: text/html; charset=utf-8');
-
-        echo '<!DOCTYPE html>
-<html lang="de">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Deine E-Mail-Einstellungen – EroCloud</title>
-    <style>
-        * { box-sizing: border-box; }
-        body { margin: 0; padding: 32px 16px; background-color: #F1F5F9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1E293B; }
-        .card { max-width: 600px; margin: 16px auto 24px auto; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06); }
-        .card-header { background: linear-gradient(135deg, #0284C7 0%, #4297D7 100%); padding: 20px 28px; color: #FFFFFF; display: flex; justify-content: space-between; align-items: center; }
-        .card-header .brand { font-size: 20px; font-weight: 700; }
-        .card-header .sub { font-size: 12px; color: #E0F2FE; font-weight: 600; }
-        .card-body { padding: 28px; }
-        .status-banner { display: flex; align-items: flex-start; gap: 14px; padding: 16px 18px; border-radius: 10px; margin-bottom: 24px; }
-        .status-info { background-color: #EFF6FF; border: 1px solid #BFDBFE; color: #1E3A8A; }
-        .status-success { background-color: #F0FDF4; border: 1px solid #BBF7D0; color: #14532D; }
-        .status-error { background-color: #FEF2F2; border: 1px solid #FECACA; color: #7F1D1D; }
-        .status-icon { font-size: 22px; line-height: 1; flex-shrink: 0; margin-top: 2px; }
-        .pref-list { border: 1px solid #E2E8F0; border-radius: 10px; overflow: hidden; margin-bottom: 22px; }
-        .pref-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 16px 18px; border-bottom: 1px solid #E2E8F0; background: #FFFFFF; }
-        .pref-item:last-child { border-bottom: none; }
-        .pref-badge { display: inline-block; font-size: 11px; font-weight: 700; color: #0284C7; background: #E0F2FE; padding: 2px 8px; border-radius: 999px; margin-bottom: 4px; }
-        .pref-title { font-size: 14px; font-weight: 700; color: #0F172A; margin: 0 0 4px 0; }
-        .pref-desc { font-size: 12.5px; line-height: 18px; color: #64748B; margin: 0; }
-        .switch-wrap { flex-shrink: 0; padding-top: 4px; }
-        .switch-input { width: 20px; height: 20px; accent-color: #0284C7; cursor: pointer; }
-        .btn-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
-        .btn { display: inline-block; padding: 11px 20px; font-size: 14px; font-weight: 600; border-radius: 8px; text-decoration: none; border: none; cursor: pointer; transition: opacity 0.15s; }
-        .btn:hover { opacity: 0.92; }
-        .btn-primary { background-color: #0284C7; color: #FFFFFF; }
-        .btn-outline { background-color: #FFFFFF; color: #475569; border: 1px solid #CBD5E1; }
-        .btn-danger-outline { background-color: #FFFFFF; color: #DC2626; border: 1px solid #FCA5A5; }
-        .footer { max-width: 600px; margin: 0 auto; text-align: center; font-size: 12px; line-height: 18px; color: #64748B; }
-        .footer a { color: #0284C7; text-decoration: none; }
-    </style>
-</head>
-<body>
-    <div class="card">
-        <div class="card-header">
-            <span class="brand">EroCloud</span>
-            <span class="sub">Benachrichtigungs-Center</span>
-        </div>
-        <div class="card-body">';
-
-        if (!$isValid) {
-            echo '
-            <div class="status-banner status-error">
-                <div class="status-icon">&#10007;</div>
-                <div>
-                    <strong>Ungültiger oder beschädigter Link</strong><br>
-                    <span style="font-size: 13.5px;">Dieser Link konnte leider nicht verifiziert werden. Bitte prüfe, ob die URL vollständig übernommen wurde.</span>
-                </div>
-            </div>
-            <a href="' . $safeDashUrl . '" class="btn btn-primary">Zum EroCloud Partner-Bereich</a>';
-        } else {
-            if ($statusMode === 'saved_matrix') {
-                echo '
-                <div class="status-banner status-success">
-                    <div class="status-icon">&#10003;</div>
-                    <div>
-                        <strong>Deine E-Mail-Einstellungen wurden gespeichert!</strong><br>
-                        <span style="font-size: 13.5px;">Deine Auswahl wurde sofort für dein EroCloud Creator-Konto übernommen.</span>
-                    </div>
-                </div>';
-            } elseif ($statusMode === 'unsubscribed_all') {
-                echo '
-                <div class="status-banner status-info">
-                    <div class="status-icon">&#10003;</div>
-                    <div>
-                        <strong>Alle E-Mail-Benachrichtigungen deaktiviert</strong><br>
-                        <span style="font-size: 13.5px;">Du erhältst ab sofort keine automatischen Benachrichtigungen oder Creator-News mehr per E-Mail. Unten kannst du einzelne Themen jederzeit wieder einschalten.</span>
-                    </div>
-                </div>';
-            } elseif ($statusMode === 'resubscribed_single') {
-                echo '
-                <div class="status-banner status-success">
-                    <div class="status-icon">&#10003;</div>
-                    <div>
-                        <strong>Benachrichtigung wieder aktiviert!</strong><br>
-                        <span style="font-size: 13.5px;">Du erhältst für <strong>„' . htmlspecialchars($eventTitle, ENT_QUOTES, 'UTF-8') . '“</strong> ab sofort wieder E-Mails.</span>
-                    </div>
-                </div>';
-            } else {
-                echo '
-                <div class="status-banner status-info">
-                    <div class="status-icon">&#10003;</div>
-                    <div>
-                        <strong>Abmeldung erfolgreich gespeichert</strong><br>
-                        <span style="font-size: 13.5px;">Du erhältst ab sofort keine E-Mails mehr zum Thema <strong>„' . htmlspecialchars($eventTitle, ENT_QUOTES, 'UTF-8') . '“</strong>.</span>
-                    </div>
-                </div>';
-            }
-
-            echo '
-            <p style="font-size: 14px; color: #475569; margin: 0 0 14px 0;">
-                Hier kannst du ohne Login genau festlegen, über welche Themen dich EroCloud per E-Mail informieren darf:
-            </p>
-            <form method="post" action="' . $formActionUrl . '">
-                <input type="hidden" name="action" value="save_preferences">
-                <div class="pref-list">';
-
-            foreach ($matrix as $evKey => $meta) {
-                $isChecked = !empty($meta['channels']['email']);
-                $safeKey   = htmlspecialchars((string)$evKey, ENT_QUOTES, 'UTF-8');
-                $safeBadge = htmlspecialchars((string)$meta['badge'], ENT_QUOTES, 'UTF-8');
-                $safeTitle = htmlspecialchars((string)$meta['title'], ENT_QUOTES, 'UTF-8');
-                $safeDesc  = htmlspecialchars((string)$meta['description'], ENT_QUOTES, 'UTF-8');
-
-                echo '
-                    <label class="pref-item" style="cursor: pointer;">
-                        <div>
-                            <span class="pref-badge">' . $safeBadge . '</span>
-                            <div class="pref-title">' . $safeTitle . '</div>
-                            <p class="pref-desc">' . $safeDesc . '</p>
-                        </div>
-                        <div class="switch-wrap">
-                            <input type="checkbox" class="switch-input" name="email_events[]" value="' . $safeKey . '" ' . ($isChecked ? 'checked' : '') . '>
-                        </div>
-                    </label>';
-            }
-
-            echo '
-                </div>
-                <div class="btn-row">
-                    <div>
-                        <button type="submit" class="btn btn-primary">Auswahl speichern</button>
-                        <a href="' . $safeDashUrl . '" class="btn btn-outline">Zum Partner-Bereich</a>
-                    </div>
-                    <a href="' . $unsubAllHref . '" class="btn btn-danger-outline" style="font-size: 12.5px; padding: 9px 14px;">Alle abbestellen</a>
-                </div>
-            </form>';
-        }
-
-        echo '
-        </div>
-    </div>
-    <div class="footer">
-        <strong>EroCloud</strong> &ndash; ein Projekt von Pay4Coins (' . $impCompany . ')<br>
-        ' . $impStreet . ' &bull; ' . $impCity . '<br>
-        <a href="' . $impExternalUrl . '" target="_blank">Impressum</a> &bull; Support: <a href="mailto:' . $impSupportMail . '">' . $impSupportMail . '</a>
-    </div>
-</body>
-</html>';
-    }
-
-    /**
-     * Erzeugt die vollständige 1-Klick-Abmelde-URL für eine Creator-Benachrichtigung.
-     *
-     * @param int    $merchantId
-     * @param string $notificationType
-     * @return string
-     */
-    public static function getUnsubscribeUrl($merchantId, $notificationType = 'movie_converted')
-    {
-        $token = self::generateUnsubscribeToken($merchantId, $notificationType);
-        return 'https://erocloud.net/mcp_neu/web/api.php?route=email-unsubscribe&token=' . rawurlencode($token);
-    }
-
-    /**
-     * Rendert ein E-Mail-Inhalts-Template innerhalb des globalen EroCloud HTML-Rahmen-Layouts.
-     *
-     * @param string $templateName Name der Datei unter includes/mail_templates/ (z.B. 'movie_converted')
-     * @param array  $vars         Variablen für das Template
-     * @return array               ['subject' => string, 'html' => string, 'text' => string]
-     */
-    public static function renderTemplate($templateName, array $vars = [])
-    {
-        $safeName     = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)$templateName);
-        $templateFile = SOURCEDIR . '/includes/mail_templates/' . $safeName . '.inc.php';
-        $layoutFile   = SOURCEDIR . '/includes/mail_templates/layout.inc.php';
-
-        $imprintData      = self::getImprintData();
-        $vars['imprint']  = $imprintData;
-
-        $emailSubject     = isset($vars['subject']) ? (string)$vars['subject'] : 'Deine Benachrichtigung von EroCloud';
-        $emailPreheader   = isset($vars['preheader']) ? (string)$vars['preheader'] : '';
+        // Standard-Variablen bereitstellen
+        $emailSubject     = 'Nachricht von EroCloud';
+        $emailPreheader   = '';
         $emailHtmlContent = '';
         $emailTextContent = '';
 
-        if (file_exists($templateFile)) {
-            include $templateFile;
-        } else {
-            $emailHtmlContent = isset($vars['body_html']) ? (string)$vars['body_html'] : '';
-            $emailTextContent = isset($vars['body_text']) ? (string)$vars['body_text'] : '';
-        }
-
-        $layoutVars = array_merge($vars, [
-            'subject'      => $emailSubject,
-            'preheader'    => $emailPreheader,
-            'content_html' => $emailHtmlContent,
-            'content_text' => $emailTextContent,
-            'imprint'      => $imprintData,
-        ]);
+        // Template ausführen (füllt $emailSubject, $emailPreheader, $emailHtmlContent, $emailTextContent)
+        include $templateFile;
 
         $finalHtml = $emailHtmlContent;
-        $finalText = $emailTextContent;
+        $finalText = trim($emailTextContent);
 
-        if (file_exists($layoutFile)) {
+        if (is_file($layoutFile)) {
+            $layoutVars = [
+                'subject'         => $emailSubject,
+                'preheader'       => $emailPreheader,
+                'content_html'    => $emailHtmlContent,
+                'content_text'    => $emailTextContent,
+                'unsubscribe_url' => (string)($vars['unsubscribe_url'] ?? ''),
+                'intended_email'  => (string)($vars['intended_email'] ?? $vars['recipient_email'] ?? $vars['to_email'] ?? ''),
+                'creator_name'    => (string)($vars['creator_name'] ?? 'Creator'),
+                'merchant_id'     => isset($vars['merchant_id']) ? abs((int)$vars['merchant_id']) : 0,
+                'imprint'         => $imprint,
+                'movie_edit_url'  => (string)($vars['movie_edit_url'] ?? ''),
+                'action_url'      => (string)($vars['action_url'] ?? $vars['movie_edit_url'] ?? ''),
+            ];
             include $layoutFile;
-        }
-
-        if (trim((string)$finalText) === '') {
-            $finalText = self::htmlToPlainText($finalHtml);
         }
 
         return [
@@ -651,271 +476,486 @@ class EroCloudMailer
     }
 
     /**
-     * Versendet eine E-Mail über den zentralen EroCloud SMTP-Server (inkl. Sandbox-Schutz & Error-Logging).
+     * Versendet eine E-Mail über SMTP (mit automatischem Sandbox-Schutz).
      *
-     * @param string $toEmail     Ziel-E-Mail-Adresse (wird bei aktivem MAIL_SANDBOX_MODE auf erocms@gmail.com umgebogen)
-     * @param string $toName      Name des Empfängers
-     * @param string $subject     E-Mail-Betreff
-     * @param string $htmlBody    HTML-Inhalt
-     * @param string $textBody    Optionaler Plaintext-Inhalt (wird sonst automatisch aus $htmlBody erzeugt)
-     * @param array  $options     Optionale Zusatzparameter: ['unsubscribe_url' => string, 'reply_to' => string, 'attachments' => array]
-     * @return bool
+     * @param string               $toEmail   Eigentliche Empfänger-Adresse (Partner/Creator)
+     * @param string               $toName    Empfänger-Name
+     * @param string               $subject   Betreffzeile
+     * @param string               $htmlBody  Vollständiger HTML-Body
+     * @param string               $textBody  Reiner Text-Body (Multipart/Alternative)
+     * @param array<string, mixed> $options   Optionale Zusatzdaten (z.B. 'reply_to', 'unsubscribe_url')
+     * @return array{success: bool, recipient: string, intended_recipient: string, sandbox: bool, message_id: string, error: string}
      */
-    public function send($toEmail, $toName, $subject, $htmlBody, $textBody = '', array $options = [])
-    {
-        $this->lastError          = '';
-        $this->lastMessageId      = '';
-        $this->effectiveRecipient = '';
+    public static function send(
+        string $toEmail,
+        string $toName,
+        string $subject,
+        string $htmlBody,
+        string $textBody = '',
+        array $options = []
+    ): array {
+        $cfg = self::getSmtpConfig();
 
-        $intendedEmail = trim((string)$toEmail);
-        $intendedName  = trim((string)$toName);
-        $subjectStr    = trim((string)$subject);
-        $htmlStr       = (string)$htmlBody;
-        $textStr       = trim((string)$textBody);
-
-        // 1. Zentraler Sandbox-/Test-Schutz:
-        // Solange MAIL_SANDBOX_MODE === true ist, geht KEINE E-Mail an echte Creator raus!
-        $isSandbox = (!defined('MAIL_SANDBOX_MODE') || MAIL_SANDBOX_MODE === true);
-        $sandboxTo = defined('MAIL_SANDBOX_RECIPIENT') ? trim((string)MAIL_SANDBOX_RECIPIENT) : 'erocms@gmail.com';
-
-        if ($isSandbox) {
-            $actualToEmail = ($sandboxTo !== '') ? $sandboxTo : 'erocms@gmail.com';
-            $actualToName  = ($intendedName !== '') ? $intendedName . ' (Test-Empfänger)' : 'EroCloud Test';
-        } else {
-            $actualToEmail = $intendedEmail;
-            $actualToName  = $intendedName;
+        $isSandbox       = (bool)$cfg['sandbox_mode'];
+        $sandboxTarget   = trim((string)$cfg['sandbox_recipient']);
+        if ($sandboxTarget === '') {
+            $sandboxTarget = 'erocms@gmail.com';
         }
 
-        $this->effectiveRecipient = $actualToEmail;
+        $intendedRecipient = trim($toEmail);
+        $actualRecipient   = $isSandbox ? $sandboxTarget : $intendedRecipient;
+        $actualSubject     = $subject;
 
-        if ($actualToEmail === '' || !filter_var($actualToEmail, FILTER_VALIDATE_EMAIL)) {
-            $this->lastError = 'Ungültige Empfänger-E-Mail-Adresse: ' . $actualToEmail;
-            $this->logMailError($this->lastError, __FILE__, __LINE__);
-            return false;
+        self::$lastStaticRecipient = $actualRecipient;
+        self::$lastStaticError     = '';
+        self::$lastStaticMessageId = '';
+
+        if ($isSandbox && $intendedRecipient !== '') {
+            $textBody = "[SANDBOX-TESTMODUS | Ursprünglicher Empfänger: $toName <$intendedRecipient>]\n\n" . $textBody;
         }
 
-        if ($textStr === '') {
-            $textStr = self::htmlToPlainText($htmlStr);
+        if ($actualRecipient === '' || !filter_var($actualRecipient, FILTER_VALIDATE_EMAIL)) {
+            $err = 'Ungültige Empfänger-E-Mail-Adresse: ' . $actualRecipient;
+            self::$lastStaticError = $err;
+            return [
+                'success'            => false,
+                'recipient'          => $actualRecipient,
+                'intended_recipient' => $intendedRecipient,
+                'sandbox'            => $isSandbox,
+                'message_id'         => '',
+                'error'              => $err,
+            ];
         }
+
+        $imprint     = self::getImprintData();
+        $fromAddress = (string)$cfg['from_address'];
+        $fromName    = (string)$cfg['from_name'];
+        $replyTo     = !empty($options['reply_to'])
+            ? (string)$options['reply_to']
+            : (defined('MAIL_REPLY_TO_ADDRESS') ? trim((string)MAIL_REPLY_TO_ADDRESS) : '');
 
         try {
             $mail = new PHPMailer(true);
-
-            // Sprache für Fehlermeldungen auf Deutsch setzen
-            $langDir = SOURCEDIR . '/includes/klassen/phpmailer/language/';
-            if (is_dir($langDir)) {
-                $mail->setLanguage('de', $langDir);
-            }
-
-            // SMTP-Grundeinstellungen
-            $mail->isSMTP();
-            $mail->Host       = defined('MAIL_SMTP_HOST') ? (string)MAIL_SMTP_HOST : 'mail.erocloud.net';
-            $mail->Port       = defined('MAIL_SMTP_PORT') ? (int)MAIL_SMTP_PORT : 587;
-            $mail->SMTPAuth   = true;
-            $mail->Username   = defined('MAIL_SMTP_USER') ? (string)MAIL_SMTP_USER : 'noreply@erocloud.net';
-            $mail->Password   = defined('MAIL_SMTP_PASS') ? (string)MAIL_SMTP_PASS : '';
-            $mail->Timeout    = 15;
-
-            $secureMode = defined('MAIL_SMTP_SECURE') ? strtolower((string)MAIL_SMTP_SECURE) : 'tls';
-            if ($secureMode === 'ssl' || (int)$mail->Port === 465) {
-                $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-            } else {
-                $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-            }
-
-            // Anti-Spam & Header-Hygiene:
-            // Hostname explizit auf erocloud.net setzen, damit Message-ID auch im CLI-Cronjob
-            // niemals @localhost lautet (verhindert SpamAssassin INVALID_MSGID).
-            $mail->Hostname = 'erocloud.net';
             $mail->CharSet  = PHPMailer::CHARSET_UTF8;
             $mail->Encoding = PHPMailer::ENCODING_QUOTED_PRINTABLE;
-            $mail->XMailer  = ' '; // Unterdrückt den Standard X-Mailer Header
+            $mail->setLanguage('de');
 
-            // Absender (noreply@erocloud.net)
-            $fromAddress = defined('MAIL_FROM_ADDRESS') ? (string)MAIL_FROM_ADDRESS : 'noreply@erocloud.net';
-            $fromName    = defined('MAIL_FROM_NAME') ? (string)MAIL_FROM_NAME : 'EroCloud';
-            $mail->setFrom($fromAddress, $fromName);
+            // SMTP-Konfiguration aus getSmtpConfig()
+            $mail->isSMTP();
+            $mail->Host       = (string)$cfg['smtp_host'];
+            $mail->Port       = (int)$cfg['smtp_port'];
+            $mail->SMTPAuth   = true;
+            $mail->Username   = (string)$cfg['smtp_user'];
+            $mail->Password   = (string)$cfg['smtp_pass'];
+            $mail->Timeout    = 15;
 
-            // Best Practice für noreply-Systemmails:
-            // Kein abweichender Reply-To-Header, außer er wurde explizit übergeben (verhindert Domain-Mismatch bei Spamfiltern).
-            $replyToAddr = isset($options['reply_to']) && trim((string)$options['reply_to']) !== ''
-                ? trim((string)$options['reply_to'])
-                : (defined('MAIL_REPLY_TO_ADDRESS') ? trim((string)MAIL_REPLY_TO_ADDRESS) : '');
-            $replyToName = isset($options['reply_to_name']) && trim((string)$options['reply_to_name']) !== ''
-                ? trim((string)$options['reply_to_name'])
-                : (defined('MAIL_REPLY_TO_NAME') ? trim((string)MAIL_REPLY_TO_NAME) : $fromName);
-
-            if ($replyToAddr !== '' && filter_var($replyToAddr, FILTER_VALIDATE_EMAIL)) {
-                $mail->addReplyTo($replyToAddr, $replyToName);
-            }
-
-            // Empfänger hinzufügen
-            if ($actualToName !== '') {
-                $mail->addAddress($actualToEmail, $actualToName);
+            $secureMode = strtolower((string)$cfg['smtp_secure']);
+            if ($secureMode === 'ssl') {
+                $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+            } elseif ($secureMode === 'tls') {
+                $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
             } else {
-                $mail->addAddress($actualToEmail);
+                $mail->SMTPSecure = '';
+                $mail->SMTPAutoTLS = false;
             }
 
-            // RFC 8058 One-Click List-Unsubscribe Header (wichtig für Gmail/Apple Mail Zustellbarkeit)
-            if (!empty($options['unsubscribe_url'])) {
-                $unsubUrl = trim((string)$options['unsubscribe_url']);
-                if ($unsubUrl !== '') {
-                    $mail->addCustomHeader('List-Unsubscribe', '<' . $unsubUrl . '>');
-                    $mail->addCustomHeader('List-Unsubscribe-Post', 'List-Unsubscribe=One-Click');
-                }
+            // Auf lokaler XAMPP-Entwicklungsumgebung selbstsignierte Zertifikate tolerieren
+            $mail->SMTPOptions = [
+                'ssl' => [
+                    'verify_peer'       => false,
+                    'verify_peer_name'  => false,
+                    'allow_self_signed' => true,
+                ],
+            ];
+
+            $mail->setFrom($fromAddress, $fromName);
+            $mail->addAddress($actualRecipient, $toName);
+
+            if ($replyTo !== '' && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
+                $mail->addReplyTo($replyTo, $fromName);
             }
 
-            // Optionale Dateianhänge
             if (!empty($options['attachments']) && is_array($options['attachments'])) {
                 foreach ($options['attachments'] as $att) {
-                    if (is_array($att) && !empty($att[0]) && file_exists((string)$att[0])) {
-                        $attName = isset($att[1]) ? (string)$att[1] : basename((string)$att[0]);
-                        $mail->addAttachment((string)$att[0], $attName);
-                    } elseif (is_string($att) && file_exists($att)) {
+                    if (is_array($att) && !empty($att[0]) && is_file((string)$att[0])) {
+                        $mail->addAttachment((string)$att[0], (string)($att[1] ?? ''));
+                    } elseif (is_string($att) && $att !== '' && is_file($att)) {
                         $mail->addAttachment($att);
                     }
                 }
             }
 
-            // Inhalt (HTML + Plaintext AltBody)
+            // Anti-Spam & Bulk-Sender Header (RFC 8058 List-Unsubscribe für Gmail, GMX, Web.de, T-Online)
+            $unsubEmail = $imprint['support_email'] ?? 'support@pay4coins.com';
+            if (!empty($options['unsubscribe_url'])) {
+                $unsubUrl = (string)$options['unsubscribe_url'];
+                $mail->addCustomHeader('List-Unsubscribe', '<' . $unsubUrl . '>, <mailto:' . $unsubEmail . '?subject=Unsubscribe>');
+                $mail->addCustomHeader('List-Unsubscribe-Post', 'List-Unsubscribe=One-Click');
+            } else {
+                $mail->addCustomHeader('List-Unsubscribe', '<mailto:' . $unsubEmail . '?subject=Unsubscribe>');
+            }
+            $mail->addCustomHeader('X-Auto-Response-Suppress', 'OOF, AutoReply');
+
             $mail->isHTML(true);
-            $mail->Subject = $subjectStr;
-            $mail->Body    = $htmlStr;
-            $mail->AltBody = $textStr;
+            $mail->Subject = $actualSubject;
+            $mail->Body    = $htmlBody;
+            $mail->AltBody = $textBody !== '' ? $textBody : strip_tags($htmlBody);
 
             $mail->send();
-            $this->lastMessageId = (string)$mail->getLastMessageID();
+            $msgId = trim((string)$mail->getLastMessageID(), '<> ');
+            self::$lastStaticMessageId = $msgId;
 
-            return true;
-        } catch (PHPMailerException $e) {
-            $this->lastError = 'PHPMailer Fehler: ' . $e->getMessage();
-            $this->logMailError($this->lastError . ' (Ziel: ' . $actualToEmail . ', Betreff: ' . $subjectStr . ')', __FILE__, __LINE__);
-            return false;
-        } catch (\Throwable $e) {
-            $this->lastError = 'Allgemeiner Mail-Fehler: ' . $e->getMessage();
-            $this->logMailError($this->lastError . ' (Ziel: ' . $actualToEmail . ', Betreff: ' . $subjectStr . ')', __FILE__, __LINE__);
-            return false;
+            return [
+                'success'            => true,
+                'recipient'          => $actualRecipient,
+                'intended_recipient' => $intendedRecipient,
+                'sandbox'            => $isSandbox,
+                'message_id'         => $msgId,
+                'error'              => '',
+            ];
+        } catch (PHPMailerException|\Throwable $e) {
+            $errMsg = 'Mailer Error (' . $actualRecipient . '): ' . $e->getMessage();
+            self::$lastStaticError = $e->getMessage();
+            if (function_exists('p4c_errorlog')) {
+                p4c_errorlog($errMsg);
+            }
+            return [
+                'success'            => false,
+                'recipient'          => $actualRecipient,
+                'intended_recipient' => $intendedRecipient,
+                'sandbox'            => $isSandbox,
+                'message_id'         => '',
+                'error'              => $e->getMessage(),
+            ];
         }
     }
 
     /**
-     * Komfort-Methode: Versendet direkt die Benachrichtigungs-E-Mail für ein fertig konvertiertes Video.
+     * Komfort-Methode: Versendet die „Video fertig konvertiert & Vorschaubilder bereit“-E-Mail
+     * inklusive Magic-Link (1-Klick-Auto-Login), Opt-Out-Prüfung und Versand-Protokollierung.
      *
-     * @param array $data ['merchant_id' => int, 'to_email' => string, 'creator_name' => string, 'movie_id' => int, 'upload_datetime' => string, 'playtime' => string, 'resolution' => string]
-     * @return bool
+     * @param array<string, mixed> $data
+     * @return array{success: bool, recipient: string, sandbox: bool, message_id?: string, error: string, skipped?: bool}
      */
-    public function sendMovieConvertedNotification(array $data)
+    public static function sendMovieConvertedNotification(array $data): array
     {
-        $merchantId  = isset($data['merchant_id']) ? abs((int)$data['merchant_id']) : 0;
-        $toEmail     = isset($data['to_email']) ? trim((string)$data['to_email']) : '';
-        $creatorName = isset($data['creator_name']) ? trim((string)$data['creator_name']) : 'Creator';
-        $movieId     = isset($data['movie_id']) ? abs((int)$data['movie_id']) : 0;
-        $playtime    = isset($data['playtime']) ? trim((string)$data['playtime']) : '-';
-        $resolution  = isset($data['resolution']) ? trim((string)$data['resolution']) : 'HD';
+        $merchantId = isset($data['merchant_id']) ? abs((int)$data['merchant_id']) : 0;
+        $movieId    = isset($data['movie_id']) ? abs((int)$data['movie_id']) : 0;
+        $forceSend  = !empty($data['force_send']);
+        $eventKey   = \EroCloudNotificationCenter::EVENT_MOVIE_CONVERTED;
 
-        $rawDt = isset($data['upload_datetime']) ? trim((string)$data['upload_datetime']) : '';
-        if ($rawDt !== '' && $rawDt !== '0000-00-00 00:00:00') {
-            $ts = @strtotime($rawDt);
-            $uploadDatetime = ($ts !== false && $ts > 0) ? date('d.m.Y \u\m H:i \U\h\r', $ts) : $rawDt;
-        } else {
-            $uploadDatetime = date('d.m.Y \u\m H:i \U\h\r');
+        if (empty($data['recipient_email']) && !empty($data['to_email'])) {
+            $data['recipient_email'] = (string)$data['to_email'];
         }
 
-        $unsubscribeUrl = self::getUnsubscribeUrl($merchantId, 'movie_converted');
-
-        if (!class_exists('EroCloudMagicLink') && defined('SOURCEDIR') && file_exists(SOURCEDIR . '/includes/klassen/EroCloudMagicLink.inc.php')) {
-            include_once SOURCEDIR . '/includes/klassen/EroCloudMagicLink.inc.php';
+        if ($merchantId > 0 && (empty($data['recipient_email']) || empty($data['creator_name']))) {
+            $mInfo = self::getMerchantRecipientInfo($merchantId);
+            if (empty($data['recipient_email'])) {
+                $data['recipient_email'] = $mInfo['email'];
+            }
+            if (empty($data['creator_name'])) {
+                $data['creator_name'] = $mInfo['creator_name'];
+            }
         }
 
-        if (class_exists('EroCloudMagicLink') && $merchantId > 0) {
-            $movieEditUrl = EroCloudMagicLink::forMovie($merchantId, $movieId, 'email', 'movie_converted');
+        $intendedEmail = trim((string)($data['recipient_email'] ?? ''));
+
+        // 1. Prüfen, ob der Partner diese Benachrichtigung aktiviert hat (Opt-out Check)
+        if (!$forceSend && $merchantId > 0) {
+            if (!\EroCloudNotificationCenter::isEnabled($merchantId, $eventKey)) {
+                return [
+                    'success'   => false,
+                    'skipped'   => true,
+                    'recipient' => $intendedEmail,
+                    'sandbox'   => false,
+                    'error'     => 'Partner hat diese Benachrichtigungs-Kategorie deaktiviert.',
+                ];
+            }
+
+            // Doppel-Versand für denselben Film verhindern
+            if ($movieId > 0 && \EroCloudNotificationCenter::hasAlreadyBeenSent($merchantId, $eventKey, $movieId)) {
+                return [
+                    'success'   => true,
+                    'skipped'   => true,
+                    'recipient' => $intendedEmail,
+                    'sandbox'   => false,
+                    'error'     => '',
+                ];
+            }
+        }
+
+        // 2. 1-Klick Auto-Login Magic-Link generieren (falls merchant_id vorhanden)
+        $targetRoute = '#/movie?id=' . $movieId;
+        if (!empty($data['movie_edit_url'])) {
+            $editUrl = (string)$data['movie_edit_url'];
+        } elseif ($merchantId > 0 && class_exists('EroCloudMagicLink')) {
+            $editUrl = \EroCloudMagicLink::createUrl($merchantId, $targetRoute, 72);
         } else {
-            $movieEditUrl = 'https://erocloud.net/mcp_neu/web/index.php#/movie?id=' . $movieId;
+            $editUrl = self::getMcpWebUrl() . '/' . $targetRoute;
+        }
+
+        // 3. 1-Klick-Abmeldelink für Header & Footer erzeugen
+        $unsubscribeUrl = '';
+        if ($merchantId > 0 && class_exists('EroCloudNotificationCenter')) {
+            $unsubscribeUrl = \EroCloudNotificationCenter::createUnsubscribeUrl($merchantId, $eventKey);
         }
 
         $rendered = self::renderTemplate('movie_converted', [
             'merchant_id'     => $merchantId,
-            'creator_name'    => $creatorName,
-            'intended_email'  => $toEmail,
+            'intended_email'  => $intendedEmail,
+            'creator_name'    => (string)($data['creator_name'] ?? 'Creator'),
             'movie_id'        => $movieId,
-            'upload_datetime' => $uploadDatetime,
-            'playtime'        => $playtime,
-            'resolution'      => $resolution,
-            'movie_edit_url'  => $movieEditUrl,
+            'upload_datetime' => (string)($data['upload_datetime'] ?? date('d.m.Y \u\m H:i \U\h\r')),
+            'playtime'        => (string)($data['playtime'] ?? '-'),
+            'resolution'      => (string)($data['resolution'] ?? 'HD'),
+            'movie_edit_url'  => $editUrl,
             'unsubscribe_url' => $unsubscribeUrl,
         ]);
 
-        $sent = $this->send(
-            $toEmail,
+        $sendResult = self::send(
+            $intendedEmail,
+            (string)($data['creator_name'] ?? 'Creator'),
+            $rendered['subject'],
+            $rendered['html'],
+            $rendered['text'],
+            ['unsubscribe_url' => $unsubscribeUrl]
+        );
+
+        // 4. Versand in `notification_log` protokollieren
+        if (class_exists('EroCloudNotificationCenter')) {
+            $logStatus = $sendResult['success']
+                ? ($sendResult['sandbox'] ? 'sandbox_sent' : 'sent')
+                : 'failed';
+            \EroCloudNotificationCenter::logDelivery(
+                $merchantId,
+                $eventKey,
+                $movieId,
+                $sendResult['recipient'],
+                $sendResult['sandbox'],
+                $logStatus,
+                $sendResult['error'],
+                $intendedEmail !== '' ? $intendedEmail : $sendResult['recipient'],
+                $rendered['subject'],
+                'movie_converted',
+                $rendered['html']
+            );
+        }
+
+        return $sendResult;
+    }
+
+    /**
+     * Komfort-Methode: Versendet eine Prüfungs-Status-Benachrichtigung für Filme, Foto-Alben oder Darsteller-Profile
+     * (Freigabe oder Ablehnung/Korrekturhinweis) inkl. 1-Klick Magic-Link und Tracking.
+     *
+     * @param array<string, mixed> $data
+     * @return array{success: bool, recipient: string, sandbox: bool, message_id?: string, error: string, skipped?: bool}
+     */
+    public static function sendContentReviewNotification(array $data): array
+    {
+        $merchantId   = isset($data['merchant_id']) ? abs((int)$data['merchant_id']) : 0;
+        $contentType  = strtolower(trim((string)($data['content_type'] ?? 'movie'))); // movie | photo_album | actor
+        $contentId    = isset($data['content_id']) ? abs((int)$data['content_id']) : 0;
+        $reviewStatus = strtolower(trim((string)($data['review_status'] ?? 'approved'))); // approved | rejected
+        $forceSend    = !empty($data['force_send']);
+        $eventKey     = \EroCloudNotificationCenter::EVENT_CONTENT_REVIEWED;
+
+        if (empty($data['recipient_email']) && !empty($data['to_email'])) {
+            $data['recipient_email'] = (string)$data['to_email'];
+        }
+
+        $mInfo = self::getMerchantRecipientInfo($merchantId);
+        $intendedEmail = !empty($data['recipient_email']) ? trim((string)$data['recipient_email']) : $mInfo['email'];
+        $creatorName   = !empty($data['creator_name']) ? trim((string)$data['creator_name']) : $mInfo['creator_name'];
+
+        if (!$forceSend && $merchantId > 0) {
+            if (!\EroCloudNotificationCenter::isEnabled($merchantId, $eventKey)) {
+                return [
+                    'success'   => false,
+                    'skipped'   => true,
+                    'recipient' => $intendedEmail,
+                    'sandbox'   => false,
+                    'error'     => 'Partner hat diese Benachrichtigungs-Kategorie deaktiviert.',
+                ];
+            }
+        }
+
+        if ($contentType === 'photo_album') {
+            $targetRoute = '#/photo-album?id=' . $contentId;
+            $triggerPrefix = 'album_';
+        } elseif ($contentType === 'actor') {
+            $targetRoute = '#/actor?id=' . $contentId;
+            $triggerPrefix = 'actor_';
+        } else {
+            $targetRoute = '#/movie?id=' . $contentId;
+            $triggerPrefix = 'movie_';
+        }
+
+        $triggerDetail = $triggerPrefix . ($reviewStatus === 'approved' ? 'approved' : 'rejected');
+
+        if ($merchantId > 0 && class_exists('EroCloudMagicLink')) {
+            $actionUrl = \EroCloudMagicLink::createUrl($merchantId, $targetRoute, 72);
+        } else {
+            $actionUrl = self::getMcpWebUrl() . '/' . $targetRoute;
+        }
+
+        $unsubscribeUrl = '';
+        if ($merchantId > 0 && class_exists('EroCloudNotificationCenter')) {
+            $unsubscribeUrl = \EroCloudNotificationCenter::createUnsubscribeUrl($merchantId, $eventKey);
+        }
+
+        $rendered = self::renderTemplate('content_reviewed', [
+            'merchant_id'      => $merchantId,
+            'intended_email'   => $intendedEmail,
+            'creator_name'     => $creatorName,
+            'content_type'     => $contentType,
+            'content_id'       => $contentId,
+            'review_status'    => $reviewStatus,
+            'review_datetime'  => (string)($data['review_datetime'] ?? date('d.m.Y \u\m H:i \U\h\r')),
+            'reason_title'     => (string)($data['reason_title'] ?? ''),
+            'reason_text'      => (string)($data['reason_text'] ?? ''),
+            'extra_meta_label' => (string)($data['extra_meta_label'] ?? ''),
+            'extra_meta_value' => (string)($data['extra_meta_value'] ?? ''),
+            'action_url'       => $actionUrl,
+            'unsubscribe_url'  => $unsubscribeUrl,
+        ]);
+
+        $sendResult = self::send(
+            $intendedEmail,
             $creatorName,
             $rendered['subject'],
             $rendered['html'],
             $rendered['text'],
-            [
-                'unsubscribe_url' => $unsubscribeUrl,
-            ]
+            ['unsubscribe_url' => $unsubscribeUrl]
         );
 
-        if (class_exists('EroCloudNotificationCenter') && $merchantId > 0) {
-            $isSandbox = (!defined('MAIL_SANDBOX_MODE') || MAIL_SANDBOX_MODE === true);
-            $statusStr = $sent ? ($isSandbox ? 'sandbox' : 'sent') : 'failed';
-            EroCloudNotificationCenter::logDelivery(
+        if (class_exists('EroCloudNotificationCenter')) {
+            $logStatus = $sendResult['success']
+                ? ($sendResult['sandbox'] ? 'sandbox_sent' : 'sent')
+                : 'failed';
+            \EroCloudNotificationCenter::logDelivery(
                 $merchantId,
-                EroCloudNotificationCenter::EVENT_MOVIE_CONVERTED,
-                EroCloudNotificationCenter::CHANNEL_EMAIL,
-                'movie',
-                $movieId,
-                $this->effectiveRecipient !== '' ? $this->effectiveRecipient : $toEmail,
-                $statusStr,
-                $this->lastMessageId,
-                $this->lastError
+                $eventKey,
+                $contentId,
+                $sendResult['recipient'],
+                $sendResult['sandbox'],
+                $logStatus,
+                $sendResult['error'],
+                $intendedEmail !== '' ? $intendedEmail : $sendResult['recipient'],
+                $rendered['subject'],
+                $triggerDetail,
+                $rendered['html']
             );
         }
 
-        return $sent;
+        return $sendResult;
     }
 
     /**
-     * Konvertiert HTML-E-Mail-Inhalt sauber in lesbaren Plaintext für den Multipart-AltBody.
+     * Komfort-Methode: Versendet eine Status-Benachrichtigung zum 18+ ID-Check / Drehpartner
+     * (Smartphone QR-Check eingereicht, im ACP bestätigt oder abgelehnt).
      *
-     * @param string $html
-     * @return string
+     * @param array<string, mixed> $data
+     * @return array{success: bool, recipient: string, sandbox: bool, message_id?: string, error: string, skipped?: bool}
      */
-    public static function htmlToPlainText($html)
+    public static function sendCoActorStatusNotification(array $data): array
     {
-        $text = (string)$html;
-        $text = (string)preg_replace('/<style\b[^>]*>(.*?)<\/style>/is', '', $text);
-        $text = (string)preg_replace('/<head\b[^>]*>(.*?)<\/head>/is', '', $text);
-        $text = (string)preg_replace('/<(br|\/p|\/div|\/tr|\/h[1-6]|\/li)\b[^>]*>/i', "\n", $text);
-        $text = (string)preg_replace('/<a\b[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/is', '$2 ($1)', $text);
-        $text = strip_tags($text);
-        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $lines = explode("\n", str_replace(["\r\n", "\r"], "\n", $text));
-        $clean = [];
-        foreach ($lines as $line) {
-            $clean[] = trim($line);
+        $merchantId = isset($data['merchant_id']) ? abs((int)$data['merchant_id']) : 0;
+        $coActorId  = isset($data['co_actor_id']) ? abs((int)$data['co_actor_id']) : 0;
+        $statusType = strtolower(trim((string)($data['status_type'] ?? 'verified'))); // submitted | verified | rejected
+        $forceSend  = !empty($data['force_send']);
+        $eventKey   = \EroCloudNotificationCenter::EVENT_CO_ACTOR_STATUS;
+
+        if (empty($data['recipient_email']) && !empty($data['to_email'])) {
+            $data['recipient_email'] = (string)$data['to_email'];
         }
-        $result = implode("\n", $clean);
-        $result = (string)preg_replace("/\n{3,}/", "\n\n", $result);
 
-        return trim($result);
-    }
+        $mInfo = self::getMerchantRecipientInfo($merchantId);
+        $intendedEmail = !empty($data['recipient_email']) ? trim((string)$data['recipient_email']) : $mInfo['email'];
+        $creatorName   = !empty($data['creator_name']) ? trim((string)$data['creator_name']) : $mInfo['creator_name'];
 
-    /**
-     * Schreibt Mail-Fehler in die zentrale EroCloud Error-Log-Datei (/var/www/web1/htdocs/log/.errorlog).
-     *
-     * @param string $message
-     * @param string $file
-     * @param int    $line
-     * @return void
-     */
-    private function logMailError($message, $file, $line)
-    {
-        global $class_errorlog;
-        if (isset($class_errorlog) && is_object($class_errorlog) && method_exists($class_errorlog, 'log')) {
-            $class_errorlog->log('[EroCloudMailer] ' . (string)$message, (string)$file, (int)$line);
+        if (!$forceSend && $merchantId > 0) {
+            if (!\EroCloudNotificationCenter::isEnabled($merchantId, $eventKey)) {
+                return [
+                    'success'   => false,
+                    'skipped'   => true,
+                    'recipient' => $intendedEmail,
+                    'sandbox'   => false,
+                    'error'     => 'Partner hat diese Benachrichtigungs-Kategorie deaktiviert.',
+                ];
+            }
+        }
+
+        $targetRoute   = '#/co-actors';
+        $triggerDetail = 'co_actor_' . (in_array($statusType, ['submitted', 'verified', 'rejected'], true) ? $statusType : 'verified');
+
+        if ($merchantId > 0 && class_exists('EroCloudMagicLink')) {
+            $actionUrl = \EroCloudMagicLink::createUrl($merchantId, $targetRoute, 72);
         } else {
-            error_log('[EroCloudMailer] ' . (string)$message . ' in ' . (string)$file . ':' . (int)$line);
+            $actionUrl = self::getMcpWebUrl() . '/' . $targetRoute;
         }
+
+        $unsubscribeUrl = '';
+        if ($merchantId > 0 && class_exists('EroCloudNotificationCenter')) {
+            $unsubscribeUrl = \EroCloudNotificationCenter::createUnsubscribeUrl($merchantId, $eventKey);
+        }
+
+        $refCode = !empty($data['ref_code']) ? (string)$data['ref_code'] : sprintf('DP-%d-%03d', $merchantId, $coActorId);
+
+        $rendered = self::renderTemplate('co_actor_status', [
+            'merchant_id'     => $merchantId,
+            'intended_email'  => $intendedEmail,
+            'creator_name'    => $creatorName,
+            'co_actor_id'     => $coActorId,
+            'ref_code'        => $refCode,
+            'role_label'      => (string)($data['role_label'] ?? 'Drehpartner'),
+            'alias_label'     => (string)($data['alias_label'] ?? ('Eintrag #' . $coActorId)),
+            'status_type'     => $statusType,
+            'event_datetime'  => (string)($data['event_datetime'] ?? date('d.m.Y \u\m H:i \U\h\r')),
+            'reason_text'     => (string)($data['reason_text'] ?? ''),
+            'action_url'      => $actionUrl,
+            'unsubscribe_url' => $unsubscribeUrl,
+        ]);
+
+        $sendResult = self::send(
+            $intendedEmail,
+            $creatorName,
+            $rendered['subject'],
+            $rendered['html'],
+            $rendered['text'],
+            ['unsubscribe_url' => $unsubscribeUrl]
+        );
+
+        if (class_exists('EroCloudNotificationCenter')) {
+            $logStatus = $sendResult['success']
+                ? ($sendResult['sandbox'] ? 'sandbox_sent' : 'sent')
+                : 'failed';
+            \EroCloudNotificationCenter::logDelivery(
+                $merchantId,
+                $eventKey,
+                $coActorId,
+                $sendResult['recipient'],
+                $sendResult['sandbox'],
+                $logStatus,
+                $sendResult['error'],
+                $intendedEmail !== '' ? $intendedEmail : $sendResult['recipient'],
+                $rendered['subject'],
+                $triggerDetail,
+                $rendered['html']
+            );
+        }
+
+        return $sendResult;
+    }
+
+    private static function cleanUtf8(string $val): string
+    {
+        if ($val === '') {
+            return '';
+        }
+        if (!mb_check_encoding($val, 'UTF-8')) {
+            $val = mb_convert_encoding($val, 'UTF-8', 'ISO-8859-1');
+        }
+        return html_entity_decode($val, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     }
 }

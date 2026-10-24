@@ -69,16 +69,28 @@ final class SystemTechController
         $imprint  = class_exists('EroCloudMailer') ? \EroCloudMailer::getImprintData(true) : [];
         $defaults = class_exists('EroCloudMailer') ? \EroCloudMailer::getDefaultImprintData() : [];
 
+        $rawSmtp = class_exists('EroCloudMailer') ? \EroCloudMailer::getSmtpConfig(true) : [];
         $smtpConfig = [
-            'is_sandbox'        => (!defined('MAIL_SANDBOX_MODE') || MAIL_SANDBOX_MODE === true),
-            'sandbox_recipient' => defined('MAIL_SANDBOX_RECIPIENT') ? (string)MAIL_SANDBOX_RECIPIENT : 'erocms@gmail.com',
-            'smtp_host'         => defined('MAIL_SMTP_HOST') ? (string)MAIL_SMTP_HOST : 'mail.erocloud.net',
-            'smtp_port'         => defined('MAIL_SMTP_PORT') ? (int)MAIL_SMTP_PORT : 587,
-            'smtp_secure'       => defined('MAIL_SMTP_SECURE') ? strtoupper((string)MAIL_SMTP_SECURE) : 'STARTTLS',
-            'smtp_user'         => defined('MAIL_SMTP_USER') ? (string)MAIL_SMTP_USER : 'noreply@erocloud.net',
-            'from_address'      => defined('MAIL_FROM_ADDRESS') ? (string)MAIL_FROM_ADDRESS : 'noreply@erocloud.net',
-            'from_name'         => defined('MAIL_FROM_NAME') ? (string)MAIL_FROM_NAME : 'EroCloud',
+            'is_sandbox'        => isset($rawSmtp['sandbox_mode']) ? (bool)$rawSmtp['sandbox_mode'] : (!defined('MAIL_SANDBOX_MODE') || MAIL_SANDBOX_MODE === true),
+            'sandbox_mode'      => isset($rawSmtp['sandbox_mode']) ? (bool)$rawSmtp['sandbox_mode'] : (!defined('MAIL_SANDBOX_MODE') || MAIL_SANDBOX_MODE === true),
+            'sandbox_recipient' => (string)($rawSmtp['sandbox_recipient'] ?? 'erocms@gmail.com'),
+            'smtp_host'         => (string)($rawSmtp['smtp_host'] ?? 't199.nlserver.net'),
+            'smtp_port'         => (int)($rawSmtp['smtp_port'] ?? 587),
+            'smtp_secure'       => strtolower((string)($rawSmtp['smtp_secure'] ?? 'tls')),
+            'smtp_user'         => (string)($rawSmtp['smtp_user'] ?? 'no-reply@erocloud.net'),
+            'has_password'      => !empty($rawSmtp['has_password']),
+            'from_address'      => (string)($rawSmtp['from_address'] ?? 'no-reply@erocloud.net'),
+            'from_name'         => (string)($rawSmtp['from_name'] ?? 'EroCloud Partner-Team'),
         ];
+
+        $eventCatalog   = class_exists('EroCloudNotificationCenter') ? \EroCloudNotificationCenter::getEventCatalog() : [];
+        $triggerCatalog = class_exists('EroCloudNotificationCenter') ? \EroCloudNotificationCenter::getTriggerCatalog() : [];
+        $optInStats     = class_exists('EroCloudNotificationCenter') ? \EroCloudNotificationCenter::getOptInStats() : [];
+
+        $triggerMap = [];
+        foreach ($triggerCatalog as $trig) {
+            $triggerMap[(string)$trig['trigger_key']] = $trig;
+        }
 
         // Versand-Statistiken aus notification_log
         $mailStats = [
@@ -91,12 +103,12 @@ final class SystemTechController
         ];
 
         $todayStart = date('Y-m-d 00:00:00');
-        $rsStats = @p4c_query(
+        $rsStats = p4c_query(
             "SELECT
                 SUM(CASE WHEN `status` = 'sent' THEN 1 ELSE 0 END) AS `cnt_sent`,
-                SUM(CASE WHEN `status` = 'sandbox' THEN 1 ELSE 0 END) AS `cnt_sandbox`,
+                SUM(CASE WHEN `status` IN ('sandbox', 'sandbox_sent') THEN 1 ELSE 0 END) AS `cnt_sandbox`,
                 SUM(CASE WHEN `status` = 'failed' THEN 1 ELSE 0 END) AS `cnt_failed`,
-                SUM(CASE WHEN `created_at` >= '" . p4c_escape_string($todayStart) . "' AND `status` IN ('sent','sandbox') THEN 1 ELSE 0 END) AS `cnt_today`
+                SUM(CASE WHEN `created_at` >= '" . p4c_escape_string($todayStart) . "' AND `status` IN ('sent','sandbox','sandbox_sent') THEN 1 ELSE 0 END) AS `cnt_today`
              FROM `notification_log`;",
             __FILE__,
             __LINE__
@@ -108,43 +120,98 @@ final class SystemTechController
             $mailStats['sent_today']    = (int)($rS->cnt_today ?? 0);
         }
 
-        $rsPrefCnt = @p4c_query("SELECT COUNT(*) AS `cnt` FROM `notification_preferences`;", __FILE__, __LINE__);
+        $rsPrefCnt = p4c_query("SELECT COUNT(*) AS `cnt` FROM `merchant_notification_prefs`;", __FILE__, __LINE__);
         if ($rsPrefCnt && ($rP = p4c_fetch_object($rsPrefCnt))) {
             $mailStats['prefs_count'] = (int)($rP->cnt ?? 0);
         }
 
-        $rsPushCnt = @p4c_query("SELECT COUNT(*) AS `cnt` FROM `notification_push_subscriptions` WHERE `is_active` = 1;", __FILE__, __LINE__);
-        if ($rsPushCnt && ($rPu = p4c_fetch_object($rsPushCnt))) {
-            $mailStats['push_devices'] = (int)($rPu->cnt ?? 0);
-        }
-
-        // Letzte 100 Einträge aus notification_log
+        // Letzte 150 Einträge aus notification_log inkl. Partner-Infos für lückenloses Tracking
         $deliveryLogs = [];
-        $rsLogs = @p4c_query(
+        $aesKey = p4c_escape_string((string)AES_KEY);
+        $rsLogs = p4c_query(
             "SELECT
-                `id`, `merchant_id`, `channel`, `event_key`, `reference_type`, `reference_id`,
-                `recipient`, `status`, `message_id`, `error_message`, `created_at`
-             FROM `notification_log`
-             ORDER BY `id` DESC
-             LIMIT 100;",
+                l.`id`,
+                l.`merchant_id`,
+                l.`event_key`,
+                l.`trigger_detail`,
+                l.`reference_id`,
+                l.`recipient`,
+                l.`intended_recipient`,
+                l.`subject`,
+                (l.`body_html` IS NOT NULL AND l.`body_html` != '') AS `has_body`,
+                l.`sandbox_mode`,
+                l.`status`,
+                l.`error_message`,
+                l.`created_at`,
+                m.`partner_id`,
+                CAST(AES_DECRYPT(m.`username`, '{$aesKey}') AS CHAR) AS `dec_username`,
+                CAST(AES_DECRYPT(m.`email`, '{$aesKey}') AS CHAR) AS `dec_email`
+             FROM `notification_log` l
+             LEFT JOIN `merchants` m ON m.`id` = l.`merchant_id`
+             ORDER BY l.`id` DESC
+             LIMIT 150;",
             __FILE__,
             __LINE__
         );
         if ($rsLogs) {
             while ($row = p4c_fetch_object($rsLogs)) {
-                $ts = strtotime((string)($row->created_at ?? ''));
+                $ts        = strtotime((string)($row->created_at ?? ''));
+                $mid       = abs((int)$row->merchant_id);
+                $evKey     = (string)($row->event_key ?? '');
+                $trigKey   = (string)($row->trigger_detail ?? '');
+                if ($trigKey === '' && $evKey === 'movie_converted') {
+                    $trigKey = 'movie_converted';
+                }
+                $refId     = abs((int)$row->reference_id);
+                $evMeta    = $eventCatalog[$evKey] ?? null;
+                $trigMeta  = $triggerMap[$trigKey] ?? null;
+
+                $refLabel = '';
+                $refLink  = '';
+                if ($refId > 0) {
+                    if ($evKey === 'movie_converted' || str_starts_with($trigKey, 'movie_')) {
+                        $refLabel = 'Film #' . $refId;
+                        $refLink  = '#/movie-edit?id=' . $refId;
+                    } elseif (str_starts_with($trigKey, 'album_')) {
+                        $refLabel = 'Foto-Album #' . $refId;
+                        $refLink  = '#/photo-album-edit?id=' . $refId;
+                    } elseif (str_starts_with($trigKey, 'actor_')) {
+                        $refLabel = 'Darsteller #' . $refId;
+                        $refLink  = '#/actor?id=' . $refId;
+                    } elseif ($evKey === 'co_actor_status' || str_starts_with($trigKey, 'co_actor_')) {
+                        $refLabel = 'Drehpartner #' . $refId;
+                        $refLink  = '#/co-actors-checking';
+                    } else {
+                        $refLabel = 'Ref #' . $refId;
+                    }
+                }
+
+                $intendedRecip = trim((string)($row->intended_recipient ?? ''));
+                if ($intendedRecip === '' && !empty($row->dec_email)) {
+                    $intendedRecip = trim((string)$row->dec_email);
+                }
+
                 $deliveryLogs[] = [
-                    'id'             => abs((int)$row->id),
-                    'merchant_id'    => abs((int)$row->merchant_id),
-                    'channel'        => (string)($row->channel ?? 'email'),
-                    'event_key'      => (string)($row->event_key ?? ''),
-                    'reference_type' => (string)($row->reference_type ?? ''),
-                    'reference_id'   => abs((int)$row->reference_id),
-                    'recipient'      => (string)($row->recipient ?? ''),
-                    'status'         => (string)($row->status ?? ''),
-                    'message_id'     => (string)($row->message_id ?? ''),
-                    'error_message'  => (string)($row->error_message ?? ''),
-                    'created_at_de'  => ($ts !== false && $ts > 0) ? date('d.m.Y H:i:s', $ts) : (string)($row->created_at ?? '-'),
+                    'id'                 => abs((int)$row->id),
+                    'merchant_id'        => $mid,
+                    'partner_id'         => trim((string)($row->partner_id ?? '')),
+                    'merchant_username'  => trim((string)($row->dec_username ?? '')),
+                    'event_key'          => $evKey,
+                    'event_label'        => $evMeta ? (string)$evMeta['title'] : $evKey,
+                    'trigger_detail'     => $trigKey,
+                    'trigger_label'      => $trigMeta ? (string)$trigMeta['title'] : ($evMeta ? (string)$evMeta['title'] : $evKey),
+                    'trigger_badge_cls'  => $trigMeta ? (string)$trigMeta['badge_cls'] : 'bg-secondary bg-opacity-10 text-body border',
+                    'reference_id'       => $refId,
+                    'reference_label'    => $refLabel,
+                    'reference_link'     => $refLink,
+                    'recipient'          => (string)($row->recipient ?? ''),
+                    'intended_recipient' => $intendedRecip,
+                    'subject'            => (string)($row->subject ?? ''),
+                    'has_body'           => (int)($row->has_body ?? 0) === 1,
+                    'sandbox_mode'       => (int)($row->sandbox_mode ?? 0) === 1 || in_array((string)($row->status ?? ''), ['sandbox', 'sandbox_sent'], true),
+                    'status'             => (string)($row->status ?? ''),
+                    'error_message'      => (string)($row->error_message ?? ''),
+                    'created_at_de'      => ($ts !== false && $ts > 0) ? date('d.m.Y H:i:s', $ts) : (string)($row->created_at ?? '-'),
                 ];
             }
         }
@@ -177,7 +244,7 @@ final class SystemTechController
             ],
         ];
 
-        // Initiale Template-Vorschau für Tab 2 rendern
+        // Initiale Template-Vorschau für Tab 1 rendern
         $initialPreview = ['subject' => '', 'html' => '', 'text' => ''];
         if (class_exists('EroCloudMailer')) {
             $initialPreview = \EroCloudMailer::renderTemplate('movie_converted', [
@@ -197,10 +264,141 @@ final class SystemTechController
             'imprint'        => $imprint,
             'defaults'       => $defaults,
             'smtpConfig'     => $smtpConfig,
+            'eventCatalog'   => $eventCatalog,
+            'triggerCatalog' => $triggerCatalog,
+            'optInStats'     => $optInStats,
             'mailStats'      => $mailStats,
             'deliveryLogs'   => $deliveryLogs,
             'envInfo'        => $envInfo,
             'initialPreview' => $initialPreview,
+        ]);
+    }
+
+    // =========================================================================
+    // 1b. Postfach-, SMTP- & Sandbox-Konfiguration speichern (POST ?route=system-settings/save-smtp)
+    // =========================================================================
+    public function saveSmtp(): void
+    {
+        if (!Csrf::validate($this->request->csrfToken())) {
+            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte lade die Seite neu.', 403);
+            return;
+        }
+
+        $this->ensureMailClasses();
+        if (!class_exists('EroCloudMailer')) {
+            Response::error('EroCloudMailer-Klasse konnte nicht geladen werden.', 500);
+            return;
+        }
+
+        $smtpHost        = trim((string)$this->request->post('smtp_host', ''));
+        $smtpPort        = abs((int)$this->request->post('smtp_port', 587));
+        $smtpSecure      = strtolower(trim((string)$this->request->post('smtp_secure', 'tls')));
+        $smtpUser        = trim((string)$this->request->post('smtp_user', ''));
+        $smtpPass        = trim((string)$this->request->post('smtp_pass', ''));
+        $fromAddress     = trim((string)$this->request->post('from_address', ''));
+        $fromName        = trim((string)$this->request->post('from_name', ''));
+        $sandboxMode     = (int)$this->request->post('sandbox_mode', 0) === 1;
+        $sandboxRecip    = trim((string)$this->request->post('sandbox_recipient', ''));
+
+        if ($smtpHost === '' || $smtpUser === '' || $fromAddress === '') {
+            Response::error('Bitte fülle mindestens SMTP-Server, SMTP-Benutzer und Absender-E-Mail aus.', 400);
+            return;
+        }
+        if (!filter_var($fromAddress, FILTER_VALIDATE_EMAIL)) {
+            Response::error('Die eingegebene Absender-E-Mail-Adresse (From) ist ungültig.', 400);
+            return;
+        }
+        if ($sandboxMode && ($sandboxRecip === '' || !filter_var($sandboxRecip, FILTER_VALIDATE_EMAIL))) {
+            Response::error('Bei aktiviertem Sandbox-Modus muss eine gültige Sandbox-Ziel-E-Mail-Adresse angegeben werden.', 400);
+            return;
+        }
+
+        $ok = \EroCloudMailer::saveSmtpConfig([
+            'smtp_host'         => $smtpHost,
+            'smtp_port'         => $smtpPort > 0 ? $smtpPort : 587,
+            'smtp_secure'       => $smtpSecure,
+            'smtp_user'         => $smtpUser,
+            'smtp_pass'         => $smtpPass,
+            'from_address'      => $fromAddress,
+            'from_name'         => $fromName !== '' ? $fromName : 'EroCloud Partner-Team',
+            'sandbox_mode'      => $sandboxMode ? 1 : 0,
+            'sandbox_recipient' => $sandboxRecip !== '' ? $sandboxRecip : 'erocms@gmail.com',
+        ]);
+
+        if (!$ok) {
+            Response::error('Fehler beim Speichern der SMTP- und Postfach-Einstellungen.', 500);
+            return;
+        }
+
+        if (function_exists('log_action')) {
+            log_action('SMTP- & Postfach-Konfiguration aktualisiert (Host: ' . $smtpHost . ':' . $smtpPort . ', Sandbox: ' . ($sandboxMode ? 'AN -> ' . $sandboxRecip : 'AUS / LIVE') . ').');
+        }
+
+        $updated = \EroCloudMailer::getSmtpConfig(true);
+        unset($updated['smtp_pass']);
+
+        Response::json([
+            'status'     => 'ok',
+            'message'    => 'Die Postfach- und SMTP-Einstellungen wurden erfolgreich gespeichert.',
+            'smtpConfig' => $updated,
+        ]);
+    }
+
+    // =========================================================================
+    // 1c. Gesendete E-Mail im Detail abrufen (GET/POST ?route=system-settings/log-detail)
+    // =========================================================================
+    public function logDetail(): void
+    {
+        $this->ensureMailClasses();
+
+        $logId = abs((int)($this->request->get('id', $this->request->post('id', 0))));
+        if ($logId <= 0) {
+            Response::error('Ungültige Protokoll-ID.', 400);
+            return;
+        }
+
+        $aesKey = p4c_escape_string((string)AES_KEY);
+        $rs = p4c_query(
+            "SELECT
+                l.`id`, l.`merchant_id`, l.`event_key`, l.`trigger_detail`, l.`reference_id`,
+                l.`recipient`, l.`intended_recipient`, l.`subject`, l.`body_html`,
+                l.`sandbox_mode`, l.`status`, l.`error_message`, l.`created_at`,
+                m.`partner_id`,
+                CAST(AES_DECRYPT(m.`username`, '{$aesKey}') AS CHAR) AS `dec_username`
+             FROM `notification_log` l
+             LEFT JOIN `merchants` m ON m.`id` = l.`merchant_id`
+             WHERE l.`id` = '{$logId}'
+             LIMIT 1;",
+            __FILE__,
+            __LINE__
+        );
+
+        if (!$rs || p4c_num_rows($rs) === 0) {
+            Response::error('Protokoll-Eintrag #' . $logId . ' wurde nicht gefunden.', 404);
+            return;
+        }
+
+        $row = p4c_fetch_object($rs);
+        $ts  = strtotime((string)($row->created_at ?? ''));
+
+        Response::json([
+            'status' => 'ok',
+            'log'    => [
+                'id'                 => abs((int)$row->id),
+                'merchant_id'        => abs((int)$row->merchant_id),
+                'partner_id'         => trim((string)($row->partner_id ?? '')),
+                'merchant_username'  => trim((string)($row->dec_username ?? '')),
+                'event_key'          => (string)($row->event_key ?? ''),
+                'trigger_detail'     => (string)($row->trigger_detail ?? ''),
+                'reference_id'       => abs((int)$row->reference_id),
+                'recipient'          => (string)($row->recipient ?? ''),
+                'intended_recipient' => (string)($row->intended_recipient ?? ''),
+                'subject'            => (string)($row->subject ?? ''),
+                'body_html'          => (string)($row->body_html ?? ''),
+                'status'             => (string)($row->status ?? ''),
+                'error_message'      => (string)($row->error_message ?? ''),
+                'created_at_de'      => ($ts !== false && $ts > 0) ? date('d.m.Y H:i:s', $ts) : (string)($row->created_at ?? '-'),
+            ],
         ]);
     }
 
@@ -278,6 +476,7 @@ final class SystemTechController
         }
 
         $mode        = trim((string)$this->request->post('mode', 'send')); // 'send' oder 'preview'
+        $templateKey = trim((string)$this->request->post('template_key', 'movie_converted')) ?: 'movie_converted';
         $creatorName = trim((string)$this->request->post('creator_name', 'Lara')) ?: 'Lara';
         $toEmail     = trim((string)$this->request->post('to_email', 'creator-beispiel@domain.tld')) ?: 'creator-beispiel@domain.tld';
         $movieId     = max(1, abs((int)$this->request->post('movie_id', 48291)));
@@ -285,52 +484,160 @@ final class SystemTechController
         $resolution  = trim((string)$this->request->post('resolution', '1920x1080 (Full-HD)')) ?: '1920x1080 (Full-HD)';
         $merchantId  = max(1, abs((int)$this->request->post('merchant_id', 10061)));
 
-        $rendered = \EroCloudMailer::renderTemplate('movie_converted', [
-            'merchant_id'     => $merchantId,
-            'creator_name'    => $creatorName,
-            'intended_email'  => $toEmail,
-            'movie_id'        => $movieId,
-            'upload_datetime' => date('d.m.Y \u\m H:i \U\h\r'),
-            'playtime'        => $playtime,
-            'resolution'      => $resolution,
-            'movie_edit_url'  => 'https://erocloud.net/mcp_neu/web/index.php#/movie?id=' . $movieId,
-            'unsubscribe_url' => \EroCloudMailer::getUnsubscribeUrl($merchantId, 'movie_converted'),
-        ]);
+        // Je nach gewählter Vorlage (alle 10 strategischen Auslöser) Vorschau rendern & ggf. absenden
+        if (in_array($templateKey, ['movie_approved', 'movie_rejected', 'album_approved', 'album_rejected', 'actor_approved', 'actor_rejected'], true)) {
+            $isApproved  = str_ends_with($templateKey, '_approved');
+            $contentType = str_starts_with($templateKey, 'album_')
+                ? 'photo_album'
+                : (str_starts_with($templateKey, 'actor_') ? 'actor' : 'movie');
 
-        if ($mode === 'preview') {
-            Response::json([
-                'status'  => 'ok',
-                'subject' => $rendered['subject'],
-                'html'    => $rendered['html'],
-                'text'    => $rendered['text'],
+            $targetRoute = $contentType === 'photo_album'
+                ? '#/photo-album?id=' . $movieId
+                : ($contentType === 'actor' ? '#/actor?id=' . $movieId : '#/movie?id=' . $movieId);
+
+            $extraLabel = $contentType === 'photo_album'
+                ? 'Anzahl Fotos'
+                : ($contentType === 'actor' ? 'Profil-Status' : 'Laufzeit & Qualität');
+            $extraVal = $contentType === 'photo_album'
+                ? '24 Bilder'
+                : ($contentType === 'actor' ? ($isApproved ? 'Aktiv & verifiziert' : 'Gesperrt / Überarbeitung') : ($playtime . ' Min. • ' . $resolution));
+
+            $reasonTitle = $isApproved ? '' : 'Vorschaubild / Angaben unvollständig';
+            $reasonText  = $isApproved ? '' : 'Bitte wähle für die FSK-16-Vorschau ein zensiertes Cover im Cover-Studio aus oder ergänze die fehlende Drehpartner-Zuweisung.';
+
+            $rendered = \EroCloudMailer::renderTemplate('content_reviewed', [
+                'merchant_id'      => $merchantId,
+                'creator_name'     => $creatorName,
+                'intended_email'   => $toEmail,
+                'content_type'     => $contentType,
+                'content_id'       => $movieId,
+                'review_status'    => $isApproved ? 'approved' : 'rejected',
+                'review_datetime'  => date('d.m.Y \u\m H:i \U\h\r'),
+                'reason_title'     => $reasonTitle,
+                'reason_text'      => $reasonText,
+                'extra_meta_label' => $extraLabel,
+                'extra_meta_value' => $extraVal,
+                'action_url'       => 'https://erocloud.net/mcp_neu/web/' . $targetRoute,
+                'unsubscribe_url'  => \EroCloudMailer::getUnsubscribeUrl($merchantId, 'content_reviewed'),
             ]);
+
+            if ($mode === 'preview') {
+                Response::json([
+                    'status'  => 'ok',
+                    'subject' => $rendered['subject'],
+                    'html'    => $rendered['html'],
+                    'text'    => $rendered['text'],
+                ]);
+                return;
+            }
+
+            $res = \EroCloudMailer::sendContentReviewNotification([
+                'merchant_id'      => $merchantId,
+                'recipient_email'  => $toEmail,
+                'creator_name'     => $creatorName,
+                'content_type'     => $contentType,
+                'content_id'       => $movieId,
+                'review_status'    => $isApproved ? 'approved' : 'rejected',
+                'reason_title'     => $reasonTitle,
+                'reason_text'      => $reasonText,
+                'extra_meta_label' => $extraLabel,
+                'extra_meta_value' => $extraVal,
+                'force_send'       => true,
+            ]);
+        } elseif (in_array($templateKey, ['co_actor_submitted', 'co_actor_verified', 'co_actor_rejected'], true)) {
+            $statusType = str_replace('co_actor_', '', $templateKey);
+            $reasonText = $statusType === 'rejected'
+                ? 'Das Ausweisfoto war leider unscharf bzw. gespiegelt. Bitte erstelle über den QR-Code kurz eine neue, gut lesbare Aufnahme.'
+                : '';
+
+            $rendered = \EroCloudMailer::renderTemplate('co_actor_status', [
+                'merchant_id'     => $merchantId,
+                'creator_name'    => $creatorName,
+                'intended_email'  => $toEmail,
+                'co_actor_id'     => $movieId,
+                'ref_code'        => sprintf('DP-%d-%03d', $merchantId, $movieId % 1000),
+                'role_label'      => 'Co-Darsteller / Drehpartner',
+                'alias_label'     => 'Alex M. (@alex_studio)',
+                'status_type'     => $statusType,
+                'event_datetime'  => date('d.m.Y \u\m H:i \U\h\r'),
+                'reason_text'     => $reasonText,
+                'action_url'      => 'https://erocloud.net/mcp_neu/web/#/co-actors',
+                'unsubscribe_url' => \EroCloudMailer::getUnsubscribeUrl($merchantId, 'co_actor_status'),
+            ]);
+
+            if ($mode === 'preview') {
+                Response::json([
+                    'status'  => 'ok',
+                    'subject' => $rendered['subject'],
+                    'html'    => $rendered['html'],
+                    'text'    => $rendered['text'],
+                ]);
+                return;
+            }
+
+            $res = \EroCloudMailer::sendCoActorStatusNotification([
+                'merchant_id'     => $merchantId,
+                'recipient_email' => $toEmail,
+                'creator_name'    => $creatorName,
+                'co_actor_id'     => $movieId,
+                'ref_code'        => sprintf('DP-%d-%03d', $merchantId, $movieId % 1000),
+                'role_label'      => 'Co-Darsteller / Drehpartner',
+                'alias_label'     => 'Alex M. (@alex_studio)',
+                'status_type'     => $statusType,
+                'reason_text'     => $reasonText,
+                'force_send'      => true,
+            ]);
+        } else {
+            $rendered = \EroCloudMailer::renderTemplate('movie_converted', [
+                'merchant_id'     => $merchantId,
+                'creator_name'    => $creatorName,
+                'intended_email'  => $toEmail,
+                'movie_id'        => $movieId,
+                'upload_datetime' => date('d.m.Y \u\m H:i \U\h\r'),
+                'playtime'        => $playtime,
+                'resolution'      => $resolution,
+                'movie_edit_url'  => 'https://erocloud.net/mcp_neu/web/index.php#/movie?id=' . $movieId,
+                'unsubscribe_url' => \EroCloudMailer::getUnsubscribeUrl($merchantId, 'movie_converted'),
+            ]);
+
+            if ($mode === 'preview') {
+                Response::json([
+                    'status'  => 'ok',
+                    'subject' => $rendered['subject'],
+                    'html'    => $rendered['html'],
+                    'text'    => $rendered['text'],
+                ]);
+                return;
+            }
+
+            $res = \EroCloudMailer::sendMovieConvertedNotification([
+                'merchant_id'     => $merchantId,
+                'recipient_email' => $toEmail,
+                'creator_name'    => $creatorName,
+                'movie_id'        => $movieId,
+                'playtime'        => $playtime,
+                'resolution'      => $resolution,
+                'force_send'      => true,
+            ]);
+        }
+
+        if (empty($res['success'])) {
+            Response::error('Test-E-Mail-Versand fehlgeschlagen: ' . ($res['error'] ?? 'Unbekannter SMTP-Fehler'), 500);
             return;
         }
 
-        $mailer = new \EroCloudMailer();
-        $ok = $mailer->sendMovieConvertedNotification([
-            'merchant_id'  => $merchantId,
-            'to_email'     => $toEmail,
-            'creator_name' => $creatorName,
-            'movie_id'     => $movieId,
-            'playtime'     => $playtime,
-            'resolution'   => $resolution,
-        ]);
-
-        if (!$ok) {
-            Response::error('Test-E-Mail-Versand fehlgeschlagen: ' . $mailer->lastError, 500);
-            return;
-        }
+        $effectiveRecipient = (string)($res['recipient'] ?? $toEmail);
+        $messageId          = (string)($res['message_id'] ?? '');
 
         if (function_exists('log_action')) {
-            log_action('Test-E-Mail (movie_converted) an ' . $mailer->effectiveRecipient . ' gesendet.');
+            log_action('Test-E-Mail (' . $templateKey . ') an ' . $effectiveRecipient . ' gesendet.');
         }
 
         Response::json([
             'status'              => 'ok',
-            'message'             => 'Test-E-Mail erfolgreich an ' . $mailer->effectiveRecipient . ' versendet (Message-ID: ' . $mailer->lastMessageId . ').',
-            'effective_recipient' => $mailer->effectiveRecipient,
-            'message_id'          => $mailer->lastMessageId,
+            'message'             => 'Test-E-Mail (' . $templateKey . ') erfolgreich an ' . $effectiveRecipient . ' versendet' . ($messageId !== '' ? ' (Message-ID: ' . $messageId . ')' : '') . '.',
+            'effective_recipient' => $effectiveRecipient,
+            'message_id'          => $messageId,
             'subject'             => $rendered['subject'],
             'html'                => $rendered['html'],
             'text'                => $rendered['text'],

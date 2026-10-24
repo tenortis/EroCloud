@@ -175,8 +175,9 @@ const App = {
       const linkRoute = (link.getAttribute('data-route') || '').replace(/^#\/?/, '');
       const linkActorId = link.getAttribute('data-actor-id');
 
+      const isWebmasterSub = ['webmaster-ads-domain', 'webmaster-new-campaign', 'webmaster-edit-campaign'].includes(pathPart);
       const isMatch = (targetActorId && linkActorId === targetActorId)
-        || (!targetActorId && (linkRoute === rawHash || linkRoute === pathPart));
+        || (!targetActorId && (linkRoute === rawHash || linkRoute === pathPart || (isWebmasterSub && linkRoute === 'webmaster-ads')));
 
       if (isMatch) {
         link.classList.add('active');
@@ -197,6 +198,8 @@ const App = {
         activeCollapseId = 'submenu-cloud';
       } else if (['movie-upload', 'photo-album-upload'].includes(pathPart)) {
         activeCollapseId = 'submenu-upload';
+      } else if (pathPart.startsWith('webmaster')) {
+        activeCollapseId = 'submenu-webmaster';
       }
     }
 
@@ -300,6 +303,7 @@ const App = {
     this.initMoviesEvents();
     this.initPhotoAlbumsEvents();
     this.initCreatorFeedbackEvents();
+    this.initWebmasterEvents();
   },
 
   searchCatalog: null,
@@ -5716,6 +5720,565 @@ const App = {
         }
       });
     }
+  },
+
+  // ========================================================================
+  // 3.8 Partnerprogramm / Webmaster-Modul Events
+  // ========================================================================
+  initWebmasterEvents() {
+    const contentArea = document.getElementById('app-content');
+    if (!contentArea) return;
+
+    // 1. 1-Klick Kopieren für Werbelinks, XML-API & Bannercodes
+    contentArea.querySelectorAll('.btn-wm-copy').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const text = btn.getAttribute('data-copy-text') || '';
+        if (!text) return;
+        try {
+          await navigator.clipboard.writeText(text);
+          this.toast('In die Zwischenablage kopiert.', 'success');
+        } catch (_) {
+          const tmp = document.createElement('textarea');
+          tmp.value = text;
+          document.body.appendChild(tmp);
+          tmp.select();
+          document.execCommand('copy');
+          tmp.remove();
+          this.toast('In die Zwischenablage kopiert.', 'success');
+        }
+      });
+    });
+
+    // 2. Bannercode ein-/ausblenden
+    contentArea.querySelectorAll('.btn-wm-toggle-code').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const bannerId = btn.getAttribute('data-banner-id');
+        const box = document.getElementById(`wm-code-${bannerId}`);
+        if (!box) return;
+        const isHidden = box.classList.contains('d-none');
+        box.classList.toggle('d-none', !isHidden);
+        btn.innerHTML = isHidden
+          ? '<i class="bi bi-eye-slash me-1"></i>Bannercode ausblenden'
+          : '<i class="bi bi-code-slash me-1"></i>Bannercode anzeigen';
+      });
+    });
+
+    // 3. Kunden werben (#/webmaster-ads)
+    const adsPage = document.getElementById('mcp-webmaster-ads-page');
+    if (adsPage) {
+      const switchToWebsites = () => {
+        const tabBtn = document.getElementById('tab-btn-websites');
+        if (tabBtn && window.bootstrap?.Tab) {
+          window.bootstrap.Tab.getOrCreateInstance(tabBtn).show();
+          document.getElementById('wm-websites-search')?.focus();
+        }
+      };
+      document.getElementById('btn-switch-to-websites-tab')?.addEventListener('click', switchToWebsites);
+      document.getElementById('btn-empty-create-campaign')?.addEventListener('click', switchToWebsites);
+
+      // Schnellsuche Websites
+      const siteSearch = document.getElementById('wm-websites-search');
+      const filterWebsitesTable = () => {
+        if (!siteSearch) return;
+        const q = siteSearch.value.trim().toLowerCase();
+        document.querySelectorAll('#wm-websites-table tbody tr').forEach(row => {
+          const dom = (row.getAttribute('data-domain') || '').toLowerCase();
+          row.classList.toggle('d-none', q !== '' && !dom.includes(q));
+        });
+      };
+      if (siteSearch) {
+        siteSearch.addEventListener('input', filterWebsitesTable);
+        if (siteSearch.value.trim() !== '') {
+          filterWebsitesTable();
+        }
+      }
+
+      // Schnellsuche Kampagnen
+      const campSearch = document.getElementById('wm-campaigns-search');
+      if (campSearch) {
+        campSearch.addEventListener('input', () => {
+          const q = campSearch.value.trim().toLowerCase();
+          document.querySelectorAll('#wm-campaigns-table tbody tr').forEach(row => {
+            const hay = (row.getAttribute('data-search') || '').toLowerCase();
+            row.classList.toggle('d-none', q !== '' && !hay.includes(q));
+          });
+        });
+      }
+
+      // Schnellsuche Deine Kunden
+      const custSearch = document.getElementById('wm-customers-search');
+      if (custSearch) {
+        custSearch.addEventListener('input', () => {
+          const q = custSearch.value.trim().toLowerCase();
+          document.querySelectorAll('#wm-customers-table tbody tr').forEach(row => {
+            const hay = (row.getAttribute('data-search') || '').toLowerCase();
+            row.classList.toggle('d-none', q !== '' && !hay.includes(q));
+          });
+        });
+      }
+
+      // Modal: Eigene Banner verwalten
+      const loadOwnSiteBanners = async (siteId) => {
+        const listContainer = document.getElementById('wm-my-banners-list-container');
+        if (!listContainer) return;
+
+        listContainer.innerHTML = `
+          <div class="text-center text-muted py-4">
+            <div class="spinner-border spinner-border-sm ec-text-primary me-2"></div>Banner werden geladen...
+          </div>
+        `;
+
+        try {
+          const res = await fetch(`${this.basePath}/api.php?route=webmaster/my-site-banners&site_id=${encodeURIComponent(siteId)}`);
+          const data = await res.json();
+
+          if (!res.ok || data.status !== 'ok') {
+            listContainer.innerHTML = `<div class="alert alert-danger mb-0">${this.escapeHtml(data.message || 'Fehler beim Laden der Banner.')}</div>`;
+            return;
+          }
+
+          const banners = Array.isArray(data.banners) ? data.banners : [];
+          if (banners.length === 0) {
+            listContainer.innerHTML = `
+              <div class="text-center py-4 text-muted border rounded bg-body-tertiary">
+                <i class="bi bi-images fs-2 d-block mb-2 opacity-50"></i>
+                Für diese Website wurde noch kein Banner hochgeladen.
+              </div>
+            `;
+            return;
+          }
+
+          listContainer.innerHTML = banners.map(b => {
+            let statusBadge = '<span class="badge bg-success-subtle text-success border border-success-subtle">Freigegeben & Aktiv</span>';
+            if (b.status_key === 'pending') {
+              statusBadge = '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Neues Banner in Prüfung</span>';
+            } else if (b.status_key === 'rejected') {
+              statusBadge = '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Neues Banner abgelehnt</span>';
+            }
+
+            const w = parseInt(b.width, 10) || 0;
+            const h = parseInt(b.height, 10) || 0;
+            let previewStyle = 'max-width: 100%; height: auto;';
+            if (w > 500) previewStyle = 'max-width: 500px; height: auto;';
+            else if (h > 220) previewStyle = 'width: auto; max-height: 220px;';
+
+            const pendingPreviewHtml = b.new_preview_data_uri ? `
+              <div class="mt-2 pt-2 border-top">
+                <div class="small fw-semibold mb-1 ${b.status_key === 'rejected' ? 'text-danger' : 'text-warning-emphasis'}">
+                  ${b.status_key === 'rejected' ? 'Abgelehnter Entwurf (du kannst jederzeit eine korrigierte Datei hochladen):' : 'Eingereichter Entwurf (wird aktuell geprüft):'}
+                </div>
+                <img src="${this.escapeHtml(b.new_preview_data_uri)}" alt="Entwurf" style="${previewStyle}" class="border rounded">
+              </div>
+            ` : '';
+
+            return `
+              <div class="border rounded p-3 mb-3 bg-body-tertiary bg-opacity-50">
+                <div class="row g-3 align-items-center">
+                  <div class="col-md-5">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                      ${statusBadge}
+                      <span class="badge bg-secondary-subtle text-secondary border">${this.escapeHtml(b.type)}</span>
+                    </div>
+                    <div class="small mb-1"><strong>Größe:</strong> ${this.escapeHtml(b.size_label)}</div>
+                    <div class="small mb-1 text-muted"><strong>Hochgeladen:</strong> ${this.escapeHtml(b.upload_datetime_fmt)}</div>
+                    <div class="small mb-2 text-muted font-monospace">ID: ${this.escapeHtml(b.file_id)}</div>
+
+                    <form class="form-wm-replace-banner mt-2 pt-2 border-top" data-site-id="${siteId}" data-file-id="${this.escapeHtml(b.file_id)}">
+                      <label class="form-label small fw-semibold mb-1">
+                        <i class="bi bi-arrow-repeat me-1 ec-text-primary"></i>Banner ersetzen (${this.escapeHtml(b.type)}, ${w}x${h} px):
+                      </label>
+                      <div class="d-flex align-items-center gap-2">
+                        <input type="file" name="banner" class="form-control form-control-sm" accept="image/png,image/jpeg,image/gif" required>
+                        <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">Ersetzen</button>
+                      </div>
+                    </form>
+                  </div>
+                  <div class="col-md-7 text-center">
+                    <div class="p-2 bg-body border rounded">
+                      <a href="${this.escapeHtml(b.image_url)}" target="_blank" rel="noopener" title="In Originalgröße öffnen">
+                        <img src="${this.escapeHtml(b.image_url)}" alt="Banner" style="${previewStyle}" loading="lazy">
+                      </a>
+                      ${pendingPreviewHtml}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('');
+
+          listContainer.querySelectorAll('.form-wm-replace-banner').forEach(form => {
+            form.addEventListener('submit', async (e) => {
+              e.preventDefault();
+              const submitBtn = form.querySelector('button[type="submit"]');
+              if (submitBtn) submitBtn.disabled = true;
+
+              try {
+                const fd = new FormData(form);
+                fd.append('site_id', form.getAttribute('data-site-id') || '');
+                fd.append('file_id', form.getAttribute('data-file-id') || '');
+                fd.append('_csrf', this.csrfToken);
+
+                const repRes = await fetch(`${this.basePath}/api.php?route=webmaster/upload-my-banner-replace`, {
+                  method: 'POST',
+                  headers: { 'X-CSRF-Token': this.csrfToken },
+                  body: fd
+                });
+                const repData = await repRes.json();
+
+                if (repRes.ok && repData.status === 'ok') {
+                  this.toast(repData.message || 'Banner wurde aktualisiert.', 'success');
+                  await loadOwnSiteBanners(siteId);
+                } else {
+                  this.toast(repData.message || 'Fehler beim Ersetzen des Banners.', 'danger');
+                }
+              } catch (err) {
+                this.toast('Verbindungsfehler: ' + err.message, 'danger');
+              } finally {
+                if (submitBtn) submitBtn.disabled = false;
+              }
+            });
+          });
+        } catch (err) {
+          listContainer.innerHTML = `<div class="alert alert-danger mb-0">Verbindungsfehler: ${this.escapeHtml(err.message)}</div>`;
+        }
+      };
+
+      adsPage.querySelectorAll('.btn-open-my-banners-modal').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const siteId = btn.getAttribute('data-site-id') || '';
+          const domain = btn.getAttribute('data-domain') || '';
+          const modalEl = document.getElementById('modal-wm-my-banners');
+          if (!modalEl) return;
+
+          const domainEl = document.getElementById('wm-modal-site-domain');
+          if (domainEl) domainEl.textContent = domain;
+
+          const siteInput = document.getElementById('wm-upload-site-id');
+          if (siteInput) siteInput.value = siteId;
+
+          const waLink = document.getElementById('wm-whatsapp-inpicture');
+          if (waLink) {
+            waLink.href = `https://wa.me/+4917660406280?text=${encodeURIComponent('Hallo Enrico, ich habe Interesse an einem Bannerset für meine Website ' + domain)}`;
+          }
+
+          if (window.bootstrap?.Modal) {
+            window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+          }
+          loadOwnSiteBanners(siteId);
+        });
+      });
+
+      const uploadForm = document.getElementById('form-wm-upload-banners');
+      if (uploadForm) {
+        uploadForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const siteId = document.getElementById('wm-upload-site-id')?.value || '';
+          const btn = document.getElementById('btn-wm-upload-submit');
+          if (btn) btn.disabled = true;
+
+          try {
+            const fd = new FormData(uploadForm);
+            fd.append('_csrf', this.csrfToken);
+
+            const res = await fetch(`${this.basePath}/api.php?route=webmaster/upload-my-banners`, {
+              method: 'POST',
+              headers: { 'X-CSRF-Token': this.csrfToken },
+              body: fd
+            });
+            const data = await res.json();
+
+            if (res.ok && data.status === 'ok') {
+              this.toast(data.message || 'Banner erfolgreich hochgeladen.', 'success');
+              uploadForm.reset();
+              const siteInput = document.getElementById('wm-upload-site-id');
+              if (siteInput) siteInput.value = siteId;
+              await loadOwnSiteBanners(siteId);
+            } else {
+              this.toast(data.message || 'Fehler beim Hochladen der Banner.', 'danger');
+            }
+          } catch (err) {
+            this.toast('Verbindungsfehler: ' + err.message, 'danger');
+          } finally {
+            if (btn) btn.disabled = false;
+          }
+        });
+      }
+    }
+
+    // 4. Neue Kampagne erstellen (#/webmaster-new-campaign)
+    const createCampForm = document.getElementById('form-wm-create-campaign');
+    if (createCampForm) {
+      createCampForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('btn-wm-create-campaign-submit');
+        if (btn) btn.disabled = true;
+
+        try {
+          const fd = new FormData(createCampForm);
+          fd.append('_csrf', this.csrfToken);
+
+          const res = await fetch(`${this.basePath}/api.php?route=webmaster/create-campaign`, {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': this.csrfToken },
+            body: fd
+          });
+          const data = await res.json();
+
+          if (res.ok && data.status === 'ok' && data.cid) {
+            this.toast(data.message || 'Deine Kampagne wurde angelegt.', 'success');
+            window.location.hash = `#/webmaster-edit-campaign?cid=${encodeURIComponent(data.cid)}&tab=2`;
+          } else {
+            this.toast(data.message || 'Fehler beim Anlegen der Kampagne.', 'danger');
+          }
+        } catch (err) {
+          this.toast('Verbindungsfehler: ' + err.message, 'danger');
+        } finally {
+          if (btn) btn.disabled = false;
+        }
+      });
+    }
+
+    // 5. Kampagne bearbeiten (#/webmaster-edit-campaign)
+    const editCampPage = document.getElementById('mcp-webmaster-edit-campaign-page');
+    if (editCampPage) {
+      const cid = editCampPage.getAttribute('data-cid') || '';
+
+      const imgWrap = document.getElementById('wm-reserve-image-wrap');
+      const colWrap = document.getElementById('wm-reserve-color-wrap');
+      editCampPage.querySelectorAll('.wm-reserve-radio').forEach(radio => {
+        radio.addEventListener('change', () => {
+          const val = radio.value;
+          if (imgWrap) imgWrap.classList.toggle('d-none', val !== 'image');
+          if (colWrap) colWrap.classList.toggle('d-none', val !== 'color');
+        });
+      });
+
+      const colPicker = document.getElementById('wm-reserve-color-picker');
+      const colInput = document.getElementById('wm-reserve-color-input');
+      if (colPicker && colInput) {
+        colPicker.addEventListener('input', () => { colInput.value = colPicker.value; });
+        colInput.addEventListener('input', () => {
+          if (/^#[0-9a-fA-F]{6}$/.test(colInput.value.trim())) {
+            colPicker.value = colInput.value.trim();
+          }
+        });
+      }
+
+      const periodSelect = document.getElementById('wm-campaign-period-select');
+      if (periodSelect) {
+        periodSelect.addEventListener('change', () => {
+          let activeTab = 'conversions';
+          if (document.getElementById('pane-camp-clicks')?.classList.contains('active')) {
+            activeTab = 'clicks';
+          } else if (document.getElementById('pane-camp-impressions')?.classList.contains('active')) {
+            activeTab = 'impressions';
+          }
+          window.location.hash = `#/webmaster-edit-campaign?cid=${encodeURIComponent(cid)}&tab=${activeTab}&month=${encodeURIComponent(periodSelect.value)}`;
+        });
+      }
+
+      const updateForm = document.getElementById('form-wm-update-campaign');
+      if (updateForm) {
+        updateForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = document.getElementById('btn-wm-save-campaign');
+          if (btn) btn.disabled = true;
+
+          try {
+            const fd = new FormData(updateForm);
+            fd.append('_csrf', this.csrfToken);
+
+            const res = await fetch(`${this.basePath}/api.php?route=webmaster/update-campaign`, {
+              method: 'POST',
+              headers: { 'X-CSRF-Token': this.csrfToken },
+              body: fd
+            });
+            const data = await res.json();
+
+            if (res.ok && data.status === 'ok') {
+              this.toast(data.message || 'Kampagne gespeichert.', 'success');
+              this.handleRoute();
+            } else {
+              this.toast(data.message || 'Fehler beim Speichern der Kampagne.', 'danger');
+            }
+          } catch (err) {
+            this.toast('Verbindungsfehler: ' + err.message, 'danger');
+          } finally {
+            if (btn) btn.disabled = false;
+          }
+        });
+      }
+
+      const deleteBtn = document.getElementById('btn-wm-delete-campaign');
+      if (deleteBtn) {
+        deleteBtn.addEventListener('click', async () => {
+          const campName = deleteBtn.getAttribute('data-name') || cid;
+          if (!window.confirm(`Möchtest du deine Kampagne „${campName}“ wirklich unwiderruflich löschen?`)) {
+            return;
+          }
+          deleteBtn.disabled = true;
+
+          try {
+            const fd = new FormData();
+            fd.append('cid', cid);
+            fd.append('_csrf', this.csrfToken);
+
+            const res = await fetch(`${this.basePath}/api.php?route=webmaster/delete-campaign`, {
+              method: 'POST',
+              headers: { 'X-CSRF-Token': this.csrfToken },
+              body: fd
+            });
+            const data = await res.json();
+
+            if (res.ok && data.status === 'ok') {
+              this.toast(data.message || 'Kampagne wurde gelöscht.', 'success');
+              window.location.hash = '#/webmaster-ads?tab=campaigns';
+            } else {
+              this.toast(data.message || 'Fehler beim Löschen.', 'danger');
+              deleteBtn.disabled = false;
+            }
+          } catch (err) {
+            this.toast('Verbindungsfehler: ' + err.message, 'danger');
+            deleteBtn.disabled = false;
+          }
+        });
+      }
+    }
+
+    // 6. Alle Banner Filter (#/webmaster-newads)
+    const newAdsPage = document.getElementById('mcp-webmaster-newads-page');
+    if (newAdsPage) {
+      const searchInput = document.getElementById('wm-newads-search');
+      const domSelect = document.getElementById('wm-newads-filter-domain');
+      const sizeSelect = document.getElementById('wm-newads-filter-size');
+      const typeSelect = document.getElementById('wm-newads-filter-type');
+      const countBadge = document.getElementById('wm-newads-count-badge');
+
+      const applyNewAdsFilter = () => {
+        const q = (searchInput?.value || '').trim().toLowerCase();
+        const dom = (domSelect?.value || '').trim().toLowerCase();
+        const sz = (sizeSelect?.value || '').trim().toLowerCase();
+        const tp = (typeSelect?.value || '').trim().toLowerCase();
+
+        let visible = 0;
+        newAdsPage.querySelectorAll('.wm-newads-row').forEach(row => {
+          const rDom = (row.getAttribute('data-domain') || '').toLowerCase();
+          const rSz = (row.getAttribute('data-size') || '').toLowerCase();
+          const rTp = (row.getAttribute('data-type') || '').toLowerCase();
+          const rSearch = (row.getAttribute('data-search') || '').toLowerCase();
+
+          const match = (q === '' || rSearch.includes(q))
+            && (dom === '' || rDom === dom)
+            && (sz === '' || rSz === sz)
+            && (tp === '' || rTp === tp);
+
+          row.classList.toggle('d-none', !match);
+          if (match) visible++;
+        });
+
+        if (countBadge) countBadge.textContent = String(visible);
+      };
+
+      searchInput?.addEventListener('input', applyNewAdsFilter);
+      domSelect?.addEventListener('change', applyNewAdsFilter);
+      sizeSelect?.addEventListener('change', applyNewAdsFilter);
+      typeSelect?.addEventListener('change', applyNewAdsFilter);
+    }
+
+    // 7. Statistiken (#/webmaster-stats)
+    const statsPage = document.getElementById('mcp-webmaster-stats-page');
+    if (statsPage) {
+      const periodSelect = document.getElementById('wm-stats-period-select');
+      if (periodSelect) {
+        periodSelect.addEventListener('change', () => {
+          const activeBtn = document.querySelector('#wmStatsTabs .nav-link.active');
+          const activeTab = activeBtn?.getAttribute('data-tab-key') || 'clicks';
+          window.location.hash = `#/webmaster-stats?month=${encodeURIComponent(periodSelect.value)}&tab=${encodeURIComponent(activeTab)}`;
+        });
+      }
+    }
+
+    // 8. Herkunfts-Details Modal (Referer für Klicks & Impressionen)
+    contentArea.querySelectorAll('.btn-wm-origin-details').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const type = btn.getAttribute('data-type') || 'clicks';
+        const origin = btn.getAttribute('data-origin') || '';
+        const month = btn.getAttribute('data-month') || '';
+        const cid = btn.getAttribute('data-cid') || '';
+
+        const modalEl = document.getElementById('modal-wm-origin-details');
+        const titleEl = document.getElementById('wm-origin-modal-title');
+        const subEl = document.getElementById('wm-origin-modal-subtitle');
+        const bodyEl = document.getElementById('wm-origin-modal-body');
+        if (!modalEl || !bodyEl) return;
+
+        if (titleEl) {
+          titleEl.textContent = `Herkunfts-Details: ${origin}`;
+        }
+        if (subEl) {
+          subEl.textContent = `${type === 'impressions' ? 'Impressionen' : 'Klicks'} im Zeitraum ${month}${cid ? ' (Kampagne ' + cid + ')' : ''}`;
+        }
+        bodyEl.innerHTML = `
+          <div class="text-center py-4 text-muted">
+            <div class="spinner-border spinner-border-sm ec-text-primary me-2"></div>Referer-Einträge werden geladen...
+          </div>
+        `;
+
+        if (window.bootstrap?.Modal) {
+          window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+
+        try {
+          const params = new URLSearchParams({ type, origin, month, cid });
+          const res = await fetch(`${this.basePath}/api.php?route=webmaster/origin-details&${params.toString()}`);
+          const data = await res.json();
+
+          if (!res.ok || data.status !== 'ok') {
+            bodyEl.innerHTML = `<div class="alert alert-danger mb-0">${this.escapeHtml(data.message || 'Fehler beim Laden der Details.')}</div>`;
+            return;
+          }
+
+          const rows = Array.isArray(data.rows) ? data.rows : [];
+          if (rows.length === 0) {
+            bodyEl.innerHTML = `<div class="text-center py-4 text-muted">Keine detaillierten Referer-Einträge vorhanden.</div>`;
+            return;
+          }
+
+          const isImp = data.type === 'impressions';
+          bodyEl.innerHTML = `
+            <div class="table-responsive">
+              <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th style="width: 170px;" class="text-center">Zeitpunkt</th>
+                    ${isImp ? '<th style="width: 120px;" class="text-center">Impressionen</th>' : ''}
+                    <th>Referer-URL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows.map(r => `
+                    <tr>
+                      <td class="text-center small text-muted">${this.escapeHtml(r.timestamp)}</td>
+                      ${isImp ? `<td class="text-center fw-semibold">${Number(r.impressions || 1).toLocaleString('de-DE')}</td>` : ''}
+                      <td class="small text-break">
+                        ${this.escapeHtml(r.referer)}
+                        ${r.referer && r.referer !== 'none' ? `
+                          <a href="${this.escapeHtml(r.referer)}" target="_blank" rel="noopener" class="ms-1 text-decoration-none" title="Referer in neuem Tab öffnen">
+                            <i class="bi bi-box-arrow-up-right"></i>
+                          </a>
+                        ` : ''}
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          `;
+        } catch (err) {
+          bodyEl.innerHTML = `<div class="alert alert-danger mb-0">Verbindungsfehler: ${this.escapeHtml(err.message)}</div>`;
+        }
+      });
+    });
   },
 
   // ========================================================================

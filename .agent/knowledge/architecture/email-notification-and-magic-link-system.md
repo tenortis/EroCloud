@@ -245,4 +245,33 @@ if (!EroCloudNotificationCenter::hasBeenSent($merchantId, EroCloudNotificationCe
 ### C) Neues Benachrichtigungs-Thema in Zukunft hinzufügen
 Um ein neues Thema (z. B. `payout_ready` oder `actor_verified`) einzuführen:
 1. In [`includes/klassen/EroCloudNotificationCenter.inc.php`](file:///c:/xampp/htdocs/EroCloud/includes/klassen/EroCloudNotificationCenter.inc.php#L30-L68) eine neue Konstante und einen Eintrag im Array von `getEventCatalog()` ergänzen.
-2. **Fertig!** Das neue Thema erscheint sofort automatisch im MCP-Modal (`#modal-notifications`), auf der öffentlichen 1-Klick-Abmeldeseite und wird in `notification_preferences` gespeichert – ganz ohne Datenbank-Migration.
+2. **Fertig!** Das neue Thema erscheint sofort automatisch im MCP-Modal (`#modal-notifications`), auf der öffentlichen 1-Klick-Abmeldeseite und wird in `merchant_notification_prefs` gespeichert – ganz ohne Datenbank-Migration.
+
+---
+
+## 7. Aktive Strategische E-Mail-Auslöser & ACP-Verwaltung (`#/system-settings`)
+
+### A) Die 10 aktiven System-E-Mail-Auslöser (in 3 operativen Kategorien + 1 Newsletter-Kategorie)
+1. **Kategorie `movie_converted` (*Video fertig konvertiert & Vorschaubilder bereit*):**
+   - `movie_converted`: Ausgelöst durch [`cronjobs/convert_movie.php`](file:///c:/xampp/htdocs/EroCloud/cronjobs/convert_movie.php) nach FFmpeg-Konvertierung & Erstellung der 10 Szenen-Thumbnails $\rightarrow$ Magic-Link nach `#/movie?id={ID}`.
+2. **Kategorie `content_reviewed` (*Prüfungs-Status: Filme, Foto-Alben & Darsteller*):**
+   - `movie_approved` & `movie_rejected`: Ausgelöst im ACP durch [`MoviesCheckingController.php`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/app/src/Modules/MoviesChecking/MoviesCheckingController.php) $\rightarrow$ Magic-Link nach `#/movie?id={ID}`.
+   - `album_approved` & `album_rejected`: Ausgelöst im ACP durch [`PhotoAlbumsCheckingController.php`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/app/src/Modules/PhotoAlbumsChecking/PhotoAlbumsCheckingController.php) $\rightarrow$ Magic-Link nach `#/photo-album?id={ID}`.
+   - `actor_approved` & `actor_rejected`: Ausgelöst im ACP durch [`ActorsController.php`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/app/src/Modules/Actors/ActorsController.php) bei Statuswechsel auf `active` oder `blocked` $\rightarrow$ Magic-Link nach `#/actor?id={ID}`.
+   - *(Hinweis: Für Werbebanner-Prüfungen im `AffiliateController` wird bewusst keine E-Mail versendet.)*
+3. **Kategorie `co_actor_status` (*Drehpartner & 18+ ID-Check Status*):**
+   - `co_actor_submitted`: Ausgelöst durch [`mcp/mcp_neu/web/verify_co_actor.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/web/verify_co_actor.php), sobald ein Drehpartner den Smartphone-QR-Check abschließt $\rightarrow$ Magic-Link nach `#/co-actors`.
+   - `co_actor_verified` & `co_actor_rejected`: Ausgelöst im ACP durch [`CoActorManager::acpReviewCoActor()`](file:///c:/xampp/htdocs/EroCloud/includes/klassen/CoActorManager.inc.php) / [`CoActorsCheckingController.php`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/app/src/Modules/CoActorsChecking/CoActorsCheckingController.php) $\rightarrow$ Magic-Link nach `#/co-actors`.
+
+### B) ACP E-Mail-Zentrale (`acp/acp_neu` $\rightarrow$ `#/system-settings`)
+In [`SystemTechController.php`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/app/src/Modules/SystemTech/SystemTechController.php) und [`views/settings.php`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/app/src/Modules/SystemTech/views/settings.php) stehen 4 spezialisierte Tabs bereit:
+1. **Tab 1 – Postfach & SMTP-Einstellungen (+ Vorlagen-Labor):**
+   - Einsehen & Ändern von SMTP-Host, Port, Verschlüsselung (`STARTTLS`/`SSL`), SMTP-Benutzer, SMTP-Passwort (AES-verschlüsselt in `settings.mail_smtp_pass_enc`), Absendername, Absenderadresse sowie **Sandbox-Testmodus An/Aus** und **Sandbox-Empfängeradresse**.
+   - Live-Vorschau (HTML & Plaintext) und echter SMTP-Testversand für alle 10 Vorlagen-Varianten.
+2. **Tab 2 – Für was werden Mails versendet? (Auslöser & Kategorien):**
+   - Übersicht der 4 Opt-Out-Kategorien inkl. Live-Zähler aktiver vs. abgemeldeter Partner (`EroCloudNotificationCenter::getOptInStats()`) sowie vollständige Tabelle aller 10 Auslöser mit 1-Klick-Vorschau.
+3. **Tab 3 – Versand-Tracking (Wer / Wann / Für was):**
+   - Durchsuch- und filterbares Protokoll (`notification_log`) mit Anzeige von Datum/Uhrzeit, Partner (`MID #`, Benutzername, Partner-ID), Auslöser + verlinktem Referenz-Objekt (`Film #`, `Foto-Album #`, `Darsteller #`, `Drehpartner #`), ursprünglichem Ziel-Empfänger vs. Sandbox-Empfänger, Betreff, Status-Badge und Modal-Ansicht (**„E-Mail ansehen“**) des exakt versendeten HTML-Inhalts.
+4. **Tab 4 – Impressum, Support & Server:**
+   - Pflege der Pay4Coins-Impressumsdaten für den E-Mail-Footer sowie PHP-Laufzeitdiagnose.
+

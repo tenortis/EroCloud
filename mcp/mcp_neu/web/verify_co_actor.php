@@ -238,6 +238,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         WHERE `id` = '" . $coActorId . "' AND `merchant_id` = '" . $merchantId . "'
         LIMIT 1;", __FILE__, __LINE__);
 
+    // Partner per E-Mail über den Eingang der Smartphone-Verifizierung informieren
+    if ($merchantId > 0 && class_exists('EroCloudMailer')) {
+        try {
+            $refCode   = (string)($coActor['ref_code'] ?? sprintf('DP-%d-%03d', $merchantId, $coActorId));
+            $roleLabel = $isOwner ? 'Account-Inhaber („Ich“)' : 'Drehpartner';
+            $aliasName = $creatorName !== '' ? $creatorName : $refCode;
+            \EroCloudMailer::sendCoActorStatusNotification([
+                'merchant_id' => $merchantId,
+                'co_actor_id' => $coActorId,
+                'status_type' => 'submitted',
+                'ref_code'    => $refCode,
+                'role_label'  => $roleLabel,
+                'alias_label' => $aliasName,
+            ]);
+        } catch (\Throwable $e) {
+            // Nicht-kritischer Fehler beim E-Mail-Versand
+        }
+    }
+
     echo json_encode([
         'status'          => 'ok',
         'message'         => 'Vielen Dank! Deine Daten, Live-Kamera-Aufnahmen und deine Unterschrift wurden erfolgreich übermittelt.',

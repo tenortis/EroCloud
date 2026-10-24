@@ -1164,7 +1164,8 @@ class CoActorManager
         int $merchantId,
         string $decision,
         string $reason = '',
-        int $employeeId = 0
+        int $employeeId = 0,
+        bool $sendNotification = true
     ): array {
         self::ensureSchema();
         $coActorId  = abs($coActorId);
@@ -1181,9 +1182,15 @@ class CoActorManager
             return ['ok' => false, 'error' => 'Der gewählte Drehpartner-Eintrag wurde nicht gefunden.'];
         }
 
-        $hasDocs = !empty($ca['has_uploaded_docs']) || !empty($ca['has_id_shot']) || !empty($ca['face_ref_img']) || !empty($ca['id_front_img']);
-        $label   = (string)($ca['display_label'] ?? ('#' . $coActorId));
-        $now     = date('Y-m-d H:i:s');
+        $hasDocs   = !empty($ca['has_uploaded_docs']) || !empty($ca['has_id_shot']) || !empty($ca['face_ref_img']) || !empty($ca['id_front_img']);
+        $label     = (string)($ca['display_label'] ?? ('#' . $coActorId));
+        $refCode   = (string)($ca['ref_code'] ?? sprintf('DP-%d-%03d', $merchantId, $coActorId));
+        $roleLabel = !empty($ca['is_owner']) ? 'Account-Inhaber („Ich“)' : 'Drehpartner';
+        $aliasName = trim((string)($ca['creator_name'] ?? ''));
+        if ($aliasName === '') {
+            $aliasName = $refCode;
+        }
+        $now       = date('Y-m-d H:i:s');
 
         if ($decision === 'verify') {
             if (!$hasDocs) {
@@ -1209,6 +1216,21 @@ class CoActorManager
                 `rejection_reason`    = ''
                 WHERE `id` = '" . $coActorId . "' AND `merchant_id` = '" . $merchantId . "'
                 LIMIT 1;", __FILE__, __LINE__);
+
+            if ($sendNotification && class_exists('EroCloudMailer')) {
+                try {
+                    \EroCloudMailer::sendCoActorStatusNotification([
+                        'merchant_id' => $merchantId,
+                        'co_actor_id' => $coActorId,
+                        'status_type' => 'verified',
+                        'ref_code'    => $refCode,
+                        'role_label'  => $roleLabel,
+                        'alias_label' => $aliasName,
+                    ]);
+                } catch (\Throwable $e) {
+                    // Nicht-kritischer Fehler beim E-Mail-Versand
+                }
+            }
 
             return [
                 'ok'             => true,
@@ -1238,6 +1260,22 @@ class CoActorManager
                 `rejection_reason`    = '" . p4c_escape_string($cleanReason) . "'
                 WHERE `id` = '" . $coActorId . "' AND `merchant_id` = '" . $merchantId . "'
                 LIMIT 1;", __FILE__, __LINE__);
+
+            if ($sendNotification && class_exists('EroCloudMailer')) {
+                try {
+                    \EroCloudMailer::sendCoActorStatusNotification([
+                        'merchant_id' => $merchantId,
+                        'co_actor_id' => $coActorId,
+                        'status_type' => 'rejected',
+                        'ref_code'    => $refCode,
+                        'role_label'  => $roleLabel,
+                        'alias_label' => $aliasName,
+                        'reason_text' => $cleanReason,
+                    ]);
+                } catch (\Throwable $e) {
+                    // Nicht-kritischer Fehler beim E-Mail-Versand
+                }
+            }
 
             return [
                 'ok'             => true,

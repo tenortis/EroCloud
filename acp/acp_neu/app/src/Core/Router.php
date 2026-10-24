@@ -200,8 +200,10 @@ class Router
 
         // 11. System & Technik (error_log)
         self::register('system-settings', $systemTechCtrl, 'settings', 'error_log');
+        self::register('system-settings/save-smtp', $systemTechCtrl, 'saveSmtp', 'error_log');
         self::register('system-settings/save-imprint', $systemTechCtrl, 'saveImprint', 'error_log');
         self::register('system-settings/send-test-mail', $systemTechCtrl, 'sendTestMail', 'error_log');
+        self::register('system-settings/log-detail', $systemTechCtrl, 'logDetail', 'error_log');
         self::register('errors', $systemTechCtrl, 'errors', 'error_log');
         self::register('errors/action', $systemTechCtrl, 'errorLogAction', 'error_log');
 
