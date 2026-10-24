@@ -909,24 +909,33 @@ class MoviesController
 
         $getId3Path = defined('MCP_DIR') ? MCP_DIR . '/includes/getid3/getid3.php' : (dirname(__DIR__, 4) . '/includes/getid3/getid3.php');
         if (file_exists($getId3Path)) {
-            include_once $getId3Path;
-            if (class_exists('getID3')) {
-                $getID3   = new \getID3();
-                $fileinfo = @$getID3->analyze($tmpFileName);
-                if (!empty($fileinfo['playtime_string'])) {
-                    $playTime = (string)$fileinfo['playtime_string'];
-                }
-                if (isset($fileinfo['playtime_seconds'])) {
-                    $playTimeSec = (int)round((float)$fileinfo['playtime_seconds']);
-                }
-                if (!empty($fileinfo['video']['resolution_x']) && !empty($fileinfo['video']['resolution_y'])) {
-                    $rx = (int)round((float)$fileinfo['video']['resolution_x']);
-                    $ry = (int)round((float)$fileinfo['video']['resolution_y']);
-                    if ($rx > 0 && $ry > 0) {
-                        $width  = $rx;
-                        $height = $ry;
+            try {
+                include_once $getId3Path;
+                if (class_exists('getID3')) {
+                    $getID3 = new \getID3();
+                    $getID3->option_tag_id3v1 = false;
+                    $getID3->option_tag_id3v2 = false;
+                    $getID3->option_tag_lyrics3 = false;
+                    $getID3->option_tag_apetag = false;
+                    $getID3->option_save_attachments = false;
+                    $fileinfo = @$getID3->analyze($tmpFileName);
+                    if (!empty($fileinfo['playtime_string'])) {
+                        $playTime = (string)$fileinfo['playtime_string'];
+                    }
+                    if (isset($fileinfo['playtime_seconds']) && is_numeric($fileinfo['playtime_seconds'])) {
+                        $playTimeSec = (int)round((float)$fileinfo['playtime_seconds']);
+                    }
+                    if (!empty($fileinfo['video']['resolution_x']) && !empty($fileinfo['video']['resolution_y'])) {
+                        $rx = (int)round((float)$fileinfo['video']['resolution_x']);
+                        $ry = (int)round((float)$fileinfo['video']['resolution_y']);
+                        if ($rx > 0 && $ry > 0) {
+                            $width  = $rx;
+                            $height = $ry;
+                        }
                     }
                 }
+            } catch (\Throwable $e) {
+                // Fallback auf Standard-Metadaten (wird durch FFmpeg-Konvertierung aktualisiert)
             }
         }
 

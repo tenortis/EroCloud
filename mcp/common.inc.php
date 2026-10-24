@@ -25,28 +25,28 @@ if(!isset($_SESSION) && session_status() !== PHP_SESSION_ACTIVE && !headers_sent
 
 
 // Error-Handler einbinden
-include(SOURCEDIR.'/includes/klassen/errorlog.inc.php');
+include_once(SOURCEDIR.'/includes/klassen/errorlog.inc.php');
 $class_errorlog = new p4c_errorlog();
 
 // MYSQLi-Klasse einbinden 
-include(SOURCEDIR.'/includes/klassen/mysqli.inc.php');
+include_once(SOURCEDIR.'/includes/klassen/mysqli.inc.php');
 $mysql = new p4c_mysqli(DB_HOST, $config['db_user'], $config['db_pass'], $config['db_name']);
 p4c_query("SET NAMES 'utf8mb4';",__FILE__,__LINE__);
 
 // Merchant-Klasse einbinden 
-include(SOURCEDIR.'/includes/klassen/merchant.inc.php');
+include_once(SOURCEDIR.'/includes/klassen/merchant.inc.php');
 
 // Movie-Klasse einbinden 
-include(SOURCEDIR.'/includes/klassen/movie.inc.php');
+include_once(SOURCEDIR.'/includes/klassen/movie.inc.php');
 
 // Fotoalbum-Klasse einbinden 
-include(SOURCEDIR.'/includes/klassen/PhotoAlbum.inc.php');
+include_once(SOURCEDIR.'/includes/klassen/PhotoAlbum.inc.php');
 
 // SMTP-Klasse laden
-include(SOURCEDIR.'/includes/klassen/sendSMTPmail.inc.php');
+include_once(SOURCEDIR.'/includes/klassen/sendSMTPmail.inc.php');
 
 // ReCaptcha
-include(SOURCEDIR.'/includes/klassen/recaptcha.inc.php');
+include_once(SOURCEDIR.'/includes/klassen/recaptcha.inc.php');
 
 /**
  * Schutz vor Hacks

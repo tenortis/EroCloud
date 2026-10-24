@@ -2,10 +2,15 @@
 
 if (!defined('SAFE_INC'))
     die ("Hacking attempt...");
+
+if (!class_exists('p4c_errorlog')) {
+    include_once(__DIR__ . '/errorlog.inc.php');
+}
         
 /**
  *  MySQLi
  **/
+if (!class_exists('p4c_mysqli')) {
 class p4c_mysqli {
     
     private $connect;
@@ -103,6 +108,7 @@ class p4c_mysqli {
         $this->is_closed = true;
         return $this->connect->close();
     }
+}
 }
 
 

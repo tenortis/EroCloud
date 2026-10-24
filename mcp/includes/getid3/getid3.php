@@ -353,7 +353,7 @@ class getID3
 
 			return true;
 
-		} catch (Exception $e) {
+		} catch (Throwable $e) {
 			$this->error($e->getMessage());
 		}
 		return false;
@@ -501,7 +501,7 @@ class getID3
 			// remove undesired keys
 			$this->CleanUp();
 
-		} catch (Exception $e) {
+		} catch (Throwable $e) {
 			$this->error('Caught exception: '.$e->getMessage());
 		}
 
@@ -1697,6 +1697,10 @@ abstract class getid3_handler {
 	}
 
 	protected function fread($bytes) {
+		$bytes = (int)$bytes;
+		if ($bytes <= 0) {
+			return '';
+		}
 		if ($this->data_string_flag) {
 			$this->data_string_position += $bytes;
 			return substr($this->data_string, $this->data_string_position - $bytes, $bytes);
@@ -1717,6 +1721,9 @@ abstract class getid3_handler {
 		$contents = '';
 		do {
 			$part = fread($this->getid3->fp, $bytes);
+			if ($part === false) {
+				break;
+			}
 			$partLength  = strlen($part);
 			$bytes      -= $partLength;
 			$contents   .= $part;

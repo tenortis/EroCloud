@@ -156,7 +156,7 @@ class getid3_quicktime extends getid3_handler
 			}
 		}
 
-		if (!isset($info['bitrate']) && isset($info['playtime_seconds'])) {
+		if (!isset($info['bitrate']) && !empty($info['playtime_seconds'])) {
 			$info['bitrate'] = (($info['avdataend'] - $info['avdataoffset']) * 8) / $info['playtime_seconds'];
 		}
 		if (isset($info['bitrate']) && !isset($info['audio']['bitrate']) && !isset($info['quicktime']['video'])) {
@@ -241,7 +241,7 @@ class getid3_quicktime extends getid3_handler
 						// some "ilst" atoms contain data atoms that have a numeric name, and the data is far more accessible if the returned array is compacted
 						$allnumericnames = true;
 						foreach ($atom_structure['subatoms'] as $subatomarray) {
-							if (!is_integer($subatomarray['name']) || (count($subatomarray['subatoms']) != 1)) {
+							if (!is_integer($subatomarray['name']) || !isset($subatomarray['subatoms']) || !is_array($subatomarray['subatoms']) || (count($subatomarray['subatoms']) != 1)) {
 								$allnumericnames = false;
 								break;
 							}
@@ -266,6 +266,7 @@ class getid3_quicktime extends getid3_handler
 					$isVideo = false;
 					$framerate  = 0;
 					$framecount = 0;
+					if (is_array($atom_structure['subatoms'])) {
 					foreach ($atom_structure['subatoms'] as $key => $value_array) {
 						if (isset($value_array['sample_description_table'])) {
 							foreach ($value_array['sample_description_table'] as $key2 => $value_array2) {
@@ -290,6 +291,7 @@ class getid3_quicktime extends getid3_handler
 								}
 							}
 						}
+					}
 					}
 					if ($isVideo && $framerate) {
 						$info['quicktime']['video']['frame_rate'] = $framerate;

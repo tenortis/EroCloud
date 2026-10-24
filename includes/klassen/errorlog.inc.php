@@ -8,6 +8,7 @@ if (!defined('SAFE_INC'))
  *  $class_errorlog->log('Meine Fehlermeldung',__FILE__,__LINE__);
  * **/
 
+if (!class_exists('p4c_errorlog')) {
 class p4c_errorlog {
     public $date;
     public function __construct() {
@@ -24,13 +25,15 @@ class p4c_errorlog {
             $uri = isset($_SERVER['REQUEST_URI']) ? ' ' . $_SERVER['REQUEST_URI'] : '';
             $context = '[' . $_SERVER['HTTP_HOST'] . $uri . '] ';
         }
-        $logDir = SOURCEDIR . '/log';
+        $baseDir = defined('SOURCEDIR') ? SOURCEDIR : dirname(__DIR__, 2);
+        $logDir = $baseDir . '/log';
         if (!is_dir($logDir)) {
             @mkdir($logDir, 0775, true);
         }
         error_log("[" . $this->date . "] " . $context . $error . " in " . $file . " on line " . $line . "\n", 3, $logDir . '/.errorlog');
         return "Sorry! Es ist ein Fehler aufgetreten.";
     }   
+}
 }
 
 ?>

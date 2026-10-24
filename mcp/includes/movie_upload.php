@@ -115,7 +115,7 @@ if (isset($_POST['upload_content']) OR isset($_POST['submit_step1'])) {
     $movie['title'] = str_replace(array('&#8364;','&euro;','Â€','€','â‚¬','&#x20AC;'), "EUR", $movie['title']);
 
     
-    if (strlen(utf8_decode($movie['title'])) > 65) {
+    if (mb_strlen((string)$movie['title'], 'UTF-8') > 65) {
         $errors[] = 'Der Filmtitel darf maximal 65 Zeichen lang sein.';
     }
     
@@ -950,7 +950,7 @@ function get_upload_wizard_html($active_step = 1) {
                     <div class="card-header bg-light fw-bold py-3"><i class="bi bi-cloud-arrow-up me-2"></i>Film hochladen</div>
                     <div class="card-body">
                         <div class="alert alert-info py-2 px-3 small mb-3 shadow-sm">
-                            <i class="bi bi-info-circle-fill me-2"></i>Nach dem Upload k&ouml;nnen Sie den Film noch einmal bearbeiten und ein Vorschaubild ausw&auml;hlen oder ein eigenes Vorschaubild hochladen.
+                            <i class="bi bi-info-circle-fill me-2"></i>Nach dem Upload kannst du den Film noch einmal bearbeiten und ein Vorschaubild ausw&auml;hlen oder ein eigenes Vorschaubild hochladen.
                         </div>
 
                         <div class="form-check form-switch mb-3 p-3 bg-light rounded border">
@@ -984,7 +984,7 @@ function get_upload_wizard_html($active_step = 1) {
                         </div>
 
                         <div class="upload_error alert alert-danger mt-3 mb-0 shadow-sm"></div>
-                        <div id="status" class="mt-2"></div>
+                        <div id="status" class="mt-2 small text-muted"></div>
                     </div>
                 </div>
             </div>
@@ -992,11 +992,11 @@ function get_upload_wizard_html($active_step = 1) {
             <!-- Right Column: Render Hints -->
             <div class="col-12 col-lg-6">
                 <div class="card shadow-sm h-100 mb-0">
-                    <div class="card-header bg-light fw-bold py-3"><i class="bi bi-gear me-2"></i>So rendern Sie Ihre Filme richtig</div>
+                    <div class="card-header bg-light fw-bold py-3"><i class="bi bi-gear me-2"></i>So renderst du deine Filme richtig</div>
                     <div class="card-body">
                         <p class="text-muted small mb-3">
-                            Immer wenn ein Film fertig gestellt wurde, kommt die Frage nach den richtigen Einstellungen zum Rendern.
-                            Die optimale Render-Einstellung gibt es leider nicht. Mit den folgenden Einstellungen sollte es Ihnen aber gelingen, einen Film vern&uuml;nftig in mp4 zu rendern.
+                            Immer wenn ein Film fertiggestellt wurde, kommt die Frage nach den richtigen Einstellungen zum Rendern.
+                            Die optimale Render-Einstellung gibt es leider nicht. Mit den folgenden Einstellungen sollte es dir aber gelingen, einen Film vern&uuml;nftig in mp4 zu rendern.
                         </p>
                         
                         <ul class="small mb-3 ps-3 text-secondary" style="line-height: 1.6;">
@@ -1011,7 +1011,7 @@ function get_upload_wizard_html($active_step = 1) {
                         </ul>
                         
                         <button type="button" class="btn btn-sm btn-outline-info shadow-sm" data-bs-toggle="modal" data-bs-target="#modalMovieTips">
-                            <i class="bi bi-info-circle me-1"></i> Hinweise zur Qualit&auml;t Ihrer Filme anzeigen
+                            <i class="bi bi-info-circle me-1"></i> Hinweise zur Qualit&auml;t deiner Filme anzeigen
                         </button>
                     </div>
                 </div>
@@ -1040,64 +1040,107 @@ function get_upload_wizard_html($active_step = 1) {
                 var upload = jQuery(".upload_movie");
                 var movie_released = jQuery("#upload_movie_released");
                 
-                var percent_total = 1;
+                var lastKeepAlive = 0;
+                var isAbortedByUser = false;
+
+                function resetUploadUi() {
+                    jQuery("#upload_file").val("");
+                    upload.show();
+                    abort.hide();
+                    movie_released.attr("disabled", false);
+                    progress.hide();
+                    status.empty();
+                }
+
+                function formatMb(bytes) {
+                    return (bytes / (1024 * 1024)).toFixed(1).replace(".", ",") + " MB";
+                }
 
                 jQuery("#form_upload_movie").ajaxForm({
                     clearForm: true,
                     resetForm: true,
                     forceSync: true,
                     dataType:  "json",
-                    data: {released: movie_released.is(":checked")},
+                    beforeSerialize: function($form, options) {
+                        options.data = { released: movie_released.is(":checked") };
+                    },
                     beforeSend: function(xhr) {
+                        isAbortedByUser = false;
                         jQuery(".upload_error").hide().html("");
                         progress.show();
                         upload.hide();
                         abort.show();
                         movie_released.attr("disabled", true);
-                        abort.click(function () {
+                        abort.off("click").on("click", function () {
+                            isAbortedByUser = true;
                             xhr.abort();
-                            jQuery("#upload_file").val("");
-                            upload.show();
-                            abort.hide();
-                            movie_released.attr("disabled", false);
-                            progress.hide();
+                            resetUploadUi();
                         });
 
-                        status.empty();
+                        status.html("Upload wird gestartet...");
                         var percentVal = "0%";
-                        bar.width(percentVal)
+                        bar.width(percentVal);
                         percent.html(percentVal);
                     },
                     uploadProgress: function(event, position, total, percentComplete) {
-                        var percentVal = percentComplete + "%";
-                        bar.width(percentVal)
-                        percent.html(percentVal);
+                        var realPercent = total > 0 ? Math.floor((position / total) * 100) : percentComplete;
+                        var barPercent = Math.max(1, realPercent) + "%";
+                        var displayPercent = realPercent + "%";
+                        bar.width(barPercent);
+                        percent.html(displayPercent);
+
+                        if (total > 0) {
+                            if (realPercent >= 100) {
+                                status.html("100% &uuml;bertragen (" + formatMb(total) + ") &ndash; Datei wird auf dem Server gepr&uuml;ft und gespeichert, bitte kurz warten...");
+                            } else {
+                                status.html("&Uuml;bertragen: " + formatMb(position) + " von " + formatMb(total) + " (" + ((position / total) * 100).toFixed(1).replace(".", ",") + "%)");
+                            }
+                        }
                         
-                        if (percentComplete > percent_total) {
-                            percent_total = percentComplete;
+                        var now = Date.now ? Date.now() : (new Date()).getTime();
+                        if (now - lastKeepAlive > 30000) {
+                            lastKeepAlive = now;
                             // set logged in status
                             jQuery.get("'.MCP_URL.'/Ajax/set_loggedin_status.php");
                         }
                     },
                     success: function(data) {
                         var percentVal = "100%";
-                        bar.width(percentVal)
+                        bar.width(percentVal);
                         percent.html(percentVal);
                         // If error
-                        if (data["jquery-upload-file-error"]) {
+                        if (!data || typeof data !== "object") {
+                            resetUploadUi();
+                            jQuery(".upload_error").show().html("Der Server hat eine unerwartete Antwort gesendet. Bitte pr&uuml;fe deine Internetverbindung und versuche es erneut.");
+                        } else if (data["jquery-upload-file-error"]) {
                             var error = data["jquery-upload-file-error"];
+                            resetUploadUi();
                             jQuery(".upload_error").show().html(error);
-
-                            jQuery(".upload_file").val("");
-                            upload.show();
-                            abort.hide();
-                            movie_released.attr("disabled", false);
-                            progress.hide();
-
                         } else {
-                            console.log("1");
                             window.location.href="'.MCP_URL.'/Movie-Upload?step=3&movie_id='.$movie_id.'";
                         }
+                    },
+                    error: function(xhr, textStatus, errorThrown) {
+                        if (isAbortedByUser) {
+                            return;
+                        }
+                        resetUploadUi();
+                        var msg = "Der Upload wurde unterbrochen oder konnte nicht abgeschlossen werden.";
+                        if (xhr && xhr.status === 413) {
+                            msg = "Deine Videodatei ist zu gro&szlig; f&uuml;r den Server (Fehler 413). Bitte stelle sicher, dass die Datei maximal 2,0 GB gro&szlig; ist.";
+                        } else if (xhr && xhr.responseText) {
+                            try {
+                                var parsed = JSON.parse(xhr.responseText);
+                                if (parsed && parsed["jquery-upload-file-error"]) {
+                                    msg = parsed["jquery-upload-file-error"];
+                                }
+                            } catch (e) {
+                                msg += "<br /><small>Bitte stelle sicher, dass die Videodatei vollst&auml;ndig lokal auf deinem Ger&auml;t gespeichert ist (nicht nur in iCloud, Google Drive oder OneDrive) und deine Internetverbindung stabil ist.</small>";
+                            }
+                        } else {
+                            msg += "<br /><small>Bitte stelle sicher, dass die Videodatei vollst&auml;ndig lokal auf deinem Ger&auml;t gespeichert ist (nicht nur in iCloud, Google Drive oder OneDrive) und deine Internetverbindung stabil ist.</small>";
+                        }
+                        jQuery(".upload_error").show().html(msg);
                     },
                     complete: function(data) {
 
@@ -1107,24 +1150,30 @@ function get_upload_wizard_html($active_step = 1) {
 
                 var s = jQuery.extend({
                     allowedTypes: "mp4,avi,flv,m4v,mkv,mov,mp4,mpg,wmv",
-                    maxFileSize: 4294967296
-                    // maxFileSize: 3221225472, // 3000 MB
-                    // maxFileSize: 2097152000, // 2000 MB                    
+                    maxFileSize: 2147483648 // 2048 MB (2,0 GB)
                 });
 
                 function uploadMovie(f) {
-
-                var file = f.files[0],
-                    fileName = file.name,
-                    fileSize = file.size;
+                    if (!f.files || !f.files[0]) {
+                        error = "Bitte w&auml;hle eine Videodatei aus.";
+                        return false;
+                    }
+                    var file = f.files[0],
+                        fileName = file.name,
+                        fileSize = file.size;
 
                     if(!isFileTypeAllowed(s, fileName)) {
-                        error = "Es sind nur "+s.allowedTypes+" erlaubt.";
+                        error = "Falsches Dateiformat! Es sind nur " + s.allowedTypes + " erlaubt.";
+                        return false;
+                    }
+
+                    if(fileSize <= 0) {
+                        error = "Die ausgew&auml;hlte Datei ist leer (0 Byte) oder liegt nur in einem Cloud-Speicher (z.&nbsp;B. iCloud / Google Drive). Bitte speichere das Video zuerst lokal auf deinem Ger&auml;t.";
                         return false;
                     }
 
                     if(fileSize > s.maxFileSize) {
-                        error = "Datei zu gro&ouml;";
+                        error = "Deine Datei ist zu gro&szlig; (" + formatMb(fileSize) + "). Es sind maximal 2,0 GB (2.048 MB) erlaubt.";
                         return false;
                     }
                     return true;
