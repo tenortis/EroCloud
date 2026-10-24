@@ -164,7 +164,8 @@ final class MerchantsController
                 COUNT(*) AS `total`,
                 SUM(CASE WHEN `status` = 'active' THEN 1 ELSE 0 END) AS `active_cnt`,
                 SUM(CASE WHEN `status` = 'blocked' THEN 1 ELSE 0 END) AS `blocked_cnt`,
-                SUM(CASE WHEN `status` = 'deleted' THEN 1 ELSE 0 END) AS `deleted_cnt`
+                SUM(CASE WHEN `status` = 'deleted' THEN 1 ELSE 0 END) AS `deleted_cnt`,
+                GROUP_CONCAT(`username` ORDER BY `id` ASC SEPARATOR ', ') AS `actor_names`
              FROM `actors`
              GROUP BY `merchant_id`;",
             __FILE__,
@@ -180,6 +181,7 @@ final class MerchantsController
                     'active'  => $actCnt,
                     'blocked' => (int)($r->blocked_cnt ?? 0),
                     'deleted' => (int)($r->deleted_cnt ?? 0),
+                    'names'   => $this->toUtf8((string)($r->actor_names ?? '')),
                 ];
             }
         }
@@ -294,21 +296,35 @@ final class MerchantsController
         }
 
         if ($searchQuery !== '') {
-            $qEsc = p4c_escape_string($searchQuery);
-            $qParts = [
-                "m.`partner_id` LIKE '%" . $qEsc . "%'",
-                "CAST(AES_DECRYPT(m.`username`, '" . $aesKeyEsc . "') AS CHAR) LIKE '%" . $qEsc . "%'",
-                "CAST(AES_DECRYPT(m.`email`, '" . $aesKeyEsc . "') AS CHAR) LIKE '%" . $qEsc . "%'",
-                "CAST(AES_DECRYPT(m.`firstname`, '" . $aesKeyEsc . "') AS CHAR) LIKE '%" . $qEsc . "%'",
-                "CAST(AES_DECRYPT(m.`surname`, '" . $aesKeyEsc . "') AS CHAR) LIKE '%" . $qEsc . "%'",
-                "CAST(AES_DECRYPT(m.`last_ip`, '" . $aesKeyEsc . "') AS CHAR) LIKE '%" . $qEsc . "%'",
-                "EXISTS (SELECT 1 FROM `actors` a WHERE a.`merchant_id` = m.`id` AND a.`username` LIKE '%" . $qEsc . "%')",
-            ];
-            $cleanNum = ltrim($searchQuery, '#');
-            if ($cleanNum !== '' && ctype_digit($cleanNum)) {
-                $qParts[] = "m.`id` = '" . abs((int)$cleanNum) . "'";
+            $rawTokens = preg_split('/\s+/u', trim($searchQuery), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $tokens    = [];
+            foreach ($rawTokens as $tok) {
+                $cleanTok = (string)preg_replace('/^(?:mid|pid|id|#)[:\s#-]*/iu', '', trim($tok));
+                if ($cleanTok !== '') {
+                    $tokens[] = $cleanTok;
+                }
             }
-            $whereParts[] = '(' . implode(' OR ', $qParts) . ')';
+            if (empty($tokens)) {
+                $tokens = [trim($searchQuery)];
+            }
+
+            foreach (array_slice($tokens, 0, 5) as $token) {
+                $qEsc   = p4c_escape_string($token);
+                $qParts = [
+                    "m.`partner_id` LIKE '%" . $qEsc . "%'",
+                    "CAST(AES_DECRYPT(m.`username`, '" . $aesKeyEsc . "') AS CHAR) LIKE '%" . $qEsc . "%'",
+                    "CAST(AES_DECRYPT(m.`email`, '" . $aesKeyEsc . "') AS CHAR) LIKE '%" . $qEsc . "%'",
+                    "CAST(AES_DECRYPT(m.`firstname`, '" . $aesKeyEsc . "') AS CHAR) LIKE '%" . $qEsc . "%'",
+                    "CAST(AES_DECRYPT(m.`surname`, '" . $aesKeyEsc . "') AS CHAR) LIKE '%" . $qEsc . "%'",
+                    "CAST(AES_DECRYPT(m.`last_ip`, '" . $aesKeyEsc . "') AS CHAR) LIKE '%" . $qEsc . "%'",
+                    "EXISTS (SELECT 1 FROM `actors` a WHERE a.`merchant_id` = m.`id` AND a.`username` LIKE '%" . $qEsc . "%')",
+                ];
+                $cleanNum = ltrim($token, '#');
+                if ($cleanNum !== '' && ctype_digit($cleanNum)) {
+                    $qParts[] = "m.`id` = '" . abs((int)$cleanNum) . "'";
+                }
+                $whereParts[] = '(' . implode(' OR ', $qParts) . ')';
+            }
         }
 
         $whereSql = implode(' AND ', $whereParts);
@@ -373,7 +389,7 @@ final class MerchantsController
                 $lastIp     = $this->toUtf8((string)($row->dec_last_ip ?? ''));
                 $fullName   = trim($firstname . ' ' . $surname);
 
-                $actStats   = $actorsByMerchant[$mid] ?? ['total' => 0, 'active' => 0, 'blocked' => 0, 'deleted' => 0];
+                $actStats   = $actorsByMerchant[$mid] ?? ['total' => 0, 'active' => 0, 'blocked' => 0, 'deleted' => 0, 'names' => ''];
                 $movStats   = $moviesByMerchant[$mid] ?? ['online' => 0, 'checking' => 0, 'drafts' => 0];
                 $albStats   = $albumsByMerchant[$mid] ?? ['online' => 0, 'checking' => 0];
 
@@ -394,6 +410,7 @@ final class MerchantsController
                     'actors_total'       => $actStats['total'],
                     'actors_active'      => $actStats['active'],
                     'actors_blocked'     => $actStats['blocked'],
+                    'actor_names'        => (string)($actStats['names'] ?? ''),
                     'movies_online'      => $movStats['online'],
                     'movies_checking'    => $movStats['checking'],
                     'movies_drafts'      => $movStats['drafts'],

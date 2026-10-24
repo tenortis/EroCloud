@@ -145,10 +145,22 @@ $buildPageUrl = static function (int $targetPage) use ($filters): string {
     <form id="merchants-filter-form" onsubmit="return App.Merchants.submitFilterForm(event);">
       <div class="row g-2 align-items-end">
         <div class="col-12 col-md-4 col-xl-3">
-          <label class="form-label small fw-semibold mb-1">Volltextsuche (MID, PID, Username, E-Mail, IP, Profil)</label>
+          <label class="form-label small fw-semibold mb-1">Volltextsuche (MID, PID, Username, Name, E-Mail, IP, Profil)</label>
           <div class="input-group input-group-sm">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
-            <input type="text" class="form-control" name="q" id="merchants-filter-q" value="<?= View::e((string)$filters['q']) ?>" placeholder="z. B. MID, Partner-ID, Username, E-Mail...">
+            <input type="text"
+                   class="form-control"
+                   name="q"
+                   id="merchants-filter-q"
+                   value="<?= View::e((string)$filters['q']) ?>"
+                   placeholder="z. B. MID, Partner-ID, Username, Name, E-Mail..."
+                   autocomplete="off"
+                   oninput="App.Merchants.onSearchInput(this.value, 'main')">
+            <?php if ((string)$filters['q'] !== ''): ?>
+              <button type="button" class="btn btn-outline-secondary" title="Suchbegriff löschen" onclick="App.Merchants.clearSearch()">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            <?php endif; ?>
           </div>
         </div>
 
@@ -212,9 +224,16 @@ $buildPageUrl = static function (int $targetPage) use ($filters): string {
         Zeige <strong><?= count($merchants) ?></strong> von <strong><?= number_format($totalFiltered, 0, ',', '.') ?></strong> P4C-Merchants (Seite <?= $page ?> von <?= $totalPages ?>)
       </div>
       <div class="d-flex align-items-center gap-2">
-        <div class="input-group input-group-sm" style="width: 240px;">
+        <div class="input-group input-group-sm" style="width: 260px;">
           <span class="input-group-text"><i class="bi bi-lightning-charge"></i></span>
-          <input type="text" class="form-control" placeholder="Schnellfilter auf dieser Seite..." oninput="App.Merchants.quickFilterTable(this.value)">
+          <input type="text"
+                 id="merchants-quick-filter"
+                 class="form-control"
+                 value="<?= View::e((string)$filters['q']) ?>"
+                 placeholder="Schnellsuche (alle Partner)..."
+                 autocomplete="off"
+                 oninput="App.Merchants.onSearchInput(this.value, 'quick')"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();App.Merchants.submitFilterForm(event);}">
         </div>
       </div>
     </div>
@@ -246,7 +265,7 @@ $buildPageUrl = static function (int $targetPage) use ($filters): string {
             <?php foreach ($merchants as $m): ?>
               <?php
                 $searchHaystack = mb_strtolower(
-                    $m['id'] . ' ' . $m['partner_id'] . ' ' . $m['username'] . ' ' . $m['email'] . ' ' . $m['full_name'] . ' ' . $m['last_ip'],
+                    '#' . $m['id'] . ' ' . $m['id'] . ' ' . $m['partner_id'] . ' ' . $m['username'] . ' ' . $m['email'] . ' ' . $m['full_name'] . ' ' . $m['last_ip'] . ' ' . ($m['actor_names'] ?? ''),
                     'UTF-8'
                 );
               ?>
@@ -342,6 +361,12 @@ $buildPageUrl = static function (int $targetPage) use ($filters): string {
                 </td>
               </tr>
             <?php endforeach; ?>
+            <tr id="merchants-quick-empty-row" class="d-none">
+              <td colspan="9" class="text-center text-muted py-4">
+                <span class="spinner-border spinner-border-sm ec-text-primary me-2" role="status"></span>
+                Durchsuche alle Partner-Datensätze...
+              </td>
+            </tr>
           <?php endif; ?>
         </tbody>
       </table>

@@ -326,7 +326,11 @@ class HomeController
                 $whereMerchant = "(`id` = '" . $cleanId . "' OR " . $whereMerchant . ")";
             }
             if (defined('AES_KEY')) {
-                $whereMerchant .= " OR CONVERT(AES_DECRYPT(`username`, '" . p4c_escape_string((string)AES_KEY) . "') USING utf8mb4) LIKE '%" . $escQ . "%'";
+                $aesKeyEsc = p4c_escape_string((string)AES_KEY);
+                $whereMerchant .= " OR CAST(AES_DECRYPT(`username`, '" . $aesKeyEsc . "') AS CHAR) LIKE '%" . $escQ . "%'"
+                    . " OR CAST(AES_DECRYPT(`email`, '" . $aesKeyEsc . "') AS CHAR) LIKE '%" . $escQ . "%'"
+                    . " OR CAST(AES_DECRYPT(`firstname`, '" . $aesKeyEsc . "') AS CHAR) LIKE '%" . $escQ . "%'"
+                    . " OR CAST(AES_DECRYPT(`surname`, '" . $aesKeyEsc . "') AS CHAR) LIKE '%" . $escQ . "%'";
             }
             $rsMerchants = p4c_query(
                 "SELECT `id`, `partner_id`,

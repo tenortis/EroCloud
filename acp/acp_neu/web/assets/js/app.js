@@ -4221,14 +4221,15 @@ const App = {
   // 12. P4C-Merchants / Händler (#/merchants & #/merchant?id=...)
   // ========================================================================
   Merchants: {
-    submitFilterForm(event) {
-      if (event) event.preventDefault();
+    searchDebounceTimer: null,
+    searchAbortController: null,
+
+    buildFilterParams() {
       const form = document.getElementById('merchants-filter-form');
-      if (!form) return false;
+      const params = new URLSearchParams();
+      if (!form) return params;
 
       const fd = new FormData(form);
-      const params = new URLSearchParams();
-
       const rules = (fd.get('rules') || 'all').toString().trim();
       const activity = (fd.get('activity') || 'all').toString().trim();
       const sort = (fd.get('sort') || 'id_desc').toString().trim();
@@ -4241,6 +4242,17 @@ const App = {
       if (limit !== 50) params.set('limit', String(limit));
       if (q !== '') params.set('q', q);
 
+      return params;
+    },
+
+    submitFilterForm(event) {
+      if (event) event.preventDefault();
+      if (this.searchDebounceTimer) {
+        clearTimeout(this.searchDebounceTimer);
+        this.searchDebounceTimer = null;
+      }
+
+      const params = this.buildFilterParams();
       const qs = params.toString();
       const targetHash = `#/merchants${qs ? '?' + qs : ''}`;
       if (window.location.hash === targetHash) {
@@ -4251,12 +4263,111 @@ const App = {
       return false;
     },
 
+    clearSearch() {
+      const mainInp = document.getElementById('merchants-filter-q');
+      const quickInp = document.getElementById('merchants-quick-filter');
+      if (mainInp) mainInp.value = '';
+      if (quickInp) quickInp.value = '';
+      this.submitFilterForm();
+    },
+
+    onSearchInput(value, source = 'main') {
+      const val = String(value ?? '');
+      const mainInp = document.getElementById('merchants-filter-q');
+      const quickInp = document.getElementById('merchants-quick-filter');
+
+      if (source === 'main' && quickInp && quickInp.value !== val) {
+        quickInp.value = val;
+      } else if (source === 'quick' && mainInp && mainInp.value !== val) {
+        mainInp.value = val;
+      }
+
+      // 1. Sofortiges Client-Side-Vorfiltern der bereits sichtbaren Zeilen
+      this.quickFilterTable(val);
+
+      // 2. Debounced Server-Suche über alle 750+ Partner in der Datenbank (ohne Fokusverlust)
+      if (this.searchDebounceTimer) {
+        clearTimeout(this.searchDebounceTimer);
+      }
+      this.searchDebounceTimer = setTimeout(() => {
+        this.performLiveServerSearch(source);
+      }, 300);
+    },
+
+    async performLiveServerSearch(source = 'main') {
+      const form = document.getElementById('merchants-filter-form');
+      if (!form) return;
+
+      if (this.searchAbortController) {
+        this.searchAbortController.abort();
+      }
+      this.searchAbortController = new AbortController();
+
+      const params = this.buildFilterParams();
+      const qs = params.toString();
+      const targetHash = `#/merchants${qs ? '?' + qs : ''}`;
+      window.history.replaceState(null, '', targetHash);
+
+      const url = `${App.basePath}/api.php?route=merchants${qs ? '&' + qs : ''}`;
+
+      try {
+        const res = await fetch(url, { signal: this.searchAbortController.signal });
+        if (!res.ok) return;
+        const html = await res.text();
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const newTableCard = doc.querySelector('.card-kkc.overflow-hidden');
+        const currentTableCard = document.querySelector('#app-content .card-kkc.overflow-hidden');
+
+        if (newTableCard && currentTableCard) {
+          const activeId = document.activeElement?.id || '';
+          const selStart = document.activeElement?.selectionStart ?? null;
+          const selEnd = document.activeElement?.selectionEnd ?? null;
+
+          currentTableCard.innerHTML = newTableCard.innerHTML;
+
+          const currentQ = document.getElementById('merchants-filter-q')?.value || '';
+          const newQuickInp = document.getElementById('merchants-quick-filter');
+          if (newQuickInp && newQuickInp.value !== currentQ) {
+            newQuickInp.value = currentQ;
+          }
+
+          if (activeId === 'merchants-quick-filter' || source === 'quick') {
+            const focusEl = document.getElementById(activeId || 'merchants-quick-filter');
+            if (focusEl) {
+              focusEl.focus();
+              if (selStart !== null && selEnd !== null) {
+                try { focusEl.setSelectionRange(selStart, selEnd); } catch (_) {}
+              }
+            }
+          }
+        }
+        App.resetLogoutCountdown();
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;
+      }
+    },
+
     quickFilterTable(query) {
-      const q = String(query || '').trim().toLowerCase();
+      const raw = String(query || '').trim().toLowerCase();
+      const tokens = raw === '' ? [] : raw.split(/\s+/).filter(Boolean);
+      let visibleCount = 0;
+
       document.querySelectorAll('.merchant-list-row').forEach(row => {
-        const hay = row.getAttribute('data-search') || '';
-        row.classList.toggle('d-none', !(q === '' || hay.includes(q)));
+        const hay = (row.getAttribute('data-search') || '').toLowerCase();
+        const matches = tokens.every(tok => {
+          const cleanTok = tok.replace(/^(?:mid|pid|id|#)[:\s#-]*/i, '');
+          return hay.includes(tok) || (cleanTok !== '' && hay.includes(cleanTok));
+        });
+        row.classList.toggle('d-none', !matches);
+        if (matches) visibleCount++;
       });
+
+      const emptyRow = document.getElementById('merchants-quick-empty-row');
+      if (emptyRow) {
+        emptyRow.classList.toggle('d-none', !(tokens.length > 0 && visibleCount === 0));
+      }
     },
 
     filterSubTable(rowClass, query) {
