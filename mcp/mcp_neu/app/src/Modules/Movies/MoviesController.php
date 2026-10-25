@@ -459,12 +459,18 @@ class MoviesController
         if ($merchantId === 0) {
             return '<div class="alert alert-danger m-4">Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.</div>';
         }
-        @session_write_close();
 
-        $step    = abs((int)$this->request->get('step', 1));
-        $movieId = abs((int)$this->request->get('movie_id', 0));
+        $step            = abs((int)$this->request->get('step', 1));
+        $explicitMovieId = abs((int)$this->request->get('movie_id', 0));
+        $movieId         = $explicitMovieId;
         if (!in_array($step, [1, 2, 3], true)) {
             $step = 1;
+        }
+
+        if ($step === 3) {
+            unset($_SESSION['upload_movie']);
+        } elseif ($movieId === 0 && isset($_SESSION['upload_movie']['movie_id'])) {
+            $movieId = abs((int)$_SESSION['upload_movie']['movie_id']);
         }
 
         $merchant          = new \Merchant($mysql, $merchantId);
@@ -496,11 +502,6 @@ class MoviesController
             'notify_on_convert'   => $notifyDefault,
         ];
 
-        // Falls eine movie_id übergeben wurde oder in der Session liegt, vorhandenen Entwurf laden
-        if ($movieId === 0 && isset($_SESSION['upload_movie']['movie_id'])) {
-            $movieId = abs((int)$_SESSION['upload_movie']['movie_id']);
-        }
-
         if ($movieId > 0) {
             $rsDraft = p4c_query("SELECT *
                 FROM `movies`
@@ -510,43 +511,53 @@ class MoviesController
                 LIMIT 1;", __FILE__, __LINE__);
 
             if ($rsDraft && p4c_num_rows($rsDraft) > 0) {
-                $dObj  = p4c_fetch_object($rsDraft);
-                $draft = [
-                    'id'                  => abs((int)$dObj->id),
-                    'title'               => self::decodeLegacyText((string)$dObj->title),
-                    'description'         => self::decodeLegacyText((string)$dObj->description),
-                    'online_at'           => ($dObj->online_at !== '0000-00-00 00:00:00' && !empty($dObj->online_at))
-                        ? date('Y-m-d\TH:i', strtotime((string)$dObj->online_at))
-                        : date('Y-m-d\TH:i', strtotime('+90 minutes')),
-                    'amount_second'       => number_format((float)$dObj->amount_second, 1, '.', ''),
-                    'as_download'         => abs((int)$dObj->as_download) === 1 ? 1 : 0,
-                    'amount_download'     => abs((int)$dObj->amount_download),
-                    'preview'             => abs((int)$dObj->preview) === 1 ? 1 : 0,
-                    'actor_id'            => abs((int)$dObj->actor_id),
-                    'visible_for_website' => (string)$dObj->visible_for_website,
-                    'category_master'     => (string)$dObj->category_master !== '' ? (string)$dObj->category_master : 'porn',
-                    'category_slave'      => (string)$dObj->category_slave,
-                    'meta_title'          => self::decodeLegacyText((string)$dObj->meta_title),
-                    'meta_description'    => self::decodeLegacyText((string)$dObj->meta_description),
-                    'seo_url'             => (string)$dObj->seo_url,
-                    'filename'            => trim((string)($dObj->filename ?? '')),
-                    'playtime_seconds'    => (int)round((float)($dObj->playtime_seconds ?? 0)),
-                    'playtime_string'     => (string)($dObj->playtime_string ?? ''),
-                    'resolution'          => (string)($dObj->resolution ?? ''),
-                    'convert_status'      => abs((int)($dObj->convert_status ?? 0)),
-                    'convert_starttime'   => (string)($dObj->convert_starttime ?? '0000-00-00 00:00:00'),
-                    'released'            => abs((int)($dObj->released ?? 0)),
-                    'notify_on_convert'   => isset($dObj->notify_on_convert) ? (abs((int)$dObj->notify_on_convert) === 1 ? 1 : 0) : $notifyDefault,
-                ];
-            } elseif ($step === 2) {
-                $step    = 1;
-                $movieId = 0;
+                $dObj          = p4c_fetch_object($rsDraft);
+                $draftFilename = trim((string)($dObj->filename ?? ''));
+
+                // Wenn Schritt 1 ohne explizite movie_id aufgerufen wird, aber der Session-Film bereits eine
+                // hochgeladene Videodatei besitzt, starten wir sauber einen neuen leeren Film-Entwurf.
+                if ($step === 1 && $explicitMovieId === 0 && $draftFilename !== '' && (int)($dObj->convert_status ?? 0) !== 3) {
+                    unset($_SESSION['upload_movie']);
+                    $movieId = 0;
+                } else {
+                    $draft = [
+                        'id'                  => abs((int)$dObj->id),
+                        'title'               => self::decodeLegacyText((string)$dObj->title),
+                        'description'         => self::decodeLegacyText((string)$dObj->description),
+                        'online_at'           => ($dObj->online_at !== '0000-00-00 00:00:00' && !empty($dObj->online_at))
+                            ? date('Y-m-d\TH:i', strtotime((string)$dObj->online_at))
+                            : date('Y-m-d\TH:i', strtotime('+90 minutes')),
+                        'amount_second'       => number_format((float)$dObj->amount_second, 1, '.', ''),
+                        'as_download'         => abs((int)$dObj->as_download) === 1 ? 1 : 0,
+                        'amount_download'     => abs((int)$dObj->amount_download),
+                        'preview'             => abs((int)$dObj->preview) === 1 ? 1 : 0,
+                        'actor_id'            => abs((int)$dObj->actor_id),
+                        'visible_for_website' => (string)$dObj->visible_for_website,
+                        'category_master'     => (string)$dObj->category_master !== '' ? (string)$dObj->category_master : 'porn',
+                        'category_slave'      => (string)$dObj->category_slave,
+                        'meta_title'          => self::decodeLegacyText((string)$dObj->meta_title),
+                        'meta_description'    => self::decodeLegacyText((string)$dObj->meta_description),
+                        'seo_url'             => (string)$dObj->seo_url,
+                        'filename'            => $draftFilename,
+                        'playtime_seconds'    => (int)round((float)($dObj->playtime_seconds ?? 0)),
+                        'playtime_string'     => (string)($dObj->playtime_string ?? ''),
+                        'resolution'          => (string)($dObj->resolution ?? ''),
+                        'convert_status'      => abs((int)($dObj->convert_status ?? 0)),
+                        'convert_starttime'   => (string)($dObj->convert_starttime ?? '0000-00-00 00:00:00'),
+                        'released'            => abs((int)($dObj->released ?? 0)),
+                        'notify_on_convert'   => isset($dObj->notify_on_convert) ? (abs((int)$dObj->notify_on_convert) === 1 ? 1 : 0) : $notifyDefault,
+                    ];
+                }
+            } else {
+                unset($_SESSION['upload_movie']);
+                if ($step === 2) {
+                    $step    = 1;
+                    $movieId = 0;
+                }
             }
         }
 
-        if ($step === 3) {
-            unset($_SESSION['upload_movie']);
-        }
+        @session_write_close();
 
         $conversionQueueInfo = null;
         if ($step === 3 && (int)$draft['id'] > 0 && (int)$draft['convert_status'] < 2) {
@@ -643,6 +654,7 @@ class MoviesController
         $allowedTags = '<ul><ol><li><u><em><strong><h1><h2><h3><h4><h5><h6><pre><address><p><br>';
         $description = trim(strip_tags((string)$this->request->post('description', ''), $allowedTags));
         $description = str_replace(self::ZERO_WIDTH_SPACES, '', $description);
+        $description = str_replace(['#?', '?en'], ['#', 'en'], $description);
         if ($description === '') {
             $errors[] = 'Bitte gib eine aussagekräftige Beschreibung des Films an.';
         }
@@ -751,7 +763,8 @@ class MoviesController
             return;
         }
 
-        $rawMetaTitle = trim(strip_tags((string)$this->request->post('meta_title', '')));
+        $rawMetaTitle = $this->cleanMovieTitle(strip_tags((string)$this->request->post('meta_title', '')));
+        $rawMetaTitle = str_replace(["\n", "\r"], '', $rawMetaTitle);
         $metaTitle    = $rawMetaTitle !== '' ? mb_substr($rawMetaTitle, 0, 65, 'UTF-8') : mb_substr($title, 0, 65, 'UTF-8');
 
         $rawSeoUrl = trim(strip_tags((string)$this->request->post('seo_url', '')));
@@ -769,13 +782,24 @@ class MoviesController
             $metaDesc = mb_substr($metaDesc, 0, 156, 'UTF-8');
         }
 
-        $movieExists = false;
+        $movieExists         = false;
+        $existingPlaytimeSec = 0.0;
         if ($movieId > 0) {
-            $rsExisting = p4c_query("SELECT `id` FROM `movies` WHERE `id` = '" . $movieId . "' AND `merchant_id` = '" . $merchantId . "' LIMIT 1;", __FILE__, __LINE__);
-            $movieExists = ($rsExisting && p4c_num_rows($rsExisting) > 0);
+            $rsExisting = p4c_query("SELECT `id`, `playtime_seconds` FROM `movies` WHERE `id` = '" . $movieId . "' AND `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted' LIMIT 1;", __FILE__, __LINE__);
+            if ($rsExisting && p4c_num_rows($rsExisting) > 0) {
+                $movieExists         = true;
+                $exObj               = p4c_fetch_object($rsExisting);
+                $existingPlaytimeSec = (float)($exObj->playtime_seconds ?? 0);
+            }
         }
 
         if ($movieExists) {
+            $amountOwnSql = '';
+            if ($existingPlaytimeSec > 0.0 || $isTrailer) {
+                $recalcOwn    = $isTrailer ? 0 : (int)round($existingPlaytimeSec * (float)$amountSecond);
+                $amountOwnSql = "`amount_own` = '" . abs($recalcOwn) . "',";
+            }
+
             p4c_query("UPDATE `movies` SET
                 `actor_id`            = '" . $actorId . "',
                 `title`               = '" . p4c_escape_string($title) . "',
@@ -785,6 +809,7 @@ class MoviesController
                 `seo_url`             = '" . p4c_escape_string($seoUrl) . "',
                 `online_at`           = '" . p4c_escape_string($onlineAt) . "',
                 `amount_second`       = '" . abs((float)$amountSecond) . "',
+                {$amountOwnSql}
                 `amount_webmaster`    = '10',
                 `as_download`         = '" . $asDownload . "',
                 `amount_download`     = '" . $amountDownload . "',
@@ -1121,7 +1146,8 @@ class MoviesController
         }
 
         $resolution = $width . 'x' . $height;
-        $amountOwn  = (int)round((float)$playTimeSec * (float)$movieObj->amount_second);
+        $isPreview  = abs((int)($movieObj->preview ?? 0)) === 1;
+        $amountOwn  = $isPreview ? 0 : (int)round((float)$playTimeSec * (float)$movieObj->amount_second);
         $rawRel     = (string)$this->request->post('released', $this->request->get('released', ''));
         $released   = ($rawRel === '1' || $rawRel === 'true');
 
@@ -1304,6 +1330,7 @@ class MoviesController
         $allowedTags = '<ul><ol><li><u><em><strong><h1><h2><h3><h4><h5><h6><pre><address><p><br>';
         $description = trim(strip_tags((string)$this->request->post('description', ''), $allowedTags));
         $description = str_replace(self::ZERO_WIDTH_SPACES, '', $description);
+        $description = str_replace(['#?', '?en'], ['#', 'en'], $description);
         if ($description === '') {
             $errors[] = 'Bitte gib eine aussagekräftige Beschreibung des Films an.';
         }

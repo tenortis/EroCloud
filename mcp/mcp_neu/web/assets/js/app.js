@@ -2464,13 +2464,15 @@ const App = {
           const data = await res.json();
           if (data && data.status === 'ok') {
             const cStatus = parseInt(data.convert_status ?? 0, 10);
-            const qInfo = data.queue || {};
+            const qInfo = data.queue_info || data.queue || {};
 
-            const titleEl = document.getElementById('conv-status-title');
-            const subEl = document.getElementById('conv-status-subtitle');
-            const badgeEl = document.getElementById('conv-queue-badge');
-            const remEl = document.getElementById('conv-remaining-label');
-            const progBar = document.getElementById('conv-progress-bar');
+            const titleEl = document.getElementById('movie-conv-headline') || document.getElementById('conv-status-title');
+            const subEl = document.getElementById('movie-conv-detail') || document.getElementById('conv-status-subtitle');
+            const badgeEl = document.getElementById('movie-conv-state-badge') || document.getElementById('conv-queue-badge');
+            const remEl = document.getElementById('movie-conv-remaining') || document.getElementById('conv-remaining-label');
+            const progBar = document.getElementById('movie-conv-progress-bar') || document.getElementById('conv-progress-bar');
+            const step2SubEl = document.getElementById('step2-progress-subtext');
+            const playerRemBadge = document.getElementById('movie-player-remaining-badge');
 
             if (cStatus === 2) {
               if (this.conversionPollTimer) {
@@ -2497,23 +2499,34 @@ const App = {
               return;
             }
 
-            if (titleEl) {
-              titleEl.textContent = cStatus === 1
-                ? 'Dein Video wird gerade aktiv konvertiert...'
-                : 'Dein Video befindet sich in der Konvertierungs-Warteschlange';
+            if (titleEl && qInfo.status_headline) {
+              titleEl.textContent = qInfo.status_headline;
             }
-            if (subEl && qInfo.status_hint) {
-              subEl.textContent = qInfo.status_hint;
+            if (subEl && (qInfo.status_detail || qInfo.status_hint)) {
+              subEl.textContent = qInfo.status_detail || qInfo.status_hint;
             }
-            if (badgeEl && qInfo.queue_position) {
-              badgeEl.textContent = `#${qInfo.queue_position} von ${qInfo.total_active || qInfo.queue_position}`;
-              badgeEl.className = `badge ${cStatus === 1 ? 'bg-primary' : 'bg-secondary'}`;
+            if (badgeEl) {
+              const qPos = qInfo.queue_position || 1;
+              if (cStatus === 1 || qInfo.state === 'converting') {
+                badgeEl.textContent = 'Aktiv in Konvertierung';
+                badgeEl.className = 'badge bg-primary';
+              } else {
+                badgeEl.textContent = `Warteschlange Platz #${qPos}`;
+                badgeEl.className = 'badge bg-warning text-dark';
+              }
             }
-            if (remEl && qInfo.estimated_remaining_label) {
-              remEl.innerHTML = `<i class="bi bi-clock-history me-1"></i>${this.escapeHtml(qInfo.estimated_remaining_label)}`;
+            const remText = qInfo.remaining_formatted || qInfo.estimated_remaining_label || '';
+            if (remEl && remText) {
+              remEl.textContent = remText;
+            }
+            if (step2SubEl && remText) {
+              step2SubEl.textContent = `Restdauer: ${remText}`;
+            }
+            if (playerRemBadge && remText) {
+              playerRemBadge.innerHTML = `<i class="bi bi-clock-history me-1"></i>Geschätzte Restdauer: ${this.escapeHtml(remText)}`;
             }
             if (progBar && typeof qInfo.progress_percent !== 'undefined') {
-              const pct = Math.max(8, Math.min(99, parseInt(qInfo.progress_percent, 10) || 10));
+              const pct = Math.max(5, Math.min(98, parseInt(qInfo.progress_percent, 10) || 10));
               progBar.style.width = `${pct}%`;
               progBar.setAttribute('aria-valuenow', String(pct));
             }
