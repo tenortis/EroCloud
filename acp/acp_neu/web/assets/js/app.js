@@ -649,10 +649,15 @@ const App = {
   async reviewMovieCoActor(movieId, merchantId, coActorId, decision) {
     let reason = '';
     if (decision === 'reject') {
-      const r = window.prompt(
-        'Grund für die Ablehnung des ID-Shots / Drehpartners:',
-        'Der Personalausweis ist auf dem ID-Shot leider nicht scharf genug lesbar. Bitte nimm den ID-Shot per Smartphone-QR-Code erneut auf.'
-      );
+      const r = await this.prompt({
+        title: 'Drehpartner / ID-Shot ablehnen',
+        message: 'Bitte gib den Grund für die Ablehnung des ID-Shots bzw. Drehpartners ein:',
+        defaultValue: 'Der Personalausweis ist auf dem ID-Shot leider nicht scharf genug lesbar. Bitte nimm den ID-Shot per Smartphone-QR-Code erneut auf.',
+        variant: 'danger',
+        icon: 'bi-person-x-fill',
+        confirmText: 'ID-Shot ablehnen',
+        confirmIcon: 'bi-x-circle'
+      });
       if (r === null) return;
       reason = r.trim();
     }
@@ -1149,10 +1154,15 @@ const App = {
   async reviewAlbumCoActor(albumDbId, merchantId, coActorId, decision) {
     let reason = '';
     if (decision === 'reject') {
-      const r = window.prompt(
-        'Grund für die Ablehnung des ID-Shots / Drehpartners:',
-        'Der Personalausweis ist auf dem ID-Shot leider nicht scharf genug lesbar. Bitte nimm den ID-Shot per Smartphone-QR-Code erneut auf.'
-      );
+      const r = await this.prompt({
+        title: 'Drehpartner / ID-Shot ablehnen',
+        message: 'Bitte gib den Grund für die Ablehnung des ID-Shots bzw. Drehpartners ein:',
+        defaultValue: 'Der Personalausweis ist auf dem ID-Shot leider nicht scharf genug lesbar. Bitte nimm den ID-Shot per Smartphone-QR-Code erneut auf.',
+        variant: 'danger',
+        icon: 'bi-person-x-fill',
+        confirmText: 'ID-Shot ablehnen',
+        confirmIcon: 'bi-x-circle'
+      });
       if (r === null) return;
       reason = r.trim();
     }
@@ -1532,7 +1542,14 @@ const App = {
 
     const statusSel = form.querySelector('select[name="movie_status"]');
     if (statusSel && statusSel.value === 'deleted') {
-      const ok = window.confirm('Möchtest du diesen Film wirklich auf „Gelöscht“ setzen? Alle Videodateien auf dem Server werden unwiderruflich gelöscht und der Film wird aus movies_online entfernt!');
+      const ok = await this.confirm({
+        title: 'Film endgültig löschen?',
+        message: 'Möchtest du diesen Film wirklich auf „Gelöscht“ setzen?\nAlle Videodateien auf dem Server werden unwiderruflich gelöscht und der Film wird aus movies_online entfernt!',
+        variant: 'danger',
+        icon: 'bi-trash3-fill',
+        confirmText: 'Film unwiderruflich löschen',
+        confirmIcon: 'bi-trash3'
+      });
       if (!ok) return false;
     }
 
@@ -1744,7 +1761,14 @@ const App = {
 
     const statusSel = document.getElementById('pao-status-select');
     if (statusSel && statusSel.value === 'deleted') {
-      const ok = window.confirm('Möchtest du dieses Fotoalbum wirklich auf „Löschen“ setzen? Alle Bilddateien auf dem Server werden unwiderruflich gelöscht und das Album wird aus photo_albums_online entfernt!');
+      const ok = await this.confirm({
+        title: 'Fotoalbum endgültig löschen?',
+        message: 'Möchtest du dieses Fotoalbum wirklich auf „Löschen“ setzen?\nAlle Bilddateien auf dem Server werden unwiderruflich gelöscht und das Album wird aus photo_albums_online entfernt!',
+        variant: 'danger',
+        icon: 'bi-trash3-fill',
+        confirmText: 'Fotoalbum unwiderruflich löschen',
+        confirmIcon: 'bi-trash3'
+      });
       if (!ok) return false;
     }
 
@@ -2480,6 +2504,204 @@ const App = {
     } else {
       setTimeout(() => toastEl.remove(), 3500);
     }
+  },
+
+  /**
+   * Globale ACP Modal-Engine (info | success | warning | danger)
+   * Unterstützt Confirm-, Prompt- (Texteingabe) und Alert-Modals sowie eine optionale Checkbox.
+   */
+  dialog(options = {}) {
+    return new Promise((resolve) => {
+      const opts = typeof options === 'string' ? { message: options } : (options || {});
+      const mode = opts.mode || 'confirm'; // 'confirm' | 'prompt' | 'alert'
+      const variant = opts.variant || (mode === 'alert' ? 'info' : 'warning');
+
+      const variantConfig = {
+        info: {
+          bg: 'rgba(2, 132, 199, 0.12)',
+          color: '#0284c7',
+          icon: 'bi-info-circle-fill',
+          btnClass: 'btn btn-sm btn-primary-kkc fw-semibold ms-auto',
+          defaultTitle: 'Information'
+        },
+        success: {
+          bg: 'rgba(16, 185, 129, 0.12)',
+          color: '#10b981',
+          icon: 'bi-check-circle-fill',
+          btnClass: 'btn btn-sm btn-success fw-semibold ms-auto',
+          defaultTitle: 'Bestätigung'
+        },
+        warning: {
+          bg: 'rgba(245, 158, 11, 0.15)',
+          color: '#d97706',
+          icon: 'bi-exclamation-triangle-fill',
+          btnClass: 'btn btn-sm btn-warning text-dark fw-semibold ms-auto',
+          defaultTitle: 'Bitte bestätigen'
+        },
+        danger: {
+          bg: 'rgba(239, 68, 68, 0.12)',
+          color: '#ef4444',
+          icon: 'bi-exclamation-octagon-fill',
+          btnClass: 'btn btn-sm btn-danger fw-semibold ms-auto',
+          defaultTitle: 'Sicherheitsabfrage'
+        }
+      };
+
+      const vCfg = variantConfig[variant] || variantConfig.warning;
+      const modalEl = document.getElementById('ec-global-modal');
+      if (!modalEl || !window.bootstrap?.Modal) {
+        resolve(mode === 'prompt' ? null : false);
+        return;
+      }
+
+      const iconBoxEl   = document.getElementById('ec-global-modal-icon-box');
+      const iconEl      = document.getElementById('ec-global-modal-icon');
+      const titleEl     = document.getElementById('ec-global-modal-title');
+      const msgEl       = document.getElementById('ec-global-modal-message');
+      const promptWrap  = document.getElementById('ec-global-modal-prompt-wrap');
+      const promptInput = document.getElementById('ec-global-modal-prompt-input');
+      const chkWrap     = document.getElementById('ec-global-modal-checkbox-wrap');
+      const chkInput    = document.getElementById('ec-global-modal-checkbox');
+      const chkLabel    = document.getElementById('ec-global-modal-checkbox-label');
+      const chkSub      = document.getElementById('ec-global-modal-checkbox-subtext');
+      const cancelBtn   = document.getElementById('ec-global-modal-cancel');
+      const confirmBtn  = document.getElementById('ec-global-modal-confirm');
+
+      if (iconBoxEl) {
+        iconBoxEl.style.background = vCfg.bg;
+        iconBoxEl.style.color = vCfg.color;
+      }
+      if (iconEl) {
+        iconEl.className = `bi ${opts.icon || vCfg.icon} fs-5`;
+      }
+      if (titleEl) {
+        titleEl.textContent = opts.title || vCfg.defaultTitle;
+      }
+      if (msgEl) {
+        const rawMsg = String(opts.message || '');
+        msgEl.innerHTML = rawMsg
+          .split(/\n+/)
+          .map(line => `<p class="mb-2 last-mb-0">${this.escapeHtml(line)}</p>`)
+          .join('');
+        const lastP = msgEl.querySelector('p:last-child');
+        if (lastP) lastP.classList.replace('mb-2', 'mb-0');
+      }
+
+      // Prompt-Feld konfigurieren
+      if (promptWrap && promptInput) {
+        if (mode === 'prompt') {
+          promptWrap.classList.remove('d-none');
+          promptInput.value = String(opts.defaultValue ?? '');
+          promptInput.placeholder = String(opts.placeholder || '');
+          promptInput.rows = Number(opts.rows || 3);
+        } else {
+          promptWrap.classList.add('d-none');
+          promptInput.value = '';
+        }
+      }
+
+      // Optionale Checkbox konfigurieren
+      const hasCheckbox = Boolean(opts.checkbox && typeof opts.checkbox === 'object');
+      if (chkWrap && chkInput && chkLabel && chkSub) {
+        if (hasCheckbox) {
+          chkWrap.classList.remove('d-none');
+          chkInput.checked = opts.checkbox.checked !== false;
+          chkLabel.textContent = String(opts.checkbox.label || '');
+          if (opts.checkbox.subtext) {
+            chkSub.textContent = String(opts.checkbox.subtext);
+            chkSub.classList.remove('d-none');
+          } else {
+            chkSub.textContent = '';
+            chkSub.classList.add('d-none');
+          }
+        } else {
+          chkWrap.classList.add('d-none');
+        }
+      }
+
+      // Buttons konfigurieren
+      if (cancelBtn) {
+        cancelBtn.textContent = String(opts.cancelText || 'Abbrechen');
+        cancelBtn.classList.toggle('d-none', mode === 'alert');
+      }
+      if (confirmBtn) {
+        confirmBtn.className = vCfg.btnClass;
+        const confirmLabel = opts.confirmText || (mode === 'alert' ? 'OK' : 'Bestätigen');
+        confirmBtn.innerHTML = opts.confirmIcon
+          ? `<i class="bi ${this.escapeHtml(opts.confirmIcon)} me-1"></i>${this.escapeHtml(confirmLabel)}`
+          : this.escapeHtml(confirmLabel);
+      }
+
+      const bsModal = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+      let settled = false;
+
+      const finish = (result) => {
+        if (settled) return;
+        settled = true;
+        confirmBtn?.removeEventListener('click', onConfirm);
+        modalEl.removeEventListener('hidden.bs.modal', onHidden);
+        resolve(result);
+      };
+
+      const onConfirm = () => {
+        if (typeof opts.onConfirmClick === 'function') {
+          try {
+            opts.onConfirmClick();
+          } catch (_) {}
+        }
+        let resVal = true;
+        if (mode === 'prompt') {
+          resVal = promptInput ? promptInput.value : '';
+        } else if (hasCheckbox) {
+          resVal = {
+            confirmed: true,
+            checked: Boolean(chkInput && chkInput.checked)
+          };
+        }
+        bsModal.hide();
+        finish(resVal);
+      };
+
+      const onHidden = () => {
+        if (mode === 'prompt') {
+          finish(null);
+        } else if (hasCheckbox) {
+          finish({ confirmed: false, checked: false });
+        } else {
+          finish(mode === 'alert' ? true : false);
+        }
+      };
+
+      confirmBtn?.addEventListener('click', onConfirm);
+      modalEl.addEventListener('hidden.bs.modal', onHidden);
+
+      if (mode === 'prompt' && promptInput) {
+        modalEl.addEventListener('shown.bs.modal', () => {
+          promptInput.focus();
+          promptInput.select();
+        }, { once: true });
+      }
+
+      bsModal.show();
+    });
+  },
+
+  confirm(options = {}) {
+    const opts = typeof options === 'string' ? { message: options } : { ...options };
+    opts.mode = 'confirm';
+    return this.dialog(opts);
+  },
+
+  prompt(options = {}) {
+    const opts = typeof options === 'string' ? { message: options } : { ...options };
+    opts.mode = 'prompt';
+    return this.dialog(opts);
+  },
+
+  alert(options = {}) {
+    const opts = typeof options === 'string' ? { message: options } : { ...options };
+    opts.mode = 'alert';
+    return this.dialog(opts);
   },
 
   // ========================================================================
@@ -4103,7 +4325,15 @@ const App = {
       const checkedRadio = form.querySelector('input[name="actor_status"]:checked');
       const statusVal = checkedRadio ? checkedRadio.value : '';
       if (statusVal === 'deleted') {
-        if (!window.confirm('Achtung: Möchtest du dieses Darsteller-Profil wirklich endgültig auf GELÖSCHT setzen? Dadurch werden auch alle zugeordneten Filme und Fotoalben als gelöscht markiert.')) {
+        const ok = await App.confirm({
+          title: 'Darsteller-Profil endgültig löschen?',
+          message: 'Möchtest du dieses Darsteller-Profil wirklich endgültig auf „Gelöscht“ setzen?\nDadurch werden auch alle zugeordneten Filme und Fotoalben als gelöscht markiert.',
+          variant: 'danger',
+          icon: 'bi-trash3-fill',
+          confirmText: 'Profil & Inhalte löschen',
+          confirmIcon: 'bi-trash3'
+        });
+        if (!ok) {
           return false;
         }
       }
@@ -4152,7 +4382,15 @@ const App = {
 
     async deleteProfileImage(actorId, fsk) {
       const fskCode = String(fsk || '').toUpperCase().includes('16') ? 'FSK16' : 'FSK18';
-      if (!window.confirm(`Möchtest du das ${fskCode}-Profilbild von Profil #${actorId} wirklich löschen?`)) {
+      const ok = await App.confirm({
+        title: `${fskCode}-Profilbild löschen?`,
+        message: `Möchtest du das ${fskCode}-Profilbild von Profil #${actorId} wirklich löschen?`,
+        variant: 'danger',
+        icon: 'bi-image',
+        confirmText: 'Profilbild löschen',
+        confirmIcon: 'bi-trash3'
+      });
+      if (!ok) {
         return;
       }
 
@@ -4193,7 +4431,15 @@ const App = {
         return;
       }
 
-      if (!window.confirm(`Möchtest du das Darsteller-Profil #${actorId} samt aller Videos und Fotoalben wirklich dem Händler #${newMerchantId} zuweisen?`)) {
+      const ok = await App.confirm({
+        title: 'Profil-Inhaber wechseln?',
+        message: `Möchtest du das Darsteller-Profil #${actorId} samt aller Videos und Fotoalben wirklich dem Händler #${newMerchantId} zuweisen?`,
+        variant: 'warning',
+        icon: 'bi-arrow-left-right',
+        confirmText: 'Händler-Zuweisung starten',
+        confirmIcon: 'bi-check2-circle'
+      });
+      if (!ok) {
         return;
       }
 
@@ -4464,14 +4710,21 @@ const App = {
     },
 
     async impersonateMerchant(merchantId, username, targetRoute = 'startseite') {
-      if (!window.confirm(
-        `Möchtest du dich jetzt als Partner „${username}“ (#${merchantId}) im Partner-Backend (MCP) einloggen?\n\n` +
-        `Das Partner-Dashboard wird in einem neuen Tab geöffnet. Der Zugriff wird im Mitarbeiter-Audit-Log protokolliert.`
-      )) {
+      let newWin = null;
+      const ok = await App.confirm({
+        title: 'Partner-Session übernehmen',
+        message: `Möchtest du dich jetzt als Partner „${username}“ (#${merchantId}) im Partner-Backend (MCP) einloggen?\nDas Partner-Dashboard wird in einem neuen Tab geöffnet. Der Zugriff wird im Mitarbeiter-Audit-Log protokolliert.`,
+        variant: 'info',
+        icon: 'bi-box-arrow-up-right',
+        confirmText: 'Im Partner-Backend öffnen',
+        confirmIcon: 'bi-box-arrow-up-right',
+        onConfirmClick: () => {
+          newWin = window.open('about:blank', '_blank');
+        }
+      });
+      if (!ok) {
         return;
       }
-
-      const newWin = window.open('about:blank', '_blank');
 
       const fd = new FormData();
       fd.append('_csrf', App.csrfToken);
@@ -4891,8 +5144,16 @@ const App = {
       return false;
     },
 
-    resetImprintDefaults() {
-      if (!window.confirm('Möchtest du alle Impressums- und Support-Felder auf die Pay4Coins-Standardwerte zurücksetzen?')) {
+    async resetImprintDefaults() {
+      const ok = await App.confirm({
+        title: 'Auf Standardwerte zurücksetzen?',
+        message: 'Möchtest du alle Impressums- und Support-Felder auf die Pay4Coins-Standardwerte zurücksetzen?',
+        variant: 'warning',
+        icon: 'bi-arrow-counterclockwise',
+        confirmText: 'Standardwerte laden',
+        confirmIcon: 'bi-arrow-counterclockwise'
+      });
+      if (!ok) {
         return;
       }
       this.saveImprint(null, true);
@@ -5173,45 +5434,42 @@ const App = {
       }
     },
 
-    openClearErrorLogModal() {
-      const modalEl = document.getElementById('clearErrorLogModal');
-      if (!modalEl) return;
-      const chk = document.getElementById('err-clear-create-backup');
-      if (chk) chk.checked = true;
-      if (window.bootstrap?.Modal) {
-        window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    async openClearErrorLogModal(sizeFmt = '') {
+      const sizeInfo = sizeFmt ? ` (aktuelle Größe: ${sizeFmt})` : '';
+      const res = await App.confirm({
+        title: 'PHP-Error-Log leeren',
+        message: `Möchtest du das zentrale PHP-Error-Log (.errorlog)${sizeInfo} wirklich vollständig leeren?`,
+        variant: 'danger',
+        icon: 'bi-trash3-fill',
+        confirmText: 'Jetzt Log leeren',
+        confirmIcon: 'bi-trash3',
+        checkbox: {
+          label: 'Backup vor dem Leeren erstellen (.errorlog.bak)',
+          subtext: 'Speichert den bisherigen Log-Inhalt als Sicherungskopie, damit du ihn bei Bedarf jederzeit wiederherstellen kannst.',
+          checked: true
+        }
+      });
+      if (!res || !res.confirmed) {
+        return;
       }
-    },
-
-    async confirmClearErrorLog() {
-      const chk = document.getElementById('err-clear-create-backup');
-      const createBackup = chk ? (chk.checked ? '1' : '0') : '1';
-      const btn = document.getElementById('btn-confirm-clear-errorlog');
-      if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Leere Log...';
-      }
-
-      const modalEl = document.getElementById('clearErrorLogModal');
-      if (modalEl && window.bootstrap?.Modal) {
-        const inst = window.bootstrap.Modal.getInstance(modalEl);
-        if (inst) inst.hide();
-      }
-      document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-      document.body.classList.remove('modal-open');
-      document.body.style.removeProperty('overflow');
-      document.body.style.removeProperty('padding-right');
-
-      await this.errorLogAction('clear_log', { createBackup });
+      await this.errorLogAction('clear_log', { createBackup: res.checked ? '1' : '0' });
     },
 
     async errorLogAction(actionType, options = {}) {
       if (actionType === 'clear_log' && options.createBackup === undefined) {
-        this.openClearErrorLogModal();
+        await this.openClearErrorLogModal();
         return;
       }
       if (actionType === 'restore_backup') {
-        if (!window.confirm('Möchtest du die Sicherungskopie (.errorlog.bak) wiederherstellen?')) {
+        const ok = await App.confirm({
+          title: 'Backup wiederherstellen?',
+          message: 'Möchtest du die Sicherungskopie (.errorlog.bak) wiederherstellen?\nDer aktuelle Inhalt von .errorlog wird dadurch mit dem Backup überschrieben.',
+          variant: 'warning',
+          icon: 'bi-arrow-counterclockwise',
+          confirmText: 'Backup wiederherstellen',
+          confirmIcon: 'bi-arrow-counterclockwise'
+        });
+        if (!ok) {
           return;
         }
       }
@@ -5305,7 +5563,15 @@ const App = {
       const msg = isLock
         ? `Möchtest du den Cloud-User #${memberId} wirklich sperren?`
         : `Möchtest du den Cloud-User #${memberId} wieder entsperren?`;
-      if (!window.confirm(msg)) {
+      const ok = await App.confirm({
+        title: isLock ? 'Cloud-User sperren?' : 'Cloud-User entsperren?',
+        message: msg,
+        variant: isLock ? 'danger' : 'success',
+        icon: isLock ? 'bi-lock-fill' : 'bi-unlock-fill',
+        confirmText: isLock ? 'User sperren' : 'User entsperren',
+        confirmIcon: isLock ? 'bi-lock' : 'bi-unlock'
+      });
+      if (!ok) {
         return;
       }
 
@@ -5574,7 +5840,16 @@ const App = {
       };
 
       if (action === 'delete' || action === 'reject') {
-        if (!window.confirm(confirmLabels[action] || 'Aktion ausführen?')) {
+        const isDelete = action === 'delete';
+        const ok = await App.confirm({
+          title: isDelete ? 'Werbebanner löschen?' : 'Werbebanner ablehnen?',
+          message: confirmLabels[action] || 'Möchtest du diese Aktion wirklich ausführen?',
+          variant: isDelete ? 'danger' : 'warning',
+          icon: isDelete ? 'bi-trash3-fill' : 'bi-x-circle-fill',
+          confirmText: isDelete ? 'Banner löschen' : 'Banner ablehnen',
+          confirmIcon: isDelete ? 'bi-trash3' : 'bi-x-circle'
+        });
+        if (!ok) {
           return;
         }
       }
@@ -5864,7 +6139,15 @@ const App = {
       const empId = parseInt(employeeId, 10) || 0;
       if (empId <= 0) return;
 
-      if (!window.confirm(`Möchtest du den Mitarbeiter-Account „${username}“ (#${empId}) wirklich dauerhaft löschen?`)) {
+      const ok = await App.confirm({
+        title: 'Mitarbeiter-Account löschen?',
+        message: `Möchtest du den Mitarbeiter-Account „${username}“ (#${empId}) wirklich dauerhaft löschen?`,
+        variant: 'danger',
+        icon: 'bi-person-x-fill',
+        confirmText: 'Account dauerhaft löschen',
+        confirmIcon: 'bi-trash3'
+      });
+      if (!ok) {
         return;
       }
 
@@ -5916,7 +6199,15 @@ const App = {
         ? `Möchtest du wirklich die gesamte Aktivitäts-Historie von Mitarbeiter #${empId} leeren?`
         : `Möchtest du alle Historien-Einträge von Mitarbeiter #${empId}, die älter als 30 Tage sind, bereinigen?`;
 
-      if (!window.confirm(msg)) {
+      const ok = await App.confirm({
+        title: 'Aktivitäts-Historie bereinigen?',
+        message: msg,
+        variant: mode === 'all' ? 'danger' : 'warning',
+        icon: 'bi-clock-history',
+        confirmText: 'Historie bereinigen',
+        confirmIcon: 'bi-trash3'
+      });
+      if (!ok) {
         return;
       }
 
@@ -5953,7 +6244,15 @@ const App = {
       const empId = parseInt(employeeId, 10) || 0;
       if (empId <= 0) return;
 
-      if (!window.confirm(`Möchtest du jetzt die Session von „${username}“ (#${empId}) übernehmen und dich in diesen Mitarbeiter-Account einloggen?`)) {
+      const ok = await App.confirm({
+        title: 'Mitarbeiter-Session übernehmen',
+        message: `Möchtest du jetzt die Session von „${username}“ (#${empId}) übernehmen und dich in diesen Mitarbeiter-Account einloggen?`,
+        variant: 'info',
+        icon: 'bi-person-badge-fill',
+        confirmText: 'Session übernehmen',
+        confirmIcon: 'bi-box-arrow-in-right'
+      });
+      if (!ok) {
         return;
       }
 
