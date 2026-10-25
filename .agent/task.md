@@ -91,3 +91,11 @@
         - [x] Build dedicated MCP module `#/co-actors` (`CoActorsController`, `views/co_actors/index.php`, `views/co_actors/_quick_modal.php` with 4s live polling) and integrate into movie upload/edit (`views/movies/_performer_section.php` & `MoviesController`)
         - [x] Integrate ACP performer verification box, single-performer approve/reject, and publish protection into `acp/includes/movie_checking.php` and `acp/includes/movie_edit.php`
         - [x] Document complete architecture and workflows in `.agent/knowledge/architecture/co-actor-verification-and-model-release.md`
+
+- [x] **ACP Complete Modernization (`acp_neu` -> Live Switch on `acp.erocloud.net` & PHP 8.4.27)**
+    - [x] Build complete SPA ACP v2.0 (`acp/acp_neu/app/` & `acp/acp_neu/web/`) across all 14 core modules (`Home`, `MoviesChecking`, `PhotoAlbumsChecking`, `CoActorsChecking`, `AiCompliance`, `MoviesOnline`, `PhotoAlbumsOnline`, `ContentCleanup`, `StorageAnalytics`, `Actors`, `Merchants`, `Users`, `Websites`, `Affiliate`, `Employees`, `SystemTech`)
+    - [x] Run 5-stage Deep-Logic-Audit (`Router`, `258` `p4c_query` calls, `208` `EXPLAIN` queries, Controller/View renders, JS handler cross-check) for 100% PHP 8.0.30 & PHP 8.4.27 compatibility
+    - [x] Configure clean notice pages for `#/webcams` and `#/pointssystem` (`PreviewController`) and clean up sidebar badges (hide `0` badges; remove badges on *Content Online*, *Filme online*, *Fotoalben online*, and *Mitarbeiter & Admins*)
+    - [x] Implement global Promise-based modal dialog system (`#ec-global-modal` with `App.dialog`, `App.confirm`, `App.prompt`, `App.alert` in variants `info`, `success`, `warning`, `danger`) in both ACP (`acp_neu`) and MCP (`mcp_neu`), replacing all native `confirm()`/`prompt()` dialogs (including optional `.errorlog.bak` backup checkbox on `#/errors`)
+    - [x] Generate multi-resolution favicons (`favicon.ico`, `16x16`, `32x32`, `96x96`, `apple-touch-icon.png`) from `erocloud_logo.png` and integrate into ACP and MCP
+    - [x] Switch `acp.erocloud.net` in LiveConfig to `/htdocs/acp/acp_neu/web` on **PHP `8.4.27`** (`php-8.4-opt`) with `.acp_htpasswd` & IP whitelist protection in `acp/acp_neu/web/.htaccess` and clean `/Startseite#/merchants` return redirect from MCP impersonation

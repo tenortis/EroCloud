@@ -32,14 +32,24 @@ usage: 'Wird automatisch herangezogen bei allen Arbeiten am Neubau des ACP unter
 
 ## 2. 📂 Ordnerstruktur & URL-Strategie
 
-### 2.1 Produktiv-Routing auf `acp.erocloud.net` mit parallelem Legacy-Zugriff
-* **Standard-URL (Neues ACP v2.0):** `https://acp.erocloud.net/` bzw. `https://acp.erocloud.net/Startseite` (in [`acp/.htaccess`](file:///c:/xampp/htdocs/EroCloud/acp/.htaccess) direkt auf `acp_neu/web/index.php` inkl. `api.php`, `media.php` und `assets/` geroutet; auch `/acp_neu/web/Startseite` funktioniert weiterhin).
-* **Paralleler Zugriff auf das alte ACP (Referenz):** Das bisherige System bleibt unter `https://acp.erocloud.net/Alt-Startseite` (sowie allen alten Unterseiten in `acp/includes/`) parallel im Dateisystem erhalten, um später bei Bedarf jederzeit auf den alten Aufbau (z. B. für Webcams oder Punktesystem) zurückgreifen zu können.
-* **Schlichte Hinweis-Seiten für `#/webcams` & `#/pointssystem` ([`PreviewController.php`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/app/src/Modules/Preview/PreviewController.php)):** Beide Menüpunkte bleiben in der Sidebar sichtbar und zeigen auf der jeweiligen Seite einen klaren Hinweis ohne Untermenüs, dass der Bereich im Hintergrund aktuell nicht aktiv ist und zu einem späteren Zeitpunkt neu konzipiert bzw. neu hinzugefügt wird.
-* **HTTP Basic Auth & Session-Sharing:**
-  * Da `/acp/acp_neu/` innerhalb von `/acp/` liegt, greift der bestehende `.htaccess` Verzeichnisschutz (`.acp_htpasswd`) automatisch.
-  * Die PHP-Session (`$_SESSION['logged_id'] = 'acp'`, `$_SESSION['employee_id']`, `$_SESSION['employee_access_area']`) wird nahtlos zwischen dem alten ACP und `acp_neu` geteilt.
-  * Zusätzlich schützt ein mit `AES_KEY` HMAC-signiertes 30-Minuten-Cookie (`erocloud_acp_auth`) vor vorzeitigem Session-Verlust durch den PHP Garbage Collector im geteilten `TEMP_DIR`.
+### 2.1 Produktiv-Umstellung von `acp.erocloud.net` auf `/htdocs/acp/acp_neu/web` (PHP 8.4.27)
+* **LiveConfig DocumentRoot & PHP-Version:**
+  * Die Domain `acp.erocloud.net` zeigt in LiveConfig direkt auf `/htdocs/acp/acp_neu/web` und läuft produktiv unter **PHP `8.4.27`** (`php-8.4-opt`).
+  * Dadurch ist `acp/acp_neu/web/` das öffentliche DocumentRoot (`https://acp.erocloud.net/Startseite`), während der Anwendungskern `acp/acp_neu/app/` (`../app`) physisch **oberhalb des DocumentRoots** liegt und aus dem Web nicht erreichbar ist.
+  * Das alte ACP (`acp/index.php` und `acp/includes/`) bleibt im Dateisystem als Code-Referenz für den späteren Neubau von Webcams und Punktesystem erhalten.
+  * Beim Beenden einer übernommenen Partner-Session im MCP (`mcp/mcp_neu/web/index.php`) erfolgt der Redirect direkt auf die saubere URL `https://acp.erocloud.net/Startseite#/merchants`.
+* **Schlichte Hinweis-Seiten für `#/webcams` & `#/pointssystem` ([`PreviewController.php`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/app/src/Modules/Preview/PreviewController.php)):** Beide Menüpunkte bleiben in der Sidebar sichtbar und zeigen auf der jeweiligen Seite einen klaren Hinweis ohne Untermenüs oder Buttons, dass der Bereich im Hintergrund aktuell nicht aktiv ist und zu einem späteren Zeitpunkt neu konzipiert bzw. neu hinzugefügt wird.
+* **Sidebar-Badge-Regeln ([`acp/acp_neu/web/index.php`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/web/index.php) & [`app.js`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/web/assets/js/app.js)):**
+  * Badges mit dem Wert `0` werden grundsätzlich ausgeblendet (`d-none`) und nur bei `> 0` eingeblendet.
+  * Bei *Content Online*, *Filme online*, *Fotoalben online* sowie *Mitarbeiter & Admins* wird kein Zähler-Badge in der Sidebar angezeigt.
+* **Globales Dialog-Modal-System (`#ec-global-modal` in `web/index.php` & `App.dialog` / `App.confirm` / `App.prompt` / `App.alert` in `app.js`):**
+  * Ersetzt ausnahmslos alle nativen Browser-`confirm()`-, `prompt()`- und `alert()`-Boxen im gesamten ACP durch ein einheitliches, Promise-basiertes Bootstrap-5-Modal im KKC-Design.
+  * Unterstützt die 4 Varianten `info`, `success`, `warning` und `danger` sowie optionale Textfelder (`input`) und Zusatz-Häkchen (`checkbox`, z. B. beim Leeren des `.errorlog` unter `#/errors` für das optionale `.errorlog.bak`-Backup).
+* **Favicons:**
+  * Aus `erocloud_logo.png` generierte, zentrierte Favicons (`favicon.ico`, `favicon-16x16.png`, `favicon-32x32.png`, `favicon-96x96.png`, `apple-touch-icon.png`) sind in `acp/acp_neu/web/assets/img/` und `acp/acp_neu/web/favicon.ico` abgelegt und im `<head>` (Login & Haupt-App) verlinkt.
+* **HTTP Basic Auth, IP-Schutz & 30-Minuten Session-Timeout:**
+  * In [`acp/acp_neu/web/.htaccess`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/web/.htaccess) sind der `.acp_htpasswd`-Schutz (`AuthType Basic`) und die IP-/Browser-Freigaben direkt integriert.
+  * Die Sitzungsdauer beträgt **30 Minuten (1.800 Sekunden) Inaktivitäts-Timeout** (`ACP_SESSION_DURATION` + HMAC-signiertes Cookie `erocloud_acp_auth` + sichtbarer Topbar-Countdown `#acp-logout-timer`, der sich bei jeder Aktion automatisch auf `30:00` zurücksetzt).
 
 ### 2.2 Verzeichnisbaum
 

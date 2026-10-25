@@ -165,6 +165,9 @@ mcp_neu/ (später: mcp/)
    * **Alle Banner (`#/webmaster-newads`):** Übersicht aller freigegebenen Werbebanner aktiver EroAds-Websites mit Live-Filterung nach Website, Format und Bannergröße.
    * **Statistiken (`#/webmaster-stats`):** Monats- und Jahres-Auswertungen für Klicks, Impressionen und Conversions inkl. Herkunfts-/Referer-Details (`webmaster/origin-details`).
    * **Darsteller werben (`#/webmaster-advertise-partner`):** Übersicht der persönlichen 3%-Partner-Werbelinks (`https://pay4coins.com/wm/{partner_id}` sowie `https://ad5.tv/wm/{actor_username}`).
+8. **Globales Dialog-Modal-System (`#ec-global-modal`) & Favicons:**
+   * In [`mcp/mcp_neu/web/index.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/web/index.php) und [`mcp/mcp_neu/web/assets/js/app.js`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/web/assets/js/app.js) steht analog zum ACP das globale, Promise-basierte Dialog-System (`App.dialog`, `App.confirm`, `App.prompt`, `App.alert`) mit den Varianten `info`, `success`, `warning` und `danger` zur Verfügung; sämtliche nativen `window.confirm()`-Aufrufe (Film löschen, Foto-Album löschen, Einzelfoto entfernen, Drehpartner entfernen, Kampagne löschen) sind dadurch abgelöst.
+   * Aus `erocloud_logo.png` generierte Favicons (`favicon.ico`, `favicon-16x16.png`, `favicon-32x32.png`, `favicon-96x96.png`, `apple-touch-icon.png`) sind in `mcp/mcp_neu/web/assets/img/` und `mcp/mcp_neu/web/favicon.ico` abgelegt und im `<head>` von `index.php` und `verify_co_actor.php` eingebunden.
 
 ---
 
