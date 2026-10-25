@@ -105,6 +105,36 @@ Jede Creatorin kann im Creator Studio (`mcp_neu`) selbst entscheiden, ob und mit
   * Im **ACP** legt der Admin die Kriterien fest, ab wann eine Creatorin automatisch ihre eigene Subdomain `creatorname.amoredea.com` erhält (z. B. `min_videos`, `min_feed_posts_streak`, `min_user_interactions`).
   * Im **EroCloud MCP (`mcp_neu`)** sieht jede Creatorin auf ihrem Dashboard / im Creator Studio einen motivierenden Fortschrittsbalken (*„Noch 2 Videos oder 12 Chat-Interaktionen bis zur Freischaltung deiner eigenen VIP-Domain `lara.amoredea.com`!“*).
 
+### 4.3 Technische Subdomain-Anlage via LiveConfig-API (Ein einziger zentraler Code-Baustein)
+* **Kein eigenes Verzeichnis / kein eigenes Web pro Creatorin:**
+  * Für eine neue Subdomain (`creatorname.amoredea.com`) wird **niemals** ein eigener Ordner oder ein Duplikat des Codes angelegt.
+  * Stattdessen verweisen **alle** Subdomains auf exakt denselben zentralen **Private-Page-Baustein** im Webroot.
+  * Der zentrale Router liest beim Seitenaufruf die Subdomain aus `$_SERVER['HTTP_HOST']` aus, ermittelt den zugehörigen `actor_id`-Datensatz und rendert den gemeinsamen Private-Page-Baustein dynamisch mit den Inhalten und Design-Einstellungen dieser Creatorin.
+* **Vollautomatische Provisionierung über die LiveConfig SOAP-API (+ Let's Encrypt SSL):**
+  * Sobald eine Creatorin die Freischalt-Kriterien erreicht (oder der Admin sie im ACP freischaltet), ruft das PHP-Backend automatisch die **LiveConfig SOAP-API** (`https://t199.nlserver.net:8443/liveconfig/soap`, Funktion `HostingSubdomainAdd`) auf.
+  * Dadurch wird `creatorname.amoredea.com` vollautomatisch im DNS/Apache eingetragen, auf das zentrale Zielverzeichnis der Private-Page-Engine gemappt und automatisch mit einem **Let's Encrypt TLS/SSL-Zertifikat** versehen (alternativ ergänzt durch ein globales Wildcard-Routing `*.amoredea.com`).
+
+### 4.4 Der visuelle „Private Page Editor“ im Creator Studio (`mcp_neu`)
+Obwohl technisch alle Subdomains auf denselben zentralen Software-Baustein zugreifen, soll jede Creatorin ihre Private Page **optisch und strukturell individuell gestalten** können. Dafür erhält das **Creator Studio im MCP (`mcp_neu`)** einen interaktiven **Private Page Editor** (mit Echtzeit-Smartphone-/Desktop-Vorschau), der die Konfiguration als strukturiertes JSON (`private_page_config_json`) in der Datenbank speichert:
+
+1. **Farbwelt, Theme-Presets & Atmosphäre:**
+   * **1-Klick-Design-Vorlagen (Vibe-Presets):** Z. B. *„Dark Luxury & Rose-Gold“*, *„Girlfriend Pastel (Hell & Warm)“*, *„Domina / Fetisch (Tiefschwarz, Latex-Glanz & Karmesinrot)“*, *„Neon Cyber / Gamer Girl“* oder *„Minimal Elegance“*.
+   * **Individuelle Akzentfarben & Hintergründe:** Eigene Primärfarbe (für Buttons, Rahmen, Badges), wählbarer Seitenhintergrund (eigenes Hintergrundbild mit einstellbarem Glassmorphism-Blur, Farbverlauf oder subtiles Muster) sowie Auswahl aus kuratierten Schriftarten-Kombinationen (modern, edel-serifenbetont, verspielt, dominant).
+2. **Individueller Hero-Header (Der erste Eindruck):**
+   * Auswahl zwischen klassischem **Panorama-Coverbild**, einem **lautlos startenden Video-Hero-Loop** (z. B. 6-Sekunden-Begrüßungsvideo im Header) oder einem **Full-Screen-Portrait-Header**.
+   * Optionales **Begrüßungs-Audio-Widget (Voice-Intro)** direkt unter dem Profilnamen (*„Hör dir meine persönliche Begrüßung an“*).
+3. **Modulares Block- & Sektionen-System (Drag & Drop Reihenfolge):**
+   * Die Creatorin kann selbst bestimmen, welche Bausteine auf ihrer Private Page sichtbar sind und **in welcher Reihenfolge** sie erscheinen:
+     * *Spotlight-/Pinned-Video* (z. B. ihr bestes Video ganz oben anheften),
+     * *Livecam- & Lovense-Steuerungs-Box* (ideal für Cam-Girls oder Dominas mit User-Toy-Steuerung),
+     * *VIP-Abo-Vorteilsbox* (zeigt prominent ihre eingestellten Abo-Vorteile wie X % Rabatt oder Early-Access),
+     * *Persönlicher Fan-Feed / Timeline*,
+     * *EroCloud-Videothek & Fotoalben-Galerie*,
+     * *Über mich, Vorlieben-Pills & FAQ-Akkordeon*,
+     * *Countdown-Banner* (z. B. *„Nächste Live-Show heute um 21:00 Uhr“*) oder *Glücksrad-Widget*.
+4. **Sicheres Design-System („Unkaputtbares Layout“):**
+   * Da der Editor über definierte CSS-Custom-Properties (`--pp-primary`, `--pp-bg`, `--pp-surface`, `--pp-font`) und geprüfte Layout-Module arbeitet, sieht jede Private Page individuell und einzigartig aus, bleibt aber auf jedem Smartphone und Desktop technisch zu 100 % schnell, responsiv und verkaufsoptimiert.
+
 ---
 
 ## 5. 📈 Wachstums-Motor & Mehrstufiges Partnerprogramm (Auszahlung über Pay4Coins)
