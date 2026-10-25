@@ -207,22 +207,11 @@ if (class_exists('CoActorManager')) {
 
 $countContentChecking = $countMoviesChecking + $countPhotoAlbumsChecking + $countCoActorsChecking;
 
-$rsMoviesOnline = p4c_query("SELECT COUNT(*) AS `cnt` FROM `movies_online`;", __FILE__, __LINE__);
-$countMoviesOnline = $rsMoviesOnline ? abs((int)(p4c_fetch_object($rsMoviesOnline)->cnt ?? 0)) : 0;
-
 $rsMoviesDrafts = p4c_query("SELECT COUNT(*) AS `cnt` FROM `movies` WHERE `released`='0' AND `status`!='deleted';", __FILE__, __LINE__);
 $countMoviesDrafts = $rsMoviesDrafts ? abs((int)(p4c_fetch_object($rsMoviesDrafts)->cnt ?? 0)) : 0;
 
-$rsPhotoAlbumsOnline = p4c_query("SELECT COUNT(*) AS `cnt` FROM `photo_albums_online`;", __FILE__, __LINE__);
-$countPhotoAlbumsOnline = $rsPhotoAlbumsOnline ? abs((int)(p4c_fetch_object($rsPhotoAlbumsOnline)->cnt ?? 0)) : 0;
-
-$countContentOnline = $countMoviesOnline + $countPhotoAlbumsOnline;
-
 $rsNewBanners = p4c_query("SELECT COUNT(*) AS `cnt` FROM `ads_media` WHERE `new_filename`!='' AND `rejected`='0';", __FILE__, __LINE__);
 $countNewBanners = $rsNewBanners ? abs((int)(p4c_fetch_object($rsNewBanners)->cnt ?? 0)) : 0;
-
-$rsActorCams = p4c_query("SELECT COUNT(*) AS `cnt` FROM `actor_cams` WHERE `datetime` >= '" . date('Y-m-d H:i:s', strtotime('-80 seconds')) . "';", __FILE__, __LINE__);
-$countActorCams = $rsActorCams ? abs((int)(p4c_fetch_object($rsActorCams)->cnt ?? 0)) : 0;
 
 $rsNewActors = p4c_query("SELECT COUNT(*) AS `cnt` FROM `actors` WHERE `created_datetime` >= '" . date('Y-m-d H:i:s', strtotime('-5 days')) . "' AND `status`='inactive';", __FILE__, __LINE__);
 $countNewActors = $rsNewActors ? abs((int)(p4c_fetch_object($rsNewActors)->cnt ?? 0)) : 0;
@@ -288,38 +277,38 @@ $sessionRemainingSeconds = 1800;
       </a>
 
       <?php if (acp_has_access('content_check')): ?>
-      <!-- 2. Content prüfen (Standardmäßig geschlossen, mit echtem Zähler) -->
+      <!-- 2. Content prüfen (Standardmäßig geschlossen, mit echtem Zähler falls > 0) -->
       <a class="sidebar-link sidebar-submenu-toggle" data-bs-toggle="collapse" href="#submenu-checking" role="button" aria-expanded="false" aria-controls="submenu-checking">
         <i class="bi bi-shield-check"></i>
-        <span class="text-nowrap">Content prüfen</span>
-        <span id="sidebar-checking-count" class="sidebar-count-badge ms-auto me-1 <?= $countContentChecking > 0 ? 'bg-warning text-dark border-warning' : '' ?>" title="Inhalte in Prüfung"><?= (int)$countContentChecking ?></span>
+        <span class="text-nowrap flex-grow-1">Content prüfen</span>
+        <span id="sidebar-checking-count" class="sidebar-count-badge me-1 <?= $countContentChecking > 0 ? 'bg-warning text-dark border-warning' : 'd-none' ?>" title="Inhalte in Prüfung"><?= (int)$countContentChecking ?></span>
         <i class="bi bi-chevron-right chevron-icon ms-0"></i>
       </a>
       <div class="collapse sidebar-submenu" id="submenu-checking">
         <a href="#/movies-checking" class="sidebar-link" data-route="#/movies-checking">
           <i class="bi bi-film"></i>
           <span class="text-nowrap">Filme prüfen</span>
-          <span id="sidebar-movies-checking-count" class="sidebar-count-badge ms-auto"><?= (int)$countMoviesChecking ?></span>
+          <span id="sidebar-movies-checking-count" class="sidebar-count-badge ms-auto <?= $countMoviesChecking <= 0 ? 'd-none' : '' ?>"><?= (int)$countMoviesChecking ?></span>
         </a>
         <a href="#/photo-albums-checking" class="sidebar-link" data-route="#/photo-albums-checking">
           <i class="bi bi-images"></i>
           <span class="text-nowrap">Fotoalben prüfen</span>
-          <span id="sidebar-albums-checking-count" class="sidebar-count-badge ms-auto"><?= (int)$countPhotoAlbumsChecking ?></span>
+          <span id="sidebar-albums-checking-count" class="sidebar-count-badge ms-auto <?= $countPhotoAlbumsChecking <= 0 ? 'd-none' : '' ?>"><?= (int)$countPhotoAlbumsChecking ?></span>
         </a>
         <a href="#/co-actors-checking" class="sidebar-link" data-route="#/co-actors-checking">
           <i class="bi bi-person-badge"></i>
           <span class="text-nowrap">Drehpartner &amp; ID</span>
-          <span id="sidebar-coactors-checking-count" class="sidebar-count-badge ms-auto"><?= (int)$countCoActorsChecking ?></span>
+          <span id="sidebar-coactors-checking-count" class="sidebar-count-badge ms-auto <?= $countCoActorsChecking <= 0 ? 'd-none' : '' ?>"><?= (int)$countCoActorsChecking ?></span>
         </a>
         <a href="#/movies-drafts" class="sidebar-link" data-route="#/movies-drafts">
           <i class="bi bi-clock-history"></i>
           <span class="text-nowrap">Filme in Planung</span>
-          <span id="sidebar-movies-drafts-count" class="sidebar-count-badge ms-auto"><?= (int)$countMoviesDrafts ?></span>
+          <span id="sidebar-movies-drafts-count" class="sidebar-count-badge ms-auto <?= $countMoviesDrafts <= 0 ? 'd-none' : '' ?>"><?= (int)$countMoviesDrafts ?></span>
         </a>
         <a href="#/movies-blocked" class="sidebar-link" data-route="#/movies-blocked">
           <i class="bi bi-slash-circle"></i>
           <span class="text-nowrap">Filme abgelehnt</span>
-          <span id="sidebar-movies-blocked-count" class="sidebar-count-badge ms-auto"><?= (int)$countMoviesBlocked ?></span>
+          <span id="sidebar-movies-blocked-count" class="sidebar-count-badge ms-auto <?= $countMoviesBlocked <= 0 ? 'd-none' : '' ?>"><?= (int)$countMoviesBlocked ?></span>
         </a>
         <?php if (function_exists('acp_is_admin') && acp_is_admin()): ?>
         <a href="#/ai-compliance" class="sidebar-link" data-route="#/ai-compliance">
@@ -331,23 +320,20 @@ $sessionRemainingSeconds = 1800;
       <?php endif; ?>
 
       <?php if (acp_has_access('content_online')): ?>
-      <!-- 3. Content Online (Standardmäßig geschlossen) -->
+      <!-- 3. Content Online (Standardmäßig geschlossen, ohne Badge) -->
       <a class="sidebar-link sidebar-submenu-toggle" data-bs-toggle="collapse" href="#submenu-online" role="button" aria-expanded="false" aria-controls="submenu-online">
         <i class="bi bi-cloud-check-fill"></i>
-        <span class="text-nowrap">Content Online</span>
-        <span id="sidebar-online-count" class="sidebar-count-badge ms-auto me-1" title="Filme &amp; Fotoalben online"><?= (int)$countContentOnline ?></span>
+        <span class="text-nowrap flex-grow-1">Content Online</span>
         <i class="bi bi-chevron-right chevron-icon ms-0"></i>
       </a>
       <div class="collapse sidebar-submenu" id="submenu-online">
         <a href="#/movies-online" class="sidebar-link" data-route="#/movies-online">
           <i class="bi bi-collection-play-fill"></i>
           <span class="text-nowrap">Filme online</span>
-          <span class="sidebar-count-badge ms-auto"><?= (int)$countMoviesOnline ?></span>
         </a>
         <a href="#/photo-albums-online" class="sidebar-link" data-route="#/photo-albums-online">
           <i class="bi bi-journal-album"></i>
           <span class="text-nowrap">Fotoalben online</span>
-          <span class="sidebar-count-badge ms-auto"><?= (int)$countPhotoAlbumsOnline ?></span>
         </a>
         <?php if (function_exists('acp_is_admin') && acp_is_admin()): ?>
         <a href="#/content-cleanup" class="sidebar-link" data-route="#/content-cleanup">
@@ -385,8 +371,8 @@ $sessionRemainingSeconds = 1800;
       <!-- 6. Partnerprogramm -->
       <a class="sidebar-link sidebar-submenu-toggle" data-bs-toggle="collapse" href="#submenu-banners" role="button" aria-expanded="false" aria-controls="submenu-banners">
         <i class="bi bi-megaphone-fill"></i>
-        <span class="text-nowrap">Partnerprogramm</span>
-        <span class="sidebar-count-badge ms-auto me-1"><?= (int)$countNewBanners ?></span>
+        <span class="text-nowrap flex-grow-1">Partnerprogramm</span>
+        <span id="sidebar-banners-parent-count" class="sidebar-count-badge me-1 <?= $countNewBanners <= 0 ? 'd-none' : '' ?>"><?= (int)$countNewBanners ?></span>
         <i class="bi bi-chevron-right chevron-icon ms-0"></i>
       </a>
       <div class="collapse sidebar-submenu" id="submenu-banners">
@@ -401,7 +387,7 @@ $sessionRemainingSeconds = 1800;
         <a href="#/banners-new" class="sidebar-link" data-route="#/banners-new">
           <i class="bi bi-stars"></i>
           <span class="text-nowrap">Neue Banner</span>
-          <span class="sidebar-count-badge ms-auto"><?= (int)$countNewBanners ?></span>
+          <span id="sidebar-banners-new-count" class="sidebar-count-badge ms-auto <?= $countNewBanners <= 0 ? 'd-none' : '' ?>"><?= (int)$countNewBanners ?></span>
         </a>
       </div>
       <?php endif; ?>
@@ -411,7 +397,6 @@ $sessionRemainingSeconds = 1800;
       <a href="#/webcams" class="sidebar-link" data-route="#/webcams">
         <i class="bi bi-camera-video-fill"></i>
         <span class="text-nowrap">Webcams</span>
-        <span class="sidebar-count-badge ms-auto"><?= (int)$countActorCams ?></span>
       </a>
       <?php endif; ?>
 
@@ -447,7 +432,9 @@ $sessionRemainingSeconds = 1800;
       <a href="#/employees" class="sidebar-link" data-route="#/employees">
         <i class="bi bi-person-gear"></i>
         <span class="text-nowrap">Mitarbeiter &amp; Admins</span>
+        <?php if ($countEmployees > 0): ?>
         <span class="sidebar-count-badge ms-auto"><?= (int)$countEmployees ?></span>
+        <?php endif; ?>
       </a>
       <?php endif; ?>
 

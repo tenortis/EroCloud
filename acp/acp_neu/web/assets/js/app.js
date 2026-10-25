@@ -240,16 +240,26 @@ const App = {
       const data = await res.json();
       if (res.ok && data.status === 'ok' && data.counts) {
         const c = data.counts;
-        const setBadge = (id, val) => {
+        const setBadge = (id, val, isWarning = false) => {
           const el = document.getElementById(id);
-          if (el) el.textContent = String(val ?? 0);
+          if (!el) return;
+          const num = parseInt(val ?? 0, 10) || 0;
+          el.textContent = String(num);
+          el.classList.toggle('d-none', num <= 0);
+          if (isWarning) {
+            el.classList.toggle('bg-warning', num > 0);
+            el.classList.toggle('text-dark', num > 0);
+            el.classList.toggle('border-warning', num > 0);
+          }
         };
-        setBadge('sidebar-checking-count', c.content_checking);
+        setBadge('sidebar-checking-count', c.content_checking, true);
         setBadge('sidebar-movies-checking-count', c.movies_checking);
         setBadge('sidebar-albums-checking-count', c.photo_albums_checking);
         setBadge('sidebar-coactors-checking-count', c.co_actors_checking);
+        setBadge('sidebar-movies-drafts-count', c.movies_drafts);
         setBadge('sidebar-movies-blocked-count', c.movies_blocked);
-        setBadge('sidebar-online-count', c.content_online);
+        setBadge('sidebar-banners-parent-count', c.new_banners);
+        setBadge('sidebar-banners-new-count', c.new_banners);
       }
     } catch (_) {}
   },
