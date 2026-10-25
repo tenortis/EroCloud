@@ -851,9 +851,13 @@ class MoviesController
 
     /**
      * POST: Lädt die eigentliche Videodatei in Schritt 2 hoch (movies/upload-file)
+     * Unterstützt sowohl Chunked-Uploads (5 MB Teilabschnitte via FormData oder php://input)
+     * als auch den klassischen Single-POST-Modus.
      */
     public function uploadFile(): void
     {
+        global $class_errorlog;
+
         if (!$this->request->isPost()) {
             Response::error('Ungültige Anfrage-Methode.', 405);
             return;
@@ -864,8 +868,14 @@ class MoviesController
             return;
         }
 
+        @set_time_limit(0);
+        @ini_set('max_execution_time', '0');
+
         $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
-        $movieId    = abs((int)$this->request->post('movie_id', $this->request->post('id', 0)));
+        $movieId    = abs((int)$this->request->post('movie_id', $this->request->post('id', $this->request->get('movie_id', $this->request->get('id', 0)))));
+
+        // Session-Lock sofort freigeben, damit parallele Requests nicht blockieren
+        @session_write_close();
 
         if ($merchantId === 0 || $movieId === 0) {
             Response::error('Ungültige Film-ID oder abgelaufene Sitzung.', 400);
@@ -884,24 +894,178 @@ class MoviesController
             return;
         }
 
-        $fileUpload = $_FILES['movie'] ?? ($_FILES['video'] ?? null);
-        if (!is_array($fileUpload) || (int)$fileUpload['error'] !== UPLOAD_ERR_OK) {
-            $errCode = is_array($fileUpload) && isset($fileUpload['error']) ? (int)$fileUpload['error'] : -1;
-            Response::error("Fehler beim Datei-Upload (Code: {$errCode}). Bitte prüfe die Dateigröße (max. 2,0 GB).", 400);
-            return;
-        }
-
-        $fileName    = (string)$fileUpload['name'];
-        $tmpFileName = (string)$fileUpload['tmp_name'];
-        $extension   = strtolower((string)pathinfo($fileName, PATHINFO_EXTENSION));
+        $movieObj    = p4c_fetch_object($rsMovie);
+        $moviesPath  = defined('MOVIES_PATH') ? MOVIES_PATH : (dirname(__DIR__, 5) . '/priv');
+        $targetDir   = rtrim($moviesPath, '/\\') . '/' . $movieObj->storage_location . '/' . $merchantId . '/' . $movieId;
         $allowedExts = ['avi', 'flv', 'm4v', 'mkv', 'mov', 'mp4', 'mpg', 'wmv'];
 
-        if (!in_array($extension, $allowedExts, true)) {
-            Response::error('Ungültiges Dateiformat. Erlaubt sind: avi, flv, m4v, mkv, mov, mp4, mpg, wmv.', 400);
-            return;
+        if (!is_dir($targetDir)) {
+            if (!@mkdir($targetDir, 0777, true) && !is_dir($targetDir)) {
+                Response::error('Das Zielverzeichnis für den Film konnte auf dem Server nicht angelegt werden.', 500);
+                return;
+            }
         }
 
-        // Video-Metadaten mit getID3 auslesen (analog upload_movie.php)
+        $rawChunkIndex  = $this->request->get('chunk_index', $this->request->post('chunk_index', null));
+        $rawTotalChunks = $this->request->get('total_chunks', $this->request->post('total_chunks', null));
+        $rawUploadUid   = $this->request->get('upload_uid', $this->request->post('upload_uid', null));
+
+        // 1. Chunked-Upload-Modus (5 MB Teilabschnitte)
+        if ($rawChunkIndex !== null && $rawTotalChunks !== null && $rawUploadUid !== null) {
+            $chunkIndex    = abs((int)$rawChunkIndex);
+            $totalChunks   = abs((int)$rawTotalChunks);
+            $rawOffset     = $this->request->get('chunk_offset', $this->request->post('chunk_offset', null));
+            $chunkOffset   = ($rawOffset !== null && is_numeric($rawOffset) && (float)$rawOffset >= 0) ? (int)$rawOffset : ($chunkIndex * 5242880);
+            $rawFileSize   = $this->request->get('file_size', $this->request->post('file_size', 0));
+            $totalFileSize = (is_numeric($rawFileSize) && (float)$rawFileSize > 0) ? (int)$rawFileSize : 0;
+            $uploadUid     = (string)preg_replace('/[^a-zA-Z0-9_-]/', '', (string)$rawUploadUid);
+            $fileUpload    = $_FILES['video'] ?? ($_FILES['movie'] ?? null);
+            $origFileName  = trim((string)$this->request->get('file_name', $this->request->post('file_name', is_array($fileUpload) ? ($fileUpload['name'] ?? '') : '')));
+
+            if ($totalChunks < 1 || $chunkIndex >= $totalChunks || $uploadUid === '') {
+                Response::error('Ungültige Chunk-Upload-Parameter. Bitte lade die Seite neu.', 400);
+                return;
+            }
+
+            if ($totalFileSize > 2147483648) {
+                Response::error('Deine Videodatei überschreitet das Limit von 2,0 GB.', 400);
+                return;
+            }
+
+            $extension = strtolower((string)pathinfo($origFileName, PATHINFO_EXTENSION));
+            if (!in_array($extension, $allowedExts, true)) {
+                Response::error('Ungültiges Dateiformat. Erlaubt sind: avi, flv, m4v, mkv, mov, mp4, mpg, wmv.', 400);
+                return;
+            }
+
+            $partFilePath = $targetDir . '/.part_' . $movieId . '_' . $uploadUid . '.tmp';
+
+            if ($chunkIndex === 0 && $chunkOffset === 0) {
+                $staleParts = @glob($targetDir . '/.part_*.tmp');
+                if (is_array($staleParts)) {
+                    foreach ($staleParts as $stalePart) {
+                        if (is_file($stalePart)) {
+                            @unlink($stalePart);
+                        }
+                    }
+                }
+            }
+
+            $inFp = false;
+            if (is_array($fileUpload)) {
+                $chunkErr = (int)($fileUpload['error'] ?? UPLOAD_ERR_NO_FILE);
+                $chunkTmp = (string)($fileUpload['tmp_name'] ?? '');
+                if ($chunkErr === UPLOAD_ERR_OK && $chunkTmp !== '' && (is_uploaded_file($chunkTmp) || is_file($chunkTmp))) {
+                    $inFp = @fopen($chunkTmp, 'rb');
+                } elseif ($chunkErr !== UPLOAD_ERR_OK && $chunkErr !== UPLOAD_ERR_NO_FILE) {
+                    Response::error("Fehler beim Datei-Upload (Code: {$chunkErr}).", 400);
+                    return;
+                }
+            }
+
+            if (!$inFp) {
+                $inFp = @fopen('php://input', 'rb');
+            }
+
+            $outFp = @fopen($partFilePath, ($chunkIndex === 0 && $chunkOffset === 0) ? 'wb' : 'c+b');
+            if (!$outFp) {
+                if ($inFp) {
+                    @fclose($inFp);
+                }
+                Response::error('Die Videodatei konnte auf dem Server nicht zwischengespeichert werden.', 500);
+                return;
+            }
+
+            if ($chunkOffset > 0) {
+                @fseek($outFp, $chunkOffset, SEEK_SET);
+            }
+
+            $bytesWritten = 0;
+            if ($inFp) {
+                while (!feof($inFp)) {
+                    $buf = fread($inFp, 65536);
+                    if ($buf === false || $buf === '') {
+                        break;
+                    }
+                    $written = fwrite($outFp, $buf);
+                    if ($written === false) {
+                        break;
+                    }
+                    $bytesWritten += $written;
+                }
+                @fclose($inFp);
+            }
+
+            @fflush($outFp);
+            @fclose($outFp);
+
+            if ($bytesWritten <= 0) {
+                if (isset($class_errorlog) && is_object($class_errorlog)) {
+                    $class_errorlog->log("MCP-Neu Movie-Chunk-Upload abgebrochen (Merchant #{$merchantId}, Movie #{$movieId}, Chunk {$chunkIndex}/{$totalChunks}): 0 Bytes empfangen.", __FILE__, __LINE__);
+                }
+                Response::error('Es wurden keine Daten für diesen Dateiabschnitt empfangen (0 Bytes).', 400);
+                return;
+            }
+
+            if ($chunkIndex < $totalChunks - 1) {
+                Response::json([
+                    'status'      => 'chunk_ok',
+                    'chunk_index' => $chunkIndex,
+                    'bytes'       => $bytesWritten,
+                ]);
+                return;
+            }
+
+            clearstatcache(true, $partFilePath);
+            $actualSize = is_file($partFilePath) ? (int)@filesize($partFilePath) : 0;
+            if ($totalFileSize > 0 && $actualSize !== $totalFileSize) {
+                @unlink($partFilePath);
+                Response::error('Die Übertragung der Videodatei war unvollständig. Bitte starte den Upload erneut.', 400);
+                return;
+            }
+
+            $targetFileName = $movieId . '_' . $movieObj->file_id . '.' . $extension;
+            $targetFilePath = $targetDir . '/' . $targetFileName;
+
+            if (is_file($targetFilePath)) {
+                @unlink($targetFilePath);
+            }
+
+            if (!@rename($partFilePath, $targetFilePath)) {
+                if (!@copy($partFilePath, $targetFilePath)) {
+                    Response::error('Die Videodatei konnte nicht final auf dem Server gespeichert werden.', 500);
+                    return;
+                }
+                @unlink($partFilePath);
+            }
+        } else {
+            // 2. Klassischer Single-POST-Modus (Fallback)
+            $fileUpload = $_FILES['movie'] ?? ($_FILES['video'] ?? null);
+            if (!is_array($fileUpload) || (int)$fileUpload['error'] !== UPLOAD_ERR_OK) {
+                $errCode = is_array($fileUpload) && isset($fileUpload['error']) ? (int)$fileUpload['error'] : -1;
+                Response::error("Fehler beim Datei-Upload (Code: {$errCode}). Bitte prüfe die Dateigröße (max. 2,0 GB).", 400);
+                return;
+            }
+
+            $fileName    = (string)$fileUpload['name'];
+            $tmpFileName = (string)$fileUpload['tmp_name'];
+            $extension   = strtolower((string)pathinfo($fileName, PATHINFO_EXTENSION));
+
+            if (!in_array($extension, $allowedExts, true)) {
+                Response::error('Ungültiges Dateiformat. Erlaubt sind: avi, flv, m4v, mkv, mov, mp4, mpg, wmv.', 400);
+                return;
+            }
+
+            $targetFileName = $movieId . '_' . $movieObj->file_id . '.' . $extension;
+            $targetFilePath = $targetDir . '/' . $targetFileName;
+
+            if (!@move_uploaded_file($tmpFileName, $targetFilePath) || !is_file($targetFilePath)) {
+                Response::error('Die Videodatei konnte nicht auf dem Server gespeichert werden.', 500);
+                return;
+            }
+        }
+
+        // Video-Metadaten mit getID3 aus der fertigen Zieldatei auslesen (analog upload_movie.php)
         $playTime    = '0:00';
         $playTimeSec = 0;
         $width       = 1920;
@@ -918,7 +1082,7 @@ class MoviesController
                     $getID3->option_tag_lyrics3 = false;
                     $getID3->option_tag_apetag = false;
                     $getID3->option_save_attachments = false;
-                    $fileinfo = @$getID3->analyze($tmpFileName);
+                    $fileinfo = @$getID3->analyze($targetFilePath);
                     if (!empty($fileinfo['playtime_string'])) {
                         $playTime = (string)$fileinfo['playtime_string'];
                     }
@@ -939,28 +1103,10 @@ class MoviesController
             }
         }
 
-        $movieObj   = p4c_fetch_object($rsMovie);
-        $moviesPath = defined('MOVIES_PATH') ? MOVIES_PATH : (dirname(__DIR__, 5) . '/priv');
-        $targetDir  = rtrim($moviesPath, '/\\') . '/' . $movieObj->storage_location . '/' . $merchantId . '/' . $movieId;
-
-        if (!is_dir($targetDir)) {
-            if (!@mkdir($targetDir, 0777, true) && !is_dir($targetDir)) {
-                Response::error('Das Zielverzeichnis für den Film konnte auf dem Server nicht angelegt werden.', 500);
-                return;
-            }
-        }
-
-        $targetFileName = $movieId . '_' . $movieObj->file_id . '.' . $extension;
-        $targetFilePath = $targetDir . '/' . $targetFileName;
-
-        if (!@move_uploaded_file($tmpFileName, $targetFilePath) || !is_file($targetFilePath)) {
-            Response::error('Die Videodatei konnte nicht auf dem Server gespeichert werden.', 500);
-            return;
-        }
-
         $resolution = $width . 'x' . $height;
         $amountOwn  = (int)round((float)$playTimeSec * (float)$movieObj->amount_second);
-        $released   = ((string)$this->request->post('released', '') === '1' || (string)$this->request->post('released', '') === 'true');
+        $rawRel     = (string)$this->request->post('released', $this->request->get('released', ''));
+        $released   = ($rawRel === '1' || $rawRel === 'true');
 
         $releaseSql = '';
         if ($released) {
@@ -1967,6 +2113,9 @@ class MoviesController
         }
         if ($token === '') {
             $token = (string)$this->request->post('_csrf', '');
+        }
+        if ($token === '') {
+            $token = (string)$this->request->get('_csrf', '');
         }
         return Csrf::validate($token);
     }

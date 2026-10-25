@@ -1955,6 +1955,11 @@ const App = {
           return;
         }
 
+        if (file.size <= 0) {
+          this.toast('Die ausgewählte Videodatei ist leer (0 Byte). Bitte speichere sie zuerst lokal auf deinem Gerät.', 'danger');
+          return;
+        }
+
         const maxBytes = 2 * 1024 * 1024 * 1024;
         if (file.size > maxBytes) {
           this.toast('Die Videodatei überschreitet das Limit von 2,0 GB.', 'danger');
@@ -1969,43 +1974,115 @@ const App = {
         const statusText = document.getElementById('movie-upload-status-text');
 
         if (progressWrap) progressWrap.classList.remove('d-none');
-        if (progressBar) progressBar.style.width = '0%';
+        if (progressBar) progressBar.style.width = '1%';
         if (percentBadge) percentBadge.textContent = '0 %';
         if (statusText) statusText.textContent = 'Videodatei wird hochgeladen...';
         btnStartUpload.disabled = true;
         videoFileInput.disabled = true;
         if (btnCancelUpload) btnCancelUpload.classList.remove('d-none');
 
-        const formData = new FormData();
-        formData.append('movie_id', movieId);
-        formData.append('video', file);
-        formData.append('released', '0');
-        formData.append('_csrf', this.csrfToken);
+        const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB pro Teilabschnitt
+        const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
+        const uploadUid = Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 10);
+        let useRawStream = false;
+        this.movieUploadAborted = false;
+        if (this.movieUploadRetryTimer) {
+          clearTimeout(this.movieUploadRetryTimer);
+          this.movieUploadRetryTimer = null;
+        }
 
-        const xhr = new XMLHttpRequest();
-        this.activeMovieUploadXhr = xhr;
-
-        xhr.upload.addEventListener('progress', (ev) => {
-          if (!ev.lengthComputable) return;
-          const pct = Math.min(100, Math.round((ev.loaded / ev.total) * 100));
-          const loadedMb = (ev.loaded / (1024 * 1024)).toFixed(1);
-          const totalMb = (ev.total / (1024 * 1024)).toFixed(1);
-          if (progressBar) progressBar.style.width = `${pct}%`;
+        const updateChunkProgress = (loadedBytes) => {
+          const safeTotal = file.size > 0 ? file.size : 1;
+          const clamped = Math.min(safeTotal, Math.max(0, loadedBytes));
+          const pct = Math.min(100, Math.floor((clamped / safeTotal) * 100));
+          const loadedMb = (clamped / (1024 * 1024)).toFixed(1);
+          const totalMb = (safeTotal / (1024 * 1024)).toFixed(1);
+          if (progressBar) progressBar.style.width = `${Math.max(1, pct)}%`;
           if (percentBadge) percentBadge.textContent = `${pct} %`;
           if (bytesInfo) bytesInfo.textContent = `${loadedMb} MB / ${totalMb} MB`;
-          if (pct === 100 && statusText) {
+          if (clamped >= safeTotal && statusText) {
             statusText.textContent = 'Datei übertragen – Server prüft Videodaten...';
+          } else if (statusText) {
+            statusText.textContent = 'Videodatei wird hochgeladen...';
           }
-        });
+        };
 
-        xhr.addEventListener('load', () => {
+        const resetUploadControls = () => {
           this.activeMovieUploadXhr = null;
-          try {
-            const data = JSON.parse(xhr.responseText || '{}');
-            if (xhr.status >= 200 && xhr.status < 300 && data.status === 'ok') {
+          if (this.movieUploadRetryTimer) {
+            clearTimeout(this.movieUploadRetryTimer);
+            this.movieUploadRetryTimer = null;
+          }
+          btnStartUpload.disabled = false;
+          videoFileInput.disabled = false;
+          if (btnCancelUpload) btnCancelUpload.classList.add('d-none');
+        };
+
+        const sendChunk = (chunkIndex, attempt) => {
+          if (this.movieUploadAborted) return;
+
+          const offset = chunkIndex * CHUNK_SIZE;
+          const end = Math.min(offset + CHUNK_SIZE, file.size);
+          const chunkBlob = file.slice(offset, end);
+
+          const url = `${this.basePath}/api.php?route=movies/upload-file`
+            + `&movie_id=${encodeURIComponent(movieId)}`
+            + `&chunk_index=${chunkIndex}`
+            + `&total_chunks=${totalChunks}`
+            + `&chunk_offset=${offset}`
+            + `&file_size=${file.size}`
+            + `&upload_uid=${encodeURIComponent(uploadUid)}`
+            + `&file_name=${encodeURIComponent(file.name)}`
+            + `&_csrf=${encodeURIComponent(this.csrfToken)}`;
+
+          const xhr = new XMLHttpRequest();
+          this.activeMovieUploadXhr = xhr;
+
+          xhr.upload.addEventListener('progress', (ev) => {
+            if (this.movieUploadAborted || !ev.lengthComputable) return;
+            const chunkLoaded = Math.min(end - offset, ev.loaded);
+            updateChunkProgress(offset + chunkLoaded);
+          });
+
+          const retryOrFail = (errMsg, toggleMode) => {
+            if (this.movieUploadAborted) return;
+            if (attempt < 4) {
+              if (toggleMode) {
+                useRawStream = !useRawStream;
+              }
+              const nextAttempt = attempt + 1;
+              if (statusText) {
+                statusText.textContent = `Kurze Unterbrechung – Abschnitt wird erneut gesendet (${nextAttempt}/4)...`;
+              }
+              this.movieUploadRetryTimer = setTimeout(() => {
+                sendChunk(chunkIndex, nextAttempt);
+              }, 1200);
+            } else {
+              resetUploadControls();
+              this.toast(errMsg || 'Fehler beim Video-Upload.', 'danger');
+            }
+          };
+
+          xhr.addEventListener('load', () => {
+            if (this.movieUploadAborted) return;
+            this.activeMovieUploadXhr = null;
+            let data = null;
+            try {
+              data = JSON.parse(xhr.responseText || '{}');
+            } catch (_) {
+              data = null;
+            }
+
+            if (xhr.status >= 200 && xhr.status < 300 && data && (data.status === 'chunk_ok' || data.status === 'ok')) {
+              if (chunkIndex + 1 < totalChunks) {
+                updateChunkProgress(end);
+                sendChunk(chunkIndex + 1, 0);
+                return;
+              }
+
+              // Letzter Chunk erfolgreich abgeschlossen
               this.toast(data.message || 'Videodatei erfolgreich hochgeladen.', 'success');
 
-              // Erfolgsbox in Schritt 2 aktualisieren & Auswahl-Bereich freischalten
               const fnEl = document.getElementById('uploaded-movie-filename');
               const ptEl = document.getElementById('uploaded-movie-playtime');
               const resEl = document.getElementById('uploaded-movie-resolution');
@@ -2035,48 +2112,69 @@ const App = {
                 postUploadCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
               }
 
-              btnStartUpload.disabled = false;
-              videoFileInput.disabled = false;
               videoFileInput.value = '';
-              if (btnCancelUpload) btnCancelUpload.classList.add('d-none');
+              resetUploadControls();
               return;
             }
-            this.toast(data.message || 'Fehler beim Video-Upload.', 'danger');
-          } catch (_) {
-            this.toast('Unerwartete Antwort vom Server beim Video-Upload.', 'danger');
+
+            const serverMsg = (data && data.message) ? String(data.message) : '';
+            if (serverMsg && serverMsg.indexOf('0 Bytes') === -1 && xhr.status >= 400 && xhr.status < 500) {
+              resetUploadControls();
+              this.toast(serverMsg, 'danger');
+            } else {
+              retryOrFail(serverMsg || 'Unerwartete Antwort vom Server beim Video-Upload.', true);
+            }
+          });
+
+          xhr.addEventListener('error', () => {
+            if (this.movieUploadAborted) return;
+            this.activeMovieUploadXhr = null;
+            retryOrFail('Netzwerkfehler während der Dateiübertragung.', true);
+          });
+
+          xhr.addEventListener('abort', () => {
+            this.activeMovieUploadXhr = null;
+            if (this.movieUploadAborted) {
+              this.toast('Der Video-Upload wurde abgebrochen.', 'warning');
+              if (progressBar) progressBar.style.width = '0%';
+              resetUploadControls();
+            }
+          });
+
+          xhr.open('POST', url, true);
+          xhr.setRequestHeader('X-CSRF-Token', this.csrfToken);
+
+          if (useRawStream) {
+            xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+            xhr.send(chunkBlob);
+          } else {
+            const formData = new FormData();
+            formData.append('movie_id', movieId);
+            formData.append('video', chunkBlob, file.name);
+            formData.append('released', '0');
+            formData.append('_csrf', this.csrfToken);
+            xhr.send(formData);
           }
-          btnStartUpload.disabled = false;
-          videoFileInput.disabled = false;
-          if (btnCancelUpload) btnCancelUpload.classList.add('d-none');
-        });
+        };
 
-        xhr.addEventListener('error', () => {
-          this.activeMovieUploadXhr = null;
-          this.toast('Netzwerkfehler während der Dateiübertragung.', 'danger');
-          btnStartUpload.disabled = false;
-          videoFileInput.disabled = false;
-          if (btnCancelUpload) btnCancelUpload.classList.add('d-none');
-        });
-
-        xhr.addEventListener('abort', () => {
-          this.activeMovieUploadXhr = null;
-          this.toast('Der Video-Upload wurde abgebrochen.', 'warning');
-          btnStartUpload.disabled = false;
-          videoFileInput.disabled = false;
-          if (progressBar) progressBar.style.width = '0%';
-          if (btnCancelUpload) btnCancelUpload.classList.add('d-none');
-        });
-
-        xhr.open('POST', `${this.basePath}/api.php?route=movies/upload-file`, true);
-        xhr.setRequestHeader('X-CSRF-Token', this.csrfToken);
-        xhr.send(formData);
+        sendChunk(0, 0);
       });
     }
 
     if (btnCancelUpload) {
       btnCancelUpload.addEventListener('click', () => {
+        this.movieUploadAborted = true;
+        if (this.movieUploadRetryTimer) {
+          clearTimeout(this.movieUploadRetryTimer);
+          this.movieUploadRetryTimer = null;
+        }
         if (this.activeMovieUploadXhr) {
           this.activeMovieUploadXhr.abort();
+        } else {
+          this.toast('Der Video-Upload wurde abgebrochen.', 'warning');
+          btnStartUpload.disabled = false;
+          videoFileInput.disabled = false;
+          btnCancelUpload.classList.add('d-none');
         }
       });
     }
