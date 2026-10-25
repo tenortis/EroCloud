@@ -6,7 +6,7 @@ if (!defined('SAFE_INC')) {
 
 $sql = '';
 // ++++++++++++++++++++++++++++++++++++++++++++++
-$get_category_master = trim(filter_input(INPUT_GET, 'category_master', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_HIGH));
+$get_category_master = trim((string)($_GET['category_master'] ?? ''));
 
 if (!empty($get_category_master)) {
     $get_category_master = preg_replace ( '/[^a-z]/i', '', $get_category_master);
@@ -18,7 +18,7 @@ if (!empty($get_category_master)) {
 }
 
 // age ++++++++++++++++++++++++++++++++++++++++++++++
-$get_category_age = trim(filter_input(INPUT_GET, 'age', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_HIGH));
+$get_category_age = trim((string)($_GET['age'] ?? ''));
 
 if (!empty($get_category_age)) {
     $get_category_age = preg_replace ( '/[^\|A-Za-z0-9-_]/i', '', $get_category_age);
@@ -47,7 +47,7 @@ if (isset($category_age_ary)) {
 }
 
 // body ++++++++++++++++++++++++++++++++++++++++++++++
-$get_category_body = trim(filter_input(INPUT_GET, 'body', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_HIGH));
+$get_category_body = trim((string)($_GET['body'] ?? ''));
 
 if (!empty($get_category_body)) {
     $get_category_body = preg_replace ( '/[^\|A-Za-z0-9-_]/i', '', $get_category_body);
@@ -76,7 +76,7 @@ if (isset($category_body_ary)) {
 }
 
 // gender ++++++++++++++++++++++++++++++++++++++++++++++
-$get_category_gender = trim(filter_input(INPUT_GET, 'gender', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_HIGH));
+$get_category_gender = trim((string)($_GET['gender'] ?? ''));
 
 if (!empty($get_category_gender)) {
     $get_category_gender = preg_replace ( '/[^\|A-Za-z0-9-_]/i', '', $get_category_gender);
@@ -120,7 +120,7 @@ if (isset($category_gender_ary)) {
 }
 
 // hair color ++++++++++++++++++++++++++++++++++++++++++++++
-$get_category_hair_color = trim(filter_input(INPUT_GET, 'hair_color', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_HIGH));
+$get_category_hair_color = trim((string)($_GET['hair_color'] ?? ''));
 
 if (!empty($get_category_hair_color)) {
     $get_category_hair_color = preg_replace ( '/[^\|A-Za-z0-9-_]/i', '', $get_category_hair_color);
@@ -143,7 +143,7 @@ if (isset($category_hair_color_ary)) {
 }
 
 // skin color ++++++++++++++++++++++++++++++++++++++++++++++
-$get_category_skin_color = trim(filter_input(INPUT_GET, 'skin_color', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_HIGH));
+$get_category_skin_color = trim((string)($_GET['skin_color'] ?? ''));
 
 if (!empty($get_category_skin_color)) {
     $get_category_skin_color = preg_replace ( '/[^\|A-Za-z0-9-_]/i', '', $get_category_skin_color);
@@ -166,7 +166,7 @@ if (isset($category_skin_color_ary)) {
 }
 
 // weight ++++++++++++++++++++++++++++++++++++++++++++++
-$get_category_weight = trim(filter_input(INPUT_GET, 'weight', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_HIGH));
+$get_category_weight = trim((string)($_GET['weight'] ?? ''));
 
 if (!empty($get_category_weight)) {
     $get_category_weight = preg_replace ( '/[^\|A-Za-z0-9-_]/i', '', $get_category_weight);

@@ -420,7 +420,8 @@ function actor_checksum($actor_id) {
 
 function print_xml($api) {
     global $config;
-    echo json_encode($api);
+    $json = json_encode($api, defined('JSON_INVALID_UTF8_SUBSTITUTE') ? JSON_INVALID_UTF8_SUBSTITUTE : 0);
+    echo ($json !== false) ? $json : '';
     exit;
 }
 

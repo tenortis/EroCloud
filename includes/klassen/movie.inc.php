@@ -50,6 +50,8 @@ class MovieOnline {
     
     public $mysql;
     public $movie_id;
+    private $row_data = null;
+    private $row_loaded = false;
 
         
     public function __construct($mysql, $movie_id='') {
@@ -58,20 +60,27 @@ class MovieOnline {
     }   
     
     private function sql_get_var($var) {
-        
-        // Wenn movie_id = file_id ist
-        if (strlen($this->movie_id) == 32) {
-            $from = "`file_id`='".p4c_escape_string($this->movie_id)."'";
-        } else {
-            $from = "`id`='".abs((int)$this->movie_id)."'";
-        }
-        
-        $rs_movies = $this->mysql->query("SELECT `".p4c_escape_string($var)."` FROM `movies_online` WHERE ".$from." LIMIT 1;", __FILE__, __LINE__);
+        if (!$this->row_loaded) {
+            $this->row_loaded = true;
 
-        if ($this->mysql->num_rows($rs_movies) > 0) {
-            $movie_ary = $this->mysql->fetch_object($rs_movies);
-            return $movie_ary->$var;
+            // Wenn movie_id = file_id ist
+            if (strlen((string)$this->movie_id) == 32) {
+                $from = "`file_id`='".p4c_escape_string($this->movie_id)."'";
+            } else {
+                $from = "`id`='".abs((int)$this->movie_id)."'";
+            }
+            
+            $rs_movies = $this->mysql->query("SELECT * FROM `movies_online` WHERE ".$from." LIMIT 1;", __FILE__, __LINE__);
+
+            if ($rs_movies && $this->mysql->num_rows($rs_movies) > 0) {
+                $this->row_data = $this->mysql->fetch_object($rs_movies);
+            }
         }
+
+        if (is_object($this->row_data) && property_exists($this->row_data, $var)) {
+            return $this->row_data->$var;
+        }
+        return null;
     } 
 
     public function field($var=''){

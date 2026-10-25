@@ -43,6 +43,8 @@ class PhotoAlbumOnline {
     
     public $mysql;
     public $album_id;
+    private $row_data = null;
+    private $row_loaded = false;
 
         
     public function __construct($mysql, $album_id='') {
@@ -51,12 +53,19 @@ class PhotoAlbumOnline {
     }   
     
     private function sql_get_var($var) {
-        $rs_albums = $this->mysql->query("SELECT `".p4c_escape_string($var)."` FROM `photo_albums_online` WHERE `id`='".abs((int)$this->album_id)."' LIMIT 1;", __FILE__, __LINE__);
+        if (!$this->row_loaded) {
+            $this->row_loaded = true;
+            $rs_albums = $this->mysql->query("SELECT * FROM `photo_albums_online` WHERE `id`='".abs((int)$this->album_id)."' LIMIT 1;", __FILE__, __LINE__);
 
-        if ($this->mysql->num_rows($rs_albums) > 0) {
-            $album_ary = $this->mysql->fetch_object($rs_albums);
-            return $album_ary->$var;
+            if ($rs_albums && $this->mysql->num_rows($rs_albums) > 0) {
+                $this->row_data = $this->mysql->fetch_object($rs_albums);
+            }
         }
+
+        if (is_object($this->row_data) && property_exists($this->row_data, $var)) {
+            return $this->row_data->$var;
+        }
+        return null;
     } 
 
     public function field($var=''){
