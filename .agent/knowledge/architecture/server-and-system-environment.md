@@ -18,7 +18,7 @@ usage: 'Wird automatisch herangezogen bei Fragen oder Arbeiten an Server-Konfigu
 | **IPv4-Adresse** | `91.184.62.199` (`/24`, Interface `eno1`) |
 | **Hardware** | Dell PowerEdge R720 – Intel Xeon CPU E5-2690 v2 @ 3.00GHz (20 Kerne / 40 Threads), 64 GiB RAM |
 | **Betriebssystem** | **Debian GNU/Linux 11 (Bullseye)** (`VERSION_ID="11"`, Kernel `5.10.0-46-amd64`) |
-| **Server Control Panel** | **LiveConfig `2.19.4-release`** (Port `8443`) |
+| **Server Control Panel** | **LiveConfig `2.19.4-release`** (Port `8443` – abgesichert mit Let's Encrypt RSA 2048-Bit TLS für `t199.nlserver.net` in `/etc/liveconfig/sslcert.pem`, vollautomatisch verlängert über `certbot.timer` + Deploy-Hook `/etc/letsencrypt/renewal-hooks/deploy/liveconfig-ssl.sh`) |
 | **Webserver** | **Apache httpd `2.4.67`** (`2.4.67-1~deb11u3`) – aktive Module: `fcgid`, `http2`, `rewrite`, `ssl`, `suexec` |
 | **Mailserver (SMTP/IMAP)** | **Postfix & Dovecot (`mail.erocloud.net`)** – Let's Encrypt RSA 2048-Bit TLS, SPF, DKIM (2048-Bit), DMARC (`p=quarantine`) & SMTP-Absender-IP-Maskierung (Details in `@email-notification-and-magic-link-system.md`) |
 | **Datenbank-Server** | **MariaDB `10.5.29`** (`1:10.5.29-0+deb11u1`) |
