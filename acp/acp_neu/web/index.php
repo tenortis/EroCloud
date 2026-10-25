@@ -216,9 +216,6 @@ $countNewBanners = $rsNewBanners ? abs((int)(p4c_fetch_object($rsNewBanners)->cn
 $rsNewActors = p4c_query("SELECT COUNT(*) AS `cnt` FROM `actors` WHERE `created_datetime` >= '" . date('Y-m-d H:i:s', strtotime('-5 days')) . "' AND `status`='inactive';", __FILE__, __LINE__);
 $countNewActors = $rsNewActors ? abs((int)(p4c_fetch_object($rsNewActors)->cnt ?? 0)) : 0;
 
-$rsEmployeesCount = p4c_query("SELECT COUNT(*) AS `cnt` FROM `employee`;", __FILE__, __LINE__);
-$countEmployees = $rsEmployeesCount ? abs((int)(p4c_fetch_object($rsEmployeesCount)->cnt ?? 0)) : 0;
-
 $sessionRemainingSeconds = 1800;
 ?>
 <!DOCTYPE html>
@@ -432,9 +429,6 @@ $sessionRemainingSeconds = 1800;
       <a href="#/employees" class="sidebar-link" data-route="#/employees">
         <i class="bi bi-person-gear"></i>
         <span class="text-nowrap">Mitarbeiter &amp; Admins</span>
-        <?php if ($countEmployees > 0): ?>
-        <span class="sidebar-count-badge ms-auto"><?= (int)$countEmployees ?></span>
-        <?php endif; ?>
       </a>
       <?php endif; ?>
 
