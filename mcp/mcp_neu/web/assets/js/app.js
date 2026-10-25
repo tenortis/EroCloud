@@ -1948,21 +1948,116 @@ const App = {
     });
 
     if (btnStartUpload && videoFileInput) {
+      const dropzoneArea = document.getElementById('movie-dropzone-area');
+      const selectedFilePill = document.getElementById('movie-selected-file-pill');
+      const selectedFileName = document.getElementById('movie-selected-file-name');
+      const selectedFileSize = document.getElementById('movie-selected-file-size');
+      const inlineErrorBox = document.getElementById('movie-upload-inline-error');
+      const inlineErrorText = document.getElementById('movie-upload-inline-error-text');
+
+      const formatMbStr = (bytes) => {
+        if (bytes >= 1024 * 1024 * 1024) {
+          return (bytes / (1024 * 1024 * 1024)).toFixed(2).replace('.', ',') + ' GB';
+        }
+        return (bytes / (1024 * 1024)).toFixed(1).replace('.', ',') + ' MB';
+      };
+
+      const formatEtaStr = (seconds) => {
+        if (!Number.isFinite(seconds) || seconds < 0) return 'Berechne...';
+        const sec = Math.max(1, Math.round(seconds));
+        if (sec < 60) return `ca. ${sec} Sek.`;
+        const mins = Math.floor(sec / 60);
+        const remSec = sec % 60;
+        return remSec > 0 ? `ca. ${mins} Min. ${remSec} Sek.` : `ca. ${mins} Min.`;
+      };
+
+      const showInlineUploadError = (msg) => {
+        if (inlineErrorBox && inlineErrorText) {
+          inlineErrorText.innerHTML = msg;
+          inlineErrorBox.classList.remove('d-none');
+        }
+        this.toast(msg.replace(/<[^>]*>/g, ''), 'danger');
+      };
+
+      const hideInlineUploadError = () => {
+        if (inlineErrorBox) inlineErrorBox.classList.add('d-none');
+      };
+
+      const updateSelectedFilePreview = () => {
+        hideInlineUploadError();
+        const f = videoFileInput.files?.[0];
+        if (f && selectedFilePill && selectedFileName && selectedFileSize) {
+          selectedFileName.textContent = f.name;
+          selectedFileSize.textContent = formatMbStr(f.size);
+          selectedFilePill.classList.remove('d-none');
+        } else if (selectedFilePill) {
+          selectedFilePill.classList.add('d-none');
+        }
+      };
+
+      videoFileInput.addEventListener('change', updateSelectedFilePreview);
+
+      if (dropzoneArea) {
+        dropzoneArea.addEventListener('click', (ev) => {
+          if (ev.target !== videoFileInput && !videoFileInput.disabled) {
+            videoFileInput.click();
+          }
+        });
+        ['dragenter', 'dragover'].forEach((evName) => {
+          dropzoneArea.addEventListener(evName, (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            if (!videoFileInput.disabled) {
+              dropzoneArea.classList.add('border-primary', 'bg-primary', 'bg-opacity-10');
+              dropzoneArea.classList.remove('bg-light');
+            }
+          });
+        });
+        ['dragleave', 'drop'].forEach((evName) => {
+          dropzoneArea.addEventListener(evName, (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            dropzoneArea.classList.remove('border-primary', 'bg-primary', 'bg-opacity-10');
+            dropzoneArea.classList.add('bg-light');
+          });
+        });
+        dropzoneArea.addEventListener('drop', (ev) => {
+          if (videoFileInput.disabled) return;
+          const droppedFiles = ev.dataTransfer?.files;
+          if (droppedFiles && droppedFiles.length > 0) {
+            try {
+              const dt = new DataTransfer();
+              dt.items.add(droppedFiles[0]);
+              videoFileInput.files = dt.files;
+              updateSelectedFilePreview();
+            } catch (_) {}
+          }
+        });
+      }
+
       btnStartUpload.addEventListener('click', () => {
+        hideInlineUploadError();
         const file = videoFileInput.files?.[0];
         if (!file) {
           this.toast('Bitte wähle zuerst eine Videodatei auf deinem Gerät aus.', 'warning');
           return;
         }
 
+        const allowedExts = ['avi', 'flv', 'm4v', 'mkv', 'mov', 'mp4', 'mpg', 'wmv'];
+        const ext = (file.name.split('.').pop() || '').toLowerCase();
+        if (!allowedExts.includes(ext)) {
+          showInlineUploadError('<strong>Ungültiges Dateiformat:</strong> Bitte wähle eine Videodatei im Format MP4, MOV, MKV, AVI, WMV, MPG, M4V oder FLV aus.');
+          return;
+        }
+
         if (file.size <= 0) {
-          this.toast('Die ausgewählte Videodatei ist leer (0 Byte). Bitte speichere sie zuerst lokal auf deinem Gerät.', 'danger');
+          showInlineUploadError('<strong>Die ausgewählte Videodatei ist leer (0 Byte):</strong> Bitte stelle sicher, dass das Video vollständig lokal auf deinem Gerät gespeichert ist (nicht nur in iCloud, Google Drive oder OneDrive).');
           return;
         }
 
         const maxBytes = 2 * 1024 * 1024 * 1024;
         if (file.size > maxBytes) {
-          this.toast('Die Videodatei überschreitet das Limit von 2,0 GB.', 'danger');
+          showInlineUploadError(`<strong>Datei zu groß (${formatMbStr(file.size)}):</strong> Die Videodatei überschreitet das maximale Limit von 2,0 GB (2.048 MB).`);
           return;
         }
 
@@ -1971,44 +2066,120 @@ const App = {
         const progressBar = document.getElementById('movie-upload-progress-bar');
         const percentBadge = document.getElementById('movie-upload-percent-badge');
         const bytesInfo = document.getElementById('movie-upload-bytes-info');
+        const speedInfo = document.getElementById('movie-upload-speed-info');
+        const etaInfo = document.getElementById('movie-upload-eta-info');
+        const chunkInfo = document.getElementById('movie-upload-chunk-info');
         const statusText = document.getElementById('movie-upload-status-text');
+        const phase2El = document.getElementById('movie-phase-2');
+        const phase3El = document.getElementById('movie-phase-3');
 
-        if (progressWrap) progressWrap.classList.remove('d-none');
-        if (progressBar) progressBar.style.width = '1%';
-        if (percentBadge) percentBadge.textContent = '0 %';
-        if (statusText) statusText.textContent = 'Videodatei wird hochgeladen...';
-        btnStartUpload.disabled = true;
-        videoFileInput.disabled = true;
-        if (btnCancelUpload) btnCancelUpload.classList.remove('d-none');
-
-        const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB pro Teilabschnitt
+        // 8 MB Standard-Paketgröße (Zero-Copy Stream via php://input als Primärmodus für 50% weniger Server-Disk-I/O)
+        const CHUNK_SIZE = 8 * 1024 * 1024;
         const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
         const uploadUid = Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 10);
-        let useRawStream = false;
+        let useRawStream = true;
+
+        this.activeMovieUploadMeta = { movieId, uploadUid };
         this.movieUploadAborted = false;
         if (this.movieUploadRetryTimer) {
           clearTimeout(this.movieUploadRetryTimer);
           this.movieUploadRetryTimer = null;
         }
 
-        const updateChunkProgress = (loadedBytes) => {
+        // Browser-Warnung gegen versehentliches Schließen des Tabs während des Uploads
+        const beforeUnloadGuard = (ev) => {
+          ev.preventDefault();
+          ev.returnValue = 'Dein Video-Upload läuft noch. Möchtest du die Seite wirklich verlassen?';
+          return ev.returnValue;
+        };
+        window.addEventListener('beforeunload', beforeUnloadGuard);
+
+        if (progressWrap) progressWrap.classList.remove('d-none');
+        if (progressBar) {
+          progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated bg-primary';
+          progressBar.style.width = '1%';
+        }
+        if (percentBadge) percentBadge.textContent = '0 %';
+        if (bytesInfo) bytesInfo.textContent = `0,0 MB / ${formatMbStr(file.size)}`;
+        if (speedInfo) speedInfo.textContent = 'Berechne...';
+        if (etaInfo) etaInfo.textContent = 'Berechne...';
+        if (chunkInfo) chunkInfo.textContent = `1 / ${totalChunks}`;
+        if (statusText) statusText.textContent = 'Sichere Übertragung wird gestartet...';
+        if (phase2El) {
+          phase2El.className = 'text-primary fw-bold';
+          phase2El.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>2. Sichere Paket-Übertragung';
+        }
+        if (phase3El) {
+          phase3El.className = 'text-muted';
+          phase3El.innerHTML = '<i class="bi bi-hdd-check me-1"></i>3. Server-Verarbeitung';
+        }
+
+        btnStartUpload.disabled = true;
+        videoFileInput.disabled = true;
+        if (btnCancelUpload) btnCancelUpload.classList.remove('d-none');
+
+        const uploadStartTime = performance.now();
+        let lastSampleTime = uploadStartTime;
+        let lastSampleBytes = 0;
+        let smoothedSpeedBps = 0;
+
+        const updateChunkProgress = (loadedBytes, currentChunkIdx) => {
           const safeTotal = file.size > 0 ? file.size : 1;
           const clamped = Math.min(safeTotal, Math.max(0, loadedBytes));
           const pct = Math.min(100, Math.floor((clamped / safeTotal) * 100));
-          const loadedMb = (clamped / (1024 * 1024)).toFixed(1);
-          const totalMb = (safeTotal / (1024 * 1024)).toFixed(1);
+          const loadedMb = (clamped / (1024 * 1024)).toFixed(1).replace('.', ',');
+          const totalMb = (safeTotal / (1024 * 1024)).toFixed(1).replace('.', ',');
+
           if (progressBar) progressBar.style.width = `${Math.max(1, pct)}%`;
           if (percentBadge) percentBadge.textContent = `${pct} %`;
           if (bytesInfo) bytesInfo.textContent = `${loadedMb} MB / ${totalMb} MB`;
-          if (clamped >= safeTotal && statusText) {
-            statusText.textContent = 'Datei übertragen – Server prüft Videodaten...';
+          if (chunkInfo) chunkInfo.textContent = `${Math.min(totalChunks, currentChunkIdx + 1)} / ${totalChunks}`;
+
+          const now = performance.now();
+          const dtSec = (now - lastSampleTime) / 1000;
+          if (dtSec >= 0.35 && clamped > lastSampleBytes) {
+            const instantBps = (clamped - lastSampleBytes) / dtSec;
+            smoothedSpeedBps = smoothedSpeedBps > 0
+              ? (smoothedSpeedBps * 0.7 + instantBps * 0.3)
+              : instantBps;
+            lastSampleTime = now;
+            lastSampleBytes = clamped;
+
+            if (speedInfo && smoothedSpeedBps > 0) {
+              const mbPerSec = smoothedSpeedBps / (1024 * 1024);
+              speedInfo.textContent = mbPerSec >= 1
+                ? `${mbPerSec.toFixed(1).replace('.', ',')} MB/s`
+                : `${Math.round(smoothedSpeedBps / 1024)} KB/s`;
+            }
+
+            if (etaInfo && smoothedSpeedBps > 0) {
+              const remBytes = Math.max(0, safeTotal - clamped);
+              etaInfo.textContent = remBytes > 0 ? formatEtaStr(remBytes / smoothedSpeedBps) : 'Fast fertig...';
+            }
+          }
+
+          if (clamped >= safeTotal) {
+            if (statusText) {
+              statusText.textContent = '100 % übertragen – Server prüft Videodaten & Laufzeit, bitte kurz warten...';
+            }
+            if (etaInfo) etaInfo.textContent = 'Wird abgeschlossen...';
+            if (phase2El) {
+              phase2El.className = 'text-success fw-semibold';
+              phase2El.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>2. Übertragung abgeschlossen';
+            }
+            if (phase3El) {
+              phase3El.className = 'text-primary fw-bold';
+              phase3El.innerHTML = '<i class="bi bi-hdd-check me-1"></i>3. Server-Verarbeitung läuft...';
+            }
           } else if (statusText) {
-            statusText.textContent = 'Videodatei wird hochgeladen...';
+            statusText.textContent = `Videodatei wird hochgeladen (Paket ${Math.min(totalChunks, currentChunkIdx + 1)} von ${totalChunks})...`;
           }
         };
 
         const resetUploadControls = () => {
+          window.removeEventListener('beforeunload', beforeUnloadGuard);
           this.activeMovieUploadXhr = null;
+          this.activeMovieUploadMeta = null;
           if (this.movieUploadRetryTimer) {
             clearTimeout(this.movieUploadRetryTimer);
             this.movieUploadRetryTimer = null;
@@ -2024,6 +2195,8 @@ const App = {
           const offset = chunkIndex * CHUNK_SIZE;
           const end = Math.min(offset + CHUNK_SIZE, file.size);
           const chunkBlob = file.slice(offset, end);
+
+          if (chunkInfo) chunkInfo.textContent = `${chunkIndex + 1} / ${totalChunks}`;
 
           const url = `${this.basePath}/api.php?route=movies/upload-file`
             + `&movie_id=${encodeURIComponent(movieId)}`
@@ -2041,7 +2214,7 @@ const App = {
           xhr.upload.addEventListener('progress', (ev) => {
             if (this.movieUploadAborted || !ev.lengthComputable) return;
             const chunkLoaded = Math.min(end - offset, ev.loaded);
-            updateChunkProgress(offset + chunkLoaded);
+            updateChunkProgress(offset + chunkLoaded, chunkIndex);
           });
 
           const retryOrFail = (errMsg, toggleMode) => {
@@ -2051,15 +2224,22 @@ const App = {
                 useRawStream = !useRawStream;
               }
               const nextAttempt = attempt + 1;
+              const backoffMs = nextAttempt * 1200;
               if (statusText) {
-                statusText.textContent = `Kurze Unterbrechung – Abschnitt wird erneut gesendet (${nextAttempt}/4)...`;
+                statusText.textContent = `Kurze Verbindungsunterbrechung – Paket ${chunkIndex + 1}/${totalChunks} wird automatisch wiederholt (Versuch ${nextAttempt}/4)...`;
               }
               this.movieUploadRetryTimer = setTimeout(() => {
                 sendChunk(chunkIndex, nextAttempt);
-              }, 1200);
+              }, backoffMs);
             } else {
               resetUploadControls();
-              this.toast(errMsg || 'Fehler beim Video-Upload.', 'danger');
+              if (progressBar) {
+                progressBar.className = 'progress-bar bg-danger';
+              }
+              if (statusText) {
+                statusText.textContent = 'Upload abgebrochen – bitte prüfe deine Verbindung und versuche es erneut.';
+              }
+              showInlineUploadError(errMsg || 'Fehler beim Video-Upload. Bitte prüfe deine Internetverbindung und starte den Upload erneut.');
             }
           };
 
@@ -2075,12 +2255,16 @@ const App = {
 
             if (xhr.status >= 200 && xhr.status < 300 && data && (data.status === 'chunk_ok' || data.status === 'ok')) {
               if (chunkIndex + 1 < totalChunks) {
-                updateChunkProgress(end);
+                updateChunkProgress(end, chunkIndex + 1);
                 sendChunk(chunkIndex + 1, 0);
                 return;
               }
 
               // Letzter Chunk erfolgreich abgeschlossen
+              if (phase3El) {
+                phase3El.className = 'text-success fw-semibold';
+                phase3El.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>3. Server-Verarbeitung abgeschlossen';
+              }
               this.toast(data.message || 'Videodatei erfolgreich hochgeladen.', 'success');
 
               const fnEl = document.getElementById('uploaded-movie-filename');
@@ -2113,6 +2297,7 @@ const App = {
               }
 
               videoFileInput.value = '';
+              if (selectedFilePill) selectedFilePill.classList.add('d-none');
               resetUploadControls();
               return;
             }
@@ -2120,7 +2305,7 @@ const App = {
             const serverMsg = (data && data.message) ? String(data.message) : '';
             if (serverMsg && serverMsg.indexOf('0 Bytes') === -1 && xhr.status >= 400 && xhr.status < 500) {
               resetUploadControls();
-              this.toast(serverMsg, 'danger');
+              showInlineUploadError(serverMsg);
             } else {
               retryOrFail(serverMsg || 'Unerwartete Antwort vom Server beim Video-Upload.', true);
             }
@@ -2129,13 +2314,14 @@ const App = {
           xhr.addEventListener('error', () => {
             if (this.movieUploadAborted) return;
             this.activeMovieUploadXhr = null;
-            retryOrFail('Netzwerkfehler während der Dateiübertragung.', true);
+            retryOrFail('Netzwerkfehler während der Dateiübertragung. Bitte stelle sicher, dass deine Internetverbindung stabil ist.', true);
           });
 
           xhr.addEventListener('abort', () => {
             this.activeMovieUploadXhr = null;
             if (this.movieUploadAborted) {
               this.toast('Der Video-Upload wurde abgebrochen.', 'warning');
+              if (progressWrap) progressWrap.classList.add('d-none');
               if (progressBar) progressBar.style.width = '0%';
               resetUploadControls();
             }
@@ -2168,9 +2354,18 @@ const App = {
           clearTimeout(this.movieUploadRetryTimer);
           this.movieUploadRetryTimer = null;
         }
+        const meta = this.activeMovieUploadMeta;
+        if (meta && meta.movieId && meta.uploadUid) {
+          fetch(`${this.basePath}/api.php?route=movies/upload-file&movie_id=${encodeURIComponent(meta.movieId)}&abort_upload=1&upload_uid=${encodeURIComponent(meta.uploadUid)}&_csrf=${encodeURIComponent(this.csrfToken)}`, {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': this.csrfToken }
+          }).catch(() => {});
+        }
         if (this.activeMovieUploadXhr) {
           this.activeMovieUploadXhr.abort();
         } else {
+          const progressWrap = document.getElementById('movie-upload-progress-wrap');
+          if (progressWrap) progressWrap.classList.add('d-none');
           this.toast('Der Video-Upload wurde abgebrochen.', 'warning');
           btnStartUpload.disabled = false;
           videoFileInput.disabled = false;

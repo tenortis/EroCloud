@@ -909,13 +909,27 @@ class MoviesController
         $rawChunkIndex  = $this->request->get('chunk_index', $this->request->post('chunk_index', null));
         $rawTotalChunks = $this->request->get('total_chunks', $this->request->post('total_chunks', null));
         $rawUploadUid   = $this->request->get('upload_uid', $this->request->post('upload_uid', null));
+        $rawAbortUpload = (int)$this->request->get('abort_upload', $this->request->post('abort_upload', 0));
 
-        // 1. Chunked-Upload-Modus (5 MB Teilabschnitte)
+        // 0. Abbruch-Cleanup: Löscht temporäre .part-Dateien bei abgebrochenem Upload sofort vom Server
+        if ($rawAbortUpload === 1 && $rawUploadUid !== null) {
+            $cleanUid = (string)preg_replace('/[^a-zA-Z0-9_-]/', '', (string)$rawUploadUid);
+            if ($cleanUid !== '') {
+                $abortPartPath = $targetDir . '/.part_' . $movieId . '_' . $cleanUid . '.tmp';
+                if (is_file($abortPartPath)) {
+                    @unlink($abortPartPath);
+                }
+            }
+            Response::json(['status' => 'aborted']);
+            return;
+        }
+
+        // 1. Chunked-Upload-Modus (Teilabschnitte via php://input oder FormData)
         if ($rawChunkIndex !== null && $rawTotalChunks !== null && $rawUploadUid !== null) {
             $chunkIndex    = abs((int)$rawChunkIndex);
             $totalChunks   = abs((int)$rawTotalChunks);
             $rawOffset     = $this->request->get('chunk_offset', $this->request->post('chunk_offset', null));
-            $chunkOffset   = ($rawOffset !== null && is_numeric($rawOffset) && (float)$rawOffset >= 0) ? (int)$rawOffset : ($chunkIndex * 5242880);
+            $chunkOffset   = ($rawOffset !== null && is_numeric($rawOffset) && (float)$rawOffset >= 0) ? (int)$rawOffset : ($chunkIndex * 8388608);
             $rawFileSize   = $this->request->get('file_size', $this->request->post('file_size', 0));
             $totalFileSize = (is_numeric($rawFileSize) && (float)$rawFileSize > 0) ? (int)$rawFileSize : 0;
             $uploadUid     = (string)preg_replace('/[^a-zA-Z0-9_-]/', '', (string)$rawUploadUid);
@@ -944,7 +958,7 @@ class MoviesController
                 $staleParts = @glob($targetDir . '/.part_*.tmp');
                 if (is_array($staleParts)) {
                     foreach ($staleParts as $stalePart) {
-                        if (is_file($stalePart)) {
+                        if (is_file($stalePart) && $stalePart !== $partFilePath) {
                             @unlink($stalePart);
                         }
                     }
@@ -976,6 +990,8 @@ class MoviesController
                 return;
             }
 
+            @flock($outFp, LOCK_EX);
+
             if ($chunkOffset > 0) {
                 @fseek($outFp, $chunkOffset, SEEK_SET);
             }
@@ -997,6 +1013,7 @@ class MoviesController
             }
 
             @fflush($outFp);
+            @flock($outFp, LOCK_UN);
             @fclose($outFp);
 
             if ($bytesWritten <= 0) {

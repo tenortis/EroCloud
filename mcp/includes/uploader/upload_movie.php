@@ -242,6 +242,8 @@ if (isset($_GET['movie_id'], $_GET['chunk_index'], $_GET['total_chunks'], $_GET[
         @fseek($outFp, $chunkOffset, SEEK_SET);
     }
 
+    @flock($outFp, LOCK_EX);
+
     $bytesWritten = 0;
     if ($inFp) {
         while (!feof($inFp)) {
@@ -259,6 +261,7 @@ if (isset($_GET['movie_id'], $_GET['chunk_index'], $_GET['total_chunks'], $_GET[
     }
 
     @fflush($outFp);
+    @flock($outFp, LOCK_UN);
     @fclose($outFp);
 
     if ($bytesWritten <= 0) {

@@ -417,37 +417,92 @@ $downloadPercentOptions = range(0, 150);
 
           <!-- Datei-Auswahlbox (wird ausgeblendet, sobald Datei übertragen wurde) -->
           <div id="movie-file-select-wrap" class="<?= $hasUploadedFile ? 'd-none' : '' ?> text-center">
-            <div class="p-4 rounded-3 border border-2 border-dashed bg-light mb-3">
-              <i class="bi bi-file-earmark-play text-primary display-4 d-block mb-2"></i>
-              <h5 class="fw-bold mb-1">Wähle deine Videodatei aus</h5>
+            <div id="movie-dropzone-area" class="p-4 rounded-3 border border-2 border-dashed bg-light mb-3" style="transition: all 0.2s ease; cursor: pointer;">
+              <i class="bi bi-cloud-arrow-up text-primary display-4 d-block mb-2" id="movie-dropzone-icon"></i>
+              <h5 class="fw-bold mb-1">Wähle deine Videodatei aus oder ziehe sie hierher</h5>
               <p class="text-muted small mb-3">
                 Unterstützte Formate: <strong>MP4, MOV, MKV, AVI, WMV, MPG, M4V, FLV</strong> &bull; Maximale Dateigröße: <strong>2,0 GB</strong>
               </p>
               <input type="file" id="movie-video-file-input" class="form-control mx-auto" style="max-width: 440px;"
                      accept=".avi,.flv,.m4v,.mkv,.mov,.mp4,.mpg,.wmv">
+
+              <!-- Ausgewählte Datei-Info-Vorschau -->
+              <div id="movie-selected-file-pill" class="d-none mt-3 d-inline-flex align-items-center gap-2 px-3 py-2 rounded-pill bg-white border border-primary border-opacity-25 shadow-sm small text-dark">
+                <i class="bi bi-file-earmark-play-fill text-primary fs-6"></i>
+                <strong id="movie-selected-file-name" class="text-truncate" style="max-width: 280px;">-</strong>
+                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25" id="movie-selected-file-size">0 MB</span>
+              </div>
             </div>
 
-            <!-- Fortschrittsanzeige (wird beim Upload eingeblendet) -->
-            <div id="movie-upload-progress-wrap" class="d-none text-start mb-3 p-3 rounded-3 border bg-white shadow-sm">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="fw-semibold small" id="movie-upload-status-text">Videodatei wird hochgeladen...</span>
-                <span class="badge bg-primary" id="movie-upload-percent-badge">0 %</span>
+            <!-- Sichtbare Inline-Fehlermeldung bei Upload-Problemen -->
+            <div id="movie-upload-inline-error" class="alert alert-danger d-none text-start mb-3 shadow-sm">
+              <div class="d-flex align-items-start gap-2">
+                <i class="bi bi-exclamation-triangle-fill text-danger fs-5 flex-shrink-0"></i>
+                <div class="small" id="movie-upload-inline-error-text"></div>
               </div>
-              <div class="progress mb-2" style="height: 14px;">
+            </div>
+
+            <!-- Fortschrittsanzeige / Live-Upload-Cockpit (wird beim Upload eingeblendet) -->
+            <div id="movie-upload-progress-wrap" class="d-none text-start mb-3 p-3 p-md-4 rounded-3 border border-primary border-opacity-25 bg-white shadow-sm">
+              <!-- Kopfzeile mit Status & Prozent-Badge -->
+              <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                <div class="d-flex align-items-center gap-2">
+                  <div class="spinner-border spinner-border-sm text-primary" id="movie-upload-spinner" role="status"></div>
+                  <span class="fw-bold text-dark small" id="movie-upload-status-text">Videodatei wird hochgeladen...</span>
+                </div>
+                <span class="badge bg-primary fs-6 px-3 py-1" id="movie-upload-percent-badge">0 %</span>
+              </div>
+
+              <!-- Fortschrittsbalken -->
+              <div class="progress mb-3" style="height: 16px; border-radius: 8px;">
                 <div id="movie-upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
                      role="progressbar" style="width: 0%;"></div>
               </div>
-              <div class="d-flex justify-content-between text-muted small">
-                <span id="movie-upload-bytes-info">0 MB / 0 MB</span>
-                <span>Bitte schließe dieses Browserfenster während der Übertragung nicht.</span>
+
+              <!-- 4 Live-Telemetrie-Kacheln (Übertragen, Geschwindigkeit, Restzeit, Datenpaket) -->
+              <div class="row g-2 mb-3 text-center">
+                <div class="col-6 col-md-3">
+                  <div class="p-2 rounded-2 bg-light border h-100">
+                    <div class="text-muted" style="font-size: 0.7rem;">ÜBERTRAGEN</div>
+                    <div class="fw-bold small text-dark" id="movie-upload-bytes-info">0 MB / 0 MB</div>
+                  </div>
+                </div>
+                <div class="col-6 col-md-3">
+                  <div class="p-2 rounded-2 bg-light border h-100">
+                    <div class="text-muted" style="font-size: 0.7rem;">GESCHWINDIGKEIT</div>
+                    <div class="fw-bold small text-primary" id="movie-upload-speed-info">Berechne...</div>
+                  </div>
+                </div>
+                <div class="col-6 col-md-3">
+                  <div class="p-2 rounded-2 bg-light border h-100">
+                    <div class="text-muted" style="font-size: 0.7rem;">RESTDAUER (CA.)</div>
+                    <div class="fw-bold small text-dark" id="movie-upload-eta-info">Berechne...</div>
+                  </div>
+                </div>
+                <div class="col-6 col-md-3">
+                  <div class="p-2 rounded-2 bg-light border h-100">
+                    <div class="text-muted" style="font-size: 0.7rem;">DATENPAKET</div>
+                    <div class="fw-bold small text-secondary" id="movie-upload-chunk-info">1 / 1</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 3-Phasen-Statusleiste -->
+              <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-2 border-top small text-muted">
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                  <span id="movie-phase-1" class="text-success fw-semibold"><i class="bi bi-check-circle-fill me-1"></i>1. Dateiprüfung</span>
+                  <span id="movie-phase-2" class="text-primary fw-bold"><i class="bi bi-arrow-repeat me-1"></i>2. Sichere Paket-Übertragung</span>
+                  <span id="movie-phase-3" class="text-muted"><i class="bi bi-hdd-check me-1"></i>3. Server-Verarbeitung</span>
+                </div>
+                <span class="text-muted" style="font-size: 0.75rem;"><i class="bi bi-shield-lock me-1"></i>Automatische Verbindungs-Wiederherstellung aktiv</span>
               </div>
             </div>
 
             <div class="d-flex justify-content-center flex-wrap gap-3">
-              <button type="button" class="btn btn-kkc-primary px-4" id="btn-start-movie-file-upload" data-movie-id="<?= $movieId ?>">
+              <button type="button" class="btn btn-kkc-primary btn-lg px-4" id="btn-start-movie-file-upload" data-movie-id="<?= $movieId ?>">
                 <i class="bi bi-cloud-upload me-2"></i> Videodatei jetzt hochladen
               </button>
-              <button type="button" class="btn btn-outline-danger d-none" id="btn-cancel-movie-file-upload">
+              <button type="button" class="btn btn-outline-danger btn-lg d-none" id="btn-cancel-movie-file-upload">
                 <i class="bi bi-x-circle me-1"></i> Upload abbrechen
               </button>
             </div>
