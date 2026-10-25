@@ -107,14 +107,78 @@ Jede Creatorin kann im Creator Studio (`mcp_neu`) selbst entscheiden, ob und mit
 
 ---
 
-## 5. 🛠️ Technische Leitplanken für die spätere Umsetzung
+## 5. 📈 Wachstums-Motor & Mehrstufiges Partnerprogramm (Auszahlung über Pay4Coins)
+
+Das größte Problem neuer Portale ist die Bekanntmachung. Durch den bestehenden Pool an EroCloud-Creatorinnen haben wir bereits tausende Multiplikatoren zum Start. Um diesen Effekt zu maximieren, wird (als eigener Ausbauschritt) ein **durchdachtes Partner- & Affiliate-Programm** integriert, dessen Abrechnung und Auszahlung vollständig über **Pay4Coins** läuft:
+
+### 5.1 Drei Säulen des Partnerprogramms
+1. **Creator-Eigenwerbung („Bring-Your-Own-Fan“ & Cross-Spending):**
+   * Teilt eine Creatorin ihren Profil-Link oder ihre Private Page (`creatorname.amoredea.com`), wird jeder darüber registrierte User dauerhaft ihrer `partner_id` / `actor_id` als geworbener Kunde zugeordnet.
+   * **Vorteil 1:** Kauft dieser Fan bei ihr selbst, erhält sie (zusätzlich zu ihrer normalen Creator-Provision) den **Webmaster-/Eigenwerbe-Bonus** (höhere Gesamtausschüttung).
+   * **Vorteil 2 (Passives Einkommen):** Wechselt dieser geworbene User später auf das globale Portal `amoredea.com` und gibt dort auch bei *anderen* Creatorinnen Coins aus, verdient die ursprünglich werbende Creatorin dauerhaft eine **Werbe-Provision an allen Fremdumsätzen dieses Users** mit! Das nimmt Creatorinnen jede Angst davor, ihren Traffic ins Ökosystem zu holen.
+2. **Creator-werben-Creator (Sub-Affiliate / Lifetime-Bonus):**
+   * Analog zum bestehenden EroCloud-Partnerprogramm (`https://pay4coins.com/wm/{partner_id}`) können Creatorinnen andere Models/Creatorinnen für Amoredea werben und erhalten dauerhaft X % Bonus (aus dem Plattform-Anteil) auf deren Umsätze.
+3. **Externe Webmaster, Tube-Sites & Social-Media-Marketer:**
+   * Reine Traffic-Partner (mit Pay4Coins-Merchant-Account) können gezielt Tracking-Links auf `amoredea.com`, den Reels-Swiper, bestimmte Fetisch-Kategorien oder einzelne Creatorinnen generieren und werden über Pay4Coins auf RevShare-/CPO-Basis vergütet.
+
+---
+
+## 6. 🛡️ Jugendschutz, Social-Media-Safe-Links (FSK16/FSK18), 18+ Overlay & Echtes AVS
+
+Wenn Creatorinnen (insbesondere mit Wohnsitz in **Deutschland**) ihr Profil auf Instagram, TikTok, X (Twitter), Twitch oder in ihrem Linktree teilen, stoßen sie auf zwei massive Probleme:
+1. **Deutscher Jugendschutz (JMStV / KJM / § 184d StGB):** Offene FSK18-Inhalte ohne echtes Altersverifikationssystem (AVS) sind in Deutschland abmahn- und strafgefährdet.
+2. **Social-Media-Sperren (Shadowbans & Account-Löschung):** Die Prüf-Bots von Instagram und TikTok scannen verlinkte Seiten im Hintergrund. Sehen die Bots unzensierte Nacktheit, wird der Social-Media-Account der Creatorin gesperrt.
+
+> **Unser entscheidender Vorteil in der EroCloud:**
+> In der EroCloud existieren für **jedes Profil**, **jeden Film** und **jedes Fotoalbum** bereits heute getrennt geprüfte **FSK16-Vorschaubilder** (`preview_image`) und **FSK18-Vorschaubilder** (`preview_image_fsk18`)!
+
+Darauf aufbauend berücksichtigen wir direkt von Beginn an in der Grundarchitektur ein **3-stufiges Schutz- & Link-System**:
+
+```mermaid
+flowchart TD
+    U["Besucher klickt auf geteilten Creator-Link"] --> L{"Welcher Link-Typ / Status?"}
+    
+    L -->|"1. FSK16 / DE-Safe-Link\n(z.B. lara.amoredea.com/s oder ?fsk=16)"| M1["🟢 STUFE 1: FSK16 Safe-Mode (Social & DE-konform)\n• Zeigt NUR FSK16-Bilder & entschärfte Texte\n• Alle FSK18-Medien sind serverseitig stark verpixelt/geblurrt\n• 100% sicher für Instagram/TikTok & deutschen Jugendschutz"]
+    
+    L -->|"2. Standard FSK18-Link\n(International / Allgemein)"| M2["🟡 STUFE 2: 18+ Age-Gate Overlay\n• Vorschalt-Overlay: 'Ja, ich bin über 18 Jahre alt'\n• Inkl. RTA-Jugendschutz-Meta-Tags im HTML-Header"]
+    
+    L -->|"3. Direkter AVS-Link\n(z.B. lara.amoredea.com/avs)"| M3["🔴 STUFE 3: Echtes AVS-Gate (JMStV-konform)\n• Direkter Einstieg in echte Altersprüfung / Pay4Coins-AVS\n• Nach 1x Prüfung: Dauerhaftes '18+ Verified'-Flag im Account\n• Schaltet sofort alle FSK18-Vorschauen unzensiert frei!"]
+
+    M1 -->|"User klickt auf verpixelten Inhalt\noder '18+ Vollansicht freischalten'"| M3
+```
+
+### 6.1 Die 3 Link-Varianten im Creator Studio (1-Klick-Kopierfunktion für die Mädels)
+Jede Creatorin bekommt in ihrem MCP (`Creator Studio -> Meine Promo-Links`) fertig vorbereitete Links mit klarer Erklärung, welchen Link sie wo nutzen sollte:
+
+1. **🟢 Der FSK16 / Deutschland-Safe-Link (z. B. `lara.amoredea.com?fsk=16` oder `lara.amoredea.com/safe`):**
+   * **Für wen?** Für Creatorinnen, die in Deutschland leben, sowie für alle Bio-Links auf **Instagram, TikTok, YouTube & Twitch**.
+   * **Technische Funktion:**
+     * Das System liefert auf dieser Ansicht **ausschließlich FSK16-Profilbilder** und **FSK16-Vorschauen** aus; alle expliziten Feed-Posts und Videos werden **serverseitig echt verpixelt/geblurrt** ausgeliefert (sodass auch im HTML-Quelltext kein unzensiertes FSK18-Bild für Bots oder Prüfer abrufbar ist!).
+     * Explizite Hardcore-Begriffe in Titeln können im FSK16-Modus automatisch dezent maskiert werden.
+     * Optional kann eine deutsche Creatorin in ihren Einstellungen auch festlegen: *„Meine Private Page `lara.amoredea.com` für nicht eingeloggte Besucher **immer** standardmäßig im FSK16-Safe-Mode starten“*.
+2. **🔴 Der Direkt-AVS-Link (z. B. `lara.amoredea.com/avs` oder `?avs=1`):**
+   * **Für wen?** Wenn eine Creatorin in Deutschland explizit mit ihren unzensierten 18+ Inhalten werben möchte und den User direkt durch die rechtssichere Altersprüfung führen will.
+   * **Technische Funktion:**
+     * Leitet den Besucher auf eine edel gestaltete **AVS-Vorschaltseite (mit FSK16-Hintergrundbild der Creatorin)**: *„Bestätige einmalig kostenlos dein Alter (18+), um Laras unzensierte Seite zu betreten“*.
+     * **Synergie mit Pay4Coins:** Ist der User bereits bei Pay4Coins eingeloggt und altersverifiziert (oder führt den schnellen AVS-Check durch), speichert sein Account das **globale `is_avs_verified = 1`-Flag**. Ab diesem Moment sieht er auf `amoredea.com` und bei **allen** Creatorinnen sofort die unzensierte FSK18-Welt!
+3. **🟡 Der Standard-18+-Link mit „Ja, ich bin über 18“-Overlay:**
+   * **Für wen?** Für internationalen Traffic bzw. Plattformen wie X (Twitter), Reddit oder Adult-Seiten außerhalb strenger deutscher AVS-Auflagen.
+   * **Technische Funktion:**
+     * Zeigt vor dem Betreten der Seite das klassische **„Bist du mindestens 18 Jahre alt?“ (`Ja, ich bin über 18` / `Nein, Seite verlassen`)** Vorschalt-Overlay bzw. eine Vorschalt-Seite, kombiniert mit offiziellen `RTA` (Restricted to Adults) Meta-Headern.
+
+---
+
+## 7. 🛠️ Technische Leitplanken für die spätere Umsetzung
 
 1. **Software-Stack & Standards:**
    * Strikte Einhaltung von `@master.md` und `@server-and-system-environment.md` (**PHP 8.4.27**, `declare(strict_types=1);`, `SAFE_INC`, `p4c_query($sql, __FILE__, __LINE__)`, zentrales Error-Logging in `/var/www/web1/htdocs/log/.errorlog`).
    * Moderne `app/`- & `web/`-Trennung (analog zu `acp_neu` und `mcp_neu`).
-2. **Single-Codebase Multi-Host-Routing:**
+2. **Single-Codebase Multi-Host- & FSK-Routing:**
    * Wildcard-Subdomain `*.amoredea.com` und Hauptdomain `amoredea.com` zeigen auf dasselbe `web/`-DocumentRoot.
-   * Der zentrale Router erkennt anhand von `$_SERVER['HTTP_HOST']`, ob der **Global Discovery Mode** (`amoredea.com`) oder der **Creator Private Page Solo-Mode** (`{slug}.amoredea.com`) geladen wird.
+   * Der zentrale Router erkennt anhand von `$_SERVER['HTTP_HOST']` + URL-Parametern (`?fsk=16`, `/safe`, `/avs`) + Geo-IP + User-AVS-Status:
+     * **Portal-Modus:** Global Discovery (`amoredea.com`) vs. Creator Private Page Solo-Mode (`{slug}.amoredea.com`).
+     * **Jugendschutz-Modus:** `FSK16_SAFE` (alles FSK18 verpixelt/FSK16-Bilder) vs. `AGE_GATE_OVERLAY` („Ja, über 18“-Bestätigung) vs. `AVS_STRICT` (echte Altersprüfung vor FSK18-Freigabe).
 3. **Nahtlose EroCloud-Integration:**
-   * Direkter Zugriff auf die EroCloud-Datenbank und `/var/www/web1/cloud_storage` für Videos, Fotoalben, `.vtt`-Untertitel, Vorschaubilder und Co-Actor-Zertifikate.
+   * Direkter Zugriff auf die EroCloud-Datenbank und `/var/www/web1/cloud_storage` für Videos, Fotoalben, `.vtt`-Untertitel, FSK16-/FSK18-Vorschaubilder und Co-Actor-Zertifikate.
    * Integration von **Creator Studio** und **Regie-Studio** direkt in `mcp/mcp_neu/app/src/Modules/`.
+
