@@ -485,7 +485,7 @@ $singleCreatorProfileName = (count($actorNamesSummary) === 1) ? $actorNamesSumma
     <div class="<?= $actorsTotal > 1 ? 'ec-actors-col-match' : '' ?>">
 
     <!-- Kompakte Vorankündigung: ID-Shot Pflicht für alle Darsteller & Drehpartner -->
-    <div class="card-kkc mb-3 flex-shrink-0 border-start border-4 border-warning" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.10) 0%, rgba(2, 132, 199, 0.04) 100%);">
+    <div class="card-kkc mb-3 flex-shrink-0" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(2, 132, 199, 0.03) 100%); border-color: rgba(245, 158, 11, 0.32);">
       <div class="card-kkc-body py-3 px-3">
         <div class="d-flex align-items-start gap-3">
           <div class="rounded-3 text-warning d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px; background-color: rgba(245, 158, 11, 0.16);">

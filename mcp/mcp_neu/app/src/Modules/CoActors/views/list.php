@@ -62,7 +62,7 @@ $ownerId    = (int)($ownerCoActor['id'] ?? 0);
   </div>
 
   <!-- Ausführlicher Hinweis zur kommenden ID-Shot-Pflicht & Übergangsphase -->
-  <div class="card-kkc border-start border-4 border-warning mb-4 shadow-sm" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.09) 0%, rgba(2, 132, 199, 0.04) 100%);">
+  <div class="card-kkc mb-4 shadow-sm" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(2, 132, 199, 0.03) 100%); border-color: rgba(245, 158, 11, 0.32);">
     <div class="card-kkc-body p-3 p-md-4">
       <div class="d-flex align-items-start gap-3">
         <div class="rounded-3 text-warning d-none d-sm-flex align-items-center justify-content-center flex-shrink-0 mt-1" style="width: 48px; height: 48px; background-color: rgba(245, 158, 11, 0.16);">
