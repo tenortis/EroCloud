@@ -1042,8 +1042,15 @@ function get_upload_wizard_html($active_step = 1) {
                 
                 var lastKeepAlive = 0;
                 var isAbortedByUser = false;
+                var activeXhr = null;
+                var retryTimeout = null;
+                var error = "";
 
                 function resetUploadUi() {
+                    if (retryTimeout) {
+                        clearTimeout(retryTimeout);
+                        retryTimeout = null;
+                    }
                     jQuery("#upload_file").val("");
                     upload.show();
                     abort.hide();
@@ -1056,97 +1063,174 @@ function get_upload_wizard_html($active_step = 1) {
                     return (bytes / (1024 * 1024)).toFixed(1).replace(".", ",") + " MB";
                 }
 
-                jQuery("#form_upload_movie").ajaxForm({
-                    clearForm: true,
-                    resetForm: true,
-                    forceSync: true,
-                    dataType:  "json",
-                    beforeSerialize: function($form, options) {
-                        options.data = { released: movie_released.is(":checked") };
-                    },
-                    beforeSend: function(xhr) {
-                        isAbortedByUser = false;
-                        jQuery(".upload_error").hide().html("");
-                        progress.show();
-                        upload.hide();
-                        abort.show();
-                        movie_released.attr("disabled", true);
-                        abort.off("click").on("click", function () {
-                            isAbortedByUser = true;
-                            xhr.abort();
-                            resetUploadUi();
-                        });
+                function updateProgressUi(loadedBytes, totalBytes) {
+                    var safeTotal = totalBytes > 0 ? totalBytes : 1;
+                    var clampedLoaded = Math.min(safeTotal, Math.max(0, loadedBytes));
+                    var realPercent = Math.floor((clampedLoaded / safeTotal) * 100);
+                    var barPercent = Math.max(1, realPercent) + "%";
+                    var displayPercent = realPercent + "%";
+                    bar.width(barPercent);
+                    percent.html(displayPercent);
 
-                        status.html("Upload wird gestartet...");
-                        var percentVal = "0%";
-                        bar.width(percentVal);
-                        percent.html(percentVal);
-                    },
-                    uploadProgress: function(event, position, total, percentComplete) {
-                        var realPercent = total > 0 ? Math.floor((position / total) * 100) : percentComplete;
-                        var barPercent = Math.max(1, realPercent) + "%";
-                        var displayPercent = realPercent + "%";
-                        bar.width(barPercent);
-                        percent.html(displayPercent);
+                    if (clampedLoaded >= safeTotal) {
+                        status.html("100% &uuml;bertragen (" + formatMb(safeTotal) + ") &ndash; Datei wird auf dem Server gepr&uuml;ft und gespeichert, bitte kurz warten...");
+                    } else {
+                        status.html("&Uuml;bertragen: " + formatMb(clampedLoaded) + " von " + formatMb(safeTotal) + " (" + ((clampedLoaded / safeTotal) * 100).toFixed(1).replace(".", ",") + "%)");
+                    }
+                }
 
-                        if (total > 0) {
-                            if (realPercent >= 100) {
-                                status.html("100% &uuml;bertragen (" + formatMb(total) + ") &ndash; Datei wird auf dem Server gepr&uuml;ft und gespeichert, bitte kurz warten...");
-                            } else {
-                                status.html("&Uuml;bertragen: " + formatMb(position) + " von " + formatMb(total) + " (" + ((position / total) * 100).toFixed(1).replace(".", ",") + "%)");
-                            }
+                jQuery("#form_upload_movie").off("submit").on("submit", function(e) {
+                    e.preventDefault();
+                    return false;
+                });
+
+                function startChunkedUpload(file) {
+                    var CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB pro Teilabschnitt
+                    var totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
+                    var uploadUid = (Date.now ? Date.now() : (new Date()).getTime()).toString(36) + "_" + Math.random().toString(36).substring(2, 10);
+                    var isReleased = movie_released.is(":checked") ? "true" : "false";
+                    var useRawStream = false;
+
+                    isAbortedByUser = false;
+                    jQuery(".upload_error").hide().html("");
+                    progress.show();
+                    upload.hide();
+                    abort.show();
+                    movie_released.attr("disabled", true);
+
+                    abort.off("click").on("click", function () {
+                        isAbortedByUser = true;
+                        if (retryTimeout) {
+                            clearTimeout(retryTimeout);
+                            retryTimeout = null;
                         }
-                        
-                        var now = Date.now ? Date.now() : (new Date()).getTime();
-                        if (now - lastKeepAlive > 30000) {
-                            lastKeepAlive = now;
-                            // set logged in status
-                            jQuery.get("'.MCP_URL.'/Ajax/set_loggedin_status.php");
+                        if (activeXhr) {
+                            try {
+                                activeXhr.abort();
+                            } catch (e) {}
+                            activeXhr = null;
                         }
-                    },
-                    success: function(data) {
-                        var percentVal = "100%";
-                        bar.width(percentVal);
-                        percent.html(percentVal);
-                        // If error
-                        if (!data || typeof data !== "object") {
-                            resetUploadUi();
-                            jQuery(".upload_error").show().html("Der Server hat eine unerwartete Antwort gesendet. Bitte pr&uuml;fe deine Internetverbindung und versuche es erneut.");
-                        } else if (data["jquery-upload-file-error"]) {
-                            var error = data["jquery-upload-file-error"];
-                            resetUploadUi();
-                            jQuery(".upload_error").show().html(error);
-                        } else {
-                            window.location.href="'.MCP_URL.'/Movie-Upload?step=3&movie_id='.$movie_id.'";
-                        }
-                    },
-                    error: function(xhr, textStatus, errorThrown) {
+                        resetUploadUi();
+                    });
+
+                    status.html("Upload wird gestartet...");
+                    bar.width("1%");
+                    percent.html("0%");
+
+                    function sendChunk(chunkIndex, attempt) {
                         if (isAbortedByUser) {
                             return;
                         }
-                        resetUploadUi();
-                        var msg = "Der Upload wurde unterbrochen oder konnte nicht abgeschlossen werden.";
-                        if (xhr && xhr.status === 413) {
-                            msg = "Deine Videodatei ist zu gro&szlig; f&uuml;r den Server (Fehler 413). Bitte stelle sicher, dass die Datei maximal 2,0 GB gro&szlig; ist.";
-                        } else if (xhr && xhr.responseText) {
-                            try {
-                                var parsed = JSON.parse(xhr.responseText);
-                                if (parsed && parsed["jquery-upload-file-error"]) {
-                                    msg = parsed["jquery-upload-file-error"];
-                                }
-                            } catch (e) {
-                                msg += "<br /><small>Bitte stelle sicher, dass die Videodatei vollst&auml;ndig lokal auf deinem Ger&auml;t gespeichert ist (nicht nur in iCloud, Google Drive oder OneDrive) und deine Internetverbindung stabil ist.</small>";
+
+                        var offset = chunkIndex * CHUNK_SIZE;
+                        var end = Math.min(offset + CHUNK_SIZE, file.size);
+                        var chunkBlob = file.slice ? file.slice(offset, end) : (file.webkitSlice ? file.webkitSlice(offset, end) : file.mozSlice(offset, end));
+
+                        var url = "/includes/uploader/upload_movie.php?movie_id='.$movie_id.'"
+                            + "&chunk_index=" + chunkIndex
+                            + "&total_chunks=" + totalChunks
+                            + "&chunk_offset=" + offset
+                            + "&file_size=" + file.size
+                            + "&upload_uid=" + encodeURIComponent(uploadUid)
+                            + "&released=" + isReleased
+                            + "&file_name=" + encodeURIComponent(file.name);
+
+                        var xhr = new XMLHttpRequest();
+                        activeXhr = xhr;
+                        xhr.open("POST", url, true);
+                        xhr.withCredentials = true;
+
+                        xhr.upload.onprogress = function(event) {
+                            if (isAbortedByUser) {
+                                return;
                             }
-                        } else {
-                            msg += "<br /><small>Bitte stelle sicher, dass die Videodatei vollst&auml;ndig lokal auf deinem Ger&auml;t gespeichert ist (nicht nur in iCloud, Google Drive oder OneDrive) und deine Internetverbindung stabil ist.</small>";
+                            var chunkLoaded = event.lengthComputable ? event.loaded : 0;
+                            var chunkSize = end - offset;
+                            if (chunkLoaded > chunkSize) {
+                                chunkLoaded = chunkSize;
+                            }
+                            updateProgressUi(offset + chunkLoaded, file.size);
+
+                            var now = Date.now ? Date.now() : (new Date()).getTime();
+                            if (now - lastKeepAlive > 30000) {
+                                lastKeepAlive = now;
+                                jQuery.get("/Ajax/set_loggedin_status.php");
+                            }
+                        };
+
+                        function handleChunkRetryOrFail(errMsg, toggleTransport) {
+                            if (isAbortedByUser) {
+                                return;
+                            }
+                            if (attempt < 4) {
+                                if (toggleTransport) {
+                                    useRawStream = !useRawStream;
+                                }
+                                var nextAttempt = attempt + 1;
+                                status.html("Kurze Unterbrechung &ndash; Dateiabschnitt wird erneut gesendet (Versuch " + nextAttempt + "/4)...");
+                                retryTimeout = setTimeout(function() {
+                                    sendChunk(chunkIndex, nextAttempt);
+                                }, 1200);
+                            } else {
+                                resetUploadUi();
+                                jQuery(".upload_error").show().html(errMsg);
+                            }
                         }
-                        jQuery(".upload_error").show().html(msg);
-                    },
-                    complete: function(data) {
 
+                        xhr.onload = function() {
+                            if (isAbortedByUser) {
+                                return;
+                            }
+                            var parsed = null;
+                            if (xhr.responseText) {
+                                try {
+                                    parsed = JSON.parse(xhr.responseText);
+                                } catch (e) {
+                                    parsed = null;
+                                }
+                            }
+
+                            if (xhr.status >= 200 && xhr.status < 300 && parsed && !parsed["jquery-upload-file-error"]) {
+                                if (chunkIndex + 1 < totalChunks) {
+                                    updateProgressUi(end, file.size);
+                                    sendChunk(chunkIndex + 1, 0);
+                                } else {
+                                    bar.width("100%");
+                                    percent.html("100%");
+                                    window.location.href = "/Movie-Upload?step=3&movie_id='.$movie_id.'";
+                                }
+                            } else if (parsed && parsed["jquery-upload-file-error"]) {
+                                var serverErr = String(parsed["jquery-upload-file-error"]);
+                                if (serverErr.indexOf("0 Bytes") !== -1 || serverErr.indexOf("keine Dateidaten") !== -1 || serverErr.indexOf("keine Daten") !== -1) {
+                                    handleChunkRetryOrFail(serverErr, true);
+                                } else {
+                                    resetUploadUi();
+                                    jQuery(".upload_error").show().html(serverErr);
+                                }
+                            } else {
+                                var fallbackMsg = "Der Upload wurde unterbrochen oder konnte nicht abgeschlossen werden (Status " + (xhr.status || 0) + "). Bitte pr&uuml;fe deine Internetverbindung und versuche es erneut.";
+                                handleChunkRetryOrFail(fallbackMsg, true);
+                            }
+                        };
+
+                        xhr.onerror = function() {
+                            var netMsg = "Netzwerkfehler beim Hochladen. Bitte stelle sicher, dass deine Internetverbindung stabil ist und die Videodatei lokal auf deinem Ger&auml;t liegt.";
+                            handleChunkRetryOrFail(netMsg, true);
+                        };
+
+                        if (useRawStream) {
+                            xhr.setRequestHeader("Content-Type", "application/octet-stream");
+                            xhr.send(chunkBlob);
+                        } else {
+                            var formData = new FormData();
+                            formData.append("movie", chunkBlob, file.name);
+                            formData.append("released", isReleased);
+                            xhr.send(formData);
+                        }
                     }
-                }); 
 
+                    sendChunk(0, 0);
+                }
 
                 var s = jQuery.extend({
                     allowedTypes: "mp4,avi,flv,m4v,mkv,mov,mp4,mpg,wmv",
@@ -1191,8 +1275,9 @@ function get_upload_wizard_html($active_step = 1) {
                 jQuery("#upload_file").on("change", function(){
                     if (!uploadMovie(this)) {
                         jQuery(".upload_error").show().html(error);
+                        jQuery("#upload_file").val("");
                     } else {
-                        jQuery("#form_upload_movie").trigger("submit");
+                        startChunkedUpload(this.files[0]);
                     }
                 });
             })
