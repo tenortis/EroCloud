@@ -61,6 +61,34 @@ $ownerId    = (int)($ownerCoActor['id'] ?? 0);
     </div>
   </div>
 
+  <!-- Ausführlicher Hinweis zur kommenden ID-Shot-Pflicht & Übergangsphase -->
+  <div class="card-kkc border-start border-4 border-warning mb-4 shadow-sm" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.09) 0%, rgba(2, 132, 199, 0.04) 100%);">
+    <div class="card-kkc-body p-3 p-md-4">
+      <div class="d-flex align-items-start gap-3">
+        <div class="rounded-3 text-warning d-none d-sm-flex align-items-center justify-content-center flex-shrink-0 mt-1" style="width: 48px; height: 48px; background-color: rgba(245, 158, 11, 0.16);">
+          <i class="bi bi-person-vcard-fill fs-3"></i>
+        </div>
+        <div class="flex-grow-1">
+          <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+            <span class="badge-kkc badge-kkc-warning">
+              <i class="bi bi-megaphone-fill"></i> Wichtige Vorankündigung &amp; Übergangsphase
+            </span>
+            <h5 class="fw-bold text-body mb-0" style="font-size: 1.02rem;">
+              Demnächst Pflicht für alle Filme: Gültiger ID-Shot von dir &amp; jedem Drehpartner (auch rückwirkend)
+            </h5>
+          </div>
+          <p class="small text-body mb-2" style="line-height: 1.55;">
+            Aufgrund verschärfter gesetzlicher Vorgaben und Compliance-Richtlinien benötigen wir in Kürze von <strong>jedem Darsteller und jedem Drehpartner</strong>, der in deinen Videos zu sehen ist (inklusive dir selbst als Account-Inhaber), einen gültigen <strong>ID-Shot</strong> (Person hält ihren Ausweis gut lesbar neben ihr Gesicht) sowie eine unterschriebene Einverständniserklärung. Diese Nachweispflicht gilt <strong>auch rückwirkend für alle bereits hochgeladenen Filme</strong>.
+          </p>
+          <p class="small text-muted mb-0" style="line-height: 1.55;">
+            <strong class="text-body">Unser Tipp – starte schon jetzt in der Übergangsphase:</strong>
+            Du kannst deine bereits veröffentlichten Filme aktuell wie gewohnt weiterverkaufen und auch neue Filme <strong>übergangsweise noch ohne hinterlegten ID-Shot hochladen</strong>. Wir empfehlen dir jedoch dringend, die ID-Shots deiner Drehpartner (per <strong>Smartphone-QR-Code</strong> oder über <strong>„Alte Dokumente hochladen“</strong>) <strong>schon jetzt nach und nach hier hochzuladen</strong> und in deinen Filmen zuzuordnen. So stellst du sicher, dass deine bestehenden und in der Übergangszeit hochgeladenen Filme später nach Ablauf der Übergangsfrist <strong>nahtlos online bleiben und nicht offline geschaltet werden müssen</strong>!
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- KPI-Übersicht -->
   <div class="row g-3 mb-4">
     <div class="col-12 col-sm-6 col-xl-3">

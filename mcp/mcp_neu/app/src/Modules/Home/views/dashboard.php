@@ -480,8 +480,34 @@ $singleCreatorProfileName = (count($actorNamesSummary) === 1) ? $actorNamesSumma
 
   </div>
 
-  <!-- Rechte Spalte: Darsteller-Profil(e) & Richtlinien-Box -->
+  <!-- Rechte Spalte: ID-Shot Vorankündigung, Darsteller-Profil(e) & Richtlinien-Box -->
   <div class="col-lg-5<?= $actorsTotal > 1 ? ' position-relative' : '' ?>">
+    <div class="<?= $actorsTotal > 1 ? 'ec-actors-col-match' : '' ?>">
+
+    <!-- Kompakte Vorankündigung: ID-Shot Pflicht für alle Darsteller & Drehpartner -->
+    <div class="card-kkc mb-3 flex-shrink-0 border-start border-4 border-warning" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.10) 0%, rgba(2, 132, 199, 0.04) 100%);">
+      <div class="card-kkc-body py-3 px-3">
+        <div class="d-flex align-items-start gap-3">
+          <div class="rounded-3 text-warning d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px; background-color: rgba(245, 158, 11, 0.16);">
+            <i class="bi bi-person-vcard-fill fs-5"></i>
+          </div>
+          <div class="flex-grow-1 min-w-0">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-1 mb-1">
+              <span class="fw-bold text-body" style="font-size: 0.9rem;">
+                Demnächst Pflicht: ID-Shot für alle Darsteller
+              </span>
+              <span class="badge-kkc badge-kkc-warning" style="font-size: 0.68rem; padding: 0.2rem 0.5rem;">Wichtige Info</span>
+            </div>
+            <div class="text-muted small mb-0" style="line-height: 1.45;">
+              In Kürze wird von allen Darstellern und Drehpartnern ein ID-Shot benötigt (auch rückwirkend). Du kannst die Aufnahmen schon jetzt hinterlegen.
+              <a href="#/co-actors" class="fw-bold ec-text-primary text-decoration-none ms-1 text-nowrap">
+                Mehr erfahren <i class="bi bi-arrow-right-short"></i>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <?php if (empty($actors)): ?>
     <!-- Leerzustand: Noch kein Darsteller-Profil vorhanden -->
@@ -661,9 +687,8 @@ $singleCreatorProfileName = (count($actorNamesSummary) === 1) ? $actorNamesSumma
 
     <?php else: ?>
     <!-- Mehrere Darsteller-Profile im Überblick (Höhe auf linken Block begrenzt & scrollbar) -->
-    <div class="ec-actors-col-match">
-      <div class="card-kkc mb-0">
-        <div class="card-kkc-header flex-shrink-0">
+    <div class="card-kkc mb-0 ec-actors-list-card">
+      <div class="card-kkc-header flex-shrink-0">
           <div class="card-title">
             <i class="bi bi-people-fill ec-text-primary"></i>
             <span>Deine Darsteller-Profile (<?= (int)$actorsTotal ?>)</span>
@@ -730,7 +755,6 @@ $singleCreatorProfileName = (count($actorNamesSummary) === 1) ? $actorNamesSumma
           </div>
         </div>
       </div>
-    </div>
     <?php endif; ?>
 
     <?php if ($actorsTotal <= 1): ?>
@@ -789,6 +813,7 @@ $singleCreatorProfileName = (count($actorNamesSummary) === 1) ? $actorNamesSumma
     </div>
     <?php endif; ?>
 
+    </div>
   </div>
 </div>
 
