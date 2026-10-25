@@ -17,9 +17,10 @@ use App\Core\Csrf;
 
 global $mysql;
 
-$basePath    = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? ''))), '/');
+$rawBasePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? ''))), '/');
 $requestUri  = (string)($_SERVER['REQUEST_URI'] ?? '');
-$entryUrl    = (stripos($requestUri, '/acp_neu') === 0 ? $basePath : '') . '/Startseite';
+$basePath    = (stripos($requestUri, '/acp_neu') === 0) ? $rawBasePath : '';
+$entryUrl    = $basePath . '/Startseite';
 $projectName = defined('PROJECTNAME') ? (string)PROJECTNAME : 'EroCloud';
 $companyName = defined('COMPANYNAME') ? (string)COMPANYNAME : 'CIPA Media S.L.U.';
 $acpUrl      = defined('ACP_URL') ? (string)ACP_URL : 'https://acp.erocloud.net';

@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
 
-// Komfort-Weiterleitung falls /acp_neu/ direkt ohne /web/ aufgerufen wird
-header('Location: web/Startseite');
+// Weiterleitung auf die saubere Root-URL ohne /acp_neu/web/
+header('Location: /Startseite');
 exit;

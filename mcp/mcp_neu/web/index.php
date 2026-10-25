@@ -45,7 +45,7 @@ if (isset($_GET['logout'])) {
             $_SESSION = [];
             @session_destroy();
         }
-        $acpTarget = (defined('ACP_URL') ? rtrim((string)ACP_URL, '/') : 'https://acp.erocloud.net') . '/acp_neu/web/Startseite#/merchants';
+        $acpTarget = (defined('ACP_URL') ? rtrim((string)ACP_URL, '/') : 'https://acp.erocloud.net') . '/Startseite#/merchants';
         header('Location: ' . $acpTarget);
         exit;
     }

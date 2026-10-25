@@ -66,8 +66,14 @@ DirectoryIndex acp_neu/web/index.php index.php
 
 RewriteEngine On
 
-# Unterstützung für Schreibweise /ACP_Neu auf Case-Sensitive Linux-Systemen
-RewriteRule ^(?!acp_neu(?:/|$))(?i:acp_neu)(/.*)?$ acp_neu$1 [R=302,L]
+# Direkten Browser-Zugriff auf /acp_neu/app/ strikt blockieren (403 Forbidden)
+RewriteRule ^(?i:acp_neu)/app(?:/|$) - [F,L]
+
+# Direkte Aufrufe von /acp_neu/web/... oder /acp_neu/... in der Adresszeile auf saubere Root-URL umleiten
+RewriteCond %{THE_REQUEST} \s/+acp_neu/web/([^\s?]*) [NC]
+RewriteRule ^ /%1 [R=301,L]
+RewriteCond %{THE_REQUEST} \s/+acp_neu/?(?:index\.php)?[\s?] [NC]
+RewriteRule ^ /Startseite [R=301,L]
 
 # ============================================================================
 # 1. Neues ACP (v2.0) als Standard für acp.erocloud.net

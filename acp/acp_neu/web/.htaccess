@@ -1,4 +1,60 @@
-# EroCloud ACP Webroot Configuration
+# EroCloud ACP Webroot Configuration (/htdocs/acp/acp_neu/web)
+AuthName "Access denid!"
+AuthType Basic
+<If "%{HTTP_HOST} == 'acp.erocloud.local'">
+    AuthUserFile "C:/xampp/htdocs/EroCloud/.acp_htpasswd"
+</If>
+<Else>
+    AuthUserFile /var/www/web1/htdocs/.acp_htpasswd
+</Else>
+require valid-user
+
+<Limit GET POST>
+    order deny,allow
+    deny from all
+
+    # Localhost
+    allow from 127.0.0.1
+    allow from ::1
+
+    #asl
+    #allow from 88.75.
+    #allow from 92.78.
+    allow from 88.73.
+    allow from 94.222.
+    allow from 178.0.
+    allow from 178.5.
+    allow from 178.8.
+    allow from 178.12.
+    allow from 188.102.
+    allow from 188.103.
+    allow from 188.106.
+
+    #Choc
+    allow from 80.129.239.232
+
+    #schn
+    allow from 84.136.
+    allow from 84.167.
+
+    # Tina
+    allow from 83.37.
+    allow from 83.47.
+    allow from 88.24.
+    allow from 88.25.
+    allow from 82.207.
+    # DE
+    allow from 79.198.
+    allow from 91.10.
+
+    # Martin
+    BrowserMatch "(Linux; Android 7.0; HTC One A9 Build/NRD90M)" allowed
+    BrowserMatch "(Linux; Android 6.0.1; SM-G900F Build/MMB29M)" allowed
+    BrowserMatch "(Linux; Android 9; SM-G950F)" allowed
+
+    allow from env=allowed
+</Limit>
+
 Options -Indexes
 
 <IfModule mod_dir.c>
