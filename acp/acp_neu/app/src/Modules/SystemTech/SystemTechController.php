@@ -1049,7 +1049,8 @@ final class SystemTechController
         }
 
         if ($action === 'clear_log') {
-            if (is_file($logFile) && (int)@filesize($logFile) > 0) {
+            $createBackup = (int)$this->request->post('create_backup', 1) === 1;
+            if ($createBackup && is_file($logFile) && (int)@filesize($logFile) > 0) {
                 @copy($logFile, $bakFile);
             }
             $ok = @file_put_contents($logFile, '') !== false;
@@ -1058,11 +1059,17 @@ final class SystemTechController
                 return;
             }
             if (function_exists('log_action')) {
-                log_action('Zentrales PHP-Error-Log (.errorlog) geleert (Backup .errorlog.bak erstellt).');
+                log_action(
+                    $createBackup
+                        ? 'Zentrales PHP-Error-Log (.errorlog) geleert (Backup .errorlog.bak erstellt).'
+                        : 'Zentrales PHP-Error-Log (.errorlog) ohne Backup geleert.'
+                );
             }
             Response::json([
                 'status'  => 'ok',
-                'message' => 'Das zentrale PHP-Error-Log wurde erfolgreich geleert (Sicherungskopie unter .errorlog.bak gespeichert).',
+                'message' => $createBackup
+                    ? 'Das zentrale PHP-Error-Log wurde erfolgreich geleert (Sicherungskopie unter .errorlog.bak gespeichert).'
+                    : 'Das zentrale PHP-Error-Log wurde ohne Sicherungskopie geleert.',
             ]);
             return;
         }

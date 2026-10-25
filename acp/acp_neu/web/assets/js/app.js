@@ -5173,12 +5173,44 @@ const App = {
       }
     },
 
-    async errorLogAction(actionType) {
-      if (actionType === 'clear_log') {
-        if (!window.confirm('Möchtest du das zentrale PHP-Error-Log (.errorlog) wirklich leeren? Es wird automatisch eine Sicherungskopie (.errorlog.bak) angelegt.')) {
-          return;
-        }
-      } else if (actionType === 'restore_backup') {
+    openClearErrorLogModal() {
+      const modalEl = document.getElementById('clearErrorLogModal');
+      if (!modalEl) return;
+      const chk = document.getElementById('err-clear-create-backup');
+      if (chk) chk.checked = true;
+      if (window.bootstrap?.Modal) {
+        window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      }
+    },
+
+    async confirmClearErrorLog() {
+      const chk = document.getElementById('err-clear-create-backup');
+      const createBackup = chk ? (chk.checked ? '1' : '0') : '1';
+      const btn = document.getElementById('btn-confirm-clear-errorlog');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Leere Log...';
+      }
+
+      const modalEl = document.getElementById('clearErrorLogModal');
+      if (modalEl && window.bootstrap?.Modal) {
+        const inst = window.bootstrap.Modal.getInstance(modalEl);
+        if (inst) inst.hide();
+      }
+      document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+      document.body.classList.remove('modal-open');
+      document.body.style.removeProperty('overflow');
+      document.body.style.removeProperty('padding-right');
+
+      await this.errorLogAction('clear_log', { createBackup });
+    },
+
+    async errorLogAction(actionType, options = {}) {
+      if (actionType === 'clear_log' && options.createBackup === undefined) {
+        this.openClearErrorLogModal();
+        return;
+      }
+      if (actionType === 'restore_backup') {
         if (!window.confirm('Möchtest du die Sicherungskopie (.errorlog.bak) wiederherstellen?')) {
           return;
         }
@@ -5187,6 +5219,9 @@ const App = {
       const fd = new FormData();
       fd.append('_csrf', App.csrfToken);
       fd.append('action_type', actionType);
+      if (actionType === 'clear_log') {
+        fd.append('create_backup', String(options.createBackup ?? '1'));
+      }
 
       try {
         const res = await fetch(`${App.basePath}/api.php?route=errors/action`, {

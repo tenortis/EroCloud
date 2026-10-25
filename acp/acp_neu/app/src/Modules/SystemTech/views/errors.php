@@ -40,8 +40,8 @@ use App\Core\View;
         </button>
       <?php endif; ?>
 
-      <button type="button" class="btn btn-sm btn-outline-danger" onclick="App.SystemTech.errorLogAction('clear_log')" <?= (int)$logMeta['size_bytes'] === 0 ? 'disabled' : '' ?>>
-        <i class="bi bi-trash3 me-1"></i>Log leeren (mit Backup)
+      <button type="button" class="btn btn-sm btn-outline-danger" onclick="App.SystemTech.openClearErrorLogModal()" <?= (int)$logMeta['size_bytes'] === 0 ? 'disabled' : '' ?>>
+        <i class="bi bi-trash3 me-1"></i>Log leeren
       </button>
 
       <button type="button" class="btn btn-sm btn-outline-kkc" onclick="App.handleRoute()">
@@ -316,5 +316,42 @@ use App\Core\View;
       </div>
     </div>
 
+  </div>
+
+  <!-- Modal: PHP-Error-Log leeren (mit Backup-Option) -->
+  <div class="modal fade" id="clearErrorLogModal" tabindex="-1" aria-labelledby="clearErrorLogModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content card-kkc border-0 shadow-lg">
+        <div class="modal-header border-bottom py-3 px-4" style="border-color: var(--kkc-border) !important;">
+          <h5 class="modal-title fw-bold d-flex align-items-center gap-2" id="clearErrorLogModalLabel">
+            <i class="bi bi-trash3-fill text-danger"></i>
+            <span>PHP-Error-Log leeren</span>
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+        </div>
+        <div class="modal-body p-4">
+          <p class="mb-3">
+            Möchtest du das zentrale PHP-Error-Log (<code>.errorlog</code>, aktuelle Größe: <strong><?= View::e((string)$logMeta['size_fmt']) ?></strong>) wirklich vollständig leeren?
+          </p>
+          <div class="form-check d-flex align-items-start gap-2 p-3 rounded border m-0" style="background-color: var(--kkc-surface-hover); border-color: var(--kkc-border) !important;">
+            <input class="form-check-input mt-1 ms-0 flex-shrink-0" type="checkbox" value="1" id="err-clear-create-backup" checked>
+            <label class="form-check-label" for="err-clear-create-backup" style="cursor: pointer;">
+              <span class="fw-semibold d-block">Backup vor dem Leeren erstellen (<code>.errorlog.bak</code>)</span>
+              <span class="small text-muted d-block mt-1">
+                Speichert den bisherigen Log-Inhalt als Sicherungskopie, damit du ihn bei Bedarf jederzeit wiederherstellen kannst.
+              </span>
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer border-top py-3 px-4 d-flex justify-content-between" style="border-color: var(--kkc-border) !important;">
+          <button type="button" class="btn btn-sm btn-outline-kkc" data-bs-dismiss="modal">
+            Abbrechen
+          </button>
+          <button type="button" class="btn btn-sm btn-danger fw-semibold" id="btn-confirm-clear-errorlog" onclick="App.SystemTech.confirmClearErrorLog()">
+            <i class="bi bi-trash3 me-1"></i>Jetzt Log leeren
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
