@@ -18,6 +18,8 @@ use App\Core\Csrf;
 global $mysql;
 
 $basePath    = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? ''))), '/');
+$requestUri  = (string)($_SERVER['REQUEST_URI'] ?? '');
+$entryUrl    = (stripos($requestUri, '/acp_neu') === 0 ? $basePath : '') . '/Startseite';
 $projectName = defined('PROJECTNAME') ? (string)PROJECTNAME : 'EroCloud';
 $companyName = defined('COMPANYNAME') ? (string)COMPANYNAME : 'CIPA Media S.L.U.';
 $acpUrl      = defined('ACP_URL') ? (string)ACP_URL : 'https://acp.erocloud.net';
@@ -37,7 +39,7 @@ if (isset($_GET['logout'])) {
     if (function_exists('acp_neu_clear_auth_cookie')) {
         acp_neu_clear_auth_cookie();
     }
-    header('Location: ' . $basePath . '/Startseite');
+    header('Location: ' . $entryUrl);
     exit;
 }
 
@@ -75,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acp_login'])) {
                     acp_neu_sync_auth_cookie($_SESSION['employee_id'], $_SESSION['employee_username']);
                 }
                 log_action('Am System angemeldet.');
-                header('Location: ' . $basePath . '/Startseite');
+                header('Location: ' . $entryUrl);
                 exit;
             } else {
                 log_action('Login Error - Passwort falsch! - User: ' . $user);
@@ -600,7 +602,7 @@ $sessionRemainingSeconds = 1800;
             </li>
             <?php endif; ?>
             <li>
-              <a class="dropdown-item" href="<?= htmlspecialchars($acpUrl, ENT_QUOTES, 'UTF-8') ?>/Startseite" target="_blank" rel="noopener">
+              <a class="dropdown-item" href="<?= htmlspecialchars($acpUrl, ENT_QUOTES, 'UTF-8') ?>/Alt-Startseite" target="_blank" rel="noopener">
                 <i class="bi bi-box-arrow-up-right me-2 text-muted"></i>Altes ACP öffnen (Vergleich)
               </a>
             </li>

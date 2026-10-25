@@ -32,8 +32,10 @@ usage: 'Wird automatisch herangezogen bei allen Arbeiten am Neubau des ACP unter
 
 ## 2. 📂 Ordnerstruktur & URL-Strategie
 
-### 2.1 Parallelbetrieb während der Neuentwicklung (`/htdocs/acp/acp_neu/`)
-* **Entwicklungs-URL:** `https://acp.erocloud.net/acp_neu/web/Startseite` (bzw. Kurzform `https://acp.erocloud.net/acp_neu/` oder `https://acp.erocloud.net/ACP_Neu/`).
+### 2.1 Produktiv-Routing auf `acp.erocloud.net` mit parallelem Legacy-Zugriff
+* **Standard-URL (Neues ACP v2.0):** `https://acp.erocloud.net/` bzw. `https://acp.erocloud.net/Startseite` (in [`acp/.htaccess`](file:///c:/xampp/htdocs/EroCloud/acp/.htaccess) direkt auf `acp_neu/web/index.php` inkl. `api.php`, `media.php` und `assets/` geroutet; auch `/acp_neu/web/Startseite` funktioniert weiterhin).
+* **Paralleler Zugriff auf das alte ACP (Referenz):** Das bisherige System bleibt unter `https://acp.erocloud.net/Alt-Startseite` (sowie allen alten Unterseiten in `acp/includes/`) parallel im Dateisystem erhalten, um später bei Bedarf jederzeit auf den alten Aufbau (z. B. für Webcams oder Punktesystem) zurückgreifen zu können.
+* **Schlichte Hinweis-Seiten für `#/webcams` & `#/pointssystem` ([`PreviewController.php`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/app/src/Modules/Preview/PreviewController.php)):** Beide Menüpunkte bleiben in der Sidebar sichtbar und zeigen auf der jeweiligen Seite einen klaren Hinweis ohne Untermenüs, dass der Bereich im Hintergrund aktuell nicht aktiv ist und zu einem späteren Zeitpunkt neu konzipiert bzw. neu hinzugefügt wird.
 * **HTTP Basic Auth & Session-Sharing:**
   * Da `/acp/acp_neu/` innerhalb von `/acp/` liegt, greift der bestehende `.htaccess` Verzeichnisschutz (`.acp_htpasswd`) automatisch.
   * Die PHP-Session (`$_SESSION['logged_id'] = 'acp'`, `$_SESSION['employee_id']`, `$_SESSION['employee_access_area']`) wird nahtlos zwischen dem alten ACP und `acp_neu` geteilt.

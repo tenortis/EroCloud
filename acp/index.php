@@ -92,7 +92,7 @@ $site = '<!DOCTYPE html>
         #$inf = $dbip->Lookup($ip);
         #echo $inf->country;
         
-        $rs_employee = p4c_query("SELECT * FROM `employee` WHERE `id`='".abs((int)$_SESSION['employee_id'])."' LIMIT 1;");
+        $rs_employee = p4c_query("SELECT * FROM `employee` WHERE `id`='".abs((int)$_SESSION['employee_id'])."' LIMIT 1;", __FILE__, __LINE__);
         $employee = p4c_fetch_object($rs_employee);
         
         $site .= '
@@ -339,7 +339,7 @@ $site = '<!DOCTYPE html>
                     }
                     
                     $site .= '
-                    <a '.$navHome.' href="'.ACP_URL.'/Startseite">
+                    <a '.$navHome.' href="'.ACP_URL.'/Alt-Startseite">
                         <i class="material-symbols-outlined md-30">home</i>
                         <span>Startseite</span>
                     </a>

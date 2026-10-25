@@ -62,11 +62,26 @@ require valid-user
 
 # verhindert das Auflistung des Verzeichnissesinhalts
 Options -Indexes
+DirectoryIndex acp_neu/web/index.php index.php
 
 RewriteEngine On
 
 # Unterstützung für Schreibweise /ACP_Neu auf Case-Sensitive Linux-Systemen
 RewriteRule ^(?!acp_neu(?:/|$))(?i:acp_neu)(/.*)?$ acp_neu$1 [R=302,L]
+
+# ============================================================================
+# 1. Neues ACP (v2.0) als Standard für acp.erocloud.net
+# ============================================================================
+RewriteRule ^$ acp_neu/web/index.php [L,QSA]
+RewriteRule ^Startseite$ acp_neu/web/index.php [L,QSA]
+RewriteRule ^api\.php$ acp_neu/web/api.php [L,QSA]
+RewriteRule ^media\.php$ acp_neu/web/media.php [L,QSA]
+RewriteRule ^assets/(.*)$ acp_neu/web/assets/$1 [L]
+
+# ============================================================================
+# 2. Altes ACP (Legacy) bleibt parallel als Referenz erreichbar
+# ============================================================================
+RewriteRule ^(?:Alt-Startseite|alt|legacy)$ index.php?mod=home&%{QUERY_STRING} [L]
 
 RewriteRule ^erocloud_logo.png$ images/erocloud_logo.png
 RewriteRule ^favicon/(.*)$ images/favicons/$1
@@ -74,8 +89,6 @@ RewriteRule ^favicon/(.*)$ images/favicons/$1
 # jQuery usw.
 RewriteRule ^fw/(.*)$ includes/frameworks/$1
 RewriteRule ^Ajax/(.*)$ includes/ajax/$1?%{QUERY_STRING}
-
-RewriteRule ^Startseite$ index.php?mod=home&%{QUERY_STRING}
 
 RewriteRule ^Filme-pruefen index.php?mod=movies_checking&%{QUERY_STRING}
 RewriteRule ^Drehpartner-pruefen index.php?mod=co_actors_checking&%{QUERY_STRING}
