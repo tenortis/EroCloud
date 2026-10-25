@@ -152,6 +152,11 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Meine <?= htmlspecialchars($projectName, ENT_QUOTES, 'UTF-8') ?> – Partner-Bereich</title>
+  <link rel="icon" type="image/x-icon" href="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>/assets/img/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>/assets/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>/assets/img/favicon-16x16.png">
+  <link rel="icon" type="image/png" sizes="96x96" href="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>/assets/img/favicon-96x96.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>/assets/img/apple-touch-icon.png">
 
   <!-- CSRF-Schutz Token & Basis-Pfad für Vanilla JS fetch() Anfragen -->
   <meta name="csrf-token" content="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
@@ -684,6 +689,48 @@ $basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME
           <i class="bi bi-box-arrow-up-right me-1"></i> Vollständiges Impressum auf Pay4Coins öffnen
         </a>
         <button type="button" class="btn btn-sm btn-outline-kkc" data-bs-dismiss="modal">Schließen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Globales MCP Dialog-Modal (Info / Success / Warning / Danger für Confirm, Prompt & Alert) -->
+<div class="modal fade" id="ec-global-modal" tabindex="-1" aria-labelledby="ec-global-modal-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content card-kkc border-0 shadow-lg">
+      <div class="modal-header border-bottom py-3 px-4" style="border-color: var(--kkc-border) !important;">
+        <div class="d-flex align-items-center gap-2">
+          <span id="ec-global-modal-icon-box" class="rounded-circle d-inline-flex align-items-center justify-content-center flex-shrink-0" style="width: 36px; height: 36px;">
+            <i id="ec-global-modal-icon" class="bi bi-info-circle-fill fs-5"></i>
+          </span>
+          <h5 class="modal-title fw-bold mb-0" id="ec-global-modal-title">Hinweis</h5>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div id="ec-global-modal-message" class="text-body"></div>
+
+        <!-- Optionale Texteingabe (für App.prompt) -->
+        <div id="ec-global-modal-prompt-wrap" class="mt-3 d-none">
+          <textarea id="ec-global-modal-prompt-input" class="form-control" rows="3"></textarea>
+        </div>
+
+        <!-- Optionale Checkbox (z. B. Zusatz-Häkchen bei App.confirm) -->
+        <div id="ec-global-modal-checkbox-wrap" class="form-check d-flex align-items-start gap-2 p-3 rounded border mt-3 mb-0 d-none" style="background-color: var(--kkc-surface-hover); border-color: var(--kkc-border) !important;">
+          <input class="form-check-input mt-1 ms-0 flex-shrink-0" type="checkbox" value="1" id="ec-global-modal-checkbox">
+          <label class="form-check-label" for="ec-global-modal-checkbox" style="cursor: pointer;">
+            <span id="ec-global-modal-checkbox-label" class="fw-semibold d-block"></span>
+            <span id="ec-global-modal-checkbox-subtext" class="small text-muted d-block mt-1 d-none"></span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer border-top py-3 px-4 d-flex justify-content-between" style="border-color: var(--kkc-border) !important;">
+        <button type="button" class="btn btn-sm btn-outline-kkc" id="ec-global-modal-cancel" data-bs-dismiss="modal">
+          Abbrechen
+        </button>
+        <button type="button" class="btn btn-sm btn-primary-kkc fw-semibold ms-auto" id="ec-global-modal-confirm">
+          Bestätigen
+        </button>
       </div>
     </div>
   </div>

@@ -104,6 +104,11 @@ if (!$isLoggedIn):
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ACP Login – <?= htmlspecialchars($projectName, ENT_QUOTES, 'UTF-8') ?></title>
+  <link rel="icon" type="image/x-icon" href="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>/assets/img/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>/assets/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>/assets/img/favicon-16x16.png">
+  <link rel="icon" type="image/png" sizes="96x96" href="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>/assets/img/favicon-96x96.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>/assets/img/apple-touch-icon.png">
   <link rel="stylesheet" href="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>/assets/css/bootstrap.min.css">
   <link rel="stylesheet" href="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>/assets/css/bootstrap-icons.css">
   <link rel="stylesheet" href="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>/assets/css/fonts.css">
@@ -224,6 +229,11 @@ $sessionRemainingSeconds = 1800;
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ACP – <?= htmlspecialchars($projectName, ENT_QUOTES, 'UTF-8') ?> Admin-Bereich</title>
+  <link rel="icon" type="image/x-icon" href="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>/assets/img/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>/assets/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>/assets/img/favicon-16x16.png">
+  <link rel="icon" type="image/png" sizes="96x96" href="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>/assets/img/favicon-96x96.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>/assets/img/apple-touch-icon.png">
 
   <!-- CSRF-Schutz Token, Basis-Pfad & Session-Dauer für Vanilla JS -->
   <meta name="csrf-token" content="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">

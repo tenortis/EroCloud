@@ -1483,9 +1483,14 @@ const App = {
         const movieTitle = btn.getAttribute('data-movie-title') || (`#${movieId}`);
         if (!movieId) return;
 
-        if (!window.confirm(`Möchtest du den Film „${movieTitle}" wirklich unwiderruflich löschen?`)) {
-          return;
-        }
+        const ok = await this.confirm({
+          title: 'Film unwiderruflich löschen',
+          message: `Möchtest du den Film „${movieTitle}“ wirklich unwiderruflich löschen?`,
+          variant: 'danger',
+          confirmText: 'Ja, Film löschen',
+          confirmIcon: 'bi-trash'
+        });
+        if (!ok) return;
 
         btn.disabled = true;
         try {
@@ -4344,9 +4349,14 @@ const App = {
         const albumTitle = btn.getAttribute('data-album-title') || (`#${albumId}`);
         if (!albumId) return;
 
-        if (!window.confirm(`Möchtest du das Foto-Album „${albumTitle}" wirklich löschen?`)) {
-          return;
-        }
+        const ok = await this.confirm({
+          title: 'Foto-Album löschen',
+          message: `Möchtest du das Foto-Album „${albumTitle}“ wirklich unwiderruflich löschen?`,
+          variant: 'danger',
+          confirmText: 'Ja, Album löschen',
+          confirmIcon: 'bi-trash'
+        });
+        if (!ok) return;
 
         btn.disabled = true;
         try {
@@ -4540,9 +4550,14 @@ const App = {
         const fileId = btn.getAttribute('data-file-id');
         if (!albumId || !fileId) return;
 
-        if (!window.confirm('Möchtest du dieses Foto wirklich aus dem Album entfernen?')) {
-          return;
-        }
+        const ok = await this.confirm({
+          title: 'Foto entfernen',
+          message: 'Möchtest du dieses Foto wirklich aus dem Album entfernen?',
+          variant: 'danger',
+          confirmText: 'Ja, Foto entfernen',
+          confirmIcon: 'bi-trash'
+        });
+        if (!ok) return;
 
         btn.disabled = true;
         try {
@@ -5800,7 +5815,14 @@ const App = {
         },
 
         async deleteCoActor(coActorId, label) {
-          if (!confirm(`Möchtest du den Drehpartner „${label}“ wirklich entfernen?`)) {
+          const ok = await self.confirm({
+            title: 'Drehpartner entfernen',
+            message: `Möchtest du den Drehpartner „${label}“ wirklich entfernen?`,
+            variant: 'danger',
+            confirmText: 'Ja, entfernen',
+            confirmIcon: 'bi-trash'
+          });
+          if (!ok) {
             return;
           }
           try {
@@ -6419,7 +6441,14 @@ const App = {
       if (deleteBtn) {
         deleteBtn.addEventListener('click', async () => {
           const campName = deleteBtn.getAttribute('data-name') || cid;
-          if (!window.confirm(`Möchtest du deine Kampagne „${campName}“ wirklich unwiderruflich löschen?`)) {
+          const ok = await this.confirm({
+            title: 'Kampagne löschen',
+            message: `Möchtest du deine Kampagne „${campName}“ wirklich unwiderruflich löschen?`,
+            variant: 'danger',
+            confirmText: 'Ja, Kampagne löschen',
+            confirmIcon: 'bi-trash'
+          });
+          if (!ok) {
             return;
           }
           deleteBtn.disabled = true;
@@ -6630,6 +6659,202 @@ const App = {
     const bsToast = new bootstrap.Toast(toastEl, { delay: 3000 });
     bsToast.show();
     toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+  },
+
+  // ========================================================================
+  // 7b. Globales Dialog-System (Confirm, Prompt & Alert Modals: Info / Success / Warning / Danger)
+  // ========================================================================
+  dialog(options = {}) {
+    return new Promise((resolve) => {
+      const modalEl = document.getElementById('ec-global-modal');
+      if (!modalEl || typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+        const fallbackOk = window.confirm(options.message || 'Möchtest du fortfahren?');
+        resolve({
+          confirmed: fallbackOk,
+          value: options.input ? (fallbackOk ? (options.input.defaultValue || '') : null) : null,
+          checked: options.checkbox ? Boolean(options.checkbox.defaultChecked) : false
+        });
+        return;
+      }
+
+      const variant = options.variant || 'info'; // 'info' | 'success' | 'warning' | 'danger'
+      const variantConfig = {
+        info: {
+          icon: 'bi-info-circle-fill',
+          iconBoxClass: 'bg-primary bg-opacity-10 ec-text-primary',
+          btnClass: 'btn-primary-kkc'
+        },
+        success: {
+          icon: 'bi-check-circle-fill',
+          iconBoxClass: 'bg-success bg-opacity-10 text-success',
+          btnClass: 'btn-success'
+        },
+        warning: {
+          icon: 'bi-exclamation-triangle-fill',
+          iconBoxClass: 'bg-warning bg-opacity-10 text-warning',
+          btnClass: 'btn-warning text-dark'
+        },
+        danger: {
+          icon: 'bi-exclamation-octagon-fill',
+          iconBoxClass: 'bg-danger bg-opacity-10 text-danger',
+          btnClass: 'btn-danger'
+        }
+      };
+      const cfg = variantConfig[variant] || variantConfig.info;
+
+      const titleEl         = document.getElementById('ec-global-modal-title');
+      const iconBoxEl       = document.getElementById('ec-global-modal-icon-box');
+      const iconEl          = document.getElementById('ec-global-modal-icon');
+      const messageEl       = document.getElementById('ec-global-modal-message');
+      const promptWrapEl    = document.getElementById('ec-global-modal-prompt-wrap');
+      const promptInputEl   = document.getElementById('ec-global-modal-prompt-input');
+      const checkboxWrapEl  = document.getElementById('ec-global-modal-checkbox-wrap');
+      const checkboxInputEl = document.getElementById('ec-global-modal-checkbox');
+      const checkboxLabelEl = document.getElementById('ec-global-modal-checkbox-label');
+      const checkboxSubEl   = document.getElementById('ec-global-modal-checkbox-subtext');
+      const cancelBtnEl     = document.getElementById('ec-global-modal-cancel');
+      const confirmBtnEl    = document.getElementById('ec-global-modal-confirm');
+
+      if (titleEl) titleEl.textContent = options.title || 'Bestätigung';
+      if (iconBoxEl) {
+        iconBoxEl.className = `rounded-circle d-inline-flex align-items-center justify-content-center flex-shrink-0 ${cfg.iconBoxClass}`;
+      }
+      if (iconEl) {
+        iconEl.className = `bi ${options.icon || cfg.icon} fs-5`;
+      }
+
+      if (messageEl) {
+        if (options.html) {
+          messageEl.innerHTML = options.html;
+        } else {
+          messageEl.innerHTML = this.escapeHtml(options.message || '').replace(/\n/g, '<br>');
+        }
+      }
+
+      if (promptWrapEl && promptInputEl) {
+        if (options.input) {
+          promptWrapEl.classList.remove('d-none');
+          promptInputEl.value = options.input.defaultValue || '';
+          promptInputEl.placeholder = options.input.placeholder || '';
+          promptInputEl.rows = options.input.rows || 3;
+        } else {
+          promptWrapEl.classList.add('d-none');
+          promptInputEl.value = '';
+        }
+      }
+
+      if (checkboxWrapEl && checkboxInputEl && checkboxLabelEl && checkboxSubEl) {
+        if (options.checkbox && options.checkbox.label) {
+          checkboxWrapEl.classList.remove('d-none');
+          checkboxInputEl.checked = options.checkbox.defaultChecked !== false;
+          checkboxLabelEl.textContent = options.checkbox.label;
+          if (options.checkbox.subtext) {
+            checkboxSubEl.textContent = options.checkbox.subtext;
+            checkboxSubEl.classList.remove('d-none');
+          } else {
+            checkboxSubEl.textContent = '';
+            checkboxSubEl.classList.add('d-none');
+          }
+        } else {
+          checkboxWrapEl.classList.add('d-none');
+          checkboxInputEl.checked = false;
+        }
+      }
+
+      if (cancelBtnEl) {
+        if (options.hideCancel) {
+          cancelBtnEl.classList.add('d-none');
+        } else {
+          cancelBtnEl.classList.remove('d-none');
+          cancelBtnEl.textContent = options.cancelText || 'Abbrechen';
+        }
+      }
+
+      if (confirmBtnEl) {
+        confirmBtnEl.className = `btn btn-sm ${options.confirmBtnClass || cfg.btnClass} fw-semibold ms-auto`;
+        const btnIcon = options.confirmIcon ? `<i class="bi ${this.escapeHtml(options.confirmIcon)} me-1"></i> ` : '';
+        confirmBtnEl.innerHTML = `${btnIcon}${this.escapeHtml(options.confirmText || 'Bestätigen')}`;
+      }
+
+      const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+      let settled = false;
+
+      const cleanup = () => {
+        if (confirmBtnEl) confirmBtnEl.removeEventListener('click', onConfirm);
+        modalEl.removeEventListener('hidden.bs.modal', onHidden);
+        modalEl.removeEventListener('shown.bs.modal', onShown);
+      };
+
+      const onConfirm = () => {
+        if (options.input && options.input.required && promptInputEl && promptInputEl.value.trim() === '') {
+          promptInputEl.classList.add('is-invalid');
+          promptInputEl.focus();
+          return;
+        }
+        if (promptInputEl) promptInputEl.classList.remove('is-invalid');
+        settled = true;
+        const result = {
+          confirmed: true,
+          value: promptInputEl ? promptInputEl.value : '',
+          checked: checkboxInputEl ? Boolean(checkboxInputEl.checked) : false
+        };
+        bsModal.hide();
+        cleanup();
+        resolve(result);
+      };
+
+      const onHidden = () => {
+        if (promptInputEl) promptInputEl.classList.remove('is-invalid');
+        cleanup();
+        if (!settled) {
+          settled = true;
+          resolve({
+            confirmed: false,
+            value: null,
+            checked: checkboxInputEl ? Boolean(checkboxInputEl.checked) : false
+          });
+        }
+      };
+
+      const onShown = () => {
+        if (options.input && promptInputEl) {
+          promptInputEl.focus();
+        } else if (confirmBtnEl) {
+          confirmBtnEl.focus();
+        }
+      };
+
+      if (confirmBtnEl) confirmBtnEl.addEventListener('click', onConfirm);
+      modalEl.addEventListener('hidden.bs.modal', onHidden);
+      modalEl.addEventListener('shown.bs.modal', onShown);
+
+      bsModal.show();
+    });
+  },
+
+  async confirm(options = {}) {
+    const opts = typeof options === 'string' ? { message: options } : options;
+    const res = await this.dialog(opts);
+    return res.confirmed;
+  },
+
+  async prompt(options = {}) {
+    const opts = typeof options === 'string' ? { message: options } : options;
+    const res = await this.dialog({
+      ...opts,
+      input: opts.input || { placeholder: opts.placeholder || '', defaultValue: opts.defaultValue || '' }
+    });
+    return res.confirmed ? res.value : null;
+  },
+
+  async alert(options = {}) {
+    const opts = typeof options === 'string' ? { message: options } : options;
+    await this.dialog({
+      ...opts,
+      hideCancel: true,
+      confirmText: opts.confirmText || 'Verstanden'
+    });
+    return true;
   },
 
   escapeHtml(str) {

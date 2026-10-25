@@ -76,6 +76,7 @@ RewriteRule ^$ acp_neu/web/index.php [L,QSA]
 RewriteRule ^Startseite$ acp_neu/web/index.php [L,QSA]
 RewriteRule ^api\.php$ acp_neu/web/api.php [L,QSA]
 RewriteRule ^media\.php$ acp_neu/web/media.php [L,QSA]
+RewriteRule ^favicon\.ico$ acp_neu/web/assets/img/favicon.ico [L]
 RewriteRule ^assets/(.*)$ acp_neu/web/assets/$1 [L]
 
 # ============================================================================
