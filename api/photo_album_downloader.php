@@ -1,14 +1,13 @@
 <?php
 
 /**
- * Fotoalbum Downloader
- * 
+ * Fotoalbum Downloader (api.erocloud.net)
  */
 
 define('SAFE_INC', 1);
 
 include_once("../config.inc.php");
-include_once(API_DIR."/common.inc.php");
+include_once(API_DIR . "/common.inc.php");
 
 if (!isset($_GET['user_key'])) {
     $api['error'] = 'user_key not exists';
@@ -25,10 +24,10 @@ if (!isset($_GET['access_token'])) {
     print_xml($api);
 }
 
-$user_key = $_GET['user_key'];
+$user_key = (string)$_GET['user_key'];
 
-// Prüfen ob der user_streaming_key existiert
-$rs_user_key = p4c_query("SELECT * FROM `photo_albums_access` WHERE `user_key` = '".p4c_escape_string($user_key)."' LIMIT 1;",__FILE__,__LINE__);
+// PrÃ¼fen, ob der user_key existiert
+$rs_user_key = p4c_query("SELECT * FROM `photo_albums_access` WHERE `user_key` = '" . p4c_escape_string($user_key) . "' LIMIT 1;", __FILE__, __LINE__);
 if (p4c_num_rows($rs_user_key) == 0) {
     $api['error'] = 'access denid 2';
     print_xml($api);
@@ -37,26 +36,26 @@ if (p4c_num_rows($rs_user_key) == 0) {
 $access_obj = p4c_fetch_object($rs_user_key);
 
 // Wenn das Accesstoken nicht korrekt oder abgelaufen ist
-if ($access_obj->access_token != $_GET['access_token'] OR $access_obj->access_token_datetime < date("Y-m-d H:i:s")) {
+if ($access_obj->access_token != $_GET['access_token'] || $access_obj->access_token_datetime < date("Y-m-d H:i:s")) {
     $api['error'] = 'access denid 3';
-    print_xml($api);    
+    print_xml($api);
 }
 
-$album_id = p4c_escape_string($_GET['album_id']);
+$album_id = p4c_escape_string((string)$_GET['album_id']);
 
-$rs_album = p4c_query("SELECT * FROM `photo_albums` WHERE `album_id`='".$album_id."' LIMIT 1;",__FILE__,__LINE__);
+$rs_album = p4c_query("SELECT * FROM `photo_albums` WHERE `album_id`='" . $album_id . "' LIMIT 1;", __FILE__, __LINE__);
 if (p4c_num_rows($rs_album) == 0) {
     $api['error'] = 'album_id not exists';
-    print_xml($api);;   
+    print_xml($api);
 }
 
 $album_ary = p4c_fetch_object($rs_album);
+$albumTitleRaw = (string)($album_ary->title ?? ($album_ary->name ?? 'Fotoalbum'));
 
-$rs_photos = p4c_query("SELECT * FROM `photo_albums_photos` WHERE `album_id`='".p4c_escape_string($album_id)."' AND `rejected`='0';",__FILE__,__LINE__);
+$rs_photos = p4c_query("SELECT * FROM `photo_albums_photos` WHERE `album_id`='" . p4c_escape_string($album_id) . "' AND `rejected`='0';", __FILE__, __LINE__);
 
-
-$album_dir = PROFILE_IMAGE_PATH.'/'.$album_ary->storage_location.'/'.$album_ary->merchant_id.'/'.$album_ary->id;
-$zip_file = $album_dir.'/album.zip';
+$album_dir = PROFILE_IMAGE_PATH . '/' . $album_ary->storage_location . '/' . $album_ary->merchant_id . '/' . $album_ary->id;
+$zip_file = $album_dir . '/album.zip';
 
 if (is_file($zip_file)) {
     @unlink($zip_file);
@@ -64,106 +63,97 @@ if (is_file($zip_file)) {
 
 $zip = new ZipArchive();
 
-if ($zip->open($zip_file, ZipArchive::CREATE)!==TRUE) {
-    $api['error'] = 'cannot open zipfile\n';
-    print_xml($api);;   
+if ($zip->open($zip_file, ZipArchive::CREATE) !== true) {
+    $api['error'] = 'cannot open zipfile';
+    print_xml($api);
 }
 
-$zip->addFromString($album_ary->seo_url.'.txt', strip_tags($album_ary->description));
-while($photo_ary = p4c_fetch_object($rs_photos)) {        
-    $zip->addFile($album_dir.'/images/'.$photo_ary->filename, $photo_ary->filename);
+$zip->addFromString((string)($album_ary->seo_url ?? 'album') . '.txt', strip_tags((string)($album_ary->description ?? '')));
+while ($photo_ary = p4c_fetch_object($rs_photos)) {
+    $photoPath = $album_dir . '/images/' . $photo_ary->filename;
+    if (is_file($photoPath)) {
+        $zip->addFile($photoPath, (string)$photo_ary->filename);
+    }
 }
 $zip->close();
 
-$size = filesize($zip_file);
+$size = is_file($zip_file) ? (int)filesize($zip_file) : 0;
 
-
-if (isset($_GET['start']) AND $_GET['start'] == 'download') { 
-    
+if (isset($_GET['start']) && $_GET['start'] == 'download') {
     session_write_close();
 
     header('Pragma: public');
     header('Expires: 0');
     header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
-    header('Cache-Control: private',false);
+    header('Cache-Control: private', false);
     header('Content-Type: application/zip');
     header('Content-Type: application/force-download');
     header('Content-Type: application/download');
-    header('Content-Disposition: attachment; filename="'. seo_url($album_ary->title).'".zip');
+    header('Content-Disposition: attachment; filename="' . seo_url($albumTitleRaw) . '.zip"');
     header('Content-Description: File Transfer');
-    header('Content-Length: '.$size);
-    
+    header('Content-Length: ' . $size);
 
-    $bis = 1024*1024;
-    $count = ceil($size/(int)$bis);
-    $handle = fopen ($zip_file, "r");	
-        for ($i=0;$i<=$count;$i++) {
-            $ftell = ftell($handle)+$bis;
-            $contents = fread ($handle, $bis);
-            fseek($handle,$ftell);
-            echo $contents; 
+    $bis = 1024 * 1024;
+    $count = (int)ceil($size / max(1, $bis));
+    $handle = fopen($zip_file, "rb");
+    if ($handle !== false) {
+        for ($i = 0; $i <= $count; $i++) {
+            $ftell = ftell($handle) + $bis;
+            $contents = fread($handle, $bis);
+            if ($contents === false || $contents === '') {
+                break;
+            }
+            fseek($handle, $ftell);
+            echo $contents;
         }
-    fclose ($handle);
-
+        fclose($handle);
+    }
 } else {
+    $safeUserKey = rawurlencode($user_key);
+    $safeAlbumId = rawurlencode((string)$_GET['album_id']);
+    $safeAccessToken = rawurlencode((string)$_GET['access_token']);
+    $safeTitle = htmlspecialchars($albumTitleRaw, ENT_QUOTES, 'UTF-8');
+
     header('Content-Type: text/html; charset=utf-8');
-    header('refresh:5; '.API_URL.'/PhotoAlbumDownloader/'.$user_key.'/'.$album_id.'/'.$_GET['access_token'].'&start=download');
+    header('refresh:5; ' . API_URL . '/PhotoAlbumDownloader/' . $safeUserKey . '/' . $safeAlbumId . '/' . $safeAccessToken . '&start=download');
 
     $site = '<!DOCTYPE html>
-    <html lang="de">
-    <head>
-        <title>'.PROJECTNAME.'</title>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-        <link rel="icon" type="image/png" href="'.URL.'/images/favicons/favicon-16x16.png" sizes="16x16">
-        <link rel="icon" type="image/png" href="'.URL.'/images/favicons/favicon-32x32.png" sizes="32x32">
-        <link rel="icon" type="image/png" href="'.URL.'/images/favicons/favicon-96x96.png" sizes="96x96">
-
-        <link rel="stylesheet" type="text/css" href="'.MCP_URL.'/fw/jquery-ui/jquery-ui.min.css" />
-        <link rel="stylesheet" type="text/css" href="'.MCP_URL.'/css/style.css?id=1" />
-        <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
-
-        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
-        <script type="text/javascript" src="'.MCP_URL.'/fw/jquery-ui/jquery-ui.min.js"></script>
-
-        <style>
-            div {font-size:1em;}
-        </style>
-
-        <script type="text/javascript"><!--
-            jQuery.noConflict();
-
-            jQuery(document).ready(function() {
-                setTimeout(function(){
-                    jQuery("#dl_info").html("Das Album wird herunter geladen...");
-                }, 4000);
-            })
-
-        --></script>
-
-    </head>
-    <body class="ui-widget-content" style="border:none;">
-        <div style="position:absolute; bottom:5px; right:5px">
-            <a href="'.MCP_URL.'" target="_blank"><img src="'.MCP_URL.'/erocloud_logo.png" alt="" style="width:80px; height:auto;" /></a>
-        </div>
-        <div id="head_info" class="ui-widget-header" style="border-top:none; border-left:none; border-right:none; padding:5px 10px;">
-            '.$album_ary->title.'
-        </div>
-        <div style="padding:10px;">
-            <div id="dl_info" style="margin-bottom:10px;">Der Download startet in wenigen Sekunden...</div>
-            <div>Dateigr&ouml;&szlig;e: '.convertBytes($size).'</div>
-        </div>
-    </body>
-    </html>
-    ';
+<html lang="de">
+<head>
+    <title>' . htmlspecialchars((string)PROJECTNAME, ENT_QUOTES, 'UTF-8') . '</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="' . MCP_URL . '/favicon.ico">
+    <style>
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: #f8fafc; color: #0f172a; }
+        #head_info { background: #0284c7; color: #ffffff; font-weight: 600; padding: 10px 14px; font-size: 0.95rem; }
+        .dl-body { padding: 16px 14px; font-size: 0.92rem; line-height: 1.5; }
+        .dl-meta { color: #64748b; font-size: 0.85rem; margin-top: 6px; }
+        .dl-logo { position: fixed; bottom: 8px; right: 10px; opacity: 0.9; }
+    </style>
+    <script>
+        setTimeout(function() {
+            var el = document.getElementById("dl_info");
+            if (el) { el.textContent = "Das Album wird heruntergeladen..."; }
+        }, 4000);
+    </script>
+</head>
+<body>
+    <div id="head_info">' . $safeTitle . '</div>
+    <div class="dl-body">
+        <div id="dl_info">Der Download startet in wenigen Sekunden...</div>
+        <div class="dl-meta">Dateigr&ouml;&szlig;e: ' . htmlspecialchars((string)convertBytes($size), ENT_QUOTES, 'UTF-8') . '</div>
+    </div>
+    <div class="dl-logo">
+        <a href="' . MCP_URL . '" target="_blank" rel="noopener"><img src="' . MCP_URL . '/erocloud_logo.png" alt="EroCloud" style="width:80px; height:auto;" /></a>
+    </div>
+</body>
+</html>';
 
     echo $site;
 }
 
 p4c_close(DB_HOST);
-	
+
 // PHP Fehlermeldung loggen
 p4c_errorlog(error_get_last());
-
-?>

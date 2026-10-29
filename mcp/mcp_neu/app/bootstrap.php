@@ -10,6 +10,12 @@ if (!defined('SAFE_INC')) {
  * Unterstützt sowohl den Entwicklungs-Pfad (/mcp/mcp_neu/app) als auch den späteren Live-Pfad (/mcp/app).
  */
 
+// 0. Output-Buffering starten, damit eventuelle Leerzeilen in eingebundenen
+//    Legacy-Dateien niemals vorzeitig Header, Binär-Streams oder JSON-Responses beschädigen
+if (ob_get_level() === 0) {
+    ob_start();
+}
+
 // 1. Zeitzone vor dem Laden der config.inc.php verbindlich setzen
 date_default_timezone_set('Europe/Berlin');
 
@@ -53,15 +59,21 @@ if (isset($_COOKIE['PHPSESSID']) && $_COOKIE['PHPSESSID'] === '') {
     $_COOKIE['PHPSESSID'] = '0x';
 }
 
-// 6. Error-Handler, Datenbank ($mysql) & Kernklassen initialisieren
+// 6. Error-Handler, Datenbank ($mysql), Settings ($settings) & Kernklassen initialisieren
 if (defined('SOURCEDIR')) {
     include_once SOURCEDIR . '/includes/klassen/errorlog.inc.php';
-    global $class_errorlog, $mysql, $config;
+    global $class_errorlog, $mysql, $settings, $config;
     $class_errorlog = new p4c_errorlog();
 
     include_once SOURCEDIR . '/includes/klassen/mysqli.inc.php';
     $mysql = new p4c_mysqli(DB_HOST, $config['db_user'], $config['db_pass'], $config['db_name']);
     p4c_query("SET NAMES 'utf8mb4';", __FILE__, __LINE__);
+    p4c_query("SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION';", __FILE__, __LINE__);
+
+    if (file_exists(SOURCEDIR . '/includes/klassen/settings.inc.php')) {
+        include_once SOURCEDIR . '/includes/klassen/settings.inc.php';
+        $settings = new Settings($mysql);
+    }
 
     include_once SOURCEDIR . '/includes/klassen/merchant.inc.php';
     include_once SOURCEDIR . '/includes/klassen/actor.inc.php';

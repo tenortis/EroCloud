@@ -1,11 +1,16 @@
-# EroCloud MCP Webroot Configuration
+# EroCloud MCP Webroot Configuration (/htdocs/mcp/mcp_neu/web)
 Options -Indexes
 
 <IfModule mod_dir.c>
     DirectoryIndex index.php
 </IfModule>
 
+<IfModule mod_setenvif.c>
+    SetEnvIf Origin "^http(s)?://(.+\.)?(login\.pay4coins\.com|merchant\.p4coins\.com|merchant\.pay4coins\.com|pay4coins\.com|erocloud\.net)$" origin_is=$0
+</IfModule>
+
 <IfModule mod_headers.c>
+    Header always set Access-Control-Allow-Origin %{origin_is}e env=origin_is
     Header set X-Content-Type-Options "nosniff"
     Header set X-Frame-Options "SAMEORIGIN"
     Header set X-XSS-Protection "1; mode=block"
@@ -20,7 +25,47 @@ Options -Indexes
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # Clean URLs auf die SPA-Shell (index.php) leiten
+    # 1. Rückwärtskompatibilität für gedruckte QR-Codes, E-Mail-Magic-Links & Lesezeichen mit /mcp_neu/web/
+    RewriteRule ^mcp_neu/web/(.*)$ /$1 [R=301,L,QSA]
+    RewriteRule ^mcp_neu/?(?:index\.php)?$ /Startseite [R=301,L,QSA]
+
+    # 2. Statische Root-Logos & Favicons (Kompatibilität für externe Einbindungen & API-Downloader)
+    RewriteRule ^erocloud_logo\.png$ assets/img/erocloud_logo.png [L]
+    RewriteRule ^(?:favicon|images/favicons)/favicon\.ico$ assets/img/favicon.ico [L]
+    RewriteRule ^(?:favicon|images/favicons)/favicon-16x16\.png$ assets/img/favicon-16x16.png [L]
+    RewriteRule ^(?:favicon|images/favicons)/favicon-32x32\.png$ assets/img/favicon-32x32.png [L]
+    RewriteRule ^(?:favicon|images/favicons)/favicon-96x96\.png$ assets/img/favicon-96x96.png [L]
+    RewriteRule ^(?:favicon|images/favicons)/apple-(?:touch-)?icon.*\.png$ assets/img/apple-touch-icon.png [L]
+    RewriteRule ^(?:favicon|images/favicons)/.*\.png$ assets/img/favicon-96x96.png [L]
+
+    # 3. Geschützte Medien- & Video-Streaming-Routen (MCP_URL)
+    RewriteRule ^ProfilePicture/(.+)$ media.php?type=profile_picture&id=$1 [L,QSA]
+    RewriteRule ^AlbumPhoto/(.+)$ media.php?type=album_photo&photo_id=$1 [L,QSA]
+    RewriteRule ^Player/(.+)$ media.php?type=player&id=$1 [L,QSA]
+    RewriteRule ^PlayerPoster/(.+)$ media.php?type=player_poster&id=$1 [L,QSA]
+    RewriteRule ^amoredea/RedirectContent/([0-9]+)_([0-9]+)$ media.php?type=amoredea_redirect&content_id=$1&month=$2 [L,QSA]
+
+    # 4. Alte MCP-Lesezeichen & Direktlinks sauber auf neue SPA-Routen umleiten (NE = No Escape für #)
+    RewriteRule ^Movie-Upload/?$ /Startseite#/movie-upload [R=302,L,NE]
+    RewriteRule ^Movies/?$ /Startseite#/movies [R=302,L,NE]
+    RewriteRule ^video/([0-9]+)/?$ /Startseite#/movie?id=$1 [R=302,L,NE]
+    RewriteRule ^Photo-Album-Upload/?$ /Startseite#/photo-album-upload [R=302,L,NE]
+    RewriteRule ^Photo-Albums/?$ /Startseite#/photo-albums [R=302,L,NE]
+    RewriteRule ^Photo-Album/([0-9]+)/?$ /Startseite#/photo-album?id=$1 [R=302,L,NE]
+    RewriteRule ^Actors/?$ /Startseite#/actors [R=302,L,NE]
+    RewriteRule ^New-Actor/?$ /Startseite#/new-actor [R=302,L,NE]
+    RewriteRule ^Actor/([0-9]+)/?$ /Startseite#/actor?id=$1 [R=302,L,NE]
+    RewriteRule ^(?:CoActors|New-CoActor|CoActor/[0-9]+)/?$ /Startseite#/co-actors [R=302,L,NE]
+    RewriteRule ^Webmaster/Ads/([^/]+)/?$ /Startseite#/webmaster-ads-domain?domain=$1 [R=302,L,NE]
+    RewriteRule ^Webmaster/New-Campaign/?$ /Startseite#/webmaster-new-campaign [R=302,L,NE]
+    RewriteRule ^Webmaster/Edit-Campaign/?$ /Startseite#/webmaster-edit-campaign [R=302,L,NE]
+    RewriteRule ^Webmaster/NewAds/?$ /Startseite#/webmaster-newads [R=302,L,NE]
+    RewriteRule ^Webmaster/Statistics/?$ /Startseite#/webmaster-stats [R=302,L,NE]
+    RewriteRule ^Webmaster/Advertise-Partner/?$ /Startseite#/webmaster-advertise-partner [R=302,L,NE]
+    RewriteRule ^Webmaster(?:/Ads)?/?$ /Startseite#/webmaster-ads [R=302,L,NE]
+    RewriteRule ^faq/?$ /Startseite#/faq [R=302,L,NE]
+
+    # 5. Clean URLs auf die SPA-Shell (index.php) leiten
     RewriteRule ^Startseite$ index.php [L,QSA]
 
     # Falls keine physische Datei oder Ordner existiert -> index.php

@@ -68,6 +68,7 @@ if (defined('SOURCEDIR')) {
     include_once SOURCEDIR . '/includes/klassen/mysqli.inc.php';
     $mysql = new p4c_mysqli(DB_HOST, $config['db_user'], $config['db_pass'], $config['db_name']);
     p4c_query("SET NAMES 'utf8mb4';", __FILE__, __LINE__);
+    p4c_query("SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION';", __FILE__, __LINE__);
 
     if (file_exists(SOURCEDIR . '/includes/klassen/settings.inc.php')) {
         include_once SOURCEDIR . '/includes/klassen/settings.inc.php';

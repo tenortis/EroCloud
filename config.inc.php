@@ -48,8 +48,8 @@ define('MAIL_REPLY_TO_NAME',    '');
 
 // E-Mail Test-/Sandbox-Modus:
 // Solange MAIL_SANDBOX_MODE === true ist, werden ALLE ausgehenden E-Mails ausnahmslos
-// an MAIL_SANDBOX_RECIPIENT umgeleitet (kein Creator erhält während der Testphase E-Mails!).
-define('MAIL_SANDBOX_MODE',      true);
+// an MAIL_SANDBOX_RECIPIENT umgeleitet (produktiv auf false geschaltet).
+define('MAIL_SANDBOX_MODE',      false);
 define('MAIL_SANDBOX_RECIPIENT', 'erocms@gmail.com');
 
 // Telefon / WhatsApp (Business)

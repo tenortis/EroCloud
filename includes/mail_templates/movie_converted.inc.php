@@ -18,7 +18,7 @@ $rawPlaytime    = trim((string)($vars['playtime'] ?? '-'));
 $rawPlaytime    = preg_replace('/\s*Min\.?$/i', '', $rawPlaytime);
 $playtime       = htmlspecialchars($rawPlaytime !== '' ? $rawPlaytime : '-', ENT_QUOTES, 'UTF-8');
 $resolution     = htmlspecialchars(trim((string)($vars['resolution'] ?? 'HD')), ENT_QUOTES, 'UTF-8');
-$movieEditUrl   = htmlspecialchars(trim((string)($vars['movie_edit_url'] ?? 'https://erocloud.net/mcp_neu/web/#/movies')), ENT_QUOTES, 'UTF-8');
+$movieEditUrl   = htmlspecialchars(trim((string)($vars['movie_edit_url'] ?? 'https://erocloud.net/Startseite#/movies')), ENT_QUOTES, 'UTF-8');
 
 $emailSubject   = 'Dein Video (#' . $movieId . ') ist fertig konvertiert – Vorschaubilder stehen bereit';
 $emailPreheader = 'Deine 10 Vorschaubilder für Video #' . $movieId . ' stehen ab sofort im EroCloud Cover-Studio für dich bereit.';
@@ -99,6 +99,6 @@ $emailTextContent = "Hallo " . trim((string)($vars['creator_name'] ?? 'Creator')
     . "- Laufzeit & Qualität: " . trim((string)($vars['playtime'] ?? '-')) . " Min. / " . trim((string)($vars['resolution'] ?? 'HD')) . "\n"
     . "- Vorschaubilder: 10 Szenen-Thumbnails bereit\n\n"
     . "Du kannst jetzt in den Film-Details deine Vorschaubilder für FSK 16 & FSK 18 auswählen, im Cover-Studio gestalten und deinen Film anschließend zur Prüfung freigeben:\n"
-    . trim((string)($vars['movie_edit_url'] ?? 'https://erocloud.net/mcp_neu/web/#/movies')) . "\n\n"
+    . trim((string)($vars['movie_edit_url'] ?? 'https://erocloud.net/Startseite#/movies')) . "\n\n"
     . "Viele Grüße\n"
     . "Dein EroCloud Team";

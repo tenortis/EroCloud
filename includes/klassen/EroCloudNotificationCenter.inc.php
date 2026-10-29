@@ -486,9 +486,8 @@ class EroCloudNotificationCenter
         $sig        = self::computeHmac($merchantId, $eventKey);
 
         $mcpBase = defined('MCP_URL') ? rtrim((string)MCP_URL, '/') : 'https://erocloud.net';
-        $subPath = (defined('MCP_DIR') && is_dir(MCP_DIR . '/mcp_neu/web')) ? '/mcp_neu/web' : '';
 
-        return $mcpBase . $subPath . '/unsubscribe.php?m=' . $merchantId
+        return $mcpBase . '/unsubscribe.php?m=' . $merchantId
             . '&e=' . rawurlencode($eventKey)
             . '&s=' . rawurlencode($sig);
     }

@@ -634,10 +634,7 @@ class EroCloudMagicLink
             }
         }
 
-        if (defined('MCP_DIR') && is_dir(MCP_DIR . '/mcp_neu/web')) {
-            return $mcpBase . '/mcp_neu/web/index.php';
-        }
-        return $mcpBase . '/index.php';
+        return $mcpBase . '/Startseite';
     }
 
     /**

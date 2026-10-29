@@ -663,24 +663,15 @@ class CoActorManager
     }
 
     /**
-     * Ermittelt die Basis-URL zum neuen MCP-Webverzeichnis (funktioniert unter /mcp/mcp_neu/web, /mcp_neu/web und später /web).
+     * Ermittelt die Basis-URL zum MCP-Webverzeichnis (produktiv direkt MCP_URL / https://erocloud.net).
      */
     public static function getMcpWebBaseUrl(): string
     {
         $mcpUrl     = defined('MCP_URL') ? rtrim((string)MCP_URL, '/') : 'https://erocloud.net';
-        $scriptName = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+        $requestUri = str_replace('\\', '/', (string)($_SERVER['REQUEST_URI'] ?? ''));
 
-        if (str_contains($scriptName, '/mcp/mcp_neu/web/')) {
+        if (str_contains($requestUri, '/mcp/mcp_neu/web/')) {
             return $mcpUrl . '/mcp/mcp_neu/web';
-        }
-        if (str_contains($scriptName, '/mcp_neu/web/')) {
-            return $mcpUrl . '/mcp_neu/web';
-        }
-        if (defined('SOURCEDIR') && is_dir(SOURCEDIR . '/mcp/mcp_neu/web')) {
-            if (defined('DOMAIN') && DOMAIN === 'erocloud.local') {
-                return $mcpUrl . '/mcp/mcp_neu/web';
-            }
-            return $mcpUrl . '/mcp_neu/web';
         }
         return $mcpUrl;
     }

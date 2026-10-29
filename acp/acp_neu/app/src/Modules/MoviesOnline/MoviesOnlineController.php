@@ -1711,6 +1711,7 @@ final class MoviesOnlineController
                 }
             }
             if (!$hasIdx) {
+                p4c_query("SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION';", __FILE__, __LINE__);
                 p4c_query("ALTER TABLE `movies` ADD INDEX `idx_ec_file_id` (`file_id`);", __FILE__, __LINE__);
             }
             @file_put_contents($idxFlag, date('Y-m-d H:i:s'));

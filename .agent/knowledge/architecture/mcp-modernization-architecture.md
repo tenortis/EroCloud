@@ -171,16 +171,22 @@ mcp_neu/ (später: mcp/)
 
 ---
 
-## 5. 🚀 Go-Live & Cutover-Checkliste (`mcp/` $\rightarrow$ `mcp_neu/`)
+## 5. 🚀 Produktiv-Umstellung (Go-Live auf `erocloud.net` & PHP 8.4.27)
 
-Beim Umschalten der Hauptdomain `https://erocloud.net` auf `mcp_neu` sind folgende Punkte verbindlich einzuhalten:
-1. **Medien- & Streaming-Endpunkte im Root erhalten:**
-   * `/thumb.php`, `/ProfilePicture/{filename}`, `/AlbumPhoto/{file_id}`, `/Player/{file_id}`, `/PlayerPoster/{file_id}` sowie `/erocloud_logo.png` und `/favicon/*` müssen im neuen Web-Root erreichbar bleiben, da sowohl MCP als auch ACP ihre Medien-URLs über `MCP_URL` (`https://erocloud.net`) auflösen.
-2. **Rückwärtskompatibilität für QR-Codes & E-Mail-Links:**
-   * `.htaccess`-Regel `RewriteRule ^mcp_neu/web/(.*)$ /$1 [R=301,L,QSA]`, damit bereits gedruckte Co-Actor-QR-Codes und versendete Magic-/Unsubscribe-Links nahtlos weiterfunktionieren.
-   * Bereinigung des Subpfads `/mcp_neu/web/` in `EroCloudMailer.inc.php`, `movie_converted.inc.php`, `CoActorManager.inc.php`, `EroCloudMagicLink.inc.php` und `SystemTechController.php`.
-3. **Produktiv-Schaltung des Mail-Versands:**
-   * In `config.inc.php` `define('MAIL_SANDBOX_MODE', false);` setzen.
+Die Hauptdomain **`https://erocloud.net`** zeigt in LiveConfig analog zum ACP direkt auf **`/htdocs/mcp/mcp_neu/web/`** und läuft produktiv unter **PHP `8.4.27`** (`php-8.4-opt`):
+1. **Physische Trennung von `app/` & `web/`:**
+   * `mcp/mcp_neu/web/` ist das öffentliche DocumentRoot (`https://erocloud.net/Startseite`), während `mcp/mcp_neu/app/` (`../app`) physisch **oberhalb** des DocumentRoots liegt und aus dem Web nicht erreichbar ist.
+   * Der Altbestand in `mcp/` bleibt unangetastet im Dateisystem als Archiv erhalten (inkl. `mcp/.htaccess` als lokales XAMPP-/Fallback-Routing).
+2. **Autarke Medien- & Streaming-Endpunkte in `mcp/mcp_neu/web/`:**
+   * [`mcp/mcp_neu/web/thumb.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/web/thumb.php): Liefert Szenen-Thumbnails (`1..12`) skaliert über GD mit Session-Lock-Freigabe und HTTP-304-Caching aus.
+   * [`mcp/mcp_neu/web/media.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/web/media.php): Zentraler, geschützter Partner-Medien- & Streaming-Proxy für `/ProfilePicture/{filename}`, `/AlbumPhoto/{file_id}`, `/Player/{file_id}` (`VideoStream` mit Session-Stream-Cache), `/PlayerPoster/{file_id}` (inkl. `SD`..`6K` Wasserzeichen) und `/amoredea/RedirectContent/{content_id}_{month}`.
+   * `/erocloud_logo.png` sowie `/favicon/*` und `/images/favicons/*` werden über [`mcp/mcp_neu/web/.htaccess`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/web/.htaccess) direkt aus `assets/img/` ausgeliefert; [`api/movie_downloader.php`](file:///c:/xampp/htdocs/EroCloud/api/movie_downloader.php), [`api/photo_album_downloader.php`](file:///c:/xampp/htdocs/EroCloud/api/photo_album_downloader.php) und [`api/messenger_image_info.php`](file:///c:/xampp/htdocs/EroCloud/api/messenger_image_info.php) arbeiten mit autarkem Inline-CSS ohne veraltete `mcp/fw/jquery-ui`-Abhängigkeiten.
+3. **100 % Rückwärtskompatibilität für QR-Codes, E-Mail-Links & Lesezeichen:**
+   * `RewriteRule ^mcp_neu/web/(.*)$ /$1 [R=301,L,QSA]` in [`mcp/mcp_neu/web/.htaccess`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/web/.htaccess) stellt sicher, dass alle bereits generierten Drehpartner-QR-Codes (`/mcp_neu/web/verify_co_actor.php?t=...`), gespeicherten Lesezeichen sowie versendeten Magic- und Unsubscribe-Links nahtlos auf das Root-Level weitergeleitet werden.
+   * Alte MCP-Direktlinks (`/Movies`, `/Movie-Upload`, `/Photo-Albums`, `/Actors`, `/CoActors`, `/Webmaster`, `/faq` usw.) leiten automatisch per `[R=302,L,NE]` auf die jeweilige SPA-Route (`/Startseite#/...`) weiter.
+   * Alle URL-Generatoren ([`CoActorManager`](file:///c:/xampp/htdocs/EroCloud/includes/klassen/CoActorManager.inc.php), [`EroCloudMagicLink`](file:///c:/xampp/htdocs/EroCloud/includes/klassen/EroCloudMagicLink.inc.php), [`EroCloudMailer`](file:///c:/xampp/htdocs/EroCloud/includes/klassen/EroCloudMailer.inc.php), [`EroCloudNotificationCenter`](file:///c:/xampp/htdocs/EroCloud/includes/klassen/EroCloudNotificationCenter.inc.php)) erzeugen saubere Root-URLs auf `https://erocloud.net/...`.
+4. **Produktiver E-Mail-Versand:**
+   * In [`config.inc.php`](file:///c:/xampp/htdocs/EroCloud/config.inc.php) steht `define('MAIL_SANDBOX_MODE', false);`, sodass System-Benachrichtigungen produktiv an die Creator zugestellt werden (sofern im ACP unter `#/system-settings` kein manueller DB-Sandbox-Override aktiv ist).
 
 
 

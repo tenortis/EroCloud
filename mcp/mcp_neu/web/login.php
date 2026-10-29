@@ -121,7 +121,9 @@ if ($data === 'ok') {
 
                 log_action('Am System angemeldet.');
 
-                $basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? ''))), '/');
+                $rawBasePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? ''))), '/');
+                $requestUri  = (string)($_SERVER['REQUEST_URI'] ?? '');
+                $basePath    = (stripos($requestUri, '/mcp_neu') === 0 || stripos($requestUri, '/mcp/mcp_neu') !== false) ? $rawBasePath : '';
                 header('Location: ' . $basePath . '/Startseite');
                 exit;
             }

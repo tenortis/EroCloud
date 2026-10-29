@@ -21,7 +21,7 @@ $reasonTitle    = htmlspecialchars(trim((string)($vars['reason_title'] ?? '')), 
 $reasonText     = nl2br(htmlspecialchars(trim((string)($vars['reason_text'] ?? '')), ENT_QUOTES, 'UTF-8'));
 $extraMetaLabel = htmlspecialchars(trim((string)($vars['extra_meta_label'] ?? '')), ENT_QUOTES, 'UTF-8');
 $extraMetaValue = htmlspecialchars(trim((string)($vars['extra_meta_value'] ?? '')), ENT_QUOTES, 'UTF-8');
-$actionUrl      = htmlspecialchars(trim((string)($vars['action_url'] ?? 'https://erocloud.net/mcp_neu/web/#/home')), ENT_QUOTES, 'UTF-8');
+$actionUrl      = htmlspecialchars(trim((string)($vars['action_url'] ?? 'https://erocloud.net/Startseite#/startseite')), ENT_QUOTES, 'UTF-8');
 
 if ($contentType === 'photo_album') {
     $typeLabel     = 'Foto-Album';
@@ -166,6 +166,6 @@ $emailTextContent = "Hallo " . trim((string)($vars['creator_name'] ?? 'Creator')
         ? "\nHinweis unseres Prüf-Teams" . ($rawReasonTitle !== '' ? " (" . $rawReasonTitle . ")" : "") . ":\n" . ($rawReasonText !== '' ? $rawReasonText : $rawReasonTitle) . "\n"
         : "")
     . "\nDirektlink zum Eintrag (automatischer 1-Klick-Login):\n"
-    . trim((string)($vars['action_url'] ?? 'https://erocloud.net/mcp_neu/web/#/home')) . "\n\n"
+    . trim((string)($vars['action_url'] ?? 'https://erocloud.net/Startseite#/startseite')) . "\n\n"
     . "Viele Grüße\n"
     . "Dein EroCloud Team";

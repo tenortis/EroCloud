@@ -143,8 +143,10 @@ $projectName  = defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud';
 $siteUrl      = defined('URL') ? URL : 'https://erocloud.net';
 $imprintUrl   = (string)($imprintData['imprint_external_url'] ?? 'https://pay4coins.com/de/impressum');
 
-$csrfToken = Csrf::token();
-$basePath  = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? ''))), '/');
+$csrfToken   = Csrf::token();
+$rawBasePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? ''))), '/');
+$requestUri  = (string)($_SERVER['REQUEST_URI'] ?? '');
+$basePath    = (stripos($requestUri, '/mcp_neu') === 0 || stripos($requestUri, '/mcp/mcp_neu') !== false) ? $rawBasePath : '';
 ?>
 <!DOCTYPE html>
 <html lang="de" data-bs-theme="light">

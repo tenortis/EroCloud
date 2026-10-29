@@ -601,9 +601,9 @@ class HomeController
         $secret     = 'erocms_creator_feedback_v1_secret_2026';
         $signature  = hash_hmac('sha256', $domain . '|' . $now . '|' . $category, $secret);
 
-        $pageContext = trim((string)$this->request->post('page_context', 'mcp_neu/web/#/startseite'));
+        $pageContext = trim((string)$this->request->post('page_context', '/Startseite#/startseite'));
         if ($pageContext === '') {
-            $pageContext = 'mcp_neu/web/#/startseite';
+            $pageContext = '/Startseite#/startseite';
         }
 
         $payload = [
@@ -1659,6 +1659,9 @@ class HomeController
         if (@is_file($flagFile)) {
             return;
         }
+
+        // Legacy-Tabellen (2016) besitzen '0000-00-00 00:00:00' DATETIME-Defaults -> NO_ZERO_DATE für DDL deaktivieren
+        p4c_query("SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION';", __FILE__, __LINE__);
 
         $targets = [
             [

@@ -56,11 +56,13 @@ class EroCloudMailer
 
         $rs1 = @p4c_query("SHOW COLUMNS FROM `movies` LIKE 'notify_on_convert';", __FILE__, __LINE__);
         if ($rs1 && p4c_num_rows($rs1) === 0) {
+            @p4c_query("SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION';", __FILE__, __LINE__);
             @p4c_query("ALTER TABLE `movies` ADD COLUMN `notify_on_convert` TINYINT(1) NOT NULL DEFAULT 1;", __FILE__, __LINE__);
         }
 
         $rs2 = @p4c_query("SHOW COLUMNS FROM `movies` LIKE 'notify_sent_at';", __FILE__, __LINE__);
         if ($rs2 && p4c_num_rows($rs2) === 0) {
+            @p4c_query("SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION';", __FILE__, __LINE__);
             @p4c_query("ALTER TABLE `movies` ADD COLUMN `notify_sent_at` DATETIME NULL DEFAULT NULL;", __FILE__, __LINE__);
         }
     }
@@ -103,13 +105,11 @@ class EroCloudMailer
     }
 
     /**
-     * Ermittelt die Basis-URL zum MCP-Webverzeichnis (unterstützt /mcp_neu/web sowie nach Cutover das Root-Verzeichnis).
+     * Ermittelt die Basis-URL zum MCP-Webverzeichnis (produktiv direkt MCP_URL / https://erocloud.net).
      */
     public static function getMcpWebUrl(): string
     {
-        $mcpBase = defined('MCP_URL') ? rtrim((string)MCP_URL, '/') : 'https://erocloud.net';
-        $subPath = (defined('MCP_DIR') && is_dir(MCP_DIR . '/mcp_neu/web')) ? '/mcp_neu/web' : '';
-        return $mcpBase . $subPath;
+        return defined('MCP_URL') ? rtrim((string)MCP_URL, '/') : 'https://erocloud.net';
     }
 
     /**

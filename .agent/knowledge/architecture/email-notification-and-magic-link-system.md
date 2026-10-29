@@ -61,12 +61,12 @@ Damit System-E-Mails und Newsletter bei großen Providern (Gmail, T-Online, GMX,
   * **Direkt-Login-Button:** *„Vorschaubilder auswählen & Film bearbeiten →“*
 
 ### 2.3 Sandbox- / Test-Schutz (`MAIL_SANDBOX_MODE`)
-In [`config.inc.php`](file:///c:/xampp/htdocs/EroCloud/config.inc.php#L52-L53) steuert die Konstante `MAIL_SANDBOX_MODE`, ob E-Mails an echte Creator rausgehen:
+In [`config.inc.php`](file:///c:/xampp/htdocs/EroCloud/config.inc.php#L52-L53) steuert die Konstante `MAIL_SANDBOX_MODE` (bzw. ein optionaler Override `mail_sandbox_mode` in der Tabelle `settings` über ACP `#/system-settings`), ob E-Mails produktiv an echte Creator rausgehen:
 ```php
-define('MAIL_SANDBOX_MODE',      true); // false = Live-Betrieb (echte Creator erhalten Mails)
+define('MAIL_SANDBOX_MODE',      false); // false = Produktiver Live-Betrieb aktiv (echte Creator erhalten Mails)
 define('MAIL_SANDBOX_RECIPIENT', 'erocms@gmail.com');
 ```
-* Solange `MAIL_SANDBOX_MODE === true` ist, fängt `EroCloudMailer::send()` **jede** ausgehende E-Mail ab, leitet sie ausschließlich an `erocms@gmail.com` um und blendet oben in der E-Mail einen gelben Info-Kasten ein (inkl. Anzeige des eigentlichen Empfängers sowie direkter Test-Links für `erocloud.local`).
+* Seit dem MCP-Go-Live steht `MAIL_SANDBOX_MODE` produktiv auf `false`. Falls im ACP unter `#/system-settings` vorübergehend der Sandbox-Modus aktiviert wird (`mail_sandbox_mode = '1'`), fängt `EroCloudMailer::send()` jede ausgehende E-Mail ab und leitet sie ausschließlich an `erocms@gmail.com` um.
 
 ---
 

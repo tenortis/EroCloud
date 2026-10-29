@@ -99,3 +99,12 @@
     - [x] Implement global Promise-based modal dialog system (`#ec-global-modal` with `App.dialog`, `App.confirm`, `App.prompt`, `App.alert` in variants `info`, `success`, `warning`, `danger`) in both ACP (`acp_neu`) and MCP (`mcp_neu`), replacing all native `confirm()`/`prompt()` dialogs (including optional `.errorlog.bak` backup checkbox on `#/errors`)
     - [x] Generate multi-resolution favicons (`favicon.ico`, `16x16`, `32x32`, `96x96`, `apple-touch-icon.png`) from `erocloud_logo.png` and integrate into ACP and MCP
     - [x] Switch `acp.erocloud.net` in LiveConfig to `/htdocs/acp/acp_neu/web` on **PHP `8.4.27`** (`php-8.4-opt`) with `.acp_htpasswd` & IP whitelist protection in `acp/acp_neu/web/.htaccess` and clean `/Startseite#/merchants` return redirect from MCP impersonation
+
+- [ ] **MCP Live Switch (`erocloud.net` -> `/htdocs/mcp/mcp_neu/web` on PHP `8.4.27`) & Guest Landingpage Modernization**
+    - [x] Implement self-contained PHP 8.4 media & streaming proxies (`mcp/mcp_neu/web/thumb.php` & `mcp/mcp_neu/web/media.php`) for `/thumb.php`, `/ProfilePicture/...`, `/AlbumPhoto/...`, `/Player/...`, `/PlayerPoster/...`, and `/amoredea/RedirectContent/...`
+    - [x] Modernize `api/movie_downloader.php`, `api/photo_album_downloader.php`, and `api/messenger_image_info.php` to UTF-8 with self-contained inline styling (no legacy `mcp/fw/jquery-ui` dependency)
+    - [x] Configure `mcp/mcp_neu/web/.htaccess` (Pay4Coins CORS, 301 `/mcp_neu/web/*` QR/Magic-Link compatibility, root logo/favicon aliases, media rewrites, and legacy MCP bookmark redirects to SPA routes) plus fallback `mcp/.htaccess`
+    - [x] Remove `/mcp_neu/web` subpaths from `CoActorManager`, `EroCloudMagicLink`, `EroCloudMailer`, `EroCloudNotificationCenter`, mail templates, `SystemTechController`, and `HomeController`
+    - [x] Enable productive Creator email delivery (`MAIL_SANDBOX_MODE = false` in `config.inc.php`) and run 5-stage Deep-Logic-Audit on `mcp_neu`
+    - [ ] Switch `erocloud.net` in LiveConfig to `/htdocs/mcp/mcp_neu/web` on **PHP `8.4.27`** (`php-8.4-opt`)
+    - [ ] Step 2: Redesign & modernize public Guest Landingpage on `erocloud.net` (`Home/views/guest.php` in Pay4Coins-Blue tile design & Du-Form)

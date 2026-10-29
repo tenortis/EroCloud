@@ -309,7 +309,7 @@ final class SystemTechController
                 'upload_datetime'  => date('d.m.Y \u\m H:i \U\h\r'),
                 'playtime'         => '18:45',
                 'resolution'       => '1920x1080 (Full-HD)',
-                'movie_edit_url'   => 'https://erocloud.net/mcp_neu/web/index.php#/movie?id=48291',
+                'movie_edit_url'   => 'https://erocloud.net/Startseite#/movie?id=48291',
                 'unsubscribe_url'  => \EroCloudMailer::getUnsubscribeUrl(10061, 'movie_converted'),
             ]);
         }
@@ -627,7 +627,7 @@ final class SystemTechController
                 'reason_text'      => $reasonText,
                 'extra_meta_label' => $extraLabel,
                 'extra_meta_value' => $extraVal,
-                'action_url'       => 'https://erocloud.net/mcp_neu/web/' . $targetRoute,
+                'action_url'       => 'https://erocloud.net/Startseite' . $targetRoute,
                 'unsubscribe_url'  => \EroCloudMailer::getUnsubscribeUrl($merchantId, 'content_reviewed'),
             ]);
 
@@ -675,7 +675,7 @@ final class SystemTechController
                 'status_type'      => $statusType,
                 'event_datetime'   => date('d.m.Y \u\m H:i \U\h\r'),
                 'reason_text'      => $reasonText,
-                'action_url'       => 'https://erocloud.net/mcp_neu/web/#/co-actors',
+                'action_url'       => 'https://erocloud.net/Startseite#/co-actors',
                 'unsubscribe_url'  => \EroCloudMailer::getUnsubscribeUrl($merchantId, 'co_actor_status'),
             ]);
 
@@ -714,7 +714,7 @@ final class SystemTechController
                 'upload_datetime'  => date('d.m.Y \u\m H:i \U\h\r'),
                 'playtime'         => $playtime,
                 'resolution'       => $resolution,
-                'movie_edit_url'   => 'https://erocloud.net/mcp_neu/web/index.php#/movie?id=' . $movieId,
+                'movie_edit_url'   => 'https://erocloud.net/Startseite#/movie?id=' . $movieId,
                 'unsubscribe_url'  => \EroCloudMailer::getUnsubscribeUrl($merchantId, 'movie_converted'),
             ]);
 

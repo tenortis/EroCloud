@@ -19,7 +19,7 @@ $aliasLabel    = htmlspecialchars(trim((string)($vars['alias_label'] ?? ('Eintra
 $statusType    = strtolower(trim((string)($vars['status_type'] ?? 'verified'))); // submitted | verified | rejected
 $eventDatetime = htmlspecialchars(trim((string)($vars['event_datetime'] ?? date('d.m.Y \u\m H:i \U\h\r'))), ENT_QUOTES, 'UTF-8');
 $reasonText    = nl2br(htmlspecialchars(trim((string)($vars['reason_text'] ?? '')), ENT_QUOTES, 'UTF-8'));
-$actionUrl     = htmlspecialchars(trim((string)($vars['action_url'] ?? 'https://erocloud.net/mcp_neu/web/#/co-actors')), ENT_QUOTES, 'UTF-8');
+$actionUrl     = htmlspecialchars(trim((string)($vars['action_url'] ?? 'https://erocloud.net/Startseite#/co-actors')), ENT_QUOTES, 'UTF-8');
 
 if ($statusType === 'submitted') {
     $emailSubject   = 'Smartphone-Verifizierung (' . $refCode . ') erfolgreich eingereicht';
@@ -147,6 +147,6 @@ $emailTextContent = "Hallo " . trim((string)($vars['creator_name'] ?? 'Creator')
     . "- Zeitpunkt: " . trim((string)($vars['event_datetime'] ?? date('d.m.Y \u\m H:i \U\h\r'))) . "\n"
     . (($statusType === 'rejected' && $rawReason !== '') ? "\nGrund für die Rückfrage:\n" . $rawReason . "\n" : "")
     . "\nDirektlink zur Drehpartner-Verwaltung (automatischer 1-Klick-Login):\n"
-    . trim((string)($vars['action_url'] ?? 'https://erocloud.net/mcp_neu/web/#/co-actors')) . "\n\n"
+    . trim((string)($vars['action_url'] ?? 'https://erocloud.net/Startseite#/co-actors')) . "\n\n"
     . "Viele Grüße\n"
     . "Dein EroCloud Team";

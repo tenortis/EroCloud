@@ -1,72 +1,72 @@
+# EroCloud MCP Fallback/Local Routing (/htdocs/mcp -> mcp_neu/web)
 ErrorDocument 403 https://erocloud.net
 ErrorDocument 404 https://erocloud.net
 
-SetEnvIf Origin "^http(s)?://(.+\.)?(login\.pay4coins.com|merchant\.p4coins.com|pay4coins.com|erocloud.net)$" origin_is=$0 
-Header always set Access-Control-Allow-Origin %{origin_is}e env=origin_is
+<IfModule mod_setenvif.c>
+    SetEnvIf Origin "^http(s)?://(.+\.)?(login\.pay4coins\.com|merchant\.p4coins\.com|merchant\.pay4coins\.com|pay4coins\.com|erocloud\.net)$" origin_is=$0
+</IfModule>
+<IfModule mod_headers.c>
+    Header always set Access-Control-Allow-Origin %{origin_is}e env=origin_is
+</IfModule>
 
-
-# verhindert das Auflistung des Verzeichnissesinhalts
 Options -Indexes
+DirectoryIndex mcp_neu/web/index.php index.php
 
-RewriteEngine on
+RewriteEngine On
 
-RewriteRule ^erocloud_logo.png$ images/erocloud_logo.png
-RewriteRule ^favicon/(.*)$ images/favicons/$1
+# Direkten Browser-Zugriff auf /mcp_neu/app/ strikt blockieren (403 Forbidden)
+RewriteRule ^(?i:mcp_neu)/app(?:/|$) - [F,L]
 
-# jQuery usw.
-RewriteRule ^fw/(.*)$ includes/frameworks/$1
-RewriteRule ^Ajax/(.*)$ includes/ajax/$1?%{QUERY_STRING}
-RewriteRule ^Overlays/(.*)$ includes/overlays/$1?%{QUERY_STRING}
+# Direkte Aufrufe von /mcp_neu/web/... oder /mcp_neu/... in der Adresszeile auf saubere Root-URL umleiten
+RewriteCond %{THE_REQUEST} \s/+mcp_neu/web/([^\s?]*) [NC]
+RewriteRule ^ /%1 [R=301,L]
+RewriteCond %{THE_REQUEST} \s/+mcp_neu/?(?:index\.php)?[\s?] [NC]
+RewriteRule ^ /Startseite [R=301,L]
 
-RewriteRule ^Startseite$ index.php?mod=home&%{QUERY_STRING}
-RewriteRule ^StudioLogin$ index.php?mod=studiologin&%{QUERY_STRING}
-RewriteRule ^Webmaster$ index.php?mod=webmaster&%{QUERY_STRING}
+# ============================================================================
+# 1. Neues MCP (v2.0) als Standard für erocloud.net & erocloud.local
+# ============================================================================
+RewriteRule ^$ mcp_neu/web/index.php [L,QSA]
+RewriteRule ^index\.php$ mcp_neu/web/index.php [L,QSA]
+RewriteRule ^Startseite$ mcp_neu/web/index.php [L,QSA]
+RewriteRule ^login\.php$ mcp_neu/web/login.php [L,QSA]
+RewriteRule ^api\.php$ mcp_neu/web/api.php [L,QSA]
+RewriteRule ^media\.php$ mcp_neu/web/media.php [L,QSA]
+RewriteRule ^thumb\.php$ mcp_neu/web/thumb.php [L,QSA]
+RewriteRule ^verify_co_actor\.php$ mcp_neu/web/verify_co_actor.php [L,QSA]
+RewriteRule ^co_actor_media\.php$ mcp_neu/web/co_actor_media.php [L,QSA]
+RewriteRule ^unsubscribe\.php$ mcp_neu/web/unsubscribe.php [L,QSA]
+RewriteRule ^favicon\.ico$ mcp_neu/web/assets/img/favicon.ico [L]
+RewriteRule ^assets/(.*)$ mcp_neu/web/assets/$1 [L]
+RewriteRule ^erocloud_logo\.png$ mcp_neu/web/assets/img/erocloud_logo.png [L]
+RewriteRule ^(?:favicon|images/favicons)/(.*)$ images/favicons/$1 [L]
 
-RewriteRule ^amoredea/RedirectContent/(.*)_(.*)$ redirect_open_content.php?content_id=$1&month=$2%{QUERY_STRING}
+# Medien- & Video-Streaming-Proxys über das neue media.php
+RewriteRule ^ProfilePicture/(.+)$ mcp_neu/web/media.php?type=profile_picture&id=$1 [L,QSA]
+RewriteRule ^AlbumPhoto/(.+)$ mcp_neu/web/media.php?type=album_photo&photo_id=$1 [L,QSA]
+RewriteRule ^Player/(.+)$ mcp_neu/web/media.php?type=player&id=$1 [L,QSA]
+RewriteRule ^PlayerPoster/(.+)$ mcp_neu/web/media.php?type=player_poster&id=$1 [L,QSA]
+RewriteRule ^amoredea/RedirectContent/([0-9]+)_([0-9]+)$ mcp_neu/web/media.php?type=amoredea_redirect&content_id=$1&month=$2 [L,QSA]
 
-RewriteRule ^Groups$ index.php?mod=groups&%{QUERY_STRING}
-RewriteRule ^New-Actor$ index.php?mod=new_actor&%{QUERY_STRING}
-RewriteRule ^Actors$ index.php?mod=actors&%{QUERY_STRING}
-RewriteRule ^Actor/(.*)$ index.php?mod=actor&id=$1&%{QUERY_STRING}
-RewriteRule ^New-CoActor$ index.php?mod=co_actor_create&%{QUERY_STRING}
-RewriteRule ^CoActors$ index.php?mod=co_actors&%{QUERY_STRING}
-RewriteRule ^CoActor/(.*)$ index.php?mod=co_actor&id=$1&%{QUERY_STRING}
-RewriteRule ^Hotline$ index.php?mod=hotline&%{QUERY_STRING}
-RewriteRule ^amoredea/Comments$ index.php?mod=amoredea_comments&%{QUERY_STRING}
-RewriteRule ^amoredea/Messages$ index.php?mod=amoredea_messages&%{QUERY_STRING}
-RewriteRule ^ProfilePicture/(.*)$ includes/profile_picture.php?id=$1&%{QUERY_STRING}
-RewriteRule ^Movie-Upload index.php?mod=movie_upload&%{QUERY_STRING}
-RewriteRule ^Movies index.php?mod=movies&%{QUERY_STRING}
-RewriteRule ^video/(.*)$ index.php?mod=movie&id=$1&%{QUERY_STRING}
-RewriteRule ^Photo-Album-Upload index.php?mod=photo_album_upload&%{QUERY_STRING}
-RewriteRule ^Photo-Albums index.php?mod=photo_albums&%{QUERY_STRING}
-RewriteRule ^Photo-Album/(.*)$ index.php?mod=photo_album&id=$1&%{QUERY_STRING}
-RewriteRule ^AlbumPhoto/(.*)$ includes/show_album_photo.php?photo_id=$1&%{QUERY_STRING}
+# Alte MCP-Lesezeichen & Direktlinks auf neue SPA-Routen umleiten
+RewriteRule ^Movie-Upload/?$ /Startseite#/movie-upload [R=302,L,NE]
+RewriteRule ^Movies/?$ /Startseite#/movies [R=302,L,NE]
+RewriteRule ^video/([0-9]+)/?$ /Startseite#/movie?id=$1 [R=302,L,NE]
+RewriteRule ^Photo-Album-Upload/?$ /Startseite#/photo-album-upload [R=302,L,NE]
+RewriteRule ^Photo-Albums/?$ /Startseite#/photo-albums [R=302,L,NE]
+RewriteRule ^Photo-Album/([0-9]+)/?$ /Startseite#/photo-album?id=$1 [R=302,L,NE]
+RewriteRule ^Actors/?$ /Startseite#/actors [R=302,L,NE]
+RewriteRule ^New-Actor/?$ /Startseite#/new-actor [R=302,L,NE]
+RewriteRule ^Actor/([0-9]+)/?$ /Startseite#/actor?id=$1 [R=302,L,NE]
+RewriteRule ^(?:CoActors|New-CoActor|CoActor/[0-9]+)/?$ /Startseite#/co-actors [R=302,L,NE]
+RewriteRule ^Webmaster/Ads/([^/]+)/?$ /Startseite#/webmaster-ads-domain?domain=$1 [R=302,L,NE]
+RewriteRule ^Webmaster/New-Campaign/?$ /Startseite#/webmaster-new-campaign [R=302,L,NE]
+RewriteRule ^Webmaster/Edit-Campaign/?$ /Startseite#/webmaster-edit-campaign [R=302,L,NE]
+RewriteRule ^Webmaster/NewAds/?$ /Startseite#/webmaster-newads [R=302,L,NE]
+RewriteRule ^Webmaster/Statistics/?$ /Startseite#/webmaster-stats [R=302,L,NE]
+RewriteRule ^Webmaster/Advertise-Partner/?$ /Startseite#/webmaster-advertise-partner [R=302,L,NE]
+RewriteRule ^Webmaster(?:/Ads)?/?$ /Startseite#/webmaster-ads [R=302,L,NE]
+RewriteRule ^faq/?$ /Startseite#/faq [R=302,L,NE]
 
-RewriteRule ^Statistics/TotalSales$ index.php?mod=statistics_total_sales&%{QUERY_STRING}
-RewriteRule ^Statistics/TotalActorsSales$ index.php?mod=statistics_actors_sales&%{QUERY_STRING}
-RewriteRule ^Statistics/TotalActorSales/(.*)/Day/(.*)$ index.php?mod=statistics_actor_sales_day&actor_id=$1&day=$2%{QUERY_STRING}
-RewriteRule ^Statistics/TotalActorSales/(.*)$ index.php?mod=statistics_actor_sales&actor_id=$1&%{QUERY_STRING}
-RewriteRule ^Statistics$ index.php?mod=statistics_total_sales&%{QUERY_STRING}
-
-RewriteRule ^Webmaster/Edit-Campaign$ index.php?mod=webmaster_edit_campaign&%{QUERY_STRING}
-RewriteRule ^Webmaster/New-Campaign$ index.php?mod=webmaster_new_campaign&%{QUERY_STRING}
-RewriteRule ^Webmaster/Ads/(.*)$ index.php?mod=webmaster_ads_domain&domain=$1&%{QUERY_STRING}
-RewriteRule ^Webmaster/NewAds$ index.php?mod=webmaster_newads&%{QUERY_STRING}
-RewriteRule ^Webmaster/Ads$ index.php?mod=webmaster_ads&%{QUERY_STRING}
-RewriteRule ^Webmaster/Statistics$ index.php?mod=webmaster_stats&%{QUERY_STRING}
-RewriteRule ^Webmaster/Advertise-Partner$ index.php?mod=webmaster_advertise_partner&%{QUERY_STRING}
-
-RewriteRule ^faq$ index.php?mod=faq&%{QUERY_STRING}
-
-RewriteRule ^Player/(.*)$ includes/movie_player.php?id=$1&%{QUERY_STRING}
-RewriteRule ^PlayerPoster/(.*)$ includes/movie_poster.php?id=$1&%{QUERY_STRING}
-
-RewriteRule ^Messenger/Cam/(.*)$ messenger/livecam/$1?%{QUERY_STRING}
-RewriteRule ^Messenger/usercams/(.*)$ messenger/usercams/$1?%{QUERY_STRING}
-RewriteRule ^Messenger/css/(.*)$ messenger/css/$1?%{QUERY_STRING}
-RewriteRule ^Messenger/js/(.*)$ messenger/js/$1?%{QUERY_STRING}
-RewriteRule ^Messenger/Ajax/(.*)$ messenger/includes/ajax/$1?%{QUERY_STRING}
-RewriteRule ^Messenger/Sound/(.*)$ messenger/sounds/$1?%{QUERY_STRING}
-RewriteRule ^Messenger/emojiarea/(.*)$ messenger/includes/emojiarea/$1?%{QUERY_STRING}
-RewriteRule ^Messenger$ messenger/index.php?%{QUERY_STRING}
+# Messenger-Abschalthinweis bleibt erreichbar
+RewriteRule ^Messenger$ messenger/index.php?%{QUERY_STRING} [L]
