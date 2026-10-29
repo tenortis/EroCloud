@@ -17,9 +17,30 @@ global $mysql;
 
 // 1. Logout verarbeiten (analog mcp/index.php, mit Sonderschutz bei Admin-Session-Übernahme)
 if (isset($_GET['logout'])) {
+    // Falls die /tmp-Session bereits durch den GC gelöscht wurde, Infos aus dem signierten Auth-Cookie rekonstruieren
+    if (empty($_SESSION['merchant_id']) && !empty($_COOKIE['erocloud_mcp_auth']) && defined('AES_KEY')) {
+        $rawAuth = @base64_decode((string)$_COOKIE['erocloud_mcp_auth'], true);
+        $authArr = is_string($rawAuth) ? @json_decode($rawAuth, true) : null;
+        if (is_array($authArr) && isset($authArr['mid'], $authArr['exp'], $authArr['usr'], $authArr['sig'])) {
+            $cMid     = abs((int)$authArr['mid']);
+            $cExp     = abs((int)$authArr['exp']);
+            $cUsr     = (string)$authArr['usr'];
+            $cAdmId   = abs((int)($authArr['adm_id'] ?? 0));
+            $cAdmUsr  = (string)($authArr['adm_usr'] ?? '');
+            $cDataStr = $cMid . '|' . $cExp . '|' . $cUsr . ($cAdmId > 0 ? '|' . $cAdmId . '|' . $cAdmUsr : '');
+            if ($cMid > 0 && hash_equals(hash_hmac('sha256', $cDataStr, (string)AES_KEY), (string)$authArr['sig'])) {
+                $_SESSION['merchant_id']  = $cMid;
+                $_SESSION['logged_in_as'] = 'merchant';
+                if ($cAdmId > 0) {
+                    $_SESSION['mcp_impersonated_by_admin'] = ['id' => $cAdmId, 'username' => $cAdmUsr ?: 'Admin'];
+                }
+            }
+        }
+    }
+
     $isAdminImp = !empty($_SESSION['mcp_impersonated_by_admin']) && is_array($_SESSION['mcp_impersonated_by_admin']);
 
-    if (!$isAdminImp && isset($_SESSION['merchant_id'])) {
+    if (!$isAdminImp && !empty($_SESSION['merchant_id'])) {
         if ($_GET['logout'] === 'auto') {
             log_action('Vom System abgemeldet. (auto)');
         } else {
@@ -37,7 +58,8 @@ if (isset($_GET['logout'])) {
             $_SESSION['merchant_id'],
             $_SESSION['merchant_username'],
             $_SESSION['logged_in_as'],
-            $_SESSION['mcp_impersonated_by_admin']
+            $_SESSION['mcp_impersonated_by_admin'],
+            $_SESSION['erocloud_stream_cache']
         );
         if (!empty($_SESSION['employee_id'])) {
             $_SESSION['logged_id'] = 'acp';
@@ -50,9 +72,20 @@ if (isset($_GET['logout'])) {
         exit;
     }
 
-    $logoutUrl = (isset($_SESSION['logged_in_as']) && $_SESSION['logged_in_as'] === 'merchant')
-        ? LOGIN_URL . '/?logout&ref=erocloud'
-        : MCP_URL;
+    $isLegacyGroupLogin = (isset($_SESSION['logged_in_as']) && $_SESSION['logged_in_as'] === 'group');
+    $logoutUrl          = $isLegacyGroupLogin ? MCP_URL : (LOGIN_URL . '/?logout&ref=erocloud');
+
+    if (ini_get('session.use_cookies') && !headers_sent()) {
+        $sessParams = session_get_cookie_params();
+        @setcookie(session_name(), '', [
+            'expires'  => time() - 86400,
+            'path'     => $sessParams['path'] ?: '/',
+            'domain'   => $sessParams['domain'] ?: '',
+            'secure'   => (bool)$sessParams['secure'],
+            'httponly' => (bool)$sessParams['httponly'],
+            'samesite' => $sessParams['samesite'] ?: 'Lax',
+        ]);
+    }
 
     $_SESSION = [];
     @session_destroy();

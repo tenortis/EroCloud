@@ -11,6 +11,7 @@ Options -Indexes
 
 <IfModule mod_headers.c>
     Header always set Access-Control-Allow-Origin %{origin_is}e env=origin_is
+    Header always set Access-Control-Allow-Credentials "true" env=origin_is
     Header set X-Content-Type-Options "nosniff"
     Header set X-Frame-Options "SAMEORIGIN"
     Header set X-XSS-Protection "1; mode=block"

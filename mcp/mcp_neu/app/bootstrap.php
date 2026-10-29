@@ -150,6 +150,8 @@ if (!function_exists('mcp_neu_sync_auth_cookie')) {
 if (!function_exists('mcp_neu_clear_auth_cookie')) {
     function mcp_neu_clear_auth_cookie(): void
     {
+        unset($_COOKIE['erocloud_mcp_auth'], $_COOKIE['erocloud']);
+
         if (headers_sent()) {
             return;
         }
@@ -157,26 +159,34 @@ if (!function_exists('mcp_neu_clear_auth_cookie')) {
             || ((int)($_SERVER['SERVER_PORT'] ?? 80) === 443);
         $host      = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
         $mcpDomain = defined('MCP_DOMAIN') ? strtolower(ltrim((string)MCP_DOMAIN, '.')) : '';
-        $cookieDom = ($mcpDomain !== '' && ($host === $mcpDomain || str_ends_with($host, '.' . $mcpDomain)))
-            ? ('.' . $mcpDomain)
-            : '';
-        @setcookie('erocloud_mcp_auth', '', [
-            'expires'  => time() - 3600,
-            'path'     => '/',
-            'domain'   => $cookieDom,
-            'secure'   => $isHttps,
-            'httponly' => true,
-            'samesite' => 'Lax',
-        ]);
+        $domains   = [''];
+        if ($mcpDomain !== '' && ($host === $mcpDomain || str_ends_with($host, '.' . $mcpDomain))) {
+            $domains[] = '.' . $mcpDomain;
+        }
+
+        foreach (['erocloud_mcp_auth', 'erocloud'] as $cookieName) {
+            foreach ($domains as $dom) {
+                @setcookie($cookieName, '', [
+                    'expires'  => time() - 86400,
+                    'path'     => '/',
+                    'domain'   => $dom,
+                    'secure'   => $isHttps,
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                ]);
+            }
+        }
     }
 }
 
 if (!function_exists('mcp_neu_ensure_session')) {
     function mcp_neu_ensure_session(): bool
     {
-        global $mysql;
-
-        if (isset($_GET['logout'])) {
+        if (
+            defined('MCP_SKIP_AUTO_SESSION_RECOVERY')
+            || isset($_GET['logout'])
+            || (isset($_GET['ml']) && trim((string)$_GET['ml']) !== '')
+        ) {
             return false;
         }
 
@@ -188,7 +198,7 @@ if (!function_exists('mcp_neu_ensure_session')) {
             return true;
         }
 
-        // 2. Stufe A: Wiederherstellung aus HMAC-signiertem 3-Stunden-Cookie (falls GC die /tmp-Datei gelöscht hat)
+        // 2. Wiederherstellung aus HMAC-signiertem 3-Stunden-Cookie (falls GC die /tmp-Datei vor Ablauf der 180 Min. gelöscht hat)
         if (!empty($_COOKIE['erocloud_mcp_auth']) && defined('AES_KEY')) {
             $rawJson = @base64_decode((string)$_COOKIE['erocloud_mcp_auth'], true);
             $payload = is_string($rawJson) ? @json_decode($rawJson, true) : null;
@@ -216,49 +226,9 @@ if (!function_exists('mcp_neu_ensure_session')) {
                                 'username'   => $admUsr !== '' ? $admUsr : 'Admin',
                                 'started_at' => time(),
                             ];
+                        } else {
+                            unset($_SESSION['mcp_impersonated_by_admin']);
                         }
-                        mcp_neu_sync_auth_cookie($mid, $usr);
-                        return true;
-                    }
-                }
-            }
-        }
-
-        // 3. Stufe B: Stille Pay4Coins-SSO-Prüfung über das bestehende `erocloud`-Cookie (verhindert Redirect ins alte MCP bei F5)
-        if (!empty($_COOKIE['erocloud']) && defined('Pay4Coins_API_URL') && function_exists('loginHash')) {
-            $rawCookie = @base64_decode((string)$_COOKIE['erocloud'], true);
-            $cookieArr = is_string($rawCookie) ? @json_decode($rawCookie, true) : null;
-            $pid       = is_array($cookieArr) && isset($cookieArr['pid'])
-                ? trim((string)preg_replace('/[^a-z0-9]/i', '', (string)$cookieArr['pid']))
-                : '';
-
-            if (strlen($pid) === 10) {
-                $loginHash = loginHash($pid);
-                $ch        = curl_init();
-                curl_setopt($ch, CURLOPT_URL, Pay4Coins_API_URL . '/remote/merchant_login.php');
-                curl_setopt($ch, CURLOPT_POSTFIELDS, 'h=' . $loginHash . '&pid=' . $pid);
-                curl_setopt($ch, CURLOPT_POST, true);
-                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 4);
-                curl_setopt($ch, CURLOPT_USERAGENT, (defined('PROJECTNAME') ? PROJECTNAME : 'EroCloud') . ' - ' . (defined('COMPANYNAME') ? COMPANYNAME : '') . ' - ' . (defined('URL') ? URL : ''));
-                $resp = curl_exec($ch);
-                curl_close($ch);
-
-                if ($resp === 'ok') {
-                    $rsMerchant = p4c_query("SELECT `id` FROM `merchants` WHERE `partner_id` = '" . p4c_escape_string($pid) . "' LIMIT 1;", __FILE__, __LINE__);
-                    if ($rsMerchant && p4c_num_rows($rsMerchant) > 0) {
-                        $mRow     = p4c_fetch_object($rsMerchant);
-                        $mid      = abs((int)$mRow->id);
-                        $merchant = new Merchant($mysql, $mid);
-                        $usr      = (string)$merchant->username('aes_decrypt');
-
-                        $_SESSION['logged_in_as']      = 'merchant';
-                        $_SESSION['logged_id']         = 'mcp';
-                        $_SESSION['merchant_id']       = $mid;
-                        $_SESSION['merchant_username'] = $usr;
-                        $_SESSION['last_activity']     = time();
-
                         mcp_neu_sync_auth_cookie($mid, $usr);
                         return true;
                     }

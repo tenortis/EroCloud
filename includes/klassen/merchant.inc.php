@@ -18,10 +18,15 @@ class Merchant {
         $this->merchant_id = '';
         $this->partner_id = '';
         
-        if (isset($_SESSION['merchant_id'])) {
-            $this->merchant_id = $_SESSION['merchant_id'];
-        } else {
-            $this->partner_id = $merchant_id;
+        $rawId = trim((string)$merchant_id);
+        if ($rawId !== '') {
+            if (strlen($rawId) === 10) {
+                $this->partner_id = $rawId;
+            } else {
+                $this->merchant_id = abs((int)$rawId);
+            }
+        } elseif (isset($_SESSION['merchant_id']) && trim((string)$_SESSION['merchant_id']) !== '') {
+            $this->merchant_id = abs((int)$_SESSION['merchant_id']);
         }
     }
     
@@ -34,13 +39,13 @@ class Merchant {
             $select = "`".p4c_escape_string($var)."`";
         }
         
-        if ($this->partner_id != '' AND strlen($this->partner_id) == 10) {
-            #$rs_member = $this->mysql->query("SELECT ".$select." FROM `merchants` WHERE `id`='".abs($this->partner_id)."' OR `partner_id`='".p4c_escape_string($this->partner_id)."' LIMIT 1;", __FILE__, __LINE__);
-            $rs_member = $this->mysql->query("SELECT ".$select." FROM `merchants` WHERE `partner_id`='".p4c_escape_string($this->partner_id)."' LIMIT 1;", __FILE__, __LINE__);
-        } else if ($this->partner_id != '' AND strlen($this->partner_id) < 10) {
-            $rs_member = $this->mysql->query("SELECT ".$select." FROM `merchants` WHERE `id`='".p4c_escape_string($this->partner_id)."' LIMIT 1;", __FILE__, __LINE__);
+        $pidStr = (string)$this->partner_id;
+        if ($pidStr !== '' && strlen($pidStr) === 10) {
+            $rs_member = $this->mysql->query("SELECT ".$select." FROM `merchants` WHERE `partner_id`='".p4c_escape_string($pidStr)."' LIMIT 1;", __FILE__, __LINE__);
+        } else if ($pidStr !== '' && strlen($pidStr) < 10) {
+            $rs_member = $this->mysql->query("SELECT ".$select." FROM `merchants` WHERE `id`='".abs((int)$pidStr)."' LIMIT 1;", __FILE__, __LINE__);
         } else {
-                $rs_member = $this->mysql->query("SELECT ".$select." FROM `merchants` WHERE `id`='".abs((int)$this->merchant_id)."' LIMIT 1;", __FILE__, __LINE__);
+            $rs_member = $this->mysql->query("SELECT ".$select." FROM `merchants` WHERE `id`='".abs((int)$this->merchant_id)."' LIMIT 1;", __FILE__, __LINE__);
         }
 
         if ($this->mysql->num_rows($rs_member) > 0) {

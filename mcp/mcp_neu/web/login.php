@@ -8,6 +8,7 @@ declare(strict_types=1);
  */
 
 define('SAFE_INC', 1);
+define('MCP_SKIP_AUTO_SESSION_RECOVERY', true);
 
 require_once __DIR__ . '/../app/bootstrap.php';
 
@@ -101,23 +102,52 @@ if ($data === 'ok') {
             }
 
             if ($merchantId > 0) {
-                $merchant = new Merchant($mysql, $merchantId);
+                // Vorherige Partner-Session sauber entfernen & Session-ID rotieren (verhindert Account-Vermischung beim Partnerwechsel)
+                unset(
+                    $_SESSION['merchant_id'],
+                    $_SESSION['merchant_username'],
+                    $_SESSION['logged_in_as'],
+                    $_SESSION['logged_id'],
+                    $_SESSION['mcp_impersonated_by_admin'],
+                    $_SESSION['erocloud_stream_cache']
+                );
+                if (session_status() === PHP_SESSION_ACTIVE && !headers_sent()) {
+                    @session_regenerate_id(true);
+                }
 
+                $merchant         = new Merchant($mysql, $merchantId);
+                $resolvedMid      = abs((int)$merchant->id()) ?: $merchantId;
+                $resolvedUsername = (string)$merchant->username('aes_decrypt');
+                $resolvedPid      = (string)$merchant->partner_id() ?: (string)$merchantXmlObj->partner_id;
+
+                $_SESSION['initiated']         = true;
                 $_SESSION['logged_in_as']      = 'merchant';
                 $_SESSION['logged_id']         = 'mcp';
-                $_SESSION['merchant_id']       = $merchant->id();
-                $_SESSION['merchant_username'] = $merchant->username('aes_decrypt');
+                $_SESSION['merchant_id']       = $resolvedMid;
+                $_SESSION['merchant_username'] = $resolvedUsername;
                 $_SESSION['last_activity']     = time();
 
                 if (function_exists('mcp_neu_sync_auth_cookie')) {
-                    mcp_neu_sync_auth_cookie(abs((int)$merchant->id()), (string)$merchant->username('aes_decrypt'));
+                    mcp_neu_sync_auth_cookie($resolvedMid, $resolvedUsername);
                 }
 
+                $isHttps   = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ((int)($_SERVER['SERVER_PORT'] ?? 80) === 443);
+                $host      = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
+                $mcpDomain = defined('MCP_DOMAIN') ? strtolower(ltrim((string)MCP_DOMAIN, '.')) : '';
+                $cookieDom = ($mcpDomain !== '' && ($host === $mcpDomain || str_ends_with($host, '.' . $mcpDomain))) ? ('.' . $mcpDomain) : '';
+
                 $cookiePayload = [
-                    'pid' => $merchant->partner_id(),
+                    'pid' => $resolvedPid,
                     'sid' => session_id(),
                 ];
-                setcookie('erocloud', base64_encode((string)json_encode($cookiePayload)), (int)strtotime('+3 month'), '/', '.' . MCP_DOMAIN);
+                @setcookie('erocloud', base64_encode((string)json_encode($cookiePayload)), [
+                    'expires'  => (int)strtotime('+3 month'),
+                    'path'     => '/',
+                    'domain'   => $cookieDom,
+                    'secure'   => $isHttps,
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                ]);
 
                 log_action('Am System angemeldet.');
 
@@ -131,5 +161,17 @@ if ($data === 'ok') {
     }
 }
 
+// Fehlgeschlagener SSO-Handshake: Etwaige Alt-Sessions & Auth-Cookies bereinigen, bevor zu Pay4Coins abgemeldet wird
+if (function_exists('mcp_neu_clear_auth_cookie')) {
+    mcp_neu_clear_auth_cookie();
+}
+unset(
+    $_SESSION['merchant_id'],
+    $_SESSION['merchant_username'],
+    $_SESSION['logged_in_as'],
+    $_SESSION['logged_id'],
+    $_SESSION['mcp_impersonated_by_admin'],
+    $_SESSION['erocloud_stream_cache']
+);
 header('Location: ' . LOGIN_URL . '?logout&ref=erocloud');
 exit;
