@@ -156,8 +156,9 @@ Alle hochgeladenen Ausweisfotos, KI-Gesichtsreferenzen, Unterschriften und Altbe
 * **Für einen Drehpartner:** Der Partner klickt entweder unter `#/co-actors` oder direkt im Film-Formular auf **„+ Neuen Drehpartner anlegen“**, gibt den Anzeigenamen (und optional den Creator-Namen) ein und wählt als Methode **„Per QR-Code am Smartphone (Empfohlen)“**.
 
 ### Schritt 2: Lokaler QR-Code & 4-Sekunden-Live-Polling
-* Das Quick-Modal (`_quick_modal.php`) rendert sofort über `QrCodeSvg::toDataUri($qrUrl, 5, 3)` den scannbaren QR-Code zur URL:
-  `https://erocloud.net/mcp_neu/web/verify_co_actor.php?t=<48-zeichen-hex-token>`
+* Das Quick-Modal (`_quick_modal.php`) rendert sofort über `QrCodeSvg::toDataUri($qrUrl, 5, 3)` den scannbaren QR-Code zur Root-URL:
+  `https://erocloud.net/verify_co_actor.php?t=<48-zeichen-hex-token>`
+  *(Abwärtskompatibilität: Bereits vor dem Live-Cutover gedruckte QR-Codes mit dem Pfad `/mcp_neu/web/verify_co_actor.php?t=...` werden über `RewriteRule ^mcp_neu/web/(.*)$ /$1 [R=301,L,QSA]` in [`mcp/mcp_neu/web/.htaccess`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/web/.htaccess) automatisch weitergeleitet.)*
 * Solange das QR-Modal auf dem PC/Tablet des Partners geöffnet ist, fragt ein JavaScript-Intervall (`startPollingCoActorStatus`) alle **4 Sekunden** die Route `api.php?route=co-actors/get&id=<id>` ab.
 * Sobald der Darsteller den Vorgang auf seinem Smartphone abschließt, springt das Modal beim Partner **ohne Seiten-Reload** auf Grün (*„Verifizierung erfolgreich eingegangen!“*), aktualisiert die Darsteller-Kachel im Hintergrund und hakt den Drehpartner im geöffneten Film-Formular automatisch an.
 

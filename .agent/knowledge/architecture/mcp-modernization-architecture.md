@@ -35,30 +35,21 @@ usage: 'Wird automatisch herangezogen bei allen Arbeiten am Neubau des MCP unter
 
 ---
 
-## 2. 📂 Ordnerstruktur & URL-Strategie (Entwicklung $\rightarrow$ Go-Live)
+## 2. 📂 Ordnerstruktur & Produktives Domain-Routing (`erocloud.net`)
 
-### 2.1 Phase A: Parallelbetrieb während der Neuentwicklung (`/htdocs/mcp/mcp_neu/`)
-Während der Entwicklungsphase liegt das neue System unter `/htdocs/mcp/mcp_neu/`:
-* **Entwicklungs-URL:** `https://erocloud.net/mcp_neu/web/` (bzw. `https://erocloud.net/mcp_neu/web/Startseite`)
-* **Session-Sharing:** Da das neue System unter derselben Domain (`erocloud.net`) läuft wie das aktuelle Live-MCP, wird die bestehende PHP-Session (`PHPSESSID` aus `/var/www/web1/tmp`) nahtlos geteilt. Ein im Live-System über Pay4Coins eingeloggter Partner ist unter `/mcp_neu/web/Startseite` sofort angemeldet.
+### 2.1 Aktiver Produktivbetrieb auf `https://erocloud.net` (PHP `8.4.27`)
+Seit dem Go-Live zeigt die Hauptdomain **`https://erocloud.net`** (inkl. `www.erocloud.net`) in LiveConfig direkt auf das öffentliche Webroot **`/var/www/web1/htdocs/mcp/mcp_neu/web/`** unter **PHP `8.4.27`** (`php-8.4-opt`):
+1. **Physische Kapselung von `app/`:** Der Anwendungskern `/var/www/web1/htdocs/mcp/mcp_neu/app/` liegt physisch **oberhalb** des DocumentRoots und ist zusätzlich per `.htaccess` (`Require all denied`) geschützt.
+2. **Archivierung & lokales Fallback:** Der frühere 2016er Altbestand in `/htdocs/mcp/` bleibt als Referenz im Dateisystem erhalten; [`mcp/.htaccess`](file:///c:/xampp/htdocs/EroCloud/mcp/.htaccess) leitet lokale XAMPP-Aufrufe (`/EroCloud/mcp/`) transparent nach `mcp_neu/web/` weiter.
+3. **Dynamische Pfadauflösung in `app/bootstrap.php`:** [`bootstrap.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/app/bootstrap.php) sucht `config.inc.php` dynamisch in den übergeordneten Verzeichnisebenen und unterstützt sowohl `/htdocs/mcp/mcp_neu/app/` als auch ein eventuelles späteres `/htdocs/mcp/app/` ohne Codeänderung.
 
-### 2.2 Phase B: Späterer Go-Live (`/htdocs/mcp/`)
-Nach Fertigstellung aller Module:
-1. Das alte `/htdocs/mcp/` wird entfernt bzw. archiviert.
-2. Die Ordner `app/` und `web/` liegen dann direkt unter `/htdocs/mcp/app/` und `/htdocs/mcp/web/`.
-3. **Domain-Routing für `https://erocloud.net/Startseite`:**
-   * **Option 1 (LiveConfig DocumentRoot):** Das Zielverzeichnis der Domain `erocloud.net` wird in LiveConfig auf `/mcp/web/` gestellt (analog zum KKC). Dadurch liegt `/mcp/app/` physisch außerhalb des Webroots.
-   * **Option 2 (`.htaccess` Weiterleitung in `/mcp/.htaccess`):** Falls das DocumentRoot in LiveConfig auf `/mcp/` bleibt, leitet eine zentrale `.htaccess` in `/mcp/` alle Aufrufe transparent auf `web/` weiter, während `/mcp/app/.htaccess` (`Require all denied`) den App-Kern schützt.
-4. **Dynamische Pfadauflösung in `app/bootstrap.php`:**
-   `bootstrap.php` sucht die zentrale `config.inc.php` dynamisch in den übergeordneten Ebenen, sodass beim späteren Verschieben von `/mcp/mcp_neu/` nach `/mcp/` **keine einzige Codezeile** angepasst werden muss.
-
-### 2.3 Verzeichnisbaum im Detail
+### 2.2 Verzeichnisbaum im Detail
 
 ```text
-mcp_neu/ (später: mcp/)
+mcp_neu/
 ├── app/
 │   ├── .htaccess                  # Require all denied (Kein direkter Web-Zugriff)
-│   ├── bootstrap.php              # Lädt config.inc.php, functions.inc.php, Session, Autoloader
+│   ├── bootstrap.php              # Output-Buffer, config.inc.php, SQL-Mode, Session & 3h-Cookie-Recovery
 │   └── src/
 │       ├── Core/
 │       │   ├── Autoloader.php     # PSR-4 Autoloader für Namespace App\
@@ -67,7 +58,7 @@ mcp_neu/ (später: mcp/)
 │       │   ├── Csrf.php           # CSRF-Token-Schutz für POST-Requests
 │       │   ├── Request.php        # Gekapselter Zugriff auf GET/POST/Route
 │       │   ├── Response.php       # HTML-Fragment & JSON-Antworten
-│       │   ├── Router.php         # Zentrales Routing für api.php
+│       │   ├── Router.php         # Zentrales Routing für api.php (58 Routen)
 │       │   └── View.php           # Template-Renderer & XSS-Escaping View::e()
 │       ├── Models/
 │       │   ├── MerchantModel.php  # Kapselt Partner-Stammdaten, API-Key & Content-Regeln
@@ -75,52 +66,53 @@ mcp_neu/ (später: mcp/)
 │       │   ├── MovieModel.php     # Filme, Upload-Status & Prüfzustand
 │       │   └── PhotoAlbumModel.php# Fotoalben & Bilder
 │       └── Modules/
-│           ├── Home/
-│           │   ├── HomeController.php
-│           │   └── views/
-│           │       ├── dashboard.php   # Eingeloggtes Partner-Dashboard (Kachel-Layout)
-│           │       └── guest.php       # Öffentliche Landingpage (Pay4Coins-Login)
-│           ├── Actors/
-│           ├── CoActors/               # Drehpartner & ID-Check (Model Release & QR-Verifizierung)
-│           ├── Movies/
-│           ├── PhotoAlbums/
-│           ├── Webmaster/
-│           └── Support/
-└── web/
-    ├── .htaccess                  # RewriteEngine (/Startseite -> index.php), Security-Header
-    ├── index.php                  # App-Shell (Sidebar, Topbar, #app-content) bzw. Guest-View
+│           ├── Home/              # Dashboard, Schnellsuche, Richtlinien, Notifications & Feedback
+│           ├── Actors/            # Darsteller-Profile & FSK16/FSK18 Bildupload
+│           ├── CoActors/          # Drehpartner & ID-Check (Model Release & QR-Verifizierung)
+│           ├── Movies/            # Film-Upload (3 Schritte) & Filmverwaltung
+│           ├── PhotoAlbums/       # Fotoalben-Upload & Verwaltung
+│           ├── Webmaster/         # EroAds Partnerprogramm, Banner & Kampagnen
+│           └── Preview/           # FAQ & Info-Ansichten
+└── web/                           # LiveConfig DocumentRoot für https://erocloud.net (PHP 8.4.27)
+    ├── .htaccess                  # CORS, 301 /mcp_neu/web/* Redirect, Medien- & Legacy-SPA-Rewrites
+    ├── index.php                  # App-Shell (Sidebar, Topbar, #app-content), Logout & Magic-Link-Entry
     ├── api.php                    # Zentraler AJAX-Dispatcher für SPA-Navigation
-    ├── login.php                  # Pay4Coins Auto-Login (?pid=XXXXXXXXXX)
+    ├── login.php                  # Pay4Coins SSO Auto-Login (?pid=XXXXXXXXXX) mit sauberem Account-Switch
+    ├── media.php                  # Geschützter Medien- & Video-Streaming-Proxy (/Player, /ProfilePicture, /AlbumPhoto, /PlayerPoster)
+    ├── thumb.php                  # GD-Szenen-Thumbnail-Endpunkt (?movie_id=...&thumb_number=1..12&w=...)
+    ├── unsubscribe.php            # Öffentlicher 1-Klick-E-Mail-Abmelde- & Präferenz-Endpunkt
     ├── verify_co_actor.php        # Smartphone Self-Service für Drehpartner-ID-Check & Touch-Unterschrift (?t=<token>)
     ├── co_actor_media.php         # Geschützter Medien- & PDF-Zertifikats-Proxy für Ausweisfotos & Model-Releases
+    ├── favicon.ico                # Root-Favicon
     └── assets/
-        ├── css/
-        │   ├── bootstrap.min.css
-        │   ├── bootstrap-icons.css
-        │   ├── fonts.css
-        │   └── theme.css          # KKC-Designsystem adaptiert auf Pay4Coins-Blau (#4297D7)
-        ├── js/
-        │   ├── bootstrap.bundle.min.js
-        │   └── app.js             # Vanilla-JS SPA-Router, Theme-Toggle, Modals, Toasts
+        ├── css/                   # bootstrap.min.css, bootstrap-icons.css, fonts.css, theme.css (#4297D7)
+        ├── js/                    # bootstrap.bundle.min.js, app.js (SPA-Router, Modals, Global-Dialog)
         ├── fonts/
-        └── img/
+        └── img/                   # Logos, Favicons, movie_poster_nopic.jpg, movie_quality_buttons/ (sd..6k)
 ```
 
 ---
 
-## 3. 🔐 Login-Flow (Pay4Coins Single-Sign-On)
+## 3. 🔐 Login-Flow, Session-Recovery & Logout (Pay4Coins Single-Sign-On)
 
-1. **Ausgeloggter Zustand (`/Startseite` $\rightarrow$ `Home/views/guest.php`):**
-   * Zeigt das moderne EroCloud-Infoportal im hellen Kachel-Design (in persönlicher **Du-Form**, ohne Studio-Login).
-   * Der Login-Button führt zu `https://login.pay4coins.com?ref=erocloud`.
-2. **Automatischer Login über Pay4Coins (`web/login.php?pid=XXXXXXXXXX`):**
-   * Prüft die 10-stellige `pid` und berechnet `loginHash($pid)` (Browser-Fingerprint + `pid`).
-   * Verifiziert den Login via cURL bei `https://api.pay4coins.com/remote/merchant_login.php`.
-   * Ruft bei `'ok'` die Stammdaten von `https://api.pay4coins.com/remote/erocloud_merchant_data.php` ab, legt den Partner in `merchants` an bzw. aktualisiert ihn (AES-verschlüsselt mit `AES_KEY`), setzt die MCP-Session (`$_SESSION['logged_id'] = 'mcp'`, `$_SESSION['logged_in_as'] = 'merchant'`, `$_SESSION['merchant_id']`) und leitet auf `Startseite` weiter.
-3. **Eingeloggter Zustand (`/Startseite` $\rightarrow$ `web/index.php` + `#/startseite`):**
+1. **Ausgeloggter Zustand (`/` bzw. `/Startseite`):**
+   * Nicht eingeloggte Besucher werden aktuell direkt auf `https://login.pay4coins.com?ref=erocloud` weitergeleitet (in Schritt 2 folgt die modernisierte öffentliche Gäste-Landingpage `Home/views/guest.php` im Pay4Coins-Blau-Kacheldesign & persönlicher **Du-Form**).
+2. **Automatischer SSO-Login & sauberer Partner-Wechsel (`web/login.php?pid=XXXXXXXXXX`):**
+   * Definiert vor dem Laden von `bootstrap.php` verbindlich `MCP_SKIP_AUTO_SESSION_RECOVERY`, damit keine vorherige Partner-Session während des SSO-Handshakes wiederbelebt wird.
+   * Prüft die 10-stellige `pid`, berechnet `loginHash($pid)` (Browser-Fingerprint + `pid`) und verifiziert den Login via cURL bei `https://api.pay4coins.com/remote/merchant_login.php`.
+   * Ruft bei `'ok'` die Stammdaten von `https://api.pay4coins.com/remote/erocloud_merchant_data.php` ab und legt den Partner in `merchants` an bzw. aktualisiert ihn (AES-verschlüsselt mit `AES_KEY`).
+   * **Account-Switch-Schutz:** Vor dem Setzen der neuen Session verwirft `login.php` alle vorherigen MCP-Session-Keys (`merchant_id`, `merchant_username`, `mcp_impersonated_by_admin`, `erocloud_stream_cache`) und rotiert die Session-ID (`session_regenerate_id(true)`). In [`Merchant::__construct()`](file:///c:/xampp/htdocs/EroCloud/includes/klassen/merchant.inc.php) hat eine explizit übergebene `$merchant_id` bzw. 10-stellige `partner_id` immer Vorrang vor `$_SESSION['merchant_id']`.
+   * Synchronisiert das HMAC-signierte 3-Stunden-Cookie `erocloud_mcp_auth` (`mcp_neu_sync_auth_cookie()`) sowie `erocloud` und leitet auf `/Startseite` weiter. Schlägt der SSO-Handshake fehl, werden etwaige Alt-Cookies/Sessions bereinigt und an `LOGIN_URL?logout&ref=erocloud` abgemeldet.
+3. **180-Minuten Session-Recovery (`mcp_neu_ensure_session()` in `app/bootstrap.php`):**
+   * Da ältere Endpunkte (`api/`) denselben `TEMP_DIR` mit kürzerer Standard-GC-Lifetime nutzen können, stellt das mit `AES_KEY` HMAC-SHA256-signierte Cookie `erocloud_mcp_auth` (Gültigkeit `10800s` = 180 Min. analog `MCP_SESSION_DURATION`, inkl. optionalem Admin-Impersonation-Kontext) eine vorzeitig vom GC gelöschte `/tmp`-Session nahtlos wieder her.
+   * **Kein Stale-Auto-Login über das 3-Monats-Cookie `erocloud`:** Da Pay4Coins beim Logout `merchants.login_hash` nicht in der DB leert, erfolgt nach Ablauf von `erocloud_mcp_auth` oder nach einem Logout bewusst **keine** stille Wiederbelebung aus dem `erocloud`-Cookie.
+4. **Vollständiger Dual-Cookie-Logout (`web/index.php?logout`):**
+   * Rekonstruiert bei bereits abgelaufener `/tmp`-Session den Partner-/Impersonation-Kontext aus dem signierten `erocloud_mcp_auth`-Cookie (für korrektes Partner-Historien-Logging bzw. Admin-Rücksprung nach `https://acp.erocloud.net/Startseite#/merchants`).
+   * [`mcp_neu_clear_auth_cookie()`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/app/bootstrap.php) löscht **beide** Cookies (`erocloud_mcp_auth` und `erocloud`) sowohl für `.erocloud.net` als auch Host-only, invalidiert das `PHPSESSID`-Cookie, zerstört die PHP-Session und leitet Partner zuverlässig an `https://login.pay4coins.com/?logout&ref=erocloud` weiter.
+5. **Eingeloggter Zustand (`/Startseite` $\rightarrow$ `web/index.php` + `#/startseite`):**
    * Rendert die App-Shell (Topbar + linke Sidebar mit Darsteller-Profilen, Upload-/Cloud-Menü, Benachrichtigungs-Modal `#modal-notifications`, API-Key-Modal, FAQ/Support/Impressum dynamisch aus der DB) und lädt per JS das Partner-Dashboard (`api.php?route=startseite`).
-4. **Direkt-Login über Magic-Link (`web/index.php?ml=<token>` via `EroCloudMagicLink`):**
-   * Links aus E-Mails oder Push-Benachrichtigungen loggen den Creator automatisch und sicher ein (`session_regenerate_id(true)`) und leiten sofort per `302` (`Referrer-Policy: no-referrer`) auf die gewünschte Ziel-Ansicht (z. B. `#/movie?id=8482`) weiter. Details siehe `@email-notification-and-magic-link-system.md`.
+6. **Direkt-Login über Magic-Link (`web/index.php?ml=<token>` via `EroCloudMagicLink`):**
+   * Links aus E-Mails, Push-Benachrichtigungen oder der ACP-Session-Übernahme (`acp_impersonate`) überspringen die Auto-Recovery, loggen den Creator automatisch und sicher ein (`session_regenerate_id(true)`) und leiten sofort per `302` (`Referrer-Policy: no-referrer`) auf die gewünschte Ziel-Ansicht (z. B. `#/movie?id=8482`) weiter. Details siehe `@email-notification-and-magic-link-system.md`.
 
 ---
 
@@ -185,10 +177,8 @@ Die Hauptdomain **`https://erocloud.net`** zeigt in LiveConfig analog zum ACP di
    * `RewriteRule ^mcp_neu/web/(.*)$ /$1 [R=301,L,QSA]` in [`mcp/mcp_neu/web/.htaccess`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/web/.htaccess) stellt sicher, dass alle bereits generierten Drehpartner-QR-Codes (`/mcp_neu/web/verify_co_actor.php?t=...`), gespeicherten Lesezeichen sowie versendeten Magic- und Unsubscribe-Links nahtlos auf das Root-Level weitergeleitet werden.
    * Alte MCP-Direktlinks (`/Movies`, `/Movie-Upload`, `/Photo-Albums`, `/Actors`, `/CoActors`, `/Webmaster`, `/faq` usw.) leiten automatisch per `[R=302,L,NE]` auf die jeweilige SPA-Route (`/Startseite#/...`) weiter.
    * Alle URL-Generatoren ([`CoActorManager`](file:///c:/xampp/htdocs/EroCloud/includes/klassen/CoActorManager.inc.php), [`EroCloudMagicLink`](file:///c:/xampp/htdocs/EroCloud/includes/klassen/EroCloudMagicLink.inc.php), [`EroCloudMailer`](file:///c:/xampp/htdocs/EroCloud/includes/klassen/EroCloudMailer.inc.php), [`EroCloudNotificationCenter`](file:///c:/xampp/htdocs/EroCloud/includes/klassen/EroCloudNotificationCenter.inc.php)) erzeugen saubere Root-URLs auf `https://erocloud.net/...`.
-4. **Produktiver E-Mail-Versand:**
+4. **Produktiver E-Mail-Versand & 7-stufiger Deep-Logic-Audit (PHP 8.0 / 8.4.27):**
    * In [`config.inc.php`](file:///c:/xampp/htdocs/EroCloud/config.inc.php) steht `define('MAIL_SANDBOX_MODE', false);`, sodass System-Benachrichtigungen produktiv an die Creator zugestellt werden (sofern im ACP unter `#/system-settings` kein manueller DB-Sandbox-Override aktiv ist).
-
-
-
-
+   * [`mcp/mcp_neu/app/bootstrap.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/app/bootstrap.php) kapselt das Bootstrapping mit `ob_start()`, initialisiert global `$settings` und setzt `SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION';` für 100 % Kompatibilität mit 2016er Tabellen-Defaults (`'0000-00-00 00:00:00'`), inklusive automatischer Performance-Index-Prüfung in [`HomeController::ensureSearchIndexes()`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/app/src/Modules/Home/HomeController.php).
+   * Alle `61` involvierten PHP-Dateien (`php -l`), `316` `p4c_query()`-Aufrufe (`__FILE__, __LINE__`), `58` registrierten Router-Endpunkte, Live-View-Renders und Inline-JS-Handler über `30` Views wurden automatisiert ohne Fehler, Warnungen oder Deprecations auditiert.
 

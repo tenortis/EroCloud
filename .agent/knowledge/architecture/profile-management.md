@@ -108,12 +108,12 @@ Ein Profil kann vier verschiedene Statuswerte haben (`status`):
 
 ## 7. 🔑 Login & Händler/User wechseln (Impersonation)
 
-### Händler-Login (MCP)
-Der Login der Händler ins MCP läuft über eine Single-Sign-On-Verbindung (SSO) mit Pay4Coins:
-* **Ablauf**: Der Händler wird von Pay4Coins mit seiner Partner-ID an `mcp/login.php?pid=[PARTNER_ID]` weitergeleitet.
-* **Sicherheitsprüfung**: Der Login-Hash wird über die Pay4Coins-API validiert (`Pay4Coins_API_URL.'/remote/merchant_login.php'`).
-* **Datenabgleich**: Bei erfolgreichem Login werden die Händlerdaten (E-Mail, Name, etc.) via XML von Pay4Coins abgefragt, lokal in der Tabelle `merchants` aktualisiert und die Session-Variablen (`$_SESSION['merchant_id']`, etc.) gesetzt.
-* **Impersonation**: Administratoren können sich in den Account eines Händlers einloggen, indem sie den SSO-Login mit der entsprechenden Partner-ID (`pid`) des Merchants aufrufen.
+### Händler-Login (MCP v2.0 auf `erocloud.net`)
+Der Login der Partner ins produktive MCP (`mcp/mcp_neu/web/`) läuft über eine Single-Sign-On-Verbindung (SSO) mit Pay4Coins:
+* **Ablauf**: Der Partner wird von `login.pay4coins.com` bzw. `merchant.pay4coins.com` mit seiner 10-stelligen Partner-ID an `https://erocloud.net/login.php?pid=[PARTNER_ID]` ([`mcp/mcp_neu/web/login.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/web/login.php)) weitergeleitet.
+* **Sicherheitsprüfung & sauberer Account-Wechsel**: Der Login-Hash (`loginHash($pid)`) wird über die Pay4Coins-API validiert (`Pay4Coins_API_URL . '/remote/merchant_login.php'`). `login.php` überspringt die Auto-Session-Recovery (`MCP_SKIP_AUTO_SESSION_RECOVERY`), verwirft etwaige vorherige Partner-Sessions, rotiert die `session_id()` (`session_regenerate_id(true)`) und setzt das HMAC-signierte 3-Stunden-Cookie `erocloud_mcp_auth` sowie `erocloud` frisch.
+* **Datenabgleich & `Merchant::__construct()`**: Bei erfolgreichem Login werden die Stammdaten (E-Mail, Name, Geburtsdatum) via XML von Pay4Coins abgefragt und AES-verschlüsselt in `merchants` aktualisiert. In [`includes/klassen/merchant.inc.php`](file:///c:/xampp/htdocs/EroCloud/includes/klassen/merchant.inc.php) hat eine explizit übergebene `$merchant_id` bzw. 10-stellige `partner_id` immer Vorrang vor `$_SESSION['merchant_id']`, sodass es weder beim Partner-Wechsel noch bei ACP-Prüfungen zu Account-Vermischungen kommt.
+* **ACP-Impersonation (1-Klick-Übernahme)**: Administratoren (`employee_rule === 'write'`) können sich im ACP unter `acp.erocloud.net/#/merchants` per Klick auf *„Session übernehmen“* (`POST ?route=merchants/impersonate`) über einen 120s gültigen [`EroCloudMagicLink`](file:///c:/xampp/htdocs/EroCloud/includes/klassen/EroCloudMagicLink.inc.php) direkt in die MCP-Ansicht eines Partners schalten, ohne Pay4Coins-Passwort und ohne die Partner-Login-Historie zu verfälschen.
 
 ### User-Login (Frontend)
 Normale Benutzer (User/Members) registrieren und authentifizieren sich direkt über die jeweiligen Frontend-Shops (zu finden in der Tabelle `sites` unter der entsprechenden `p4c_shop_id`). Das ACP listet die Benutzerdaten (`amount_coins`, `online_device`, etc.) und Chatverläufe auf.

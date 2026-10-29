@@ -103,8 +103,9 @@
 - [ ] **MCP Live Switch (`erocloud.net` -> `/htdocs/mcp/mcp_neu/web` on PHP `8.4.27`) & Guest Landingpage Modernization**
     - [x] Implement self-contained PHP 8.4 media & streaming proxies (`mcp/mcp_neu/web/thumb.php` & `mcp/mcp_neu/web/media.php`) for `/thumb.php`, `/ProfilePicture/...`, `/AlbumPhoto/...`, `/Player/...`, `/PlayerPoster/...`, and `/amoredea/RedirectContent/...`
     - [x] Modernize `api/movie_downloader.php`, `api/photo_album_downloader.php`, and `api/messenger_image_info.php` to UTF-8 with self-contained inline styling (no legacy `mcp/fw/jquery-ui` dependency)
-    - [x] Configure `mcp/mcp_neu/web/.htaccess` (Pay4Coins CORS, 301 `/mcp_neu/web/*` QR/Magic-Link compatibility, root logo/favicon aliases, media rewrites, and legacy MCP bookmark redirects to SPA routes) plus fallback `mcp/.htaccess`
+    - [x] Configure `mcp/mcp_neu/web/.htaccess` (Pay4Coins CORS + Credentials, 301 `/mcp_neu/web/*` QR/Magic-Link compatibility, root logo/favicon aliases, media rewrites, and legacy MCP bookmark redirects to SPA routes) plus fallback `mcp/.htaccess`
     - [x] Remove `/mcp_neu/web` subpaths from `CoActorManager`, `EroCloudMagicLink`, `EroCloudMailer`, `EroCloudNotificationCenter`, mail templates, `SystemTechController`, and `HomeController`
-    - [x] Enable productive Creator email delivery (`MAIL_SANDBOX_MODE = false` in `config.inc.php`) and run 5-stage Deep-Logic-Audit on `mcp_neu`
-    - [ ] Switch `erocloud.net` in LiveConfig to `/htdocs/mcp/mcp_neu/web` on **PHP `8.4.27`** (`php-8.4-opt`)
+    - [x] Enable productive Creator email delivery (`MAIL_SANDBOX_MODE = false` in `config.inc.php`), add `SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION'` zero-date DDL safeguard, and run 7-stage Deep-Logic-Audit on `mcp_neu`
+    - [x] Switch `erocloud.net` in LiveConfig to `/htdocs/mcp/mcp_neu/web` on **PHP `8.4.27`** (`php-8.4-opt`)
+    - [x] Fix Pay4Coins SSO account switching (`MCP_SKIP_AUTO_SESSION_RECOVERY` + `session_regenerate_id`), complete dual-cookie logout cleanup (`erocloud_mcp_auth` + `erocloud`), and explicit ID/PID precedence in `Merchant::__construct()`
     - [ ] Step 2: Redesign & modernize public Guest Landingpage on `erocloud.net` (`Home/views/guest.php` in Pay4Coins-Blue tile design & Du-Form)

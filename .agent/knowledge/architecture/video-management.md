@@ -15,7 +15,7 @@ Dieses Dokument beschreibt im Detail den gesamten Lebenslauf eines Videos (Filme
 * **Standard-Unterverzeichnis (`MOVIES_DEFAULT_DIR`)**: `cloud_storage` (wird in `config.inc.php` definiert).
 * **Dynamische Datenbank-Spalte (`storage_location`)**:
   * In den Tabellen `movies`, `movies_online`, `movies_deleted` sowie `photo_albums` besitzt jeder Datensatz die Spalte `storage_location`.
-  * Beim Anlegen eines neuen Films (`mcp/includes/movie_upload.php`) wird dort der Wert aus `MOVIES_DEFAULT_DIR` (`'cloud_storage'`) gespeichert.
+  * Beim Anlegen eines neuen Films im produktiven MCP v2.0 ([`MoviesController.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/app/src/Modules/Movies/MoviesController.php), früher `mcp/includes/movie_upload.php`) wird dort der Wert aus `MOVIES_DEFAULT_DIR` (`'cloud_storage'`) gespeichert.
   * Beim Streaming (`api/movie_player.php`), Download (`api/movie_downloader.php`), Konvertieren (`cronjobs/convert_movie.php`) und Löschen (`cronjobs/delete_movie.php`) wird der Dateipfad immer dynamisch über `$movie_ary->storage_location` aufgelöst:
     `MOVIES_PATH . '/' . $movie_ary->storage_location . '/' . $movie_ary->merchant_id . '/' . $movie_ary->id . '/' . $movie_ary->filename`
   * **Architektur-Vorteil für externe Fileserver**: Durch diese Struktur können externe Storage-Systeme (z. B. per `rclone mount`, `s3fs` oder `SSHFS`) als zusätzliches Verzeichnis (z. B. `cloud_storage_2`) eingebunden und über `MOVIES_DEFAULT_DIR` für neue Uploads aktiviert werden, ohne dass bestehende Filme unter `cloud_storage` ihre Gültigkeit verlieren.
@@ -32,8 +32,8 @@ Dieses Dokument beschreibt im Detail den gesamten Lebenslauf eines Videos (Filme
 
 ---
 
-## 2. 📤 Video-Upload & Bearbeitung (MCP)
-Der Creator (Händler/Merchant) lädt ein Video über das **Merchant Control Panel (MCP)** hoch (`mcp/includes/movie_upload.php`) oder bearbeitet ein bestehendes Video (`mcp/includes/movie.php`). Beide Seiten basieren auf einem einheitlichen **Bootstrap 5 2-Spalten Desktop Grid** (linksbündig mit `max-width: 1600px;`).
+## 2. 📤 Video-Upload & Bearbeitung (MCP v2.0)
+Der Creator (Partner/Merchant) lädt ein Video im produktiven **Merchant Control Panel (MCP v2.0)** hoch (`https://erocloud.net/Startseite#/movie-upload` via [`MoviesController.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/app/src/Modules/Movies/MoviesController.php)) oder bearbeitet ein bestehendes Video (`#/movie?id=...`). *(Der frühere 2016er Altbestand `mcp/includes/movie_upload.php` & `movie.php` ist als Referenz archiviert).* Beide Seiten basieren auf einem einheitlichen **2-Spalten Desktop Grid** (linksbündig mit `max-width: 1600px;`).
 
 ### UI- & Layout-Standard (Upload & Bearbeitung)
 * **Dynamischer Fortschritts-Wizard**:
@@ -123,14 +123,14 @@ Ein Hintergrund-Cronjob kümmert sich um die automatische Aufbereitung der hochg
   * **RFC 7233 Range-Konformität & CORS-Support für Smart-TVs:** Sendet `Accept-Ranges: bytes`, `ETag`, `Last-Modified`, unterstützt `If-Range`, `304 Not Modified`, `HEAD`- und `OPTIONS`-Preflight-Requests sowie `Access-Control-Allow-Origin: *` und `Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges, ETag` (zwingend für Chromecast / Android TV).
 * **`api/get_movie_url.php` & `api/movie_player.php`**:
   * **Persistentes 6-Stunden-Token:** `get_movie_url.php` verwendet ein bestehendes, noch gültiges `access_token` wieder (statt es bei jedem Seiten-Reload zu überschreiben) und verlängert `access_token_datetime` auf **6 Stunden (`+6 hours`)**. Dadurch bricht ein bereits auf dem Fernseher laufender AirPlay-/Chromecast-Stream nicht ab, wenn der Kunde das Video auf dem Handy neu lädt.
-  * **Session-Stream-Cache & gedrosselte Token-Verlängerung:** `api/movie_player.php`, `acp/includes/movie_player.php` und `mcp/includes/movie_player.php` cachen den aufgelösten Dateipfad für 30 Minuten in `$_SESSION['erocloud_stream_cache']`, geben das PHP-Session-Lock (`session_write_close()`) sowie die DB-Verbindung (`p4c_close(DB_HOST)`) **vor** dem Streaming-Start frei und aktualisieren `access_token_datetime` höchstens 1× pro Stunde statt bei jedem einzelnen Range-Request.
+  * **Session-Stream-Cache & gedrosselte Token-Verlängerung:** [`api/movie_player.php`](file:///c:/xampp/htdocs/EroCloud/api/movie_player.php) sowie die geschützten v2.0-Streaming-Proxys [`acp/acp_neu/web/media.php`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/web/media.php) und [`mcp/mcp_neu/web/media.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/web/media.php) (Route `/Player/{file_id}`) cachen den aufgelösten Dateipfad für 30 Minuten in `$_SESSION['erocloud_stream_cache']`, geben das PHP-Session-Lock (`session_write_close()`) sowie die DB-Verbindung (`p4c_close(DB_HOST)`) **vor** dem Streaming-Start frei und aktualisieren `access_token_datetime` höchstens 1× pro Stunde statt bei jedem einzelnen Range-Request.
 
 ---
 
-## 5. 🖼️ Vorschaubilder und Custom Covers (MCP)
-Nach der Konvertierung kann der Händler das Video bearbeiten (`mcp/includes/movie.php`):
-* **Thumbnail-Auswahl**: Der Händler wählt aus den extrahierten Thumbnails (1-10) jeweils eines für die FSK16- und FSK18-Vorschau aus (gespeichert in `preview_image_fsk16`/`preview_image_fsk18`). Alle Thumbnails werden mit festem Seitenverhältnis (`16/9; object-fit: cover`) dargestellt.
-* **Custom Poster Upload**: Lädt der Händler eigene Vorschaubilder hoch (`mcp/includes/uploader/upload_movie_poster.php`), werden diese als `thumb_[movie_id]_[file_id]_11.[ext]` (FSK16) bzw. `_12.[ext]` (FSK18) gespeichert. In der UI sind sie transparent als *eigenes FSK16* und *eigenes FSK18* gelabelt.
+## 5. 🖼️ Vorschaubilder und Custom Covers (MCP v2.0)
+Nach der Konvertierung kann der Partner das Video im produktiven MCP (`https://erocloud.net/Startseite#/movie?id=...` via [`MoviesController.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/app/src/Modules/Movies/MoviesController.php)) bearbeiten:
+* **Thumbnail-Auswahl & Poster-Proxy**: Der Partner wählt aus den extrahierten Szenen-Thumbnails (`1..10`, ausgeliefert über [`mcp/mcp_neu/web/thumb.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/web/thumb.php)) jeweils eines für die FSK16- und FSK18-Vorschau aus (gespeichert in `preview_image_fsk16`/`preview_image_fsk18`). Das Video-Poster inkl. Qualitäts-Wasserzeichen (`SD`..`6K`) wird über `/PlayerPoster/{file_id}` ([`mcp/mcp_neu/web/media.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/web/media.php)) ausgeliefert. Alle Thumbnails werden mit festem Seitenverhältnis (`16/9; object-fit: cover`) dargestellt.
+* **Custom Poster Upload**: Lädt der Partner eigene Vorschaubilder hoch (`route=movie-upload-poster` in `MoviesController`), werden diese als `thumb_[movie_id]_[file_id]_11.[ext]` (FSK16) bzw. `_12.[ext]` (FSK18) gespeichert. In der UI sind sie transparent als *eigenes FSK16* und *eigenes FSK18* gelabelt.
 * **Freigabe**: Das Speichern setzt `released = '1'` (zur Prüfung freigegeben) und `movie_checked = '0000-00-00 00:00:00'`, wodurch das Video dem Administrator zur Prüfung vorgelegt wird.
 
 ---

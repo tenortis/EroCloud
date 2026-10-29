@@ -43,7 +43,7 @@ Alle ungenutzten Zwischenversionen (`5.6`, `7.0`, `7.1`, `7.2`, `7.4`, `8.1`, `8
 
 ### 2.2 Lokale Entwicklungsumgebung (Windows XAMPP)
 * **Lokaler Projektpfad:** `c:\xampp\htdocs\EroCloud`
-* **Lokales PHP CLI für Linting (`php -l`) & AST-Prüfungen:** `c:\xampp\php\php.exe` (PHP `8.2.12`)
+* **Lokales PHP CLI für Linting (`php -l`) & AST-/Deep-Logic-Audits:** `c:\xampp\php\php.exe` (PHP `8.5.x`)
 
 ---
 
@@ -95,19 +95,20 @@ Alle 4 Web-Bereiche (`acp`, `mcp`, `api`, `ads`) sowie alle CLI-Cronjobs schreib
     * Datum, Uhrzeit & Zeitzone (`d-M-Y H:i:s T`)
     * **Domain + Request-URI** (`[api.erocloud.net /...]`, `[erocloud.net /...]`, `[acp.erocloud.net /...]`) bzw. bei Cronjobs **`[CLI: script.php]`**
     * Ursprungsdatei und Zeilennummer.
-* **ACP-Ansicht:** Einsehbar im ACP unter [`acp/includes/errors.php`](file:///c:/xampp/htdocs/EroCloud/acp/includes/errors.php) (XSS-geschützt via `htmlspecialchars`).
+* **ACP-Ansicht:** Einsehbar und verwaltbar (inkl. `.errorlog.bak`-Backup & Leeren) im modernen ACP v2.0 unter `https://acp.erocloud.net/Startseite#/errors` ([`SystemTechController`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/app/src/Modules/SystemTech/SystemTechController.php)).
 
 ---
 
 ## 5. 🛠️ Verbindliche PHP 8.0 $\rightarrow$ PHP 8.4.27 Entwicklungsrichtlinien
 
-Da `web1` aktuell auf **PHP `8.0.30`** läuft und aktiv auf **PHP `8.4.27`** umgebaut wird, gelten für jeden neuen oder geänderten Code zwingend folgende Regeln:
+Da `acp.erocloud.net` und `erocloud.net` bereits produktiv auf **PHP `8.4.27`** laufen und die übrigen Bereiche (`api.erocloud.net`, `ads`, Cronjobs) noch auf **PHP `8.0.30`** mit Migrationsziel **PHP `8.4.27`** betrieben werden, gelten für jeden neuen oder geänderten Code zwingend folgende Regeln:
 
 1. **Strikte Typ-Casts bei `abs()`, `round()` und `number_format()`:**
    * In PHP 8+ wirft `abs("")` oder `abs("abc")` einen `Fatal Error: Uncaught TypeError`.
    * **Pflicht:** Immer explizit casten: `abs((int)$id)` für IDs/Ganzzahlen bzw. `abs((float)$betrag)` für Preise/Provisionen.
-2. **MySQLi Fehlerbehandlung (`mysqli_report`):**
+2. **MySQLi Fehlerbehandlung (`mysqli_report`) & Legacy-Zero-Date SQL-Mode:**
    * Ab PHP 8.1 steht `mysqli_report` standardmäßig auf `MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT`. In [`includes/klassen/mysqli.inc.php`](file:///c:/xampp/htdocs/EroCloud/includes/klassen/mysqli.inc.php) ist deshalb `mysqli_report(MYSQLI_REPORT_OFF)` gesetzt, damit Fehler weiterhin sauber über `$this->error_log->log()` ins zentrale `.errorlog` geschrieben werden.
+   * Da 2016er Tabellen (`movies`, `photo_albums`, `actors`, `co_actors`) `DATETIME NOT NULL DEFAULT '0000-00-00 00:00:00'` nutzen, setzen [`acp/acp_neu/app/bootstrap.php`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/app/bootstrap.php) und [`mcp/mcp_neu/app/bootstrap.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/app/bootstrap.php) sowie selbstheilende `ALTER TABLE`-Routinen verbindlich `SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION';`.
 3. **Keine undeklarierten dynamischen Klassen-Properties (PHP 8.2+ Deprecation):**
    * Jede verwendete Property (`$this->xyz`) muss in der Klasse explizit mit `public $xyz;` deklariert sein (oder bei Drittanbieter-Klassen `#[\AllowDynamicProperties]` besitzen).
 4. **Kein `utf8_encode()` / `utf8_decode()` (PHP 8.2+ Deprecation):**

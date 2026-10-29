@@ -178,7 +178,7 @@ Definierbar und jederzeit ohne DB-Migration erweiterbar in [`EroCloudNotificatio
 2. **Beim Video-Upload in Schritt 2 (`#movie-notify-on-convert` in [`upload.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/app/src/Modules/Movies/views/upload.php#L507-L519)):**
    * Zeigt den aktuellen Status für `movie_converted` als Schalter an und merkt sich Änderungen sofort für den aktuellen Film (`movies.notify_on_convert`) sowie für künftige Uploads (`notification_preferences`).
 3. **Über den öffentlichen 1-Klick-Abmeldelink in jeder E-Mail (OHNE Login-Zwang!):**
-   * Route: `https://erocloud.net/mcp_neu/web/api.php?route=email-unsubscribe&token=...` (wird in [`Router::dispatch()`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/app/src/Core/Router.php#L26-L33) **vor** der Login-Prüfung ausgeführt).
+   * Routen: `https://erocloud.net/unsubscribe.php?m=...&e=...&s=...` ([`mcp/mcp_neu/web/unsubscribe.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/web/unsubscribe.php)) bzw. `https://erocloud.net/api.php?route=email-unsubscribe&token=...` (wird in [`Router::dispatch()`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/app/src/Core/Router.php#L26-L33) **vor** der Login-Prüfung ausgeführt; alte `/mcp_neu/web/...`-Links aus früheren Mails werden per `301` in `.htaccess` automatisch auf das Root-Level weitergeleitet).
    * Unterstützt automatische **RFC 8058 One-Click POSTs** von Gmail/Apple Mail sowie im Browser ein komplettes **1-Klick-Präferenz-Center**, in dem der Creator ohne Login einzelne Themen an-/abwählen oder auf *„Alle abbestellen“* klicken kann.
 
 ---
