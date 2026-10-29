@@ -39,6 +39,7 @@ RewriteRule ^unsubscribe\.php$ mcp_neu/web/unsubscribe.php [L,QSA]
 RewriteRule ^favicon\.ico$ mcp_neu/web/assets/img/favicon.ico [L]
 RewriteRule ^assets/(.*)$ mcp_neu/web/assets/$1 [L]
 RewriteRule ^erocloud_logo\.png$ mcp_neu/web/assets/img/erocloud_logo.png [L]
+RewriteRule ^(robots\.txt|llms\.txt|sitemap\.xml)$ mcp_neu/web/$1 [L]
 RewriteRule ^(?:favicon|images/favicons)/(.*)$ images/favicons/$1 [L]
 
 # Medien- & Video-Streaming-Proxys über das neue media.php

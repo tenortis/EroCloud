@@ -1,0 +1,27 @@
+# EroCloud – https://erocloud.net
+# Public: landing page, static assets, llms.txt. Private: creator area, media proxies & tokens.
+# AI/LLM crawlers (GPTBot, ClaudeBot, PerplexityBot, Google-Extended, …) are welcome on public pages.
+
+User-agent: *
+Allow: /$
+Allow: /assets/
+Allow: /llms.txt
+Disallow: /Startseite
+Disallow: /index.php
+Disallow: /api.php
+Disallow: /login.php
+Disallow: /media.php
+Disallow: /thumb.php
+Disallow: /verify_co_actor.php
+Disallow: /co_actor_media.php
+Disallow: /unsubscribe.php
+Disallow: /ProfilePicture/
+Disallow: /AlbumPhoto/
+Disallow: /Player/
+Disallow: /PlayerPoster/
+Disallow: /amoredea/
+Disallow: /mcp_neu/
+Disallow: /*?ml=
+Disallow: /*?logout
+
+Sitemap: https://erocloud.net/sitemap.xml

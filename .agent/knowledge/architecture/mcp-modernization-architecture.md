@@ -95,8 +95,11 @@ mcp_neu/
 
 ## 3. 🔐 Login-Flow, Session-Recovery & Logout (Pay4Coins Single-Sign-On)
 
-1. **Ausgeloggter Zustand (`/` bzw. `/Startseite`):**
-   * Nicht eingeloggte Besucher werden aktuell direkt auf `https://login.pay4coins.com?ref=erocloud` weitergeleitet (in Schritt 2 folgt die modernisierte öffentliche Gäste-Landingpage `Home/views/guest.php` im Pay4Coins-Blau-Kacheldesign & persönlicher **Du-Form**).
+1. **Ausgeloggter Zustand – Öffentliche Landingpage (`/`) bzw. Login-Redirect (`/Startseite`):**
+   * **Root-URL `https://erocloud.net/`:** Nicht eingeloggte Besucher sehen die öffentliche Präsentations-Landingpage [`Home/views/guest.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/app/src/Modules/Home/views/guest.php) (gerendert aus `web/index.php` via `View::render('Home', 'guest')`). Sie präsentiert EroCloud als zentrales Content-Backend von **Pay4Coins** für Creator mit eigener **EroCMS**-Website (Sektionen: Hero mit Content-Flow-Grafik, *Das Prinzip*, *So funktioniert's*, *Funktionen*, *EroCMS*, *Pay4Coins*, *FAQ*, CTA, Footer). Das alte Webmaster-/Syndication-Thema wird bewusst **nicht** mehr beworben.
+   * **Primärer Funnel:** Alle „Website starten“-CTAs führen auf `https://pay4coins.com/de/Betreiben-Sie-Ihre-ganz-private-Erotikwebsite-mit-EroCMS`; der Login auf `LOGIN_URL?ref=erocloud`. *Partner werden* (`merchant.pay4coins.com/Partner-werden`), Impressum und Datenschutz (`pay4coins.com/de/datenschutz`) sind im Footer verlinkt.
+   * **SEO / KI / Social Sharing:** Title, Meta-Description, Canonical, hreflang, Open Graph + Twitter Card (Share-Bild `web/assets/img/og-erocloud.jpg`, 1200×630), JSON-LD `@graph` (Organization, WebSite, WebPage, WebApplication, SoftwareApplication EroCMS, FAQPage – FAQ-Inhalte aus einem einzigen `$faqItems`-Array) sowie die statischen Begleitdateien `web/robots.txt`, `web/sitemap.xml` und `web/llms.txt`. Eigene Assets: `web/assets/css/landing.css`, `web/assets/js/landing.js` (Theme-Toggle mit Key `ec-mcp-theme`, Scroll-Spy, Progressive-Reveal nur unterhalb des Viewports).
+   * **Alle anderen Pfade (z. B. `/Startseite`):** Leiten Gäste weiterhin direkt auf `https://login.pay4coins.com?ref=erocloud` weiter.
 2. **Automatischer SSO-Login & sauberer Partner-Wechsel (`web/login.php?pid=XXXXXXXXXX`):**
    * Definiert vor dem Laden von `bootstrap.php` verbindlich `MCP_SKIP_AUTO_SESSION_RECOVERY`, damit keine vorherige Partner-Session während des SSO-Handshakes wiederbelebt wird.
    * Prüft die 10-stellige `pid`, berechnet `loginHash($pid)` (Browser-Fingerprint + `pid`) und verifiziert den Login via cURL bei `https://api.pay4coins.com/remote/merchant_login.php`.

@@ -1,0 +1,30 @@
+# EroCloud
+
+> EroCloud (https://erocloud.net) ist die zentrale Content-Cloud von Pay4Coins für Content Creator mit eigener EroCMS-Website. Creator laden dort Filme und Fotoalben einmal hoch, pflegen ihre Darsteller-Profile und verifizieren ihre Drehpartner. Die eigene EroCMS-Website übernimmt die Inhalte automatisch per API-Key; Pay4Coins übernimmt Zahlungsabwicklung, Auszahlungen und den Login.
+
+EroCloud ist ein Service der CIPA Media S.L.U. (Teneriffa, Spanien), dem Unternehmen hinter Pay4Coins. Die Website richtet sich auf Deutsch an Creator, Produzenten und Betreiber eigener Erotik- bzw. Fetisch-Websites. Der Partner-Bereich ist nur nach Login mit einem Pay4Coins-Partnerkonto zugänglich.
+
+## Das System aus drei Bausteinen
+
+- **EroCloud** – zentrales Content-Backend: Upload, automatische Videokonvertierung (SD bis 4K), Hosting und geschütztes Streaming bzw. Download über zeitlich begrenzte Zugangslinks, Fotoalben, Darsteller-Profile, Cover-Studio für FSK16- und FSK18-Cover, automatische Kategorievorschläge, SEO-Felder, geplante Veröffentlichungen und E-Mail-Benachrichtigungen.
+- **EroCMS** – die eigene, schlüsselfertige Erotik- oder Fetisch-Website unter eigener Domain (Videothek, Fotoalben, Live-Messenger, Webcam-Chat, Shop, Newsletter, Gutscheine). Pay4Coins installiert und konfiguriert die Website und kümmert sich um Technik, Hosting und Payment.
+- **Pay4Coins** – spezialisierter Zahlungsdienstleister: diskrete Zahlungsabwicklung mit zahlreichen Zahlungsarten, Netto-Auszahlungen und Single-Sign-On für die EroCloud.
+
+## Digitaler Drehpartner- und ID-Check
+
+Jede Person, die im Content zu sehen ist, muss volljährig sein und der Veröffentlichung zugestimmt haben. In der EroCloud scannen Drehpartner einen QR-Code, fotografieren ihren Ausweis mit dem Smartphone und unterschreiben auf dem Display. Daraus entsteht automatisch ein Einverständnis-Zertifikat (Model Release).
+
+## Wichtige Links
+
+- [EroCloud Startseite](https://erocloud.net/): Überblick, Funktionen und FAQ
+- [EroCMS bei Pay4Coins](https://pay4coins.com/de/Betreiben-Sie-Ihre-ganz-private-Erotikwebsite-mit-EroCMS): Eigene Erotik-Website mit EroCMS starten
+- [Partner werden](https://merchant.pay4coins.com/Partner-werden): Partnerkonto bei Pay4Coins eröffnen
+- [Creator-Login](https://login.pay4coins.com/?ref=erocloud): Login in die EroCloud mit Pay4Coins-Zugangsdaten
+- [Pay4Coins](https://pay4coins.com): Zahlungsdienstleister hinter EroCloud und EroCMS
+- [EroCMS.net](https://erocms.net): Technische Übersicht zu EroCMS
+
+## Rechtliches & Kontakt
+
+- [Impressum](https://pay4coins.com/de/impressum)
+- [Datenschutz](https://pay4coins.com/de/datenschutz)
+- Support: support@pay4coins.com

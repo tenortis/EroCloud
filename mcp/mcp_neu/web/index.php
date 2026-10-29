@@ -100,6 +100,24 @@ if (isset($_GET['ml']) && trim((string)$_GET['ml']) !== '' && class_exists('EroC
 
 // 2. Authentifizierungs-Prüfung (inkl. automatischer Session-Recovery aus bootstrap.php)
 if (!function_exists('is_logged_in') || is_logged_in('mcp') !== true || empty($_SESSION['merchant_id'])) {
+    // 2a. Öffentliche Präsentations-/Landingpage für Gäste ausschließlich auf der Root-URL (https://erocloud.net/)
+    //     Alle übrigen Pfade (z. B. /Startseite-Lesezeichen) leiten wie bisher direkt zum Pay4Coins-Login weiter.
+    $guestReqPath   = (string)parse_url((string)($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+    $guestScriptDir = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? ''))), '/');
+    if ($guestScriptDir !== '' && stripos($guestReqPath, $guestScriptDir) === 0) {
+        $guestReqPath = (string)substr($guestReqPath, strlen($guestScriptDir));
+    }
+    if (in_array($guestReqPath, ['', '/', '/index.php'], true)) {
+        $guestRawBase = $guestScriptDir;
+        $guestUri     = (string)($_SERVER['REQUEST_URI'] ?? '');
+        $guestBase    = (stripos($guestUri, '/mcp_neu') === 0 || stripos($guestUri, '/mcp/mcp_neu') !== false) ? $guestRawBase : '';
+        echo \App\Core\View::render('Home', 'guest', [
+            'basePath'    => $guestBase,
+            'imprintData' => class_exists('EroCloudMailer') ? EroCloudMailer::getImprintData() : [],
+        ]);
+        exit;
+    }
+
     header('Location: ' . LOGIN_URL . '?ref=erocloud');
     exit;
 }

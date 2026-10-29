@@ -21,6 +21,8 @@ Options -Indexes
     AddType font/woff woff
     AddType font/woff2 woff2
     AddType image/svg+xml svg svgz
+    # robots.txt, llms.txt & sitemap.xml contain UTF-8 (umlauts) -> explicit charset for crawlers
+    AddCharset utf-8 .txt .xml
 </IfModule>
 
 <IfModule mod_rewrite.c>
