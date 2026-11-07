@@ -139,3 +139,57 @@ chown -R web1:web1 /var/www/web1/priv/ai
   2. **Exklusives Prozess-Lock (`flock`):** Nutzt `/var/www/web1/priv/tmp/erocloud_ai_worker.lock`. Falls ein vorheriger Whisper-Lauf bei einem 30-Minuten-Video länger als 2 Minuten dauert, bricht der nächste Cron-Aufruf sofort sauber ab – es laufen **niemals** zwei Whisper-Prozesse parallel.
   3. **Vorrang für Video-Konvertierung (`pause_on_ffmpeg_convert`):** Prüft `SELECT COUNT(*) FROM movies WHERE convert_status = '1'`. Sobald `convert_movie.php` ein neues Video konvertiert, wartet der KI-Worker automatisch.
   4. **Stummfilm- & Fehler-Toleranz:** Hat ein Video keine Tonspur (`subtitle_status = 3`) oder fehlt die `.mp4`-Datei (`subtitle_status = 4`), wird trotzdem die BRAM-Textprüfung über Titel/Beschreibung ausgeführt und das Video als verarbeitet markiert, damit die Warteschlange niemals blockiert.
+
+---
+
+## 5. 🧠 Ollama- & Gemma-4-Installation ohne `ollama.com` (Rechenzentrums-Blockade umgehen)
+
+Da `ollama.com` (inkl. `registry.ollama.ai`) Zugriffe aus dem Rechenzentrum (`91.184.x.x`) per Cloudflare blockiert, erfolgt die Installation auf `t199.nlserver.net` **100 % ohne `ollama.com`** direkt über **GitHub Releases** (`github.com/ollama/ollama`) und **HuggingFace** (`hf.co/...`):
+
+```bash
+# 1. zstd installieren (zum Entpacken des offiziellen GitHub-Archivs)
+apt-get update && apt-get install -y zstd curl ca-certificates
+
+# 2. Ollama Binary direkt von GitHub Releases herunterladen & nach /usr/local entpacken
+curl -fL https://github.com/ollama/ollama/releases/latest/download/ollama-linux-amd64.tar.zst -o /tmp/ollama-linux-amd64.tar.zst
+tar --use-compress-program=unzstd -xf /tmp/ollama-linux-amd64.tar.zst -C /usr/local
+rm -f /tmp/ollama-linux-amd64.tar.zst
+
+# 3. Systembenutzer & Systemd-Service mit Nice=15 (FFmpeg-Vorrang) und 24h RAM-Keep-Alive anlegen
+id -u ollama &>/dev/null || useradd -r -s /bin/false -U -m -d /usr/share/ollama ollama
+
+cat << 'EOF' > /etc/systemd/system/ollama.service
+[Unit]
+Description=Ollama Service (Local AI)
+After=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/ollama serve
+User=ollama
+Group=ollama
+Restart=always
+RestartSec=3
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="OLLAMA_HOST=127.0.0.1:11434"
+Environment="OLLAMA_KEEP_ALIVE=24h"
+Environment="OLLAMA_NUM_PARALLEL=1"
+Environment="OLLAMA_MAX_LOADED_MODELS=1"
+Nice=15
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+
+[Install]
+WantedBy=default.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now ollama
+
+# 4. Gemma 4 E4B Abliterated direkt von HuggingFace (hf.co) ziehen & auf den Kurznamen mappen
+ollama pull hf.co/huihui-ai/Huihui-gemma-4-E4B-it-qat-q4_0-unquantized-abliterated-GGUF:latest
+ollama cp hf.co/huihui-ai/Huihui-gemma-4-E4B-it-qat-q4_0-unquantized-abliterated-GGUF:latest huihui_ai/gemma-4-abliterated:e4b
+
+# 5. Optional: Größeres Gemma 4 12B Abliterated (~7,4 GB) direkt von HuggingFace ziehen
+ollama pull hf.co/huihui-ai/Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF:latest
+ollama cp hf.co/huihui-ai/Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF:latest huihui_ai/gemma-4-abliterated:12b
+```
