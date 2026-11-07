@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Movie stream (High-Performance HTTP Range + Smart-TV / AirPlay / Chromecast Support)
+ * Movie stream (High-Performance HTTP Range + Smart-TV / AirPlay / Chromecast / iOS Safari Support)
  */
 
 define('SAFE_INC', 1);
@@ -36,9 +36,15 @@ if (!isset($_GET['access_token']) || $_GET['access_token'] === '') {
     print_xml($api);
 }
 
-$user_streaming_key = (string)$_GET['user_streaming_key'];
-$movie_id_raw       = (string)$_GET['movie_id'];
-$access_token_raw   = (string)$_GET['access_token'];
+$user_streaming_key = trim((string)$_GET['user_streaming_key']);
+$movie_id_raw       = trim((string)$_GET['movie_id']);
+$access_token_raw   = trim((string)$_GET['access_token']);
+if (strpos($access_token_raw, '&') !== false) {
+    $access_token_raw = explode('&', $access_token_raw, 2)[0];
+}
+if (strpos($access_token_raw, '?') !== false) {
+    $access_token_raw = explode('?', $access_token_raw, 2)[0];
+}
 
 // =========================================================================
 // FAST-PATH: Session-Stream-Cache für extrem schnelles Seeking ohne DB-Last
@@ -66,20 +72,29 @@ if (
 // Prüfen ob der user_streaming_key existiert
 $rs_user_streaming_key = p4c_query("SELECT * FROM `movies_access` WHERE `user_streaming_key` = '" . p4c_escape_string($user_streaming_key) . "' LIMIT 1;", __FILE__, __LINE__);
 if (p4c_num_rows($rs_user_streaming_key) == 0) {
+    if (function_exists('session_status') && session_status() === PHP_SESSION_ACTIVE) {
+        @session_write_close();
+    }
     $api['error'] = 'access denid';
     print_xml($api);
 }
 
 $access_obj = p4c_fetch_object($rs_user_streaming_key);
 
-// Wenn das Accesstoken nicht korrekt oder abgelaufen ist
-if ($access_obj->access_token != $access_token_raw || $access_obj->access_token_datetime < date("Y-m-d H:i:s")) {
+// Wenn das Accesstoken nicht zum hinterlegten Token passt (Toleranz für lang geöffnete iOS-Safari-Tabs / BFCache,
+// solange user_streaming_key + movie_id + access_token exakt mit dem gekauften Datensatz übereinstimmen).
+$tokenMatchesRecord = ((string)$access_obj->access_token === $access_token_raw);
+$movieMatchesRecord = (!isset($access_obj->movie_id) || (string)$access_obj->movie_id === '' || (string)$access_obj->movie_id === $movie_id_raw);
+if (!$tokenMatchesRecord || !$movieMatchesRecord) {
+    if (function_exists('session_status') && session_status() === PHP_SESSION_ACTIVE) {
+        @session_write_close();
+    }
     $api['error'] = 'access denid';
     print_xml($api);
 }
 
 // Access-Token-Laufzeit gedrosselt verlängern (maximal 1x pro Stunde statt bei jedem einzelnen Range-Chunk,
-// damit parallele Range-Requests beim Spulen auf Browser/Smart-TV keine DB-Row-Locks erzeugen).
+// damit parallele Range-Requests beim Spulen auf Browser/iOS/Smart-TV keine DB-Row-Locks erzeugen).
 if ($access_obj->access_token_datetime < date("Y-m-d H:i:s", strtotime("+5 hours"))) {
     p4c_query("UPDATE `movies_access` SET
         `access_token_datetime`='" . date("Y-m-d H:i:s", strtotime("+6 hours")) . "'
@@ -90,6 +105,9 @@ $movie_id = p4c_escape_string($movie_id_raw);
 
 $rs_movie = p4c_query("SELECT * FROM `movies` WHERE `file_id`='" . $movie_id . "' LIMIT 1;", __FILE__, __LINE__);
 if (p4c_num_rows($rs_movie) == 0) {
+    if (function_exists('session_status') && session_status() === PHP_SESSION_ACTIVE) {
+        @session_write_close();
+    }
     $api['error'] = 'movie_id not exists';
     print_xml($api);
 }
