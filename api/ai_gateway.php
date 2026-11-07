@@ -49,7 +49,7 @@ function ec_ai_gateway_load_config(): array
     $defaults = array(
         'api_key'              => 'p4c_ec_ai_gw_7f9a2d4e8b1c6f3a5d0e9b2c4f7a1d8e3b6c9f2a5d8e1b4c',
         'ollama_url'           => 'http://127.0.0.1:11434',
-        'default_model'        => 'huihui_ai/gemma-4-abliterated:e4b',
+        'default_model'        => 'huihui_ai/gemma-4-abliterated:12b',
         'threads_normal'       => 16,
         'threads_busy'         => 6,
         'min_free_ram_mb'      => 2500,
