@@ -219,3 +219,23 @@ Für mehrsprachige Ausspielungen (Titel, Beschreibungen, SEO-Metadaten, Darstell
    * **Vorteile für EroCloud:**
      * Übersetzt geschriebene **Filmtitel, Filmbeschreibungen, SEO-Tags sowie bestehende `.vtt`-Untertitel-Segmente** in beliebige Zielsprachen (`DE <-> EN, FR, ES, IT, NL, PL` usw.).
      * **Keine Zensur / Kein API-Block:** Im Gegensatz zu externen Cloud-Übersetzern (DeepL, Google, OpenAI) blockiert oder verfälscht ein lokales Uncensored/Instruct-Modell explizite Adult- und Fetisch-Begriffe nicht und verursacht keinerlei laufende API-Kosten pro Wort.
+
+---
+
+## 9. 🔗 Geschütztes EroCloud AI-Gateway (`api/ai_gateway.php` für Pay4Coins & interne Dienste)
+
+Da der EroCloud Dedicated Server (`t199.nlserver.net` / `91.184.62.199`, Dell PowerEdge R720 mit **2× Intel Xeon E5-2690 v2 = 20 physische Kerne / 40 Threads** und **64 GB DDR3 ECC RAM**) über erhebliche CPU- und RAM-Reserven verfügt, stellt EroCloud über [`api/ai_gateway.php`](file:///c:/xampp/htdocs/EroCloud/api/ai_gateway.php) (bzw. Clean-URL `https://api.erocloud.net/ai-gateway` via [`api/.htaccess`](file:///c:/xampp/htdocs/EroCloud/api/.htaccess)) ein geschütztes HTTPS-KI-Gateway für das **Pay4Coins Support-Ticket-System** bereit:
+
+1. **Authentifizierung & Sicherheit**:
+   * Zugriffe werden ausschließlich mit gültigem Bearer-Token (`Authorization: Bearer <key>` oder `X-AI-Api-Key`) per zeitkonstantem `hash_equals()` akzeptiert (`ec_ai_gateway_get_expected_key()`, konfigurierbar über `includes/ai_rules/ai_gateway_config.json`).
+2. **Automatischer FFmpeg- & Whisper-Schutz (3-Stufen-Ampel in `ec_ai_gateway_get_server_state()`)**:
+   * Vor jedem KI-Aufruf prüft das Gateway live auf `t199`:
+     * **Aktive Video-Konvertierungen (`FFmpeg`)**: `SELECT COUNT(*) FROM movies WHERE convert_status = '1'` + `pgrep -c ffmpeg`.
+     * **Aktive Untertitel-/BRAM-Cronjobs (`whisper.cpp`)**: Non-blocking Lock-Prüfung auf `/var/www/web1/priv/tmp/erocloud_ai_worker.lock` + `aic_get_worker_status()` + `pgrep -fc whisper-cli`.
+     * **RAM & Load Average**: `/proc/meminfo` (`MemAvailable`) + `sys_getloadavg()`.
+   * **3-Stufen-Steuerung**:
+     * 🟢 **GRÜN (`green` – Frei)**: Weder FFmpeg noch Whisper laufen $\rightarrow$ **Volle Power (`16 Threads`)** für maximale Antwortgeschwindigkeit (~3–7 Sek.).
+     * 🟡 **GELB (`yellow` – FFmpeg oder Whisper aktiv)**: Automatische Drosselung im Modus `busy_policy = 'throttle'` auf **6 Threads (Schon-Modus)**, sodass für Video-Streaming, FFmpeg und Whisper jederzeit **34 freie CPU-Threads** verbleiben (alternativ `pause` / `fallback_local`).
+     * 🔴 **ROT (`red` – Freier RAM `< 3.500 MB` oder System-Load `> 28`)**: Sofortige Schutz-Ablehnung (`busy: true`), damit der EroCloud-Server niemals überlastet wird.
+3. **DB-Verbindungs- & Timeout-Schutz**:
+   * Vor dem Start des lokalen Ollama-Calls (`http://127.0.0.1:11434/api/chat`) schließt `api/ai_gateway.php` aktiv die MySQL-Verbindung (`p4c_close(DB_HOST)`) und sendet während des internen Ollama-Streamings alle 2 Sekunden ein Keep-Alive-Leerzeichen (`" "`), damit weder DB-Connections blockiert werden noch ein Proxy/Apache-Timeout (`504`) auftritt.
