@@ -153,9 +153,10 @@ apt-get update && apt-get install -y zstd curl ca-certificates
 # 2. Ollama Binary direkt von GitHub Releases herunterladen & nach /usr/local entpacken
 curl -fL https://github.com/ollama/ollama/releases/latest/download/ollama-linux-amd64.tar.zst -o /tmp/ollama-linux-amd64.tar.zst
 tar --use-compress-program=unzstd -xf /tmp/ollama-linux-amd64.tar.zst -C /usr/local
+ln -sf /usr/local/bin/ollama /usr/bin/ollama
 rm -f /tmp/ollama-linux-amd64.tar.zst
 
-# 3. Systembenutzer & Systemd-Service mit Nice=15 (FFmpeg-Vorrang) und 24h RAM-Keep-Alive anlegen
+# 3. Systembenutzer & Systemd-Service mit MemoryMax=12G, Nice=15 (FFmpeg-Vorrang) und 24h RAM-Keep-Alive anlegen
 id -u ollama &>/dev/null || useradd -r -s /bin/false -U -m -d /usr/share/ollama ollama
 
 cat << 'EOF' > /etc/systemd/system/ollama.service
@@ -174,6 +175,7 @@ Environment="OLLAMA_HOST=127.0.0.1:11434"
 Environment="OLLAMA_KEEP_ALIVE=24h"
 Environment="OLLAMA_NUM_PARALLEL=1"
 Environment="OLLAMA_MAX_LOADED_MODELS=1"
+MemoryMax=12G
 Nice=15
 IOSchedulingClass=best-effort
 IOSchedulingPriority=6
@@ -184,12 +186,11 @@ EOF
 
 systemctl daemon-reload
 systemctl enable --now ollama
+sleep 2
 
-# 4. Gemma 4 E4B Abliterated direkt von HuggingFace (hf.co) ziehen & auf den Kurznamen mappen
-ollama pull hf.co/huihui-ai/Huihui-gemma-4-E4B-it-qat-q4_0-unquantized-abliterated-GGUF:latest
-ollama cp hf.co/huihui-ai/Huihui-gemma-4-E4B-it-qat-q4_0-unquantized-abliterated-GGUF:latest huihui_ai/gemma-4-abliterated:e4b
-
-# 5. Optional: Größeres Gemma 4 12B Abliterated (~7,4 GB) direkt von HuggingFace ziehen
+# 4. Produktives Hauptmodell: Gemma 4 12B Abliterated (~7,6 GB) direkt von HuggingFace (hf.co) ziehen & auf Kurznamen setzen
 ollama pull hf.co/huihui-ai/Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF:latest
 ollama cp hf.co/huihui-ai/Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF:latest huihui_ai/gemma-4-abliterated:12b
+ollama rm hf.co/huihui-ai/Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF:latest
+ollama list
 ```
