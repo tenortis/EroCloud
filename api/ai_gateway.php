@@ -207,7 +207,7 @@ function ec_ai_gateway_get_server_state(array $gwCfg): array
         }
 
         $whOut = array();
-        @exec('pgrep -fc "whisper-cli" 2>/dev/null', $whOut);
+        @exec('pgrep -c whisper-cli 2>/dev/null', $whOut);
         if (!empty($whOut[0])) {
             $whisperProcCount = max(0, (int)trim((string)$whOut[0]));
         }
@@ -230,7 +230,9 @@ function ec_ai_gateway_get_server_state(array $gwCfg): array
     }
 
     $workerStatus = function_exists('aic_get_worker_status') ? aic_get_worker_status() : array();
-    $workerStateRunning = (isset($workerStatus['state']) && (string)$workerStatus['state'] === 'running');
+    $statusFilePath = SOURCEDIR . '/includes/ai_rules/batch_status.json';
+    $statusFileFresh = (@is_file($statusFilePath) && (time() - (int)@filemtime($statusFilePath)) < 300);
+    $workerStateRunning = ($statusFileFresh && isset($workerStatus['state']) && (string)$workerStatus['state'] === 'running');
 
     $ffmpegActive  = ($convertingMoviesCount > 0 || $ffmpegProcCount > 0);
     $whisperActive = ($whisperLockActive || $whisperProcCount > 0 || $workerStateRunning);
