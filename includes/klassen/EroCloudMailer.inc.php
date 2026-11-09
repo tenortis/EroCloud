@@ -35,14 +35,22 @@ class EroCloudMailer
     private static string $lastStaticRecipient = '';
     private static string $lastStaticMessageId = '';
 
-    public function __get(string $name): mixed
+    /**
+     * @param string $name
+     * @return mixed
+     */
+    public function __get(string $name)
     {
-        return match ($name) {
-            'lastError'          => self::$lastStaticError,
-            'effectiveRecipient' => self::$lastStaticRecipient,
-            'lastMessageId'      => self::$lastStaticMessageId,
-            default              => null,
-        };
+        switch ($name) {
+            case 'lastError':
+                return self::$lastStaticError;
+            case 'effectiveRecipient':
+                return self::$lastStaticRecipient;
+            case 'lastMessageId':
+                return self::$lastStaticMessageId;
+            default:
+                return null;
+        }
     }
 
     /**
@@ -695,7 +703,7 @@ class EroCloudMailer
         if (!empty($data['movie_edit_url'])) {
             $editUrl = (string)$data['movie_edit_url'];
         } elseif ($merchantId > 0 && class_exists('EroCloudMagicLink')) {
-            $editUrl = \EroCloudMagicLink::createUrl($merchantId, $targetRoute, 72);
+            $editUrl = \EroCloudMagicLink::createUrl($merchantId, $targetRoute, 'email', 'movie_converted:' . $movieId);
         } else {
             $editUrl = self::getMcpWebUrl() . '/' . $targetRoute;
         }
@@ -806,7 +814,7 @@ class EroCloudMailer
         $triggerDetail = $triggerPrefix . ($reviewStatus === 'approved' ? 'approved' : 'rejected');
 
         if ($merchantId > 0 && class_exists('EroCloudMagicLink')) {
-            $actionUrl = \EroCloudMagicLink::createUrl($merchantId, $targetRoute, 72);
+            $actionUrl = \EroCloudMagicLink::createUrl($merchantId, $targetRoute, 'email', $triggerDetail . ':' . $contentId);
         } else {
             $actionUrl = self::getMcpWebUrl() . '/' . $targetRoute;
         }
@@ -908,7 +916,7 @@ class EroCloudMailer
         $triggerDetail = 'co_actor_' . (in_array($statusType, ['submitted', 'verified', 'rejected'], true) ? $statusType : 'verified');
 
         if ($merchantId > 0 && class_exists('EroCloudMagicLink')) {
-            $actionUrl = \EroCloudMagicLink::createUrl($merchantId, $targetRoute, 72);
+            $actionUrl = \EroCloudMagicLink::createUrl($merchantId, $targetRoute, 'email', $triggerDetail . ':' . $coActorId);
         } else {
             $actionUrl = self::getMcpWebUrl() . '/' . $targetRoute;
         }

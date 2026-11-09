@@ -130,6 +130,7 @@ define('LOGIN_DOMAIN','login.pay4coins.com');
 define('LOGIN_URL',   'https://login.pay4coins.com');
 
 define('SOURCEDIR', dirname(__FILE__));
+define('KLASSEN_DIR', SOURCEDIR.'/includes/klassen');
 define('ACP_DIR', SOURCEDIR.'/acp');
 define('API_DIR', SOURCEDIR.'/api');
 define('MCP_DIR', SOURCEDIR.'/mcp');

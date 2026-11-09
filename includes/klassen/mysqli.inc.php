@@ -37,6 +37,9 @@ class p4c_mysqli {
             #die('Kann keine Verbindung zur Datenbank herstellen!');
             die('Wartungsarbeiten.');
         }
+
+        // Legacy-Tabellen (2016) nutzen '0000-00-00 00:00:00' DATETIME-Defaults -> NO_ZERO_DATE automatisch deaktivieren
+        @$this->connect->query("SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION';");
     } 
     
     public function change_connect($db='') {
@@ -45,6 +48,7 @@ class p4c_mysqli {
         } else {
             $this->connect->change_user(DB_USER, DB_PASS, DB_NAME);    
         }
+        @$this->connect->query("SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION';");
     }
     
     public function error($result = null) {

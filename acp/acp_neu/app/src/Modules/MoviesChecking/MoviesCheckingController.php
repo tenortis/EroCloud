@@ -916,18 +916,20 @@ final class MoviesCheckingController
             );
 
             // Punktesystem für neuen kostenpflichtigen Film gutschreiben
-            if ($amountSecondVal > 0 && is_file(KLASSEN_DIR . '/PointsSystem.inc.php')) {
-                require_once KLASSEN_DIR . '/PointsSystem.inc.php';
+            $pointsSystemFile = (defined('KLASSEN_DIR') ? (string)KLASSEN_DIR : (SOURCEDIR . '/includes/klassen')) . '/PointsSystem.inc.php';
+            if ($amountSecondVal > 0 && is_file($pointsSystemFile)) {
+                require_once $pointsSystemFile;
                 if (class_exists('PointsSystem')) {
                     try {
-                        $ps = new \PointsSystem();
-                        $ps->MerchantID($merchantId);
-                        $ps->ActorID($actorId);
-                        $ps->AddPoints([
-                            'group'      => 'movie_upload',
-                            'points_for' => 'new_movie',
-                            'info'       => 'ID: #' . $movieId . ' / File-ID: ' . $fileId,
-                        ]);
+                        $ps             = new \PointsSystem();
+                        $ps->group      = 'movie_upload';
+                        $ps->points_for = 'new_movie';
+                        $ps->actor_id   = $actorId;
+                        $ps->date       = date('Y-m-d');
+                        $points         = $ps->get_points();
+                        if ($points !== false) {
+                            $ps->set_points($points);
+                        }
                     } catch (\Throwable $e) {
                         // Nicht-kritischer Fehler beim Punktesystem
                     }
@@ -1301,7 +1303,8 @@ final class MoviesCheckingController
             return;
         }
 
-        require_once KLASSEN_DIR . '/getID3/getid3.php';
+        $getId3File = (defined('MCP_DIR') ? (string)MCP_DIR : (SOURCEDIR . '/mcp')) . '/includes/getid3/getid3.php';
+        require_once $getId3File;
         $getID3   = new \getID3();
         $fileInfo = $getID3->analyze($videoPath);
         unset($fileInfo['filenamepath'], $fileInfo['filepath']);

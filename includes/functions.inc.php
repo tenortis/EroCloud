@@ -10,6 +10,25 @@ if (!defined('SAFE_INC')) {
     die("Hacking attempt...");
 }
 
+if (!function_exists('str_contains')) {
+    function str_contains($haystack, $needle) {
+        return (string)$needle === '' || strpos((string)$haystack, (string)$needle) !== false;
+    }
+}
+if (!function_exists('str_starts_with')) {
+    function str_starts_with($haystack, $needle) {
+        $needleStr = (string)$needle;
+        return $needleStr === '' || strncmp((string)$haystack, $needleStr, strlen($needleStr)) === 0;
+    }
+}
+if (!function_exists('str_ends_with')) {
+    function str_ends_with($haystack, $needle) {
+        $needleStr = (string)$needle;
+        $len       = strlen($needleStr);
+        return $len === 0 || substr((string)$haystack, -$len) === $needleStr;
+    }
+}
+
 // Session erstellen und prüfen
 function p4c_session_start($session_write_close=false) {
     if (headers_sent() || session_status() === PHP_SESSION_ACTIVE) {

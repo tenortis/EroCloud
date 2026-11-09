@@ -33,6 +33,9 @@ foreach ($configCandidates as $candidate) {
 }
 
 // 3. Globale EroCloud Hilfsfunktionen laden
+if (defined('SOURCEDIR') && !defined('KLASSEN_DIR')) {
+    define('KLASSEN_DIR', SOURCEDIR . '/includes/klassen');
+}
 if (defined('SOURCEDIR') && file_exists(SOURCEDIR . '/includes/functions.inc.php')) {
     include_once SOURCEDIR . '/includes/functions.inc.php';
 }

@@ -1,20 +1,22 @@
 <?php
 
+if (!defined('SAFE_INC'))
+    die ("Hacking attempt...");
+
 /**
- * points_group  | points_for       | points   | description
- * ------------------------------------------------------------
- * messeger      | till8hours       | 3        |...
- * messeger      | till16hours      | 2        |...
- * messeger      | till24hours      | 1        |...
- * messeger      | contat_new_user  | 5        |...
- * movie_upload  | new_movie        | 15       |...
- * photo_album_upload  | new_photo_album  | 10 |...
- * webcam        | one_minute_online| 5        |...
- * 
+ * points_group       | points_for        | points | description
+ * -------------------------------------------------------------------
+ * messenger          | till8hours        | 3      | ...
+ * messenger          | till16hours       | 2      | ...
+ * messenger          | till24hours       | 1      | ...
+ * messenger          | contat_new_user   | 5      | ...
+ * movie_upload       | new_movie         | 15     | ...
+ * photo_album_upload | new_photo_album   | 10     | ...
+ * webcam             | one_minute_online | 5      | ...
  */
 
 /*
- * Beschreibeung
+ * Beschreibung
  * ====================
  *
  * $points_cls = new PointsSystem;
@@ -22,77 +24,91 @@
  * $points_cls->points_for = 'till8hours';
  * $points_cls->actor_id = '257';
  * $points_cls->date = '2020-09-10';
-
-// Gibt Anzahl der zu vergeben Punkte für den gewählten Bonus aus
-echo $points_cls->get_points();
-
-// Aktualisiert die Gesamtpunkte des Punkte-Empfängers für die gewählte Gruppe
-$points_cls->set_points($points);
- 
-*/
+ *
+ * // Gibt Anzahl der zu vergebenen Punkte fÃ¼r den gewÃ¤hlten Bonus aus
+ * echo $points_cls->get_points();
+ *
+ * // Aktualisiert die Gesamtpunkte des Punkte-EmpfÃ¤ngers fÃ¼r die gewÃ¤hlte Gruppe
+ * $points_cls->set_points($points);
+ */
 
 class PointsSystem {
-    
-    var $group = '';
-    var $points_for = '';
-    var $actor_id = 0;
-    var $date = '';
-     
+
+    public $group = '';
+    public $points_for = '';
+    public $actor_id = 0;
+    public $merchant_id = 0;
+    public $date = '';
+
     /**
-     * Punkte ausgeben. Wieviele Punkte gibt es für die gewählte Art?
+     * Punkte ausgeben. Wieviele Punkte gibt es fÃ¼r die gewÃ¤hlte Art?
      */
-    function get_points() {
-        $rs_points_system = p4c_query("SELECT * FROM `points_system` WHERE `points_group`='".p4c_escape_string($this->group)."' AND `points_for`='".p4c_escape_string($this->points_for)."' LIMIT 1;",__FILE__,__LINE__);
-        if (p4c_num_rows($rs_points_system) == 0) {
+    public function get_points() {
+        $rs_points_system = p4c_query("SELECT * FROM `points_system` WHERE `points_group`='" . p4c_escape_string((string)$this->group) . "' AND `points_for`='" . p4c_escape_string((string)$this->points_for) . "' LIMIT 1;", __FILE__, __LINE__);
+        if (!$rs_points_system || p4c_num_rows($rs_points_system) == 0) {
             return false;
         } else {
             $points = p4c_fetch_object($rs_points_system);
             return $points->points;
         }
-    }   
-    
+    }
+
     /**
      * Vergebene Punkte loggen
      */
-    function set_points($points=0) {
-        if ($this->actor_id > 0) {
-            
-            if ($this->date == '') {
+    public function set_points($points = 0) {
+        if (abs((int)$this->actor_id) > 0) {
+            if ((string)$this->date === '') {
                 $date = date("Y-m-d");
             } else {
-                $date = $this->date;
+                $date = (string)$this->date;
             }
-            
-            $rs_points_system = p4c_query("SELECT * FROM `points_scoring` WHERE `actor_id`='".abs((int)$this->actor_id)."' AND `date`='".$date."' LIMIT 1;",__FILE__,__LINE__);
-            if (p4c_num_rows($rs_points_system) == 0) {
-                
+
+            $actorId = abs((int)$this->actor_id);
+            $groupCol = preg_replace('/[^a-zA-Z0-9_]/', '', (string)$this->group);
+            if ($groupCol === '') {
+                return;
+            }
+
+            $rs_points_system = p4c_query("SELECT * FROM `points_scoring` WHERE `actor_id`='" . $actorId . "' AND `date`='" . p4c_escape_string($date) . "' LIMIT 1;", __FILE__, __LINE__);
+            if (!$rs_points_system || p4c_num_rows($rs_points_system) == 0) {
                 p4c_query("INSERT INTO `points_scoring` SET
-                    `actor_id`='".abs((int)$this->actor_id)."',
-                    `". p4c_escape_string($this->group)."` = '".abs((int)$points)."',
-                    `date` = '".$date."'
-                ",__FILE__,__LINE__);
-                
+                    `actor_id`='" . $actorId . "',
+                    `" . p4c_escape_string($groupCol) . "` = '" . abs((int)$points) . "',
+                    `date` = '" . p4c_escape_string($date) . "'
+                ;", __FILE__, __LINE__);
             } else {
                 p4c_query("UPDATE `points_scoring` SET
-                    `".p4c_escape_string($this->group)."` = `".p4c_escape_string($this->group)."` + ".abs((int)$points)."
-                WHERE 
-                    `actor_id` = '".abs((int)$this->actor_id)."' AND
-                    `date` = '".$date."'
-                LIMIT 1;",__FILE__,__LINE__);
+                    `" . p4c_escape_string($groupCol) . "` = `" . p4c_escape_string($groupCol) . "` + " . abs((int)$points) . "
+                WHERE
+                    `actor_id` = '" . $actorId . "' AND
+                    `date` = '" . p4c_escape_string($date) . "'
+                LIMIT 1;", __FILE__, __LINE__);
             }
         }
-    }    
+    }
+
+    public function MerchantID($merchantId = 0) {
+        $this->merchant_id = abs((int)$merchantId);
+    }
+
+    public function ActorID($actorId = 0) {
+        $this->actor_id = abs((int)$actorId);
+    }
+
+    public function AddPoints(array $params = []) {
+        if (!empty($params['group'])) {
+            $this->group = (string)$params['group'];
+        }
+        if (!empty($params['points_for'])) {
+            $this->points_for = (string)$params['points_for'];
+        }
+        if ((string)$this->date === '') {
+            $this->date = date('Y-m-d');
+        }
+        $points = $this->get_points();
+        if ($points !== false) {
+            $this->set_points($points);
+        }
+    }
 }
-
-/*
-$points_cls = new PointsSystem;
-$points_cls->group = 'messenger';
-$points_cls->points_for = 'till8hours';
-$points_cls->actor_id = '257';
-$points_cls->date = '2020-09-10';
-
-if ($points_cls->get_points() != false) {
-    $points = $points_cls->get_points();
-    $points_cls->set_points($points);
-};
-*/

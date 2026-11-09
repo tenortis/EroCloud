@@ -319,16 +319,32 @@ class QrCodeSvg
                 if ($isFunction[$y][$x]) {
                     continue;
                 }
-                $invert = match ($mask) {
-                    0 => (($x + $y) % 2 === 0),
-                    1 => ($y % 2 === 0),
-                    2 => ($x % 3 === 0),
-                    3 => (($x + $y) % 3 === 0),
-                    4 => (((intdiv($y, 2) + intdiv($x, 3)) % 2) === 0),
-                    5 => ((($x * $y) % 2 + ($x * $y) % 3) === 0),
-                    6 => (((($x * $y) % 2 + ($x * $y) % 3) % 2) === 0),
-                    default => (((($x + $y) % 2 + ($x * $y) % 3) % 2) === 0),
-                };
+                switch ($mask) {
+                    case 0:
+                        $invert = (($x + $y) % 2 === 0);
+                        break;
+                    case 1:
+                        $invert = ($y % 2 === 0);
+                        break;
+                    case 2:
+                        $invert = ($x % 3 === 0);
+                        break;
+                    case 3:
+                        $invert = (($x + $y) % 3 === 0);
+                        break;
+                    case 4:
+                        $invert = (((intdiv($y, 2) + intdiv($x, 3)) % 2) === 0);
+                        break;
+                    case 5:
+                        $invert = ((($x * $y) % 2 + ($x * $y) % 3) === 0);
+                        break;
+                    case 6:
+                        $invert = (((($x * $y) % 2 + ($x * $y) % 3) % 2) === 0);
+                        break;
+                    default:
+                        $invert = (((($x + $y) % 2 + ($x * $y) % 3) % 2) === 0);
+                        break;
+                }
                 if ($invert) {
                     $modules[$y][$x] = !$modules[$y][$x];
                 }

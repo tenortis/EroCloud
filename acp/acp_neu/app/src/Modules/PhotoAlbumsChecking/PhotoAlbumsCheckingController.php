@@ -903,18 +903,20 @@ final class PhotoAlbumsCheckingController
             );
 
             // Punktesystem für neues kostenpflichtiges Fotoalbum gutschreiben
-            if ($amountDownload > 0 && is_file(KLASSEN_DIR . '/PointsSystem.inc.php')) {
-                require_once KLASSEN_DIR . '/PointsSystem.inc.php';
+            $pointsSystemFile = (defined('KLASSEN_DIR') ? (string)KLASSEN_DIR : (SOURCEDIR . '/includes/klassen')) . '/PointsSystem.inc.php';
+            if ($amountDownload > 0 && is_file($pointsSystemFile)) {
+                require_once $pointsSystemFile;
                 if (class_exists('PointsSystem')) {
                     try {
-                        $ps = new \PointsSystem();
-                        $ps->MerchantID($merchantId);
-                        $ps->ActorID($actorId);
-                        $ps->AddPoints([
-                            'group'      => 'photo_album_upload',
-                            'points_for' => 'new_photo_album',
-                            'info'       => 'ID: #' . $albumDbId . ' / Album-ID: ' . $albumIdHash,
-                        ]);
+                        $ps             = new \PointsSystem();
+                        $ps->group      = 'photo_album_upload';
+                        $ps->points_for = 'new_photo_album';
+                        $ps->actor_id   = $actorId;
+                        $ps->date       = date('Y-m-d');
+                        $points         = $ps->get_points();
+                        if ($points !== false) {
+                            $ps->set_points($points);
+                        }
                     } catch (\Throwable $e) {
                         // Nicht-kritischer Fehler beim Punktesystem
                     }

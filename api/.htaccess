@@ -7,6 +7,7 @@ Options -Indexes
 RewriteEngine on
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 RewriteRule ^ai-gateway$ ai_gateway.php [L,QSA]
+RewriteRule ^p4c-internal$ p4c_internal.php [L,QSA]
 
 RewriteRule ^Player/([^/]+)/([^/]+)/([^/?&]+)$ movie_player.php?user_streaming_key=$1&movie_id=$2&access_token=$3&%{QUERY_STRING} [L]
 RewriteRule ^Downloader/([^/]+)/([^/]+)/([^/?&]+)$ movie_downloader.php?user_streaming_key=$1&movie_id=$2&access_token=$3&%{QUERY_STRING} [L]

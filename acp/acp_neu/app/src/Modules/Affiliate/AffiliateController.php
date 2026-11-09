@@ -295,19 +295,20 @@ final class AffiliateController
             return;
         }
 
-        $phpCli = '/usr/bin/php';
-        if (is_executable('/opt/php-8.4/bin/php')) {
-            $phpCli = '/opt/php-8.4/bin/php';
-        } elseif (is_executable('/opt/php-8.0/bin/php')) {
-            $phpCli = '/opt/php-8.0/bin/php';
-        } elseif (defined('PHP_BINARY') && PHP_BINARY !== '' && is_executable(PHP_BINARY)) {
-            $phpCli = PHP_BINARY;
-        }
-
         $output = [];
         $retval = 0;
         if (function_exists('exec')) {
-            $cmd = escapeshellcmd($phpCli) . ' ' . escapeshellarg($cronScript) . ' --date=' . escapeshellarg($importDate);
+            if (DIRECTORY_SEPARATOR === '/') {
+                // Auf dem Linux-Live-Server (/opt/ liegt außerhalb von open_basedir) bevorzugt PHP 8.4 / 8.0 nutzen
+                $argScript = escapeshellarg($cronScript);
+                $argDate   = escapeshellarg($importDate);
+                $cmd = 'if [ -x /opt/php-8.4/bin/php ]; then /opt/php-8.4/bin/php ' . $argScript . ' --date=' . $argDate
+                     . '; elif [ -x /opt/php-8.0/bin/php ]; then /opt/php-8.0/bin/php ' . $argScript . ' --date=' . $argDate
+                     . '; else /usr/bin/php ' . $argScript . ' --date=' . $argDate . '; fi';
+            } else {
+                $phpCli = (defined('PHP_BINARY') && PHP_BINARY !== '') ? PHP_BINARY : 'php';
+                $cmd    = escapeshellcmd($phpCli) . ' ' . escapeshellarg($cronScript) . ' --date=' . escapeshellarg($importDate);
+            }
             @exec($cmd, $output, $retval);
         } else {
             Response::error('Die PHP-Funktion exec() ist auf diesem System deaktiviert.', 500);
