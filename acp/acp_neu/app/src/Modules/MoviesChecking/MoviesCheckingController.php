@@ -282,13 +282,14 @@ final class MoviesCheckingController
         }
 
         // Merchant-Details laden
-        $merchantPartnerId = $merchantId;
+        $merchantPartnerId = '';
         $merchantUsername  = 'Merchant #' . $merchantId;
         if (class_exists('Merchant')) {
             try {
                 $merchantObj = new \Merchant($mysql, $merchantId);
-                if (!empty($merchantObj->partner_id)) {
-                    $merchantPartnerId = abs((int)$merchantObj->partner_id);
+                $pidRaw = trim((string)$merchantObj->partner_id());
+                if ($pidRaw !== '') {
+                    $merchantPartnerId = $pidRaw;
                 }
                 $decUser = (string)$merchantObj->username('aes_decrypt');
                 if ($decUser !== '') {
@@ -296,6 +297,17 @@ final class MoviesCheckingController
                 }
             } catch (\Throwable $e) {
                 // Fallback behalten
+            }
+        }
+        if ($merchantPartnerId === '' && $merchantId > 0) {
+            $rsMerchantPid = p4c_query(
+                "SELECT `partner_id` FROM `merchants` WHERE `id` = '" . $merchantId . "' LIMIT 1;",
+                __FILE__,
+                __LINE__
+            );
+            if ($rsMerchantPid && p4c_num_rows($rsMerchantPid) > 0) {
+                $mPidRow = p4c_fetch_object($rsMerchantPid);
+                $merchantPartnerId = trim((string)($mPidRow->partner_id ?? ''));
             }
         }
 
@@ -373,19 +385,28 @@ final class MoviesCheckingController
         $hasCustomFsk18  = is_file($movieDir . '/thumb_' . $movieId . '_' . $fileId . '_12.jpg');
 
         // Angeschlossene Partner-Webseiten laden (für visible_for_website)
+        $currentVisibleForWebsite = trim((string)($m->visible_for_website ?? ''));
+        if ($currentVisibleForWebsite === '') {
+            $currentVisibleForWebsite = 'public';
+        }
         $merchantDomains = [];
-        $rsSites = p4c_query(
-            "SELECT `domain` FROM `sites` WHERE `partner_id` = '" . $merchantPartnerId . "' AND `status` = '1' ORDER BY `domain` ASC;",
-            __FILE__,
-            __LINE__
-        );
-        if ($rsSites && p4c_num_rows($rsSites) > 0) {
-            while ($s = p4c_fetch_object($rsSites)) {
-                $dom = trim((string)($s->domain ?? ''));
-                if ($dom !== '') {
-                    $merchantDomains[] = $dom;
+        if ($merchantPartnerId !== '') {
+            $rsSites = p4c_query(
+                "SELECT `domain` FROM `sites` WHERE `partner_id` = '" . p4c_escape_string($merchantPartnerId) . "' AND `status` = '1' ORDER BY `domain` ASC;",
+                __FILE__,
+                __LINE__
+            );
+            if ($rsSites && p4c_num_rows($rsSites) > 0) {
+                while ($s = p4c_fetch_object($rsSites)) {
+                    $dom = trim((string)($s->domain ?? ''));
+                    if ($dom !== '' && !in_array($dom, $merchantDomains, true)) {
+                        $merchantDomains[] = $dom;
+                    }
                 }
             }
+        }
+        if ($currentVisibleForWebsite !== 'public' && !in_array($currentVisibleForWebsite, $merchantDomains, true)) {
+            $merchantDomains[] = $currentVisibleForWebsite;
         }
 
         // Film-Texte dekodieren
@@ -534,7 +555,7 @@ final class MoviesCheckingController
             'as_download'         => abs((int)($m->as_download ?? 0)) === 1,
             'amount_download'     => abs((int)($m->amount_download ?: 10)),
             'status'              => (string)($m->status ?: 'active'),
-            'visible_for_website' => (string)($m->visible_for_website ?: 'public'),
+            'visible_for_website' => $currentVisibleForWebsite,
             'admin_infos'         => $adminInfos,
             'released'            => abs((int)($m->released ?? 0)),
             'movie_checked'       => (string)($m->movie_checked ?? ''),
@@ -724,6 +745,9 @@ final class MoviesCheckingController
         $preview = abs((int)$this->request->post('preview', 0)) === 1 ? 1 : 0;
 
         $visibleForWebsite = trim((string)$this->request->post('visible_for_website', 'public'));
+        if ($visibleForWebsite === '') {
+            $visibleForWebsite = 'public';
+        }
         if (in_array('poppers', $validCategories, true) && $visibleForWebsite === 'public') {
             $errors[] = 'Filme mit der Kategorie „Poppers“ dürfen nicht auf „Alle Webseiten (public)“ gestellt werden.';
         }

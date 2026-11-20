@@ -432,13 +432,24 @@ final class MoviesOnlineController
         }
 
         // Merchant-Infos laden
-        $merchantPartnerId = 0;
+        $merchantPartnerId = '';
         $merchantUsername  = 'Unbekannt';
         if (class_exists('Merchant')) {
             global $mysql;
             $merchantObj       = new \Merchant($mysql, $merchantId);
-            $merchantPartnerId = abs((int)$merchantObj->partner_id());
+            $merchantPartnerId = trim((string)$merchantObj->partner_id());
             $merchantUsername  = self::decodeText((string)$merchantObj->username('aes_decrypt'));
+        }
+        if ($merchantPartnerId === '' && $merchantId > 0) {
+            $rsMerchantPid = p4c_query(
+                "SELECT `partner_id` FROM `merchants` WHERE `id` = '" . $merchantId . "' LIMIT 1;",
+                __FILE__,
+                __LINE__
+            );
+            if ($rsMerchantPid && p4c_num_rows($rsMerchantPid) > 0) {
+                $mPidRow = p4c_fetch_object($rsMerchantPid);
+                $merchantPartnerId = trim((string)($mPidRow->partner_id ?? ''));
+            }
         }
 
         // Darsteller-Profile des Merchants laden
@@ -488,21 +499,28 @@ final class MoviesOnlineController
         }
 
         // Partner-Domains laden
+        $currentVisibleForWebsite = trim((string)($mo->visible_for_website ?? ''));
+        if ($currentVisibleForWebsite === '') {
+            $currentVisibleForWebsite = 'public';
+        }
         $merchantDomains = [];
-        if ($merchantPartnerId > 0) {
+        if ($merchantPartnerId !== '') {
             $rsSites = p4c_query(
-                "SELECT `domain` FROM `sites` WHERE `partner_id` = '" . $merchantPartnerId . "' AND `status` = '1' ORDER BY `domain` ASC;",
+                "SELECT `domain` FROM `sites` WHERE `partner_id` = '" . p4c_escape_string($merchantPartnerId) . "' AND `status` = '1' ORDER BY `domain` ASC;",
                 __FILE__,
                 __LINE__
             );
             if ($rsSites && p4c_num_rows($rsSites) > 0) {
                 while ($s = p4c_fetch_object($rsSites)) {
                     $dom = trim((string)($s->domain ?? ''));
-                    if ($dom !== '') {
+                    if ($dom !== '' && !in_array($dom, $merchantDomains, true)) {
                         $merchantDomains[] = $dom;
                     }
                 }
             }
+        }
+        if ($currentVisibleForWebsite !== 'public' && !in_array($currentVisibleForWebsite, $merchantDomains, true)) {
+            $merchantDomains[] = $currentVisibleForWebsite;
         }
 
         // Dateipfad & technische Details
@@ -750,7 +768,7 @@ final class MoviesOnlineController
                 'as_download'          => abs((int)($mo->as_download ?? 0)),
                 'amount_download'      => abs((int)($mo->amount_download ?? 0)),
                 'status'               => (string)($mo->status ?? 'active'),
-                'visible_for_website'  => (string)($mo->visible_for_website ?? 'public'),
+                'visible_for_website'  => $currentVisibleForWebsite,
                 'admin_infos'          => $adminInfos,
                 'create_datetime'      => (string)($m->create_datetime ?? ''),
                 'movie_checked'        => (string)($mo->movie_checked ?? ''),
@@ -950,6 +968,9 @@ final class MoviesOnlineController
         $preview = abs((int)$this->request->post('preview', 0)) === 1 ? 1 : 0;
 
         $visibleForWebsite = trim(strip_tags((string)$this->request->post('visible_for_website', 'public')));
+        if ($visibleForWebsite === '') {
+            $visibleForWebsite = 'public';
+        }
         if (in_array('poppers', $validCategories, true) && $visibleForWebsite === 'public') {
             $errors[] = 'Filme mit der Kategorie „Poppers“ dürfen nicht auf „allen Partnerwebsites (public)“ vermarktet werden.';
         }
@@ -1235,13 +1256,24 @@ final class MoviesOnlineController
         }
 
         // Merchant-Infos laden (exakt wie in edit())
-        $merchantPartnerId = 0;
+        $merchantPartnerId = '';
         $merchantUsername  = 'Unbekannt';
         if (class_exists('Merchant')) {
             global $mysql;
             $merchantObj       = new \Merchant($mysql, $merchantId);
-            $merchantPartnerId = abs((int)$merchantObj->partner_id());
+            $merchantPartnerId = trim((string)$merchantObj->partner_id());
             $merchantUsername  = self::decodeText((string)$merchantObj->username('aes_decrypt'));
+        }
+        if ($merchantPartnerId === '' && $merchantId > 0) {
+            $rsMerchantPid = p4c_query(
+                "SELECT `partner_id` FROM `merchants` WHERE `id` = '" . $merchantId . "' LIMIT 1;",
+                __FILE__,
+                __LINE__
+            );
+            if ($rsMerchantPid && p4c_num_rows($rsMerchantPid) > 0) {
+                $mPidRow = p4c_fetch_object($rsMerchantPid);
+                $merchantPartnerId = trim((string)($mPidRow->partner_id ?? ''));
+            }
         }
 
         // Darsteller-Profile des Merchants laden
@@ -1282,21 +1314,28 @@ final class MoviesOnlineController
         }
 
         // Partner-Domains laden
+        $currentVisibleForWebsite = trim((string)($m->visible_for_website ?? ''));
+        if ($currentVisibleForWebsite === '') {
+            $currentVisibleForWebsite = 'public';
+        }
         $merchantDomains = [];
-        if ($merchantPartnerId > 0) {
+        if ($merchantPartnerId !== '') {
             $rsSites = p4c_query(
-                "SELECT `domain` FROM `sites` WHERE `partner_id` = '" . $merchantPartnerId . "' AND `status` = '1' ORDER BY `domain` ASC;",
+                "SELECT `domain` FROM `sites` WHERE `partner_id` = '" . p4c_escape_string($merchantPartnerId) . "' AND `status` = '1' ORDER BY `domain` ASC;",
                 __FILE__,
                 __LINE__
             );
             if ($rsSites && p4c_num_rows($rsSites) > 0) {
                 while ($s = p4c_fetch_object($rsSites)) {
                     $dom = trim((string)($s->domain ?? ''));
-                    if ($dom !== '') {
+                    if ($dom !== '' && !in_array($dom, $merchantDomains, true)) {
                         $merchantDomains[] = $dom;
                     }
                 }
             }
+        }
+        if ($currentVisibleForWebsite !== 'public' && !in_array($currentVisibleForWebsite, $merchantDomains, true)) {
+            $merchantDomains[] = $currentVisibleForWebsite;
         }
 
         // Dateipfad & technische Details
@@ -1547,7 +1586,7 @@ final class MoviesOnlineController
                 'convert_starttime'    => $cStart,
                 'convert_endtime'      => $cEnd,
                 'convert_duration'     => $convertDurationText,
-                'visible_for_website'  => (string)($m->visible_for_website ?? 'public'),
+                'visible_for_website'  => $currentVisibleForWebsite,
                 'admin_infos'          => $adminInfos,
                 'create_datetime'      => (string)($m->create_datetime ?? ''),
                 'movie_checked'        => (string)($m->movie_checked ?? ''),
