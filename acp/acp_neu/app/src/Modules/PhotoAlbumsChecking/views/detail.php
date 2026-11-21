@@ -884,6 +884,57 @@ foreach ($rejectionReasons as $rrCheck) {
   </div>
 </div>
 
+<?php if ((string)($employeeRule ?? '') === 'write'): ?>
+  <?php
+    $effPurchasesCheck = (int)($onlineInfo['effective_purchases'] ?? $onlineInfo['purchases'] ?? 0);
+    $isInOnlineCheck   = !empty($onlineInfo['is_in_online']);
+    $folderSizeTxt     = (string)($album['folder_size_text'] ?? '-');
+  ?>
+  <!-- ========================================================================
+       ADMIN-BEREICH: FOTOALBUM UNWIDERRUFLICH PHYSISCH LÖSCHEN (NUR WRITE-ADMIN)
+       ======================================================================== -->
+  <div class="card-kkc border-danger border-opacity-50 mb-4" id="pac-hard-delete-card">
+    <div class="card-kkc-header flex-wrap gap-2 bg-danger bg-opacity-10">
+      <div class="card-title text-danger">
+        <i class="bi bi-trash3-fill"></i>
+        <span>Fotoalbum unwiderruflich löschen (Nur Administrator)</span>
+      </div>
+      <?php if ($effPurchasesCheck > 0): ?>
+        <span class="badge-kkc badge-kkc-danger">
+          <i class="bi bi-people-fill me-1"></i><?= $effPurchasesCheck ?> Kundenkäufe vorhanden
+        </span>
+      <?php else: ?>
+        <span class="badge-kkc badge-kkc-success">
+          <i class="bi bi-check2-circle me-1"></i>0 Käufe (ungekauft)
+        </span>
+      <?php endif; ?>
+    </div>
+    <div class="card-kkc-body small">
+      <?php if ($effPurchasesCheck > 0): ?>
+        <p class="text-muted mb-2">
+          Dieses Fotoalbum wurde bereits <strong><?= $effPurchasesCheck ?>-mal</strong> gekauft (Speicherbedarf: <code><?= View::e($folderSizeTxt) ?></code>).
+          Eine sofortige unwiderrufliche Löschung entfernt alle Bilddateien sowie die Kunden-Zugriffe und darf ausschließlich bei zwingenden rechtlichen Gründen (z. B. Persönlichkeitsrecht, Urheberrecht oder Datenschutz/DSGVO) erfolgen.
+        </p>
+      <?php elseif ($isInOnlineCheck): ?>
+        <p class="text-muted mb-2">
+          Dieses Fotoalbum wurde noch <strong>nie gekauft</strong> (<code>0</code> Käufe, Speicherbedarf: <code><?= View::e($folderSizeTxt) ?></code>), war aber bereits in <code>photo_albums_online</code> veröffentlicht.
+          Beim unwiderruflichen Löschen werden alle Bilddateien sofort physisch vom Server entfernt und angeschlossene EroCMS-Portale erhalten automatisch das Löschsignal.
+        </p>
+      <?php else: ?>
+        <p class="text-muted mb-2">
+          Dieses Fotoalbum war noch <strong>nie veröffentlicht</strong> und wurde noch <strong>nie gekauft</strong> (Speicherbedarf: <code><?= View::e($folderSizeTxt) ?></code>).
+          Es kann inklusive aller Bilddateien und Datenbankeinträge sofort und vollständig rückstandslos gelöscht werden.
+        </p>
+      <?php endif; ?>
+      <div class="d-flex justify-content-end">
+        <button type="button" class="btn btn-outline-danger btn-sm fw-bold" onclick="App.openPhotoAlbumCheckingHardDeleteModal()">
+          <i class="bi bi-exclamation-octagon-fill me-1"></i> Fotoalbum unwiderruflich löschen…
+        </button>
+      </div>
+    </div>
+  </div>
+<?php endif; ?>
+
   </div>
 
   <!-- ========================================================================
@@ -1029,3 +1080,82 @@ foreach ($rejectionReasons as $rrCheck) {
     </div>
   </div>
 </div>
+
+<?php if ((string)($employeeRule ?? '') === 'write'): ?>
+  <?php
+    $effPurchasesModal = (int)($onlineInfo['effective_purchases'] ?? $onlineInfo['purchases'] ?? 0);
+    $isInOnlineModal   = !empty($onlineInfo['is_in_online']);
+    $folderSizeModal   = (string)($album['folder_size_text'] ?? '-');
+  ?>
+  <div class="modal fade" id="pacHardDeleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-danger" style="background: var(--kkc-surface, #ffffff);">
+        <form id="pac-hard-delete-form" onsubmit="return App.submitPhotoAlbumCheckingHardDelete(event)">
+          <input type="hidden" name="album_id" value="<?= $albumDbId ?>">
+          <div class="modal-header border-bottom border-danger border-opacity-25">
+            <h5 class="modal-title h6 fw-bold text-danger mb-0">
+              <i class="bi bi-exclamation-octagon-fill me-2"></i>Fotoalbum #<?= $albumDbId ?> unwiderruflich löschen
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+          </div>
+          <div class="modal-body small">
+            <p class="mb-2">
+              Alle Bilddateien, Vorschauen und Cover von <strong>„<?= View::e((string)$album['title']) ?>“</strong> (<code><?= View::e($folderSizeModal) ?></code>) werden sofort unwiderruflich vom Server gelöscht.
+              <?php if ($isInOnlineModal): ?>
+                Angeschlossene EroCMS-Seiten erhalten automatisch das Löschsignal.
+              <?php else: ?>
+                Da das Album noch nie veröffentlicht war, wird der gesamte Datensatz vollständig und rückstandslos entfernt.
+              <?php endif; ?>
+            </p>
+
+            <?php if ($effPurchasesModal > 0): ?>
+              <div class="alert alert-danger py-2 px-3 mb-3">
+                <div class="fw-bold mb-1">
+                  <i class="bi bi-people-fill me-1"></i>Achtung: <?= $effPurchasesModal ?> Kunden haben dieses Fotoalbum gekauft!
+                </div>
+                <div>
+                  Durch die unwiderrufliche Löschung verlieren diese Kunden dauerhaft den Zugriff auf ihr bezahltes Fotoalbum.
+                  Führe diesen Schritt nur bei zwingenden rechtlichen Gründen (Persönlichkeitsrecht, Urheberrecht, DSGVO) aus.
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-bold mb-1">Zwingender Löschgrund (Rechts-/DSGVO-Dokumentation) *</label>
+                <input type="text" name="delete_reason" id="pac-hard-delete-reason" class="form-control form-control-sm"
+                       minlength="5" maxlength="250" required
+                       placeholder="z. B. DSGVO-Löschanfrage / Persönlichkeitsrecht Mitwirkende">
+              </div>
+              <div class="form-check mb-1">
+                <input class="form-check-input" type="checkbox" name="force_legal_delete" value="1" id="pac-force-legal-delete" required>
+                <label class="form-check-label fw-semibold text-danger" for="pac-force-legal-delete">
+                  Ich bestätige als Administrator, dass die unwiderrufliche Löschung trotz <?= $effPurchasesModal ?> bestehender Kundenkäufe aus rechtlichen/datenschutzrechtlichen Gründen zwingend erforderlich ist.
+                </label>
+              </div>
+            <?php else: ?>
+              <div class="alert alert-secondary py-2 px-3 mb-3">
+                <i class="bi bi-check2-circle text-success me-1"></i>
+                Es liegen <strong>0 Kundenkäufe</strong> vor. Das ungekaufte Fotoalbum kann ohne Nachteile für Kunden unwiderruflich entfernt werden.
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-semibold mb-1">Interne Notiz / Grund (optional)</label>
+                <input type="text" name="delete_reason" id="pac-hard-delete-reason" class="form-control form-control-sm"
+                       maxlength="250" placeholder="z. B. Doppel-Upload auf Wunsch der Creatorin">
+              </div>
+              <div class="form-check mb-1">
+                <input class="form-check-input" type="checkbox" name="confirm_hard_delete" value="1" id="pac-confirm-hard-delete" required>
+                <label class="form-check-label fw-semibold text-danger" for="pac-confirm-hard-delete">
+                  Ja, ich bestätige ausdrücklich, dass Fotoalbum #<?= $albumDbId ?> und alle Bilddateien unwiderruflich gelöscht werden.
+                </label>
+              </div>
+            <?php endif; ?>
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-sm btn-outline-kkc" data-bs-dismiss="modal">Abbrechen</button>
+            <button type="submit" class="btn btn-sm btn-danger" id="pac-hard-delete-submit-btn">
+              <i class="bi bi-trash3-fill me-1"></i> Jetzt unwiderruflich löschen
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+<?php endif; ?>

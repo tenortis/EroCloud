@@ -135,6 +135,7 @@ class Router
         self::register('photo-albums-checking/toggle-photo', $photoAlbumsCheckingCtrl, 'togglePhoto', 'content_check,content_online');
         self::register('photo-albums-checking/approve', $photoAlbumsCheckingCtrl, 'approve', 'content_check');
         self::register('photo-albums-checking/reject', $photoAlbumsCheckingCtrl, 'reject', 'content_check');
+        self::register('photo-albums-checking/hard-delete', $photoAlbumsCheckingCtrl, 'hardDelete', 'content_check');
         self::register('photo-albums-checking/co-actor-action', $photoAlbumsCheckingCtrl, 'coActorAction', 'content_check,content_online');
         self::register('photo-albums-checking/ai-action', $photoAlbumsCheckingCtrl, 'aiAction', 'content_check,content_online');
 

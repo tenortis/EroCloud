@@ -11,6 +11,7 @@ use App\Core\Csrf;
 use App\Core\Request;
 use App\Core\Response;
 use App\Core\View;
+use App\Modules\MoviesOnline\MoviesOnlineController;
 
 /**
  * EroCloud ACP (v2.0) - PhotoAlbumsCheckingController
@@ -265,13 +266,15 @@ final class PhotoAlbumsCheckingController
             }
         }
 
-        // Prüfen, ob das Fotoalbum bereits in photo_albums_online existiert
+        // Prüfen, ob das Fotoalbum bereits in photo_albums_online existiert + reale Käuferanzahl laden
         $onlineInfo = [
-            'is_in_online'  => false,
-            'online_status' => '',
-            'views'         => abs((int)($a->views ?? 0)),
-            'purchases'     => abs((int)($a->purchases ?? 0)),
-            'last_purchase' => (string)($a->last_purchase ?? ''),
+            'is_in_online'        => false,
+            'online_status'       => '',
+            'views'               => abs((int)($a->views ?? 0)),
+            'purchases'           => abs((int)($a->purchases ?? 0)),
+            'access_count'        => 0,
+            'effective_purchases' => abs((int)($a->purchases ?? 0)),
+            'last_purchase'       => (string)($a->last_purchase ?? ''),
         ];
         $rsOnline = p4c_query(
             "SELECT `id`, `status`, `views`, `purchases`, `last_purchase`
@@ -289,6 +292,21 @@ final class PhotoAlbumsCheckingController
             $onlineInfo['purchases']     = abs((int)($onObj->purchases ?? $onlineInfo['purchases']));
             $onlineInfo['last_purchase'] = (string)($onObj->last_purchase ?? $onlineInfo['last_purchase']);
         }
+        $accessCount = 0;
+        if ($albumIdHash !== '') {
+            $rsAccessCnt = p4c_query(
+                "SELECT COUNT(*) AS `cnt`
+                 FROM `photo_albums_access`
+                 WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "';",
+                __FILE__,
+                __LINE__
+            );
+            if ($rsAccessCnt && p4c_num_rows($rsAccessCnt) > 0) {
+                $accessCount = abs((int)(p4c_fetch_object($rsAccessCnt)->cnt ?? 0));
+            }
+        }
+        $onlineInfo['access_count']        = $accessCount;
+        $onlineInfo['effective_purchases'] = max((int)$onlineInfo['purchases'], abs((int)($a->purchases ?? 0)), $accessCount);
 
         // Alle Einzelfotos des Albums laden
         $photos        = [];
@@ -482,6 +500,17 @@ final class PhotoAlbumsCheckingController
         $maxOnlineAtInput  = function_exists('ec_get_max_online_at_input') ? ec_get_max_online_at_input() : date('Y-m-d\T23:59', strtotime('+12 months'));
         $maxOnlineAtDe     = function_exists('ec_get_max_online_at_timestamp') ? date('d.m.Y', ec_get_max_online_at_timestamp()) : date('d.m.Y', strtotime('+12 months'));
 
+        $storageLoc = trim((string)($a->storage_location ?? ''));
+        if ($storageLoc === '') {
+            $storageLoc = defined('PHOTO_ALBUMS_DEFAULT_DIR') ? (string)PHOTO_ALBUMS_DEFAULT_DIR : 'photo_albums';
+        }
+        $folderBytes = 0;
+        if (defined('PHOTO_ALBUMS_PATH') && $merchantId > 0 && $albumDbId > 0) {
+            $albumDir    = rtrim((string)PHOTO_ALBUMS_PATH, '/\\') . '/' . trim($storageLoc, '/\\') . '/' . $merchantId . '/' . $albumDbId;
+            $folderBytes = MoviesOnlineController::getFolderSize($albumDir);
+        }
+        $folderSizeText = $folderBytes > 0 ? MoviesOnlineController::formatBytes($folderBytes) : '-';
+
         $albumData = [
             'id'                  => $albumDbId,
             'album_id'            => $albumIdHash,
@@ -491,7 +520,8 @@ final class PhotoAlbumsCheckingController
             'actor_id'            => $actorId,
             'actor_exists'        => $currentActorExists,
             'actor_name'          => $currentActorName,
-            'storage_location'    => (string)($a->storage_location ?? ''),
+            'storage_location'    => $storageLoc,
+            'folder_size_text'    => $folderSizeText,
             'checksum'            => (string)($a->checksum ?? ''),
             'number_of_photos'    => count($photos),
             'rejected_photos'     => $rejectedCount,
@@ -1096,6 +1126,217 @@ final class PhotoAlbumsCheckingController
         Response::json([
             'status'          => 'ok',
             'message'         => "Das Fotoalbum #{$albumDbId} („{$title}“) wurde abgelehnt.",
+            'next_album_id'   => $nextId,
+            'remaining_count' => count($remainingQueue),
+        ]);
+    }
+
+    /**
+     * 5b. AJAX: Fotoalbum durch Administrator unwiderruflich physisch löschen (POST ?route=photo-albums-checking/hard-delete)
+     */
+    public function hardDelete(): void
+    {
+        if (!$this->request->isPost()) {
+            Response::error('Ungültige Anfrage-Methode.', 405);
+            return;
+        }
+
+        $csrf = (string)$this->request->post('_csrf', $this->request->header('X-CSRF-Token'));
+        if (!Csrf::validate($csrf)) {
+            Response::error('Dein Sicherheitstoken ist abgelaufen. Bitte lade die Seite neu.', 403);
+            return;
+        }
+
+        if ((string)($_SESSION['employee_rule'] ?? '') !== 'write') {
+            Response::error('Nur Administratoren mit voller Schreibberechtigung dürfen Fotoalben unwiderruflich löschen.', 403);
+            return;
+        }
+
+        $employeeId        = abs((int)($_SESSION['employee_id'] ?? 0));
+        $albumDbId         = abs((int)$this->request->post('album_id', 0));
+        $confirmHardDelete = (string)$this->request->post('confirm_hard_delete', '0') === '1';
+        $forceLegalDelete  = (string)$this->request->post('force_legal_delete', '0') === '1';
+        $deleteReason      = trim(strip_tags((string)$this->request->post('delete_reason', '')));
+
+        if ($albumDbId <= 0) {
+            Response::error('Ungültige Fotoalbum-ID.', 400);
+            return;
+        }
+
+        $rsAlbum = p4c_query("SELECT * FROM `photo_albums` WHERE `id` = '" . $albumDbId . "' LIMIT 1;", __FILE__, __LINE__);
+        if (!$rsAlbum || p4c_num_rows($rsAlbum) === 0) {
+            Response::error('Das Fotoalbum wurde nicht in der Datenbank gefunden.', 404);
+            return;
+        }
+
+        $a           = p4c_fetch_object($rsAlbum);
+        $albumIdHash = (string)($a->album_id ?? '');
+        $merchantId  = abs((int)($a->merchant_id ?? 0));
+        $title       = self::decodeText((string)($a->title ?? ''));
+
+        $onObj      = null;
+        $isInOnline = false;
+        if ($albumIdHash !== '') {
+            $rsOnline = p4c_query(
+                "SELECT `id`, `purchases`, `admin_infos` FROM `photo_albums_online` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "' LIMIT 1;",
+                __FILE__,
+                __LINE__
+            );
+            if ($rsOnline && p4c_num_rows($rsOnline) > 0) {
+                $onObj      = p4c_fetch_object($rsOnline);
+                $isInOnline = true;
+            }
+        }
+
+        $accessCount = 0;
+        if ($albumIdHash !== '') {
+            $rsAccCnt = p4c_query(
+                "SELECT COUNT(*) AS `cnt` FROM `photo_albums_access` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "';",
+                __FILE__,
+                __LINE__
+            );
+            if ($rsAccCnt && p4c_num_rows($rsAccCnt) > 0) {
+                $accessCount = abs((int)(p4c_fetch_object($rsAccCnt)->cnt ?? 0));
+            }
+        }
+        $effectivePurchases = max(
+            abs((int)($a->purchases ?? 0)),
+            $onObj ? abs((int)($onObj->purchases ?? 0)) : 0,
+            $accessCount
+        );
+
+        if ($effectivePurchases === 0) {
+            if (!$confirmHardDelete) {
+                Response::error('Bitte bestätige im Kontrollkästchen ausdrücklich, dass das Fotoalbum unwiderruflich gelöscht werden soll.', 422);
+                return;
+            }
+        } else {
+            if (!$forceLegalDelete) {
+                Response::error(
+                    'Dieses Fotoalbum wurde bereits ' . $effectivePurchases . '-mal gekauft! Zum Schutz der Käufer ist eine sofortige unwiderrufliche Löschung nur bei zwingenden Rechts-/Persönlichkeitsrechts- oder Datenschutzgründen mit ausdrücklicher Bestätigung zulässig.',
+                    422
+                );
+                return;
+            }
+            if (mb_strlen($deleteReason, 'UTF-8') < 5) {
+                Response::error('Bitte gib bei einem bereits gekauften Fotoalbum zwingend den rechtlichen Löschgrund (mind. 5 Zeichen, z. B. Persönlichkeitsrecht / DSGVO) an.', 422);
+                return;
+            }
+        }
+
+        // 1. Physische Bilddateien & Album-Verzeichnis sofort vom Server löschen
+        $storageLoc = trim((string)($a->storage_location ?? ''));
+        if ($storageLoc === '') {
+            $storageLoc = defined('PHOTO_ALBUMS_DEFAULT_DIR') ? (string)PHOTO_ALBUMS_DEFAULT_DIR : 'photo_albums';
+        }
+        $deletedFilesCount = 0;
+        if (defined('PHOTO_ALBUMS_PATH') && $merchantId > 0 && $albumDbId > 0) {
+            $albumDir = rtrim((string)PHOTO_ALBUMS_PATH, '/\\') . '/' . trim($storageLoc, '/\\') . '/' . $merchantId . '/' . $albumDbId;
+            if (is_dir($albumDir)) {
+                $imagesDir = $albumDir . '/images';
+                if (is_dir($imagesDir)) {
+                    foreach ((array)@glob($imagesDir . '/*') as $f) {
+                        if (is_string($f) && is_file($f) && @unlink($f)) {
+                            $deletedFilesCount++;
+                        }
+                    }
+                    @rmdir($imagesDir);
+                }
+                foreach ((array)@glob($albumDir . '/*') as $f) {
+                    if (is_string($f) && is_file($f) && @unlink($f)) {
+                        $deletedFilesCount++;
+                    }
+                }
+                @rmdir($albumDir);
+            }
+        }
+
+        // 2. Einzelfotos (und bei bestätigter Rechts-/DSGVO-Zwangslöschung auch Kundenzugriffe) entfernen
+        if ($albumIdHash !== '') {
+            p4c_query("DELETE FROM `photo_albums_photos` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "';", __FILE__, __LINE__);
+            if ($effectivePurchases > 0 && $forceLegalDelete) {
+                p4c_query("DELETE FROM `photo_albums_access` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "';", __FILE__, __LINE__);
+            }
+        }
+
+        // 3. Datenbank-Bereinigung (Online-Sync-Tombstone vs. vollständige Löschung bei Erst-Einreichung)
+        $now       = date('Y-m-d H:i:s');
+        $reasonTxt = $deleteReason !== '' ? $deleteReason : 'Ungekauftes Fotoalbum in ACP-Prüfung unwiderruflich gelöscht';
+
+        if ($isInOnline && $albumIdHash !== '') {
+            $auditLine = '[ADMIN HARD-DELETE ' . $now . ' (Admin #' . $employeeId . ', Käufe: ' . $effectivePurchases . '): ' . $reasonTxt . ']';
+            $prevInfos = trim((string)($onObj->admin_infos ?? $a->admin_infos ?? ''));
+            $newInfos  = $prevInfos !== '' ? ($prevInfos . "\n" . $auditLine) : $auditLine;
+            $tombstoneChecksum = md5($albumIdHash . '|hard_deleted|' . $now);
+
+            p4c_query(
+                "UPDATE `photo_albums_online` SET
+                    `status`                = 'deleted',
+                    `deleted_datetime`      = '" . $now . "',
+                    `album_checked`         = '" . $now . "',
+                    `released`              = '1',
+                    `number_of_photos`      = '0',
+                    `preview_image_fsk16`   = '',
+                    `preview_image_fsk18`   = '',
+                    `checksum`              = '" . p4c_escape_string($tombstoneChecksum) . "',
+                    `admin_infos`           = '" . p4c_escape_string($newInfos) . "',
+                    `last_updated_by`       = '" . $employeeId . "',
+                    `last_updated_datetime` = '" . $now . "'
+                 WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "'
+                 LIMIT 1;",
+                __FILE__,
+                __LINE__
+            );
+
+            p4c_query(
+                "UPDATE `photo_albums` SET
+                    `status`                = 'deleted',
+                    `deleted_datetime`      = '" . $now . "',
+                    `album_checked`         = '" . $now . "',
+                    `released`              = '1',
+                    `number_of_photos`      = '0',
+                    `preview_image_fsk16`   = '',
+                    `preview_image_fsk18`   = '',
+                    `checksum`              = '" . p4c_escape_string($tombstoneChecksum) . "',
+                    `admin_infos`           = '" . p4c_escape_string($newInfos) . "',
+                    `last_updated_by`       = '" . $employeeId . "',
+                    `last_updated_datetime` = '" . $now . "'
+                 WHERE `id` = '" . $albumDbId . "'
+                 LIMIT 1;",
+                __FILE__,
+                __LINE__
+            );
+        } else {
+            if ($albumIdHash !== '') {
+                p4c_query(
+                    "DELETE FROM `rejection_reason_photo_album_history` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "';",
+                    __FILE__,
+                    __LINE__
+                );
+            }
+            p4c_query("DELETE FROM `photo_albums` WHERE `id` = '" . $albumDbId . "' LIMIT 1;", __FILE__, __LINE__);
+        }
+
+        if ($albumIdHash !== '' && function_exists('ec_invalidate_photo_album_api_cache')) {
+            \ec_invalidate_photo_album_api_cache($albumIdHash);
+        }
+
+        if (function_exists('log_action')) {
+            log_action(
+                "ADMIN HARD-DELETE Fotoalbum #{$albumDbId} („{$title}“, Album-ID: {$albumIdHash}, "
+                . "warOnline: " . ($isInOnline ? 'ja' : 'nein') . ", Dateien gelöscht: {$deletedFilesCount}, "
+                . "Käufe: {$effectivePurchases}, Grund: {$reasonTxt})."
+            );
+        }
+
+        $remainingQueue = $this->fetchUncheckedQueueIds();
+        $nextId         = $remainingQueue[0] ?? 0;
+
+        Response::json([
+            'status'          => 'ok',
+            'message'         => $isInOnline
+                ? "Fotoalbum #{$albumDbId} („{$title}“) und {$deletedFilesCount} Bilddatei(en) wurden unwiderruflich gelöscht. Angeschlossene Portale erhalten automatisch das Löschsignal."
+                : "Fotoalbum #{$albumDbId} („{$title}“) wurde inklusive {$deletedFilesCount} Bilddatei(en) vollständig und unwiderruflich gelöscht.",
             'next_album_id'   => $nextId,
             'remaining_count' => count($remainingQueue),
         ]);

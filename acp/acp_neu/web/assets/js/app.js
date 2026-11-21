@@ -1302,6 +1302,67 @@ const App = {
     return false;
   },
 
+  openPhotoAlbumCheckingHardDeleteModal() {
+    const modalEl = document.getElementById('pacHardDeleteModal');
+    if (!modalEl || typeof bootstrap === 'undefined') return;
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  },
+
+  async submitPhotoAlbumCheckingHardDelete(event) {
+    if (event) event.preventDefault();
+    const form = document.getElementById('pac-hard-delete-form');
+    const btn = document.getElementById('pac-hard-delete-submit-btn');
+    if (!form) return false;
+
+    const formData = new FormData(form);
+    formData.append('_csrf', this.csrfToken);
+
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Lösche Fotoalbum...';
+    }
+
+    try {
+      const res = await fetch(`${this.basePath}/api.php?route=photo-albums-checking/hard-delete`, {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': this.csrfToken },
+        body: formData
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.status !== 'ok') {
+        this.toast(data.message || 'Das Fotoalbum konnte nicht unwiderruflich gelöscht werden.', 'danger');
+        return false;
+      }
+
+      const modalEl = document.getElementById('pacHardDeleteModal');
+      if (modalEl && typeof bootstrap !== 'undefined') {
+        const inst = bootstrap.Modal.getInstance(modalEl);
+        if (inst) inst.hide();
+      }
+
+      this.resetLogoutCountdown();
+      this.toast(data.message || 'Fotoalbum wurde unwiderruflich gelöscht.', 'success');
+      this.refreshSidebarCounts();
+
+      const autoNext = document.getElementById('pac-auto-next-check')?.checked;
+      if (autoNext && data.next_album_id && Number(data.next_album_id) > 0) {
+        window.location.hash = `#/photo-album-checking?id=${Number(data.next_album_id)}`;
+      } else {
+        window.location.hash = '#/photo-albums-checking';
+      }
+    } catch (err) {
+      this.toast('Verbindungsfehler: ' + err.message, 'danger');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+      }
+    }
+    return false;
+  },
+
   async reviewAlbumCoActor(albumDbId, merchantId, coActorId, decision) {
     let reason = '';
     if (decision === 'reject') {
