@@ -133,6 +133,7 @@ class Router
         self::register('photo-albums-checking', $photoAlbumsCheckingCtrl, 'list', 'content_check');
         self::register('photo-album-checking', $photoAlbumsCheckingCtrl, 'detail', 'content_check');
         self::register('photo-albums-checking/toggle-photo', $photoAlbumsCheckingCtrl, 'togglePhoto', 'content_check,content_online');
+        self::register('photo-albums-checking/rotate-photo', $photoAlbumsCheckingCtrl, 'rotatePhoto', 'content_check,content_online');
         self::register('photo-albums-checking/approve', $photoAlbumsCheckingCtrl, 'approve', 'content_check');
         self::register('photo-albums-checking/reject', $photoAlbumsCheckingCtrl, 'reject', 'content_check');
         self::register('photo-albums-checking/hard-delete', $photoAlbumsCheckingCtrl, 'hardDelete', 'content_check');

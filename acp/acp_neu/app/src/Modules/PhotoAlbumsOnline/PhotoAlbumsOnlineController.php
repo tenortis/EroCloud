@@ -480,6 +480,14 @@ final class PhotoAlbumsOnlineController
         // Alle Fotos des Albums laden
         $photos = [];
         $rejectedPhotosCount = 0;
+        $stLocPhotos = trim((string)($ao->storage_location ?? $pa->storage_location ?? ''));
+        if ($stLocPhotos === '') {
+            $stLocPhotos = defined('PHOTO_ALBUMS_DEFAULT_DIR') ? (string)PHOTO_ALBUMS_DEFAULT_DIR : 'photo_albums';
+        }
+        $imagesDirOnline = (defined('PHOTO_ALBUMS_PATH') && $merchantId > 0 && $albumDbId > 0)
+            ? (rtrim((string)PHOTO_ALBUMS_PATH, '/\\') . '/' . trim($stLocPhotos, '/\\') . '/' . $merchantId . '/' . $albumDbId . '/images/')
+            : '';
+
         $rsPhotos = p4c_query(
             "SELECT * FROM `photo_albums_photos`
              WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "'
@@ -494,12 +502,16 @@ final class PhotoAlbumsOnlineController
                 if ($isRejected) {
                     $rejectedPhotosCount++;
                 }
+                $phFilename = basename((string)($ph->filename ?? ''));
+                $phFile     = ($imagesDirOnline !== '' && $phFilename !== '') ? ($imagesDirOnline . $phFilename) : '';
+                $phVer      = ($phFile !== '' && is_file($phFile)) ? (int)@filemtime($phFile) : 0;
                 $photos[] = [
                     'id'       => abs((int)$ph->id),
                     'index'    => $idx++,
                     'file_id'  => (string)($ph->file_id ?? ''),
                     'filename' => (string)($ph->filename ?? ''),
                     'rejected' => $isRejected,
+                    'mtime'    => $phVer,
                 ];
             }
         }

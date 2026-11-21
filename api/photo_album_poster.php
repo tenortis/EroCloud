@@ -20,7 +20,7 @@ $fast_cs  = isset($_GET['cs']) ? trim((string)$_GET['cs']) : '';
 
 $fastCacheDir  = ((defined('TEMP_DIR') && is_dir(TEMP_DIR)) ? rtrim((string)TEMP_DIR, '/\\') : sys_get_temp_dir()) . '/ec_poster_cache';
 $fastCacheFile = ($fast_album_param !== '' && $fast_cs !== '')
-    ? ($fastCacheDir . '/fast_pa_' . md5($fast_album_param . '|' . $fast_fsk . '|' . $fast_w . '|' . $fast_cs) . '.jpg')
+    ? ($fastCacheDir . '/fast_pa_v2_' . md5($fast_album_param . '|' . $fast_fsk . '|' . $fast_w . '|' . $fast_cs) . '.jpg')
     : '';
 
 if ($fastCacheFile !== '' && is_file($fastCacheFile) && filesize($fastCacheFile) > 0) {
@@ -195,20 +195,29 @@ function to_thumb($bild, $size = 0) {
         $size = 1024;
     }
 
-    if ($size >= $breite) {
+    $exif_orient = 1;
+    if (($mime_type == 'image/jpeg' || $mime_type == 'image/jpg') && function_exists('exif_read_data')) {
+        $exif_check = @exif_read_data($bild);
+        if (is_array($exif_check) && !empty($exif_check['Orientation'])) {
+            $exif_orient = (int)$exif_check['Orientation'];
+        }
+    }
+
+    if ($size >= $breite && !in_array($exif_orient, array(3, 6, 8), true)) {
         output_raw_file_and_exit($bild, $mime_type);
     }
 
+    $effective_size = min((int)$size, $breite);
     $prop = $hoehe / $breite;
-    $neueBreite = (int)$size;
-    $neueHoehe = (int)round($size * $prop);
+    $neueBreite = max(1, (int)$effective_size);
+    $neueHoehe = max(1, (int)round($neueBreite * $prop));
 
     $cacheBase = (defined('TEMP_DIR') && is_dir(TEMP_DIR)) ? rtrim((string)TEMP_DIR, '/\\') : sys_get_temp_dir();
     $cacheDir  = $cacheBase . '/ec_poster_cache';
     if (!is_dir($cacheDir)) {
         @mkdir($cacheDir, 0775, true);
     }
-    $cacheFile = $cacheDir . '/pa_' . md5($bild . '|' . (int)@filemtime($bild) . '|' . $neueBreite) . '.bin';
+    $cacheFile = $cacheDir . '/pa_' . md5($bild . '|' . (int)@filemtime($bild) . '|' . $neueBreite . '|' . $exif_orient) . '.bin';
     if (is_file($cacheFile) && filesize($cacheFile) > 0) {
         if (!empty($GLOBALS['fastCacheFile']) && !is_file($GLOBALS['fastCacheFile'])) {
             @copy($cacheFile, $GLOBALS['fastCacheFile']);
@@ -221,21 +230,25 @@ function to_thumb($bild, $size = 0) {
         $image_data = @file_get_contents($bild);
         if ($image_data) {
             $altesBild = @imagecreatefromstring($image_data);
-            if ($altesBild) {
-                $exif = @exif_read_data($bild);
-                if (!empty($exif['Orientation'])) {
-                    switch ($exif['Orientation']) {
-                        case 3:
-                            $altesBild = @imagerotate($altesBild, 180, 0);
-                            break;
-                        case 6:
-                            $altesBild = @imagerotate($altesBild, -90, 0);
-                            break;
-                        case 8:
-                            $altesBild = @imagerotate($altesBild, 90, 0);
-                            break;
-                    }
+            if ($altesBild && in_array($exif_orient, array(3, 6, 8), true)) {
+                switch ($exif_orient) {
+                    case 3:
+                        $rot = @imagerotate($altesBild, 180, 0);
+                        if ($rot) { $altesBild = $rot; }
+                        break;
+                    case 6:
+                        $rot = @imagerotate($altesBild, -90, 0);
+                        if ($rot) { $altesBild = $rot; }
+                        break;
+                    case 8:
+                        $rot = @imagerotate($altesBild, 90, 0);
+                        if ($rot) { $altesBild = $rot; }
+                        break;
                 }
+                $breite = imagesx($altesBild);
+                $hoehe  = imagesy($altesBild);
+                $neueBreite = max(1, min((int)$size, $breite));
+                $neueHoehe  = max(1, (int)round($neueBreite * ($hoehe / max(1, $breite))));
             }
         }
     } elseif ($mime_type == 'image/png') {
@@ -277,8 +290,7 @@ function to_thumb($bild, $size = 0) {
     header('Content-length: '.strlen((string)$binaryData));
     echo $binaryData;
 
-    imagedestroy($neuesBild);
-    imagedestroy($altesBild);
+    unset($neuesBild, $altesBild);
     exit;
 }
 

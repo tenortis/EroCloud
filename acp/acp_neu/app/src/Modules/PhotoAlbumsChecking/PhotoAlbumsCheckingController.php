@@ -311,6 +311,14 @@ final class PhotoAlbumsCheckingController
         // Alle Einzelfotos des Albums laden
         $photos        = [];
         $rejectedCount = 0;
+        $stLocPhotos   = trim((string)($a->storage_location ?? ''));
+        if ($stLocPhotos === '') {
+            $stLocPhotos = defined('PHOTO_ALBUMS_DEFAULT_DIR') ? (string)PHOTO_ALBUMS_DEFAULT_DIR : 'photo_albums';
+        }
+        $imagesDirCheck = (defined('PHOTO_ALBUMS_PATH') && $merchantId > 0 && $albumDbId > 0)
+            ? (rtrim((string)PHOTO_ALBUMS_PATH, '/\\') . '/' . trim($stLocPhotos, '/\\') . '/' . $merchantId . '/' . $albumDbId . '/images/')
+            : '';
+
         $rsPhotos = p4c_query(
             "SELECT *
              FROM `photo_albums_photos`
@@ -327,6 +335,9 @@ final class PhotoAlbumsCheckingController
                 if ($isRej) {
                     $rejectedCount++;
                 }
+                $phFilename = basename((string)($ph->filename ?? ''));
+                $phFile     = ($imagesDirCheck !== '' && $phFilename !== '') ? ($imagesDirCheck . $phFilename) : '';
+                $phVer      = ($phFile !== '' && is_file($phFile)) ? (int)@filemtime($phFile) : 0;
                 $photos[] = [
                     'id'              => abs((int)$ph->id),
                     'index'           => $idx,
@@ -334,6 +345,7 @@ final class PhotoAlbumsCheckingController
                     'filename'        => (string)($ph->filename ?? ''),
                     'upload_datetime' => (string)($ph->upload_datetime ?? ''),
                     'rejected'        => $isRej,
+                    'mtime'           => $phVer,
                 ];
             }
         }
@@ -652,6 +664,219 @@ final class PhotoAlbumsCheckingController
             'rejected'       => $rejected,
             'rejected_count' => $rejCnt,
             'message'        => $rejected === 1 ? 'Foto wurde als abgelehnt markiert.' : 'Ablehnung des Fotos wurde aufgehoben.',
+        ]);
+    }
+
+    /**
+     * 3b. AJAX: Einzelfoto im ACP um 90° links/rechts drehen (POST ?route=photo-albums-checking/rotate-photo)
+     * Nutzbar sowohl in #/photo-album-checking als auch in #/photo-album-edit.
+     */
+    public function rotatePhoto(): void
+    {
+        if (!$this->request->isPost()) {
+            Response::error('Ungültige Anfrage-Methode.', 405);
+            return;
+        }
+
+        $csrf = (string)$this->request->post('_csrf', $this->request->header('X-CSRF-Token'));
+        if (!Csrf::validate($csrf)) {
+            Response::error('Dein Sicherheitstoken ist abgelaufen. Bitte lade die Seite neu.', 403);
+            return;
+        }
+
+        $photoId   = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)$this->request->post('photo_id', ''));
+        $direction = trim((string)$this->request->post('direction', ''));
+
+        if ($photoId === '' || !in_array($direction, ['left', 'right'], true)) {
+            Response::error('Ungültige Parameter zum Drehen des Fotos.', 400);
+            return;
+        }
+
+        $rsPhoto = p4c_query(
+            "SELECT pap.`id`, pap.`file_id`, pap.`album_id`, pap.`merchant_id`, pap.`filename`,
+                    pa.`id` AS `album_db_id`, pa.`storage_location`, pa.`checksum`
+             FROM `photo_albums_photos` pap
+             INNER JOIN `photo_albums` pa ON pap.`album_id` = pa.`album_id`
+             WHERE pap.`file_id` = '" . p4c_escape_string($photoId) . "'
+             LIMIT 1;",
+            __FILE__,
+            __LINE__
+        );
+        if (!$rsPhoto || p4c_num_rows($rsPhoto) === 0) {
+            Response::error('Das ausgewählte Foto existiert nicht.', 404);
+            return;
+        }
+
+        $row          = p4c_fetch_object($rsPhoto);
+        $albumDbId    = abs((int)$row->album_db_id);
+        $merchantId   = abs((int)$row->merchant_id);
+        $albumIdHash  = (string)$row->album_id;
+        $safeFilename = basename((string)$row->filename);
+        $storageDir   = trim((string)$row->storage_location);
+        if ($storageDir === '') {
+            $storageDir = defined('PHOTO_ALBUMS_DEFAULT_DIR') ? (string)PHOTO_ALBUMS_DEFAULT_DIR : 'photo_albums';
+        }
+
+        $albumsBasePath = defined('PHOTO_ALBUMS_PATH') ? (string)PHOTO_ALBUMS_PATH : (dirname(__DIR__, 5) . '/priv');
+        $imagesDir      = rtrim($albumsBasePath, '/\\') . '/' . trim($storageDir, '/\\') . '/' . $merchantId . '/' . $albumDbId . '/images';
+        $filePath       = $imagesDir . '/' . $safeFilename;
+
+        if ($safeFilename === '' || !is_file($filePath) || (int)@filesize($filePath) === 0) {
+            Response::error('Die Bilddatei konnte auf dem Server nicht gefunden werden.', 404);
+            return;
+        }
+
+        if (!function_exists('imagerotate') || !function_exists('imagecreatetruecolor')) {
+            Response::error('Die GD-Bildbearbeitung ist auf diesem Server aktuell nicht verfügbar.', 500);
+            return;
+        }
+
+        $imgInfo = @getimagesize($filePath);
+        if (!is_array($imgInfo) || empty($imgInfo['mime'])) {
+            Response::error('Die Bilddatei konnte nicht gelesen werden.', 400);
+            return;
+        }
+
+        $mime   = strtolower((string)$imgInfo['mime']);
+        $srcImg = null;
+        if ($mime === 'image/jpeg' || $mime === 'image/jpg') {
+            $rawBytes = @file_get_contents($filePath);
+            if (is_string($rawBytes) && $rawBytes !== '') {
+                $srcImg = @imagecreatefromstring($rawBytes);
+                // Vorhandene EXIF-Ausrichtung zuerst normalisieren, damit die 90°-Drehung exakt der sichtbaren Darstellung entspricht
+                if ($srcImg instanceof \GdImage && function_exists('exif_read_data')) {
+                    $exif = @exif_read_data($filePath);
+                    if (is_array($exif) && !empty($exif['Orientation'])) {
+                        $orient = (int)$exif['Orientation'];
+                        if ($orient === 3) {
+                            $norm = @imagerotate($srcImg, 180, 0);
+                            if ($norm instanceof \GdImage) {
+                                $srcImg = $norm;
+                            }
+                        } elseif ($orient === 6) {
+                            $norm = @imagerotate($srcImg, -90, 0);
+                            if ($norm instanceof \GdImage) {
+                                $srcImg = $norm;
+                            }
+                        } elseif ($orient === 8) {
+                            $norm = @imagerotate($srcImg, 90, 0);
+                            if ($norm instanceof \GdImage) {
+                                $srcImg = $norm;
+                            }
+                        }
+                    }
+                }
+            }
+        } elseif ($mime === 'image/png') {
+            $srcImg = @imagecreatefrompng($filePath);
+        }
+
+        if (!($srcImg instanceof \GdImage)) {
+            Response::error('Das Bildformat konnte nicht zum Drehen geöffnet werden (unterstützt werden JPG und PNG).', 400);
+            return;
+        }
+
+        // GD imagerotate dreht gegen den Uhrzeigersinn: +90 = nach links, -90 = nach rechts
+        $angle = ($direction === 'left') ? 90 : -90;
+        if ($mime === 'image/png') {
+            $bgAlpha = imagecolorallocatealpha($srcImg, 0, 0, 0, 127);
+            $rotated = @imagerotate($srcImg, $angle, $bgAlpha !== false ? $bgAlpha : 0);
+            if ($rotated instanceof \GdImage) {
+                imagealphablending($rotated, false);
+                imagesavealpha($rotated, true);
+            }
+        } else {
+            $rotated = @imagerotate($srcImg, $angle, 0);
+        }
+        unset($srcImg);
+
+        if (!($rotated instanceof \GdImage)) {
+            Response::error('Das Foto konnte technisch nicht gedreht werden.', 500);
+            return;
+        }
+
+        $tmpOut = $filePath . '.rot_' . mt_rand(1000, 9999);
+        $saved  = ($mime === 'image/png')
+            ? @imagepng($rotated, $tmpOut, 8)
+            : @imagejpeg($rotated, $tmpOut, 92);
+        unset($rotated);
+
+        if (!$saved || !is_file($tmpOut) || (int)@filesize($tmpOut) === 0) {
+            if (is_file($tmpOut)) {
+                @unlink($tmpOut);
+            }
+            Response::error('Das gedrehte Foto konnte nicht gespeichert werden.', 500);
+            return;
+        }
+
+        if (!@rename($tmpOut, $filePath)) {
+            if (@copy($tmpOut, $filePath)) {
+                @unlink($tmpOut);
+            } else {
+                @unlink($tmpOut);
+                Response::error('Die Bilddatei konnte nicht überschrieben werden.', 500);
+                return;
+            }
+        }
+
+        $nowTs = time();
+        $now   = date('Y-m-d H:i:s', $nowTs);
+        @chmod($filePath, 0777);
+        @touch($filePath, $nowTs);
+        clearstatcache(true, $filePath);
+
+        // Verpixeltes API-Vorschaubild (thumb_{filename}) löschen, damit es beim nächsten Portal-Aufruf frisch generiert wird
+        $thumbCacheFile = $imagesDir . '/thumb_' . $safeFilename;
+        if (is_file($thumbCacheFile)) {
+            @unlink($thumbCacheFile);
+        }
+
+        $employeeId  = abs((int)($_SESSION['employee_id'] ?? 0));
+        $newChecksum = md5((string)($row->checksum ?? '') . '|rot|' . $nowTs);
+
+        p4c_query(
+            "UPDATE `photo_albums`
+             SET `checksum` = '" . p4c_escape_string($newChecksum) . "',
+                 `last_updated_by` = '" . $employeeId . "',
+                 `last_updated_datetime` = '" . $now . "'
+             WHERE `id` = '" . $albumDbId . "'
+             LIMIT 1;",
+            __FILE__,
+            __LINE__
+        );
+
+        $rsOnline = p4c_query(
+            "SELECT `id` FROM `photo_albums_online` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "' LIMIT 1;",
+            __FILE__,
+            __LINE__
+        );
+        if ($rsOnline && p4c_num_rows($rsOnline) > 0) {
+            p4c_query(
+                "UPDATE `photo_albums_online`
+                 SET `checksum` = '" . p4c_escape_string($newChecksum) . "',
+                     `last_updated_by` = '" . $employeeId . "',
+                     `last_updated_datetime` = '" . $now . "'
+                 WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "'
+                 LIMIT 1;",
+                __FILE__,
+                __LINE__
+            );
+        }
+
+        if (function_exists('ec_invalidate_photo_album_api_cache')) {
+            \ec_invalidate_photo_album_api_cache($albumIdHash);
+        }
+
+        if (function_exists('log_action')) {
+            log_action('Foto ' . $photoId . ' in Fotoalbum #' . $albumDbId . ' im ACP um 90° nach ' . ($direction === 'left' ? 'links' : 'rechts') . ' gedreht.');
+        }
+
+        Response::json([
+            'status'    => 'ok',
+            'message'   => $direction === 'left' ? 'Foto wurde um 90° nach links gedreht.' : 'Foto wurde um 90° nach rechts gedreht.',
+            'photo_id'  => $photoId,
+            'thumb_src' => 'media.php?type=album_photo&photo_id=' . rawurlencode($photoId) . '&w=280&v=' . $nowTs,
+            'full_src'  => 'media.php?type=album_photo&photo_id=' . rawurlencode($photoId) . '&w=1024&v=' . $nowTs,
         ]);
     }
 

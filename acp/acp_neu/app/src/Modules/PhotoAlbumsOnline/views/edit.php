@@ -479,30 +479,47 @@ $onlineAtDisplay  = ($onlineAtRawStr !== '' && !str_starts_with($onlineAtRawStr,
               </div>
             <?php else: ?>
               <p class="text-muted small mb-3">
-                Klicke auf ein Bild für die interaktive Galerie-Großansicht (mit Pfeiltasten durchblätterbar) oder sperre/aktiviere einzelne Fotos per Klick.
+                Klicke auf ein Bild für die interaktive Galerie-Großansicht (mit Pfeiltasten durchblätterbar), drehe gekippte Bilder oben rechts um 90° oder sperre/aktiviere einzelne Fotos per Klick.
               </p>
               <div class="row g-2" id="pac-photos-grid">
                 <?php foreach ($photos as $idxZero => $ph):
                   $phFileId = (string)$ph['file_id'];
                   $phIdx    = (int)$ph['index'];
                   $isRej    = !empty($ph['rejected']);
+                  $phVerQs  = !empty($ph['mtime']) ? ('&amp;v=' . (int)$ph['mtime']) : '';
                 ?>
                   <div class="col-md-3 col-sm-4 col-6">
                     <div class="p-1.5 rounded border h-100 pac-photo-card <?= $isRej ? 'border-danger bg-danger bg-opacity-10' : '' ?>"
                          id="pac-photo-card-<?= View::e($phFileId) ?>"
                          data-photo-id="<?= View::e($phFileId) ?>"
                          data-photo-index="<?= (int)$idxZero ?>"
-                         data-full-src="media.php?type=album_photo&amp;photo_id=<?= View::e($phFileId) ?>&amp;w=1024"
+                         data-full-src="media.php?type=album_photo&amp;photo_id=<?= View::e($phFileId) ?>&amp;w=1024<?= $phVerQs ?>"
                          data-photo-label="Foto #<?= $phIdx ?> (Online-Album #<?= $onlineId ?>)"
                          style="padding: 6px; background: var(--kkc-surface-hover);">
                       <div class="position-relative rounded overflow-hidden mb-2 bg-dark" style="aspect-ratio: 1/1;">
-                        <img src="media.php?type=album_photo&amp;photo_id=<?= View::e($phFileId) ?>&amp;w=280"
+                        <img src="media.php?type=album_photo&amp;photo_id=<?= View::e($phFileId) ?>&amp;w=280<?= $phVerQs ?>"
                              alt="Foto #<?= $phIdx ?>" loading="lazy"
                              class="w-100 h-100" style="object-fit: cover; cursor: pointer;"
                              onclick="App.openAlbumGalleryModal(<?= (int)$idxZero ?>)">
                         <span class="position-absolute top-0 start-0 m-1 px-1.5 py-0.5 rounded bg-dark bg-opacity-75 text-white font-monospace" style="font-size: 0.68rem;">
                           #<?= $phIdx ?>
                         </span>
+                        <div class="position-absolute top-0 end-0 m-1 d-flex gap-1">
+                          <button type="button"
+                                  class="btn btn-sm btn-dark bg-opacity-75 border-0 text-white py-0 px-1 pac-photo-rot-btn"
+                                  style="font-size: 0.72rem; line-height: 1.35;"
+                                  onclick="App.rotateAcpAlbumPhoto('<?= View::e($phFileId) ?>', 'left', this)"
+                                  title="90° nach links drehen">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                          </button>
+                          <button type="button"
+                                  class="btn btn-sm btn-dark bg-opacity-75 border-0 text-white py-0 px-1 pac-photo-rot-btn"
+                                  style="font-size: 0.72rem; line-height: 1.35;"
+                                  onclick="App.rotateAcpAlbumPhoto('<?= View::e($phFileId) ?>', 'right', this)"
+                                  title="90° nach rechts drehen">
+                            <i class="bi bi-arrow-clockwise"></i>
+                          </button>
+                        </div>
                         <span class="position-absolute bottom-0 start-0 end-0 text-center py-0.5 bg-danger text-white fw-bold pac-photo-rej-overlay <?= $isRej ? '' : 'd-none' ?>"
                               style="font-size: 0.68rem;">
                           ABGELEHNT

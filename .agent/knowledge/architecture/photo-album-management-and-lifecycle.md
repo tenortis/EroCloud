@@ -56,11 +56,12 @@ Gesteuert durch [`PhotoAlbumsController.php`](file:///c:/xampp/htdocs/EroCloud/m
 1. **Content-Prüfung (`#/photo-albums-checking` & `#/photo-album-checking`):**
    * [`PhotoAlbumsCheckingController.php`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/app/src/Modules/PhotoAlbumsChecking/PhotoAlbumsCheckingController.php): Prüft alle Alben mit `released = 1`, `album_checked = '0000-00-00 00:00:00'` und `status = 'active'`.
    * Einzelbilder können per `photo-albums-checking/toggle-photo` als `rejected = 1` markiert werden. Solange `rejected > 0`, ist eine Freigabe als `active` gesperrt.
+   * **1-Klick-Foto-Rotation im ACP (`photo-albums-checking/rotate-photo`, `rotatePhoto()`):** Sowohl in [`PhotoAlbumsChecking/views/detail.php`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/app/src/Modules/PhotoAlbumsChecking/views/detail.php) als auch in [`PhotoAlbumsOnline/views/edit.php`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/app/src/Modules/PhotoAlbumsOnline/views/edit.php) besitzt jede Foto-Kachel oben rechts zwei 90°-Drehbuttons (`App.rotateAcpAlbumPhoto()`), die EXIF normalisieren, per GD drehen, `images/thumb_{filename}` löschen, `checksum` aktualisieren und `ec_invalidate_photo_album_api_cache()` aufrufen.
    * Bei Freigabe (`approve()`) werden `photo_albums` und `photo_albums_online` synchronisiert, `photo_album_checksum()` berechnet, `ec_invalidate_photo_album_api_cache()` aufgerufen und bei Neu-Veröffentlichung Punkte gutgeschrieben sowie eine Benachrichtigungs-Mail versendet.
 2. **Online-Verwaltung (`#/photo-albums-online` & `#/photo-album-edit`):**
    * [`PhotoAlbumsOnlineController.php`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/app/src/Modules/PhotoAlbumsOnline/PhotoAlbumsOnlineController.php): Bearbeitet veröffentlichte Alben direkt in `photo_albums_online` und `photo_albums`.
    * **Duplikat-Titel-Prüfung:** Ignoriert gezielt Alben mit `status = 'deleted'`, damit Titel gelöschter Alben wiederverwendet werden können.
-   * **ACP-Medienproxy ([`acp/acp_neu/web/media.php`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/web/media.php)):** Wertet bei `type=album_photo` und `type=album_poster` EXIF-`Orientation` (`3`, `6`, `8`) aus.
+   * **ACP-Medienproxy ([`acp/acp_neu/web/media.php`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/web/media.php)):** Wertet bei `type=album_photo` und `type=album_poster` EXIF-`Orientation` (`3`, `6`, `8`) aus und nutzt `&v={filemtime}` zum sofortigen Browser-Cache-Busting.
 
 ---
 
@@ -113,7 +114,7 @@ Es existieren exakt **vier klar getrennte Löschstufen**:
    * Liefert Titel, Beschreibung, SEO-Daten, Preis (`amount_download`), Cover-URLs, Kategorien, Fotoanzahl und `status`.
    * **50-Minuten-Datei-Cache:** `api/temp/get_photo_album/{album_id}.tmp`. **Wichtig:** Jede Änderung im ACP/MCP muss `ec_invalidate_photo_album_api_cache($albumIdHash)` aus [`includes/functions.inc.php`](file:///c:/xampp/htdocs/EroCloud/includes/functions.inc.php) aufrufen!
 3. **`?api_name=get_photo_album_thumbs&album_id={hash}`** ([`api/includes/get_photo_album_thumbs.inc.php`](file:///c:/xampp/htdocs/EroCloud/api/includes/get_photo_album_thumbs.inc.php)) & [`api/album_photo_thumb.php`](file:///c:/xampp/htdocs/EroCloud/api/album_photo_thumb.php):
-   * Liefert die Liste aller `file_id`s bzw. rendert die verpixelten 200px-Vorschaubilder (`images/thumb_{filename}`).
+   * Liefert die Liste aller `file_id`s inkl. `?v={filemtime}` Cache-Buster auf `photo_url` & `my_photo_url` bzw. rendert die verpixelten 200px-Vorschaubilder (`images/thumb_{filename}` inkl. automatischer EXIF-Altbestand-Selbstheilung in `ec_album_thumb_needs_regeneration()`). Cover werden über [`api/photo_album_poster.php`](file:///c:/xampp/htdocs/EroCloud/api/photo_album_poster.php) (`fast_pa_v2_`-Cache, EXIF-korrigiert) ausgeliefert.
 4. **Kauf & Kundenabruf:**
    * [`api/buy_photo_album_erocms.php`](file:///c:/xampp/htdocs/EroCloud/api/buy_photo_album_erocms.php): Trägt Kauf in `photo_albums_access` ein und erhöht `purchases` in `photo_albums` + `photo_albums_online`.
    * [`api/get_photo_album_url.php`](file:///c:/xampp/htdocs/EroCloud/api/get_photo_album_url.php), [`api/photo_album_downloader.php`](file:///c:/xampp/htdocs/EroCloud/api/photo_album_downloader.php) (ZIP-Stream) & [`api/my_album_photo.php`](file:///c:/xampp/htdocs/EroCloud/api/my_album_photo.php) (Einzelbild-Vollansicht für Käufer).

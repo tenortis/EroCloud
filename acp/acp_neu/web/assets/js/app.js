@@ -1066,6 +1066,52 @@ const App = {
     }
   },
 
+  async rotateAcpAlbumPhoto(photoId, direction, btnEl) {
+    if (!photoId || !direction || !btnEl) return;
+
+    const card = document.getElementById(`pac-photo-card-${photoId}`);
+    const rotBtns = card ? Array.from(card.querySelectorAll('.pac-photo-rot-btn')) : [btnEl];
+    const origHtml = btnEl.innerHTML;
+    rotBtns.forEach(b => { b.disabled = true; });
+    btnEl.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+
+    try {
+      const formData = new FormData();
+      formData.append('_csrf', this.csrfToken);
+      formData.append('photo_id', photoId);
+      formData.append('direction', direction);
+
+      const res = await fetch(`${this.basePath}/api.php?route=photo-albums-checking/rotate-photo`, {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': this.csrfToken },
+        body: formData
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.status !== 'ok') {
+        this.toast(data.message || 'Das Foto konnte nicht gedreht werden.', 'danger');
+        return;
+      }
+
+      this.resetLogoutCountdown();
+      if (card) {
+        if (data.full_src) {
+          card.setAttribute('data-full-src', data.full_src);
+        }
+        const imgEl = card.querySelector('img');
+        if (imgEl && data.thumb_src) {
+          imgEl.src = data.thumb_src;
+        }
+      }
+      this.toast(data.message || 'Foto wurde um 90° gedreht.', 'success');
+    } catch (err) {
+      this.toast('Verbindungsfehler: ' + err.message, 'danger');
+    } finally {
+      btnEl.innerHTML = origHtml;
+      rotBtns.forEach(b => { b.disabled = false; });
+    }
+  },
+
   async batchAllowAllAlbumPhotos(albumDbId) {
     try {
       const formData = new FormData();
