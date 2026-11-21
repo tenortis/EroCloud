@@ -1557,13 +1557,21 @@ class MoviesController
             (array)$performerCheck['final_co_actor_ids']
         );
 
-        // Falls Film bereits in movies_online existiert, Kategorien synchronisieren
-        $fileId = (string)$mObj->file_id;
+        // Falls Film bereits in movies_online existiert, Kategorien synchronisieren & API-Cache leeren
+        $fileId     = (string)$mObj->file_id;
+        $oldActorId = abs((int)($mObj->actor_id ?? 0));
         p4c_query("UPDATE `movies_online` SET
             `category_master` = '" . p4c_escape_string($categoryMaster) . "',
             `category_slave`  = '" . p4c_escape_string($categorySlave) . "'
             WHERE `file_id` = '" . p4c_escape_string($fileId) . "' AND `merchant_id` = '" . $merchantId . "'
             LIMIT 1;", __FILE__, __LINE__);
+
+        if (function_exists('ec_invalidate_movie_api_cache')) {
+            \ec_invalidate_movie_api_cache($fileId, $oldActorId);
+            if ($actorId > 0 && $actorId !== $oldActorId) {
+                \ec_invalidate_movie_api_cache('', $actorId);
+            }
+        }
 
         if (function_exists('log_action')) {
             log_action("Film bearbeitet und zur Prüfung eingereicht: {$title} (ID: {$movieId})");
@@ -1770,15 +1778,21 @@ class MoviesController
 
         p4c_query("UPDATE `movies` SET
             `status`           = 'deleted',
-            `deleted_datetime` = '" . $deletedDatetime . "'
+            `deleted_datetime` = '" . $deletedDatetime . "',
+            `checksum`         = IF(`status` != 'deleted', MD5(CONCAT(`checksum`, '|deleted')), `checksum`)
             WHERE `id` = '" . $movieId . "' AND `merchant_id` = '" . $merchantId . "'
             LIMIT 1;", __FILE__, __LINE__);
 
         p4c_query("UPDATE `movies_online` SET
             `status`           = 'deleted',
-            `deleted_datetime` = '" . $deletedDatetime . "'
+            `deleted_datetime` = '" . $deletedDatetime . "',
+            `checksum`         = IF(`status` != 'deleted', MD5(CONCAT(`checksum`, '|deleted')), `checksum`)
             WHERE `file_id` = '" . p4c_escape_string($fileId) . "'
             LIMIT 1;", __FILE__, __LINE__);
+
+        if (function_exists('ec_invalidate_movie_api_cache')) {
+            \ec_invalidate_movie_api_cache($fileId, abs((int)($mObj->actor_id ?? 0)));
+        }
 
         if (isset($_SESSION['upload_movie']['movie_id']) && (int)$_SESSION['upload_movie']['movie_id'] === $movieId) {
             unset($_SESSION['upload_movie']);

@@ -635,6 +635,7 @@ final class MoviesCheckingController
             return;
         }
         $merchantId = abs((int)$m->merchant_id);
+        $oldActorId = abs((int)($m->actor_id ?? 0));
         $fileId     = (string)$m->file_id;
         $playtime   = abs((int)$m->playtime_seconds);
 
@@ -881,13 +882,16 @@ final class MoviesCheckingController
         );
 
         // movies_online synchronisieren
+        $oldOnlineActorId = 0;
         $rsCheckOnline = p4c_query(
-            "SELECT `id` FROM `movies_online` WHERE `file_id` = '" . p4c_escape_string($fileId) . "' LIMIT 1;",
+            "SELECT `id`, `actor_id` FROM `movies_online` WHERE `file_id` = '" . p4c_escape_string($fileId) . "' LIMIT 1;",
             __FILE__,
             __LINE__
         );
 
         if ($rsCheckOnline && p4c_num_rows($rsCheckOnline) > 0) {
+            $onlineRow = p4c_fetch_object($rsCheckOnline);
+            $oldOnlineActorId = abs((int)($onlineRow->actor_id ?? 0));
             p4c_query(
                 "UPDATE `movies_online` SET
                     `actor_id`            = '" . $actorId . "',
@@ -993,8 +997,17 @@ final class MoviesCheckingController
             'meta_description' => $metaDesc,
         ], true);
 
-        // Media-Cache invalidieren
+        // Media-Cache & EroCMS-API-Cache invalidieren
         unset($_SESSION['erocloud_acp_media_cache']['fid_' . $fileId], $_SESSION['erocloud_acp_media_cache']['mid_' . $movieId]);
+        if (function_exists('ec_invalidate_movie_api_cache')) {
+            \ec_invalidate_movie_api_cache($fileId, $actorId);
+            if ($oldActorId > 0 && $oldActorId !== $actorId) {
+                \ec_invalidate_movie_api_cache('', $oldActorId);
+            }
+            if ($oldOnlineActorId > 0 && $oldOnlineActorId !== $actorId && $oldOnlineActorId !== $oldActorId) {
+                \ec_invalidate_movie_api_cache('', $oldOnlineActorId);
+            }
+        }
 
         log_action("Film geprüft & gespeichert (ID: #{$movieId}, File-ID: {$fileId}, Status: {$movieStatus}).");
 

@@ -322,8 +322,36 @@ function seo_url($string) {
 
 
 function movie_checksum($movie) {
+    if (is_object($movie)) {
+        if (method_exists($movie, 'field')) {
+            $movie = array(
+                'merchant_id'         => $movie->field('merchant_id'),
+                'preview_image_fsk16' => $movie->field('preview_image_fsk16'),
+                'preview_image_fsk18' => $movie->field('preview_image_fsk18'),
+                'title'               => $movie->field('title'),
+                'description'         => $movie->field('description'),
+                'meta_title'          => $movie->field('meta_title'),
+                'meta_description'    => $movie->field('meta_description'),
+                'seo_url'             => $movie->field('seo_url'),
+                'online_at'           => $movie->field('online_at'),
+                'amount_second'       => $movie->field('amount_second'),
+                'amount_own'          => $movie->field('amount_own'),
+                'amount_webmaster'    => $movie->field('amount_webmaster'),
+                'as_download'         => $movie->field('as_download'),
+                'amount_download'     => $movie->field('amount_download'),
+                'status'              => $movie->field('status'),
+            );
+        } else {
+            $movie = (array)$movie;
+        }
+    } elseif (!is_array($movie)) {
+        $movie = array();
+    }
+
     $fsk16 = isset($movie['fsk16']) ? $movie['fsk16'] : (isset($movie['preview_image_fsk16']) ? $movie['preview_image_fsk16'] : '');
     $fsk18 = isset($movie['fsk18']) ? $movie['fsk18'] : (isset($movie['preview_image_fsk18']) ? $movie['preview_image_fsk18'] : '');
+    $statusVal = isset($movie['status']) ? strtolower(trim((string)$movie['status'])) : '';
+    $statusSuffix = ($statusVal !== '' && $statusVal !== 'active') ? ('|' . $statusVal) : '';
 
     return md5(
         (isset($movie['merchant_id']) ? $movie['merchant_id'] : '').
@@ -339,8 +367,37 @@ function movie_checksum($movie) {
         (isset($movie['amount_own']) ? $movie['amount_own'] : '').
         (isset($movie['amount_webmaster']) ? $movie['amount_webmaster'] : '').
         (isset($movie['as_download']) ? $movie['as_download'] : '').
-        (isset($movie['amount_download']) ? $movie['amount_download'] : '')
+        (isset($movie['amount_download']) ? $movie['amount_download'] : '').
+        $statusSuffix
     );
+}
+
+/**
+ * Invalidiert die 50-Minuten-API-Caches eines Films (api/temp/get_movie/{file_id}.tmp)
+ * sowie der Darsteller-Filmliste (api/temp/get_movies_by_actor_id/{actor_id}.tmp),
+ * damit Freigaben, Statuswechsel und Metadaten-Updates sofort an EroCMS-Seiten ausgeliefert werden.
+ */
+function ec_invalidate_movie_api_cache($fileId = '', $actorId = 0) {
+    $apiBase = defined('API_DIR') ? rtrim((string)API_DIR, '/\\') : (defined('SOURCEDIR') ? rtrim((string)SOURCEDIR, '/\\') . '/api' : '');
+    if ($apiBase === '') {
+        return;
+    }
+
+    $cleanFileId = preg_replace('/[^a-zA-Z0-9]/', '', (string)$fileId);
+    if ($cleanFileId !== '') {
+        $tmpMovieFile = $apiBase . '/temp/get_movie/' . $cleanFileId . '.tmp';
+        if (is_file($tmpMovieFile)) {
+            @unlink($tmpMovieFile);
+        }
+    }
+
+    $cleanActorId = abs((int)$actorId);
+    if ($cleanActorId > 0) {
+        $tmpActorFile = $apiBase . '/temp/get_movies_by_actor_id/' . $cleanActorId . '.tmp';
+        if (is_file($tmpActorFile)) {
+            @unlink($tmpActorFile);
+        }
+    }
 }
 
 function photo_album_checksum($album) {

@@ -25,14 +25,17 @@ Dieses Dokument beschreibt die technische Funktionsweise der zentralen API-Schni
 ### A. Filmliste abrufen (`get_movies`)
 * **Datei:** [`api/includes/get_movies.inc.php`](file:///c:/xampp/htdocs/EroCloud/api/includes/get_movies.inc.php)
 * **Request:** `GET /index.php?api_name=get_movies&api_key={KEY}&domain={DOMAIN}&actor_id={ACTOR_ID}`
-* **Cache:** `api/temp/get_movies_by_actor_id/{ACTOR_ID}.tmp` (Gültigkeit: **50 Minuten**).
-* **Domain-Whitelisting:** Ist `visible_for_website` weder `'public'` noch identisch mit `domain`, wird `status` in der API-Antwort auf `'deleted'` maskiert.
+* **Domain-neutraler Roh-Cache (`cache_v = 2`):**
+  * Speichert die **ungefilterte Rohliste** des Darstellers (`raw_status` + `domain` = `visible_for_website`) für **50 Minuten** unter `api/temp/get_movies_by_actor_id/{ACTOR_ID}.tmp`. Legacy-Cache-Dateien ohne `cache_v === 2` werden beim nächsten Zugriff automatisch gelöscht (`@unlink`).
+  * **KRITISCH (Kein Cross-Portal Cache-Poisoning):** Der effektive `status` in der API-Antwort darf **niemals** portalabhängig in die `.tmp`-Datei geschrieben werden, da derselbe Darsteller (`actor_id`) stündlich von mehreren EroCMS-Portalen abgefragt wird. Stattdessen wird bei **jedem** Request (auch aus warmem `.tmp`-Cache) dynamisch geprüft: Ist `visible_for_website === 'public'` oder entspricht die normalisierte `domain` (kleingeschrieben, ohne `www.` und ohne Trailing-Slash) exakt `visible_for_website`, wird `raw_status` ausgeliefert – andernfalls `'deleted'`.
 
 ### B. Filmdetails abrufen (`get_movie`)
 * **Datei:** [`api/includes/get_movie.inc.php`](file:///c:/xampp/htdocs/EroCloud/api/includes/get_movie.inc.php)
 * **Request:** `GET /index.php?api_name=get_movie&api_key={KEY}&domain={DOMAIN}&movie_id={FILE_ID}`
-* **Cache:** `api/temp/get_movie/{FILE_ID}.tmp` (Gültigkeit: **50 Minuten**, Cleanup > 7 Stunden).
-* **Checksummen-Funktion:** `movie_checksum($movie)` in [`includes/functions.inc.php`](file:///c:/xampp/htdocs/EroCloud/includes/functions.inc.php).
+* **Cache & Pflicht-Invalidierung:**
+  * Speichert den neutralen Rohdatensatz (inkl. `visible_for_website` und `raw_status`) für **50 Minuten** unter `api/temp/get_movie/{FILE_ID}.tmp` (Cleanup > 7 Stunden; Legacy-Dateien ohne `raw_status` werden verworfen) und löst `status` sowie `domain` bei jedem Aufruf dynamisch gegen die anfragende `$domain` auf.
+  * **PFLICHT:** Jede Freigabe, Bearbeitung, Darsteller-Umhängung oder Löschung eines Online-Films **muss** `ec_invalidate_movie_api_cache($fileId, $actorId)` aus [`includes/functions.inc.php`](file:///c:/xampp/htdocs/EroCloud/includes/functions.inc.php) aufrufen, um sowohl `{FILE_ID}.tmp` als auch `{ACTOR_ID}.tmp` sofort zu invalidieren.
+* **Checksummen-Funktion (`movie_checksum()`):** Berechnet in [`includes/functions.inc.php`](file:///c:/xampp/htdocs/EroCloud/includes/functions.inc.php) den MD5-Hash über Metadaten, Preise, Cover **sowie** (sofern `status != 'active'`) das Suffix `|{status}`, sodass reine Statusänderungen (`blocked` / `deleted`) sofort einen Delta-Sync auf externen EroCMS-Portalen auslösen (für `'active'` bleibt der Hash zu 100 % abwärtskompatibel).
 
 ### C. Film-Kauf & Streaming-/Download-Auslieferung
 * **Kauf:** [`api/buy_movie_erocms.php`](file:///c:/xampp/htdocs/EroCloud/api/buy_movie_erocms.php) $\rightarrow$ schreibt `movies_access`.

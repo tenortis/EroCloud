@@ -843,6 +843,7 @@ final class MoviesOnlineController
         $onlineId   = abs((int)$mo->id);
         $fileId     = (string)$mo->file_id;
         $merchantId = abs((int)$mo->merchant_id);
+        $oldActorId = abs((int)($mo->actor_id ?? 0));
 
         $rsM       = p4c_query("SELECT * FROM `movies` WHERE `file_id` = '" . p4c_escape_string($fileId) . "' LIMIT 1;", __FILE__, __LINE__);
         $m         = ($rsM && p4c_num_rows($rsM) > 0) ? p4c_fetch_object($rsM) : $mo;
@@ -1031,6 +1032,7 @@ final class MoviesOnlineController
             'amount_webmaster'    => $amountWebmaster,
             'as_download'         => $asDownload,
             'amount_download'     => $amountDownload,
+            'status'              => $movieStatus,
         ];
         $checksum = function_exists('movie_checksum') ? (string)movie_checksum($checksumData) : md5($fileId . $now);
 
@@ -1101,6 +1103,13 @@ final class MoviesOnlineController
             __FILE__,
             __LINE__
         );
+
+        if (function_exists('ec_invalidate_movie_api_cache')) {
+            \ec_invalidate_movie_api_cache($fileId, $actorId);
+            if ($oldActorId > 0 && $oldActorId !== $actorId) {
+                \ec_invalidate_movie_api_cache('', $oldActorId);
+            }
+        }
 
         // 3. BRAM-Compliance nach dem Speichern direkt aktualisieren (analog movie_edit.php)
         if ($movieDbId > 0) {

@@ -982,8 +982,17 @@ final class ActorsController
         // Wenn das Profil auf 'deleted' gesetzt wird, auch zugehörige Filme & Fotoalben als 'deleted' markieren
         if ($status === 'deleted') {
             $now = date('Y-m-d H:i:s');
-            \p4c_query("UPDATE `movies` SET `status` = 'deleted', `deleted_datetime` = '{$now}' WHERE `actor_id` = '" . $actorId . "';", __FILE__, __LINE__);
-            \p4c_query("UPDATE `movies_online` SET `status` = 'deleted', `deleted_datetime` = '{$now}' WHERE `actor_id` = '" . $actorId . "';", __FILE__, __LINE__);
+            \p4c_query("UPDATE `movies` SET `status` = 'deleted', `deleted_datetime` = '{$now}', `checksum` = IF(`status` != 'deleted', MD5(CONCAT(`checksum`, '|deleted')), `checksum`) WHERE `actor_id` = '" . $actorId . "';", __FILE__, __LINE__);
+            \p4c_query("UPDATE `movies_online` SET `status` = 'deleted', `deleted_datetime` = '{$now}', `checksum` = IF(`status` != 'deleted', MD5(CONCAT(`checksum`, '|deleted')), `checksum`) WHERE `actor_id` = '" . $actorId . "';", __FILE__, __LINE__);
+            if (function_exists('ec_invalidate_movie_api_cache')) {
+                \ec_invalidate_movie_api_cache('', $actorId);
+                $rsDelMovs = \p4c_query("SELECT `file_id` FROM `movies_online` WHERE `actor_id` = '" . $actorId . "';", __FILE__, __LINE__);
+                if ($rsDelMovs) {
+                    while ($dm = \p4c_fetch_object($rsDelMovs)) {
+                        \ec_invalidate_movie_api_cache((string)($dm->file_id ?? ''), 0);
+                    }
+                }
+            }
             \p4c_query("UPDATE `photo_albums` SET `status` = 'deleted', `deleted_datetime` = '{$now}', `checksum` = MD5(CONCAT(`checksum`, '|deleted')) WHERE `actor_id` = '" . $actorId . "' AND `status` != 'deleted';", __FILE__, __LINE__);
             \p4c_query("UPDATE `photo_albums_online` SET `status` = 'deleted', `deleted_datetime` = '{$now}', `checksum` = MD5(CONCAT(`checksum`, '|deleted')) WHERE `actor_id` = '" . $actorId . "' AND `status` != 'deleted';", __FILE__, __LINE__);
             if (function_exists('ec_invalidate_photo_album_api_cache')) {

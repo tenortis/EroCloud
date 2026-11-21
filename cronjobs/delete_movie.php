@@ -196,6 +196,9 @@ if ($count_delete_movie > 0 OR $count_old_movie > 0) {
                 p4c_query("DELETE FROM `movies_access` WHERE `movie_id` = '".$movie_obj->file_id."'",__FILE__,__LINE__);
                 p4c_query("DELETE FROM `movies` WHERE `file_id` = '".$movie_obj->file_id."' LIMIT 1;",__FILE__,__LINE__);
                 p4c_query("DELETE FROM `movies_online` WHERE `file_id` = '".$movie_obj->file_id."' LIMIT 1;",__FILE__,__LINE__);
+                if (function_exists('ec_invalidate_movie_api_cache')) {
+                    ec_invalidate_movie_api_cache((string)$movie_obj->file_id, abs((int)$movie_obj->actor_id));
+                }
             } else {
                 echo "Verzeichnis sollte geloescht werden, existiert aber noch. / ";
             }
