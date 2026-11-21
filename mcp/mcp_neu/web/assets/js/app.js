@@ -18,6 +18,50 @@ const App = {
     this.initNotificationsModal();
     this.initGlobalTopbarSearch();
     this.initSessionKeepAlive();
+    this.initOnlineAtGuard();
+  },
+
+  initOnlineAtGuard() {
+    const handleEvent = (ev) => {
+      const target = ev.target;
+      if (target && target.matches && target.matches('input[name="online_at"][data-max-online-at]')) {
+        this.validateOnlineAtInput(target, false);
+      }
+    };
+    document.addEventListener('input', handleEvent);
+    document.addEventListener('change', handleEvent);
+  },
+
+  validateOnlineAtInput(formOrInput, showToast = false) {
+    if (!formOrInput) return true;
+    const inputEl = formOrInput.matches && formOrInput.matches('input[name="online_at"]')
+      ? formOrInput
+      : formOrInput.querySelector?.('input[name="online_at"][data-max-online-at]');
+    if (!inputEl) return true;
+
+    const maxVal = (inputEl.getAttribute('data-max-online-at') || '').trim();
+    const maxDe = (inputEl.getAttribute('data-max-online-at-de') || '').trim();
+    const val = (inputEl.value || '').trim();
+    const errEl = inputEl.parentElement?.querySelector('.js-online-at-future-error');
+
+    const isTooFar = maxVal !== '' && val !== '' && val.slice(0, 16) > maxVal.slice(0, 16);
+    if (isTooFar) {
+      inputEl.classList.add('is-invalid');
+      if (errEl) errEl.classList.add('d-block');
+      if (showToast) {
+        const msg = maxDe
+          ? `Du kannst die Veröffentlichung maximal 12 Monate im Voraus planen (spätestens bis ${maxDe}). Wenn du den Inhalt noch zurückhalten möchtest, belasse ihn stattdessen als Entwurf.`
+          : 'Du kannst die Veröffentlichung maximal 12 Monate im Voraus planen.';
+        this.toast(msg, 'danger');
+        inputEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        inputEl.focus();
+      }
+      return false;
+    }
+
+    inputEl.classList.remove('is-invalid');
+    if (errEl) errEl.classList.remove('d-block');
+    return true;
   },
 
   initNotificationsModal() {
@@ -1811,6 +1855,7 @@ const App = {
     if (editForm) {
       editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!this.validateOnlineAtInput(editForm, true)) return;
 
         const inpFsk16 = document.getElementById('input-preview-fsk16');
         const inpFsk18 = document.getElementById('input-preview-fsk18');
@@ -1867,6 +1912,7 @@ const App = {
     if (step1Form) {
       step1Form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!this.validateOnlineAtInput(step1Form, true)) return;
         const submitBtn = document.getElementById('btn-submit-movie-step1');
         if (submitBtn) submitBtn.disabled = true;
 
@@ -4394,6 +4440,7 @@ const App = {
     if (step1Form) {
       step1Form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!this.validateOnlineAtInput(step1Form, true)) return;
         const submitBtn = document.getElementById('btn-submit-photo-album-step1');
         if (submitBtn) submitBtn.disabled = true;
 
@@ -4429,6 +4476,7 @@ const App = {
     if (editForm) {
       editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!this.validateOnlineAtInput(editForm, true)) return;
         const btns = document.querySelectorAll('#btn-save-photo-album-top, #btn-save-photo-album-bottom');
         btns.forEach(b => { b.disabled = true; });
 
@@ -4594,6 +4642,74 @@ const App = {
         } catch (err) {
           this.toast('Verbindungsfehler: ' + err.message, 'danger');
           btn.disabled = false;
+        }
+      });
+    });
+
+    // 7b. Einzelnes Foto im Album um 90° nach links/rechts drehen
+    document.querySelectorAll('.js-rotate-album-photo-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const albumId = btn.getAttribute('data-album-id');
+        const fileId = btn.getAttribute('data-file-id');
+        const direction = btn.getAttribute('data-direction') || 'right';
+        if (!albumId || !fileId) return;
+
+        const card = btn.closest('.js-album-photo-card');
+        const cardRotateBtns = card ? card.querySelectorAll('.js-rotate-album-photo-btn') : [btn];
+        const origHtml = btn.innerHTML;
+        cardRotateBtns.forEach(b => { b.disabled = true; });
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:0.7rem;height:0.7rem;"></span>';
+
+        try {
+          const formData = new FormData();
+          formData.append('album_id', albumId);
+          formData.append('file_id', fileId);
+          formData.append('direction', direction);
+          formData.append('_csrf', this.csrfToken);
+
+          const res = await fetch(`${this.basePath}/api.php?route=photo-albums/rotate-photo`, {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': this.csrfToken },
+            body: formData
+          });
+          const data = await res.json();
+
+          if (res.ok && data.status === 'ok') {
+            this.toast(data.message || 'Foto wurde gedreht.', 'success');
+            if (card) {
+              const imgEl = card.querySelector('img.js-hover-zoom-thumb');
+              if (imgEl && data.thumb_url) {
+                imgEl.src = data.thumb_url;
+                if (data.zoom_url) imgEl.setAttribute('data-zoom-src', data.zoom_url);
+              }
+              const zoomLink = card.querySelector('.js-zoom-album-photo');
+              if (zoomLink && data.zoom_url) {
+                zoomLink.setAttribute('data-zoom-url', data.zoom_url);
+              }
+              card.querySelectorAll('.js-open-thumb-editor-modal').forEach(edBtn => {
+                if (data.editor_url) edBtn.setAttribute('data-editor-url', data.editor_url);
+              });
+            }
+            const stripThumb = document.querySelector(`.js-studio-filmstrip-thumb[data-num="photo_${fileId}"]`);
+            if (stripThumb) {
+              if (data.thumb_url) {
+                stripThumb.setAttribute('data-url', data.thumb_url);
+                const sImg = stripThumb.querySelector('img');
+                if (sImg) sImg.src = data.thumb_url;
+              }
+              if (data.editor_url) {
+                stripThumb.setAttribute('data-editor-url', data.editor_url);
+              }
+            }
+          } else {
+            this.toast(data.message || 'Foto konnte nicht gedreht werden.', 'danger');
+          }
+        } catch (err) {
+          this.toast('Verbindungsfehler: ' + err.message, 'danger');
+        } finally {
+          btn.innerHTML = origHtml;
+          cardRotateBtns.forEach(b => { b.disabled = false; });
         }
       });
     });

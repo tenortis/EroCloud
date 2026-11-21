@@ -238,6 +238,11 @@ $firstAlbumId = !empty($albums) ? (int)$albums[0]['id'] : 0;
                 <span class="ms-1" title="Online ab Datum">
                   <i class="bi bi-calendar-event me-1"></i>ab <?= View::e((string)$a['online_at']) ?>
                 </span>
+                <?php if (!empty($a['online_at_too_far'])): ?>
+                <span class="badge-kkc badge-kkc-danger ms-1" title="Veröffentlichungsdatum liegt mehr als 12 Monate in der Zukunft">
+                  <i class="bi bi-calendar-x-fill me-1"></i>Datum &gt; 12 Mon.
+                </span>
+                <?php endif; ?>
               </div>
             </td>
 

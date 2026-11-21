@@ -113,6 +113,9 @@ function aic_clean_html_text($str) {
     if ($str === null || $str === '') {
         return '';
     }
+    if (function_exists('ec_html_to_plain_text')) {
+        return ec_html_to_plain_text($str);
+    }
     $str = aic_utf8((string)$str);
     $str = preg_replace('/<br\s*\/?>/i', "\n", $str);
     $str = preg_replace('/<\/p>\s*<p[^>]*>/i', "\n\n", $str);
@@ -732,12 +735,14 @@ function aic_analyze_texts($movie_data, $segments = array(), $spoken_transcript 
     }
 
     // Stufe 1: Deterministischer BRAM-Keyword- & Kontext-Scanner
+    $matched_spans = array();
     foreach ($categories as $cat) {
-        $cat_name  = isset($cat['name']) ? $cat['name'] : 'BRAM-Regel';
-        $severity  = isset($cat['severity']) ? $cat['severity'] : 'warning';
-        $base_risk = isset($cat['base_risk_score']) ? (int)$cat['base_risk_score'] : 50;
-        $cat_desc  = isset($cat['description']) ? $cat['description'] : '';
-        $keywords  = isset($cat['keywords']) && is_array($cat['keywords']) ? $cat['keywords'] : array();
+        $cat_name       = isset($cat['name']) ? $cat['name'] : 'BRAM-Regel';
+        $severity       = isset($cat['severity']) ? $cat['severity'] : 'warning';
+        $base_risk      = isset($cat['base_risk_score']) ? (int)$cat['base_risk_score'] : 50;
+        $cat_desc       = isset($cat['description']) ? $cat['description'] : '';
+        $cat_suggestion = isset($cat['suggestion']) ? (string)$cat['suggestion'] : '';
+        $keywords       = isset($cat['keywords']) && is_array($cat['keywords']) ? $cat['keywords'] : array();
 
         foreach ($keywords as $kw) {
             $kw_trim = trim($kw);
@@ -746,17 +751,38 @@ function aic_analyze_texts($movie_data, $segments = array(), $spoken_transcript 
             }
             $pattern = '/(?<![a-zA-ZäöüÄÖÜß0-9])' . preg_quote($kw_trim, '/') . '(?![a-zA-ZäöüÄÖÜß0-9])/iu';
 
-            foreach ($sources as $src) {
+            foreach ($sources as $src_idx => $src) {
                 if ($src['text'] === '') {
                     continue;
                 }
                 if (preg_match($pattern, $src['text'], $match, PREG_OFFSET_CAPTURE)) {
                     $matched_word = $match[0][0];
-                    $offset = $match[0][1];
+                    $offset       = (int)$match[0][1];
+                    $match_end    = $offset + strlen($matched_word);
+
+                    // Wenn eine schaerfere violation-Regel genau diesen Textabschnitt bereits abdeckt, keinen doppelten warning-Treffer erzeugen
+                    if ($severity === 'warning' && !empty($matched_spans[$src_idx])) {
+                        $covered_by_violation = false;
+                        foreach ($matched_spans[$src_idx] as $span) {
+                            if ($span['severity'] === 'violation' && $offset >= $span['start'] && $match_end <= $span['end']) {
+                                $covered_by_violation = true;
+                                break;
+                            }
+                        }
+                        if ($covered_by_violation) {
+                            continue;
+                        }
+                    }
+
+                    $matched_spans[$src_idx][] = array(
+                        'start'    => $offset,
+                        'end'      => $match_end,
+                        'severity' => $severity
+                    );
 
                     $snip_start = max(0, $offset - 45);
                     $snip_len   = strlen($matched_word) + 90;
-                    $quote = trim(substr($src['text'], $snip_start, $snip_len));
+                    $quote = aic_utf8(trim(substr($src['text'], $snip_start, $snip_len)));
                     if ($snip_start > 0) {
                         $quote = '...' . $quote;
                     }
@@ -772,7 +798,8 @@ function aic_analyze_texts($movie_data, $segments = array(), $spoken_transcript 
                         'timestamp'     => $src['timestamp'],
                         'matched_term'  => $matched_word,
                         'matched_quote' => $quote,
-                        'reason'        => $cat_desc
+                        'reason'        => $cat_desc,
+                        'suggestion'    => $cat_suggestion
                     );
 
                     if (!in_array($cat_name, $detected_topics)) {
@@ -791,7 +818,7 @@ function aic_analyze_texts($movie_data, $segments = array(), $spoken_transcript 
         }
     }
 
-    $engine_used = 'BRAM-Regel-Engine (JSON v1.1)';
+    $engine_used = 'BRAM-Regel-Engine (JSON v1.2)';
     $llm_summary = '';
 
     // Stufe 2: Falls lokaler llama.cpp / Ollama Server aktiv ist, semantische Tiefenpruefung ausfuehren
@@ -855,6 +882,98 @@ function aic_analyze_texts($movie_data, $segments = array(), $spoken_transcript 
                                     $overall_status = 'violation';
                                 } elseif ($parsed_llm['compliance_status'] === 'warning' && $overall_status === 'ok') {
                                     $overall_status = 'warning';
+                                }
+                            }
+
+                            if (!empty($parsed_llm['violations']) && is_array($parsed_llm['violations'])) {
+                                $src_label_map = array(
+                                    'title'       => $is_photo_album ? 'Albumtitel' : 'Filmtitel',
+                                    'description' => $is_photo_album ? 'Albumbeschreibung' : 'Filmbeschreibung',
+                                    'meta'        => 'SEO Meta-Angaben',
+                                    'transcript'  => 'Gesprochenes Video-Audio'
+                                );
+                                foreach ($parsed_llm['violations'] as $lv) {
+                                    if (!is_array($lv)) {
+                                        continue;
+                                    }
+                                    $lv_sev = (isset($lv['severity']) && strtolower((string)$lv['severity']) === 'violation') ? 'violation' : 'warning';
+                                    $lv_cat = isset($lv['category']) && trim((string)$lv['category']) !== '' ? trim((string)$lv['category']) : 'KI-Compliance-Prüfung';
+                                    $lv_src_raw = isset($lv['source']) ? strtolower(trim((string)$lv['source'])) : 'description';
+                                    if (!isset($src_label_map[$lv_src_raw])) {
+                                        if (strpos($lv_src_raw, 'title') !== false || strpos($lv_src_raw, 'titel') !== false) {
+                                            $lv_src_raw = 'title';
+                                        } elseif (strpos($lv_src_raw, 'meta') !== false) {
+                                            $lv_src_raw = 'meta';
+                                        } elseif (strpos($lv_src_raw, 'trans') !== false || strpos($lv_src_raw, 'audio') !== false) {
+                                            $lv_src_raw = 'transcript';
+                                        } else {
+                                            $lv_src_raw = 'description';
+                                        }
+                                    }
+                                    $lv_src_label  = $src_label_map[$lv_src_raw];
+                                    $lv_ts         = isset($lv['timestamp']) && trim((string)$lv['timestamp']) !== '' ? trim((string)$lv['timestamp']) : '-';
+                                    $lv_quote      = isset($lv['matched_quote']) ? trim((string)$lv['matched_quote']) : '';
+                                    $lv_term       = isset($lv['matched_term']) && trim((string)$lv['matched_term']) !== '' ? trim((string)$lv['matched_term']) : $lv_quote;
+                                    $lv_reason     = isset($lv['reason']) ? trim((string)$lv['reason']) : '';
+                                    $lv_suggestion = isset($lv['suggestion']) ? trim((string)$lv['suggestion']) : '';
+
+                                    if ($lv_term === '' && $lv_quote === '') {
+                                        continue;
+                                    }
+
+                                    $norm_term  = mb_strtolower($lv_term, 'UTF-8');
+                                    $norm_quote = mb_strtolower($lv_quote, 'UTF-8');
+                                    $is_dup     = false;
+
+                                    foreach ($violations as $v_idx => $ex_v) {
+                                        if ((string)$ex_v['source'] !== $lv_src_raw) {
+                                            continue;
+                                        }
+                                        $ex_term  = mb_strtolower(trim((string)($ex_v['matched_term'] ?? '')), 'UTF-8');
+                                        $ex_quote = mb_strtolower(trim((string)($ex_v['matched_quote'] ?? '')), 'UTF-8');
+                                        if (
+                                            ($norm_term !== '' && $ex_term !== '' && ($ex_term === $norm_term || mb_strpos($ex_term, $norm_term, 0, 'UTF-8') !== false || mb_strpos($norm_term, $ex_term, 0, 'UTF-8') !== false))
+                                            || ($norm_term !== '' && $ex_quote !== '' && mb_strpos($ex_quote, $norm_term, 0, 'UTF-8') !== false)
+                                            || ($norm_quote !== '' && $ex_quote !== '' && ($ex_quote === $norm_quote || mb_strpos($ex_quote, $norm_quote, 0, 'UTF-8') !== false))
+                                        ) {
+                                            $is_dup = true;
+                                            if (empty($ex_v['suggestion']) && $lv_suggestion !== '') {
+                                                $violations[$v_idx]['suggestion'] = $lv_suggestion;
+                                            }
+                                            break;
+                                        }
+                                    }
+
+                                    if ($is_dup) {
+                                        continue;
+                                    }
+
+                                    $violations[] = array(
+                                        'severity'      => $lv_sev,
+                                        'category'      => $lv_cat,
+                                        'source'        => $lv_src_raw,
+                                        'source_label'  => $lv_src_label,
+                                        'timestamp'     => $lv_ts,
+                                        'matched_term'  => $lv_term,
+                                        'matched_quote' => $lv_quote !== '' ? $lv_quote : $lv_term,
+                                        'reason'        => $lv_reason,
+                                        'suggestion'    => $lv_suggestion
+                                    );
+
+                                    if (!in_array($lv_cat, $detected_topics)) {
+                                        $detected_topics[] = $lv_cat;
+                                    }
+                                    if ($lv_sev === 'violation') {
+                                        $overall_status = 'violation';
+                                        if ($max_risk < 85) {
+                                            $max_risk = 85;
+                                        }
+                                    } elseif ($overall_status === 'ok') {
+                                        $overall_status = 'warning';
+                                        if ($max_risk < 50) {
+                                            $max_risk = 50;
+                                        }
+                                    }
                                 }
                             }
                         }

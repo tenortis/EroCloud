@@ -525,13 +525,146 @@ const App = {
     }
   },
 
+  checkAcpOnlineAtGuard(prefix) {
+    const map = {
+      pac: {
+        input: 'pac-input-online-at',
+        status: 'pac-input-status',
+        banner: 'pac-online-at-block-banner',
+        bannerDate: 'pac-online-at-block-date',
+        err: 'pac-online-at-error',
+        btn: 'pac-submit-approve-btn',
+        hint: 'pac-approve-blocked-hint',
+      },
+      mc: {
+        input: 'mc-input-online-at',
+        status: 'mc-input-status',
+        banner: 'mc-online-at-block-banner',
+        bannerDate: 'mc-online-at-block-date',
+        err: 'mc-online-at-error',
+        btn: 'mc-submit-approve-btn',
+        hint: 'mc-approve-blocked-hint',
+      },
+      pao: {
+        input: 'pao-input-online-at',
+        status: 'pao-status-select',
+        banner: 'pao-online-at-block-banner',
+        bannerDate: 'pao-online-at-block-date',
+        err: 'pao-online-at-error',
+        btn: 'pao-save-btn',
+        hint: 'pao-approve-blocked-hint',
+      },
+      me: {
+        input: 'me-input-online-at',
+        status: null,
+        radioName: 'movie_status',
+        banner: 'me-online-at-block-banner',
+        bannerDate: 'me-online-at-block-date',
+        err: 'me-online-at-error',
+        btn: 'me-submit-save-btn',
+        btnFallback: 'me-save-btn',
+        hint: 'me-approve-blocked-hint',
+      },
+    };
+    const cfg = map[prefix];
+    if (!cfg) return false;
+
+    const inputEl = document.getElementById(cfg.input);
+    if (!inputEl) return false;
+
+    const val = (inputEl.value || '').trim();
+    const maxVal = (inputEl.getAttribute('data-max-online-at') || '').trim();
+    const tooFar = maxVal !== '' && val !== '' && val.slice(0, 16) > maxVal.slice(0, 16);
+
+    let statusVal = 'active';
+    if (cfg.status) {
+      const statusEl = document.getElementById(cfg.status);
+      if (statusEl) statusVal = statusEl.value || 'active';
+    } else if (cfg.radioName) {
+      const checkedRadio = document.querySelector(`input[name="${cfg.radioName}"]:checked`);
+      if (checkedRadio) statusVal = checkedRadio.value || 'active';
+    }
+
+    const isBlocked = tooFar && statusVal === 'active';
+
+    inputEl.classList.toggle('is-invalid', tooFar);
+    const errEl = document.getElementById(cfg.err);
+    if (errEl) errEl.classList.toggle('d-block', tooFar);
+
+    const bannerEl = document.getElementById(cfg.banner);
+    if (bannerEl) bannerEl.classList.toggle('d-none', !tooFar);
+
+    const bannerDateEl = document.getElementById(cfg.bannerDate);
+    if (bannerDateEl && val) {
+      const m = val.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+      if (m) {
+        bannerDateEl.textContent = `${m[3]}.${m[2]}.${m[1]} ${m[4]}:${m[5]}`;
+      }
+    }
+
+    const btnEl = document.getElementById(cfg.btn) || (cfg.btnFallback ? document.getElementById(cfg.btnFallback) : null);
+    if (btnEl) btnEl.disabled = isBlocked;
+
+    const hintEl = document.getElementById(cfg.hint);
+    if (hintEl) hintEl.classList.toggle('d-none', !isBlocked);
+
+    return isBlocked;
+  },
+
+  setAcpOnlineAtNow(prefix) {
+    const inputMap = {
+      pac: 'pac-input-online-at',
+      mc: 'mc-input-online-at',
+      pao: 'pao-input-online-at',
+      me: 'me-input-online-at',
+    };
+    const inputEl = document.getElementById(inputMap[prefix] || '');
+    if (!inputEl) return;
+
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    inputEl.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    this.checkAcpOnlineAtGuard(prefix);
+    this.toast('Veröffentlichungsdatum auf den aktuellen Zeitpunkt gesetzt.', 'info');
+  },
+
+  prefillOnlineAtRejection(prefix) {
+    const isAlbum = prefix === 'pac';
+    const tabBtnId = isAlbum ? 'tab-btn-pac-review' : 'tab-btn-review';
+    const selectId = isAlbum ? 'pac-rejection-reason-select' : 'mc-rejection-reason-select';
+    const textId = isAlbum ? 'pac-rejection-text' : 'mc-rejection-text';
+    const cardId = isAlbum ? 'pac-reject-card' : 'mc-reject-card';
+    const submitBtnId = isAlbum ? 'pac-submit-reject-btn' : 'mc-submit-reject-btn';
+
+    document.getElementById(tabBtnId)?.click();
+    const selectEl = document.getElementById(selectId);
+    if (selectEl) {
+      selectEl.value = 'online_at_too_far';
+      if (isAlbum) {
+        this.onPhotoAlbumRejectionReasonChange(selectEl);
+      } else {
+        this.onMovieRejectionReasonChange(selectEl);
+      }
+    }
+    const textEl = document.getElementById(textId);
+    if (textEl && textEl.value.trim() === '') {
+      textEl.value = 'Das gewählte Veröffentlichungsdatum liegt zu weit in der Zukunft. Eine Vorausplanung ist maximal 12 Monate im Voraus möglich. Bitte passe das Datum an und reiche den Inhalt erneut ein.';
+    }
+    document.getElementById(cardId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById(submitBtnId)?.focus();
+  },
+
   onMovieRejectionReasonChange(selectEl) {
     if (!selectEl) return;
     const opt = selectEl.options[selectEl.selectedIndex];
     const longText = opt ? (opt.getAttribute('data-long-text') || '') : '';
     const textarea = document.getElementById('mc-rejection-text');
     if (textarea) {
-      textarea.value = longText;
+      if (selectEl.value === 'free_text' && longText === '') {
+        textarea.focus();
+      } else {
+        textarea.value = longText;
+      }
     }
   },
 
@@ -548,6 +681,12 @@ const App = {
     const form = document.getElementById('mc-approve-form');
     const btn = document.getElementById('mc-submit-approve-btn');
     if (!form) return false;
+
+    if (this.checkAcpOnlineAtGuard('mc')) {
+      this.toast('Freigabe blockiert: Das Veröffentlichungsdatum liegt mehr als 12 Monate in der Zukunft.', 'danger');
+      document.getElementById('mc-online-at-block-banner')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return false;
+    }
 
     const formData = new FormData(form);
     formData.append('_csrf', this.csrfToken);
@@ -587,6 +726,7 @@ const App = {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Film speichern &amp; freigeben';
       }
+      this.checkAcpOnlineAtGuard('mc');
     }
     return false;
   },
@@ -1044,7 +1184,11 @@ const App = {
     const longText = opt ? (opt.getAttribute('data-long-text') || '') : '';
     const textarea = document.getElementById('pac-rejection-text');
     if (textarea) {
-      textarea.value = longText;
+      if (selectEl.value === 'free_text' && longText === '') {
+        textarea.focus();
+      } else {
+        textarea.value = longText;
+      }
     }
   },
 
@@ -1053,6 +1197,12 @@ const App = {
     const form = document.getElementById('pac-approve-form');
     const btn = document.getElementById('pac-submit-approve-btn');
     if (!form) return false;
+
+    if (this.checkAcpOnlineAtGuard('pac')) {
+      this.toast('Freigabe blockiert: Das Veröffentlichungsdatum liegt mehr als 12 Monate in der Zukunft.', 'danger');
+      document.getElementById('pac-online-at-block-banner')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return false;
+    }
 
     const formData = new FormData(form);
     formData.append('_csrf', this.csrfToken);
@@ -1092,6 +1242,7 @@ const App = {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Fotoalbum speichern &amp; veröffentlichen';
       }
+      this.checkAcpOnlineAtGuard('pac');
     }
     return false;
   },
@@ -1215,16 +1366,18 @@ const App = {
 
     this.toast('Starte BRAM Text-Scan mit aktuellen Formularwerten...', 'info');
     try {
+      const formData = new FormData();
+      formData.append('_csrf', this.csrfToken);
+      formData.append('album_id', String(albumId));
+      formData.append('title', title);
+      formData.append('description', description);
+      formData.append('meta_title', metaTitle);
+      formData.append('meta_description', metaDescription);
+
       const res = await fetch(`${this.basePath}/api.php?route=photo-albums-checking/ai-action`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          album_id: Number(albumId),
-          title,
-          description,
-          meta_title: metaTitle,
-          meta_description: metaDescription,
-        }),
+        headers: { 'X-CSRF-Token': this.csrfToken },
+        body: formData
       });
       const data = await res.json();
 
@@ -1236,52 +1389,50 @@ const App = {
       this.resetLogoutCountdown();
       this.toast(data.message || 'BRAM Text-Check abgeschlossen.', 'success');
 
-      const report = data.bram_report;
+      const report = data.ai_data || data.bram_report;
       if (!report) return;
 
-      const cStatus = String(report.compliance_status || 'pending');
-      const rScore = Math.max(0, Number(report.risk_score || 0));
-      const summary = String(report.summary || '');
+      const cStatus = String(report.text_compliance || report.compliance_status || 'ok');
+      const rScore = Math.max(0, Number(report.text_risk_score ?? report.risk_score ?? 0));
+      const summary = String(report.text_summary || report.summary || '');
       const violations = Array.isArray(report.violations) ? report.violations : [];
-      const engine = String(report.ai_engine || 'local_rules');
+      const engine = String(report.text_engine_used || report.ai_engine || 'BRAM-Regel-Engine (JSON v1.2)');
       const updatedAt = String(report.updated_at || '');
 
-      let bgClass = 'bg-secondary bg-opacity-10 border-secondary';
-      let badgeClass = 'badge-kkc-muted';
-      let label = 'Prüfung ausstehend';
-      let icon = 'bi-hourglass-split';
+      let bgClass = 'border-success bg-success bg-opacity-10';
+      let badgeClass = 'badge-kkc-success';
+      let label = 'BRAM Unbedenklich (Grün)';
+      let icon = 'bi-shield-check';
+      let pillClass = 'bg-success';
 
-      if (cStatus === 'ok' || cStatus === 'green') {
-        bgClass = 'bg-success bg-opacity-10 border-success';
-        badgeClass = 'badge-kkc-success';
-        label = 'BRAM Konform (Keine Treffer)';
-        icon = 'bi-shield-check';
-      } else if (cStatus === 'warning' || cStatus === 'yellow') {
-        bgClass = 'bg-warning bg-opacity-10 border-warning';
+      if (cStatus === 'warning' || cStatus === 'yellow') {
+        bgClass = 'border-warning bg-warning bg-opacity-10';
         badgeClass = 'badge-kkc-warning';
-        label = 'Manuelle Prüfung empfohlen (Hinweis)';
+        label = 'BRAM Hinweis / Prüfen (Gelb)';
         icon = 'bi-exclamation-triangle-fill';
+        pillClass = 'bg-warning text-dark';
       } else if (cStatus === 'violation' || cStatus === 'red') {
-        bgClass = 'bg-danger bg-opacity-10 border-danger';
+        bgClass = 'border-danger bg-danger bg-opacity-10';
         badgeClass = 'badge-kkc-danger';
-        label = 'BRAM / Compliance Treffer erkannt!';
-        icon = 'bi-shield-fill-exclamation';
+        label = 'BRAM Verstoß / Kritisch (Rot)';
+        icon = 'bi-exclamation-octagon-fill';
+        pillClass = 'bg-danger';
       }
 
       const topBanner = document.getElementById('pac-top-bram-banner');
       if (topBanner) {
-        topBanner.className = `card card-kkc mb-4 border ${bgClass}`;
+        topBanner.className = `p-3 rounded border mb-3 ${bgClass}`;
       }
 
       const topBadge = document.getElementById('pac-top-bram-badge');
       if (topBadge) {
-        topBadge.className = `badge-kkc ${badgeClass}`;
-        topBadge.innerHTML = `<i class="bi ${icon} me-1"></i>${this.escapeHtml(label)}`;
+        topBadge.className = `badge-kkc ${badgeClass} fs-6 py-1 px-2`;
+        topBadge.innerHTML = `<i class="bi ${icon} me-1"></i> ${this.escapeHtml(label)}`;
       }
 
       const topScore = document.getElementById('pac-top-bram-score');
       if (topScore) {
-        topScore.textContent = `Risk-Score: ${rScore}/100`;
+        topScore.textContent = `Risiko-Score: ${rScore} / 100`;
       }
 
       const topSummary = document.getElementById('pac-top-bram-summary');
@@ -1291,45 +1442,45 @@ const App = {
 
       const topDetailsCnt = document.getElementById('pac-top-bram-details-cnt');
       if (topDetailsCnt) {
-        topDetailsCnt.textContent = `Details (${violations.length})`;
+        topDetailsCnt.textContent = String(violations.length);
       }
 
       const topPills = document.getElementById('pac-top-bram-pills');
       if (topPills) {
         if (violations.length > 0) {
           topPills.classList.remove('d-none');
-          topPills.innerHTML = violations.map(v => {
+          const pillsHtml = violations.map(v => {
             const vSev = String(v.severity || 'warning');
-            const vBadge = (vSev === 'violation' || vSev === 'critical') ? 'badge-kkc-danger' : 'badge-kkc-warning';
+            const isCrit = (vSev === 'violation' || vSev === 'critical');
+            const vCls = isCrit ? 'bg-danger text-white' : 'bg-warning text-dark';
+            const vIcon = isCrit ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill';
             const vTerm = String(v.matched_term || v.matched_quote || v.term || '');
             const vCat = String(v.category || 'BRAM');
             const vSrc = String(v.source_label || v.source || 'Text');
             const vReason = String(v.reason || '');
-            return `<span class="badge-kkc ${vBadge}" title="${this.escapeHtml(vReason)}"><strong>${this.escapeHtml(vCat)}:</strong> "${this.escapeHtml(vTerm)}" <span class="opacity-75">(${this.escapeHtml(vSrc)})</span></span>`;
+            return `<span class="badge ${vCls} d-inline-flex align-items-center gap-1 py-1 px-2" style="font-size: 0.78rem;" title="${this.escapeHtml(vReason)}"><i class="bi ${vIcon}"></i><strong>${this.escapeHtml(vCat)}:</strong> <span>„${this.escapeHtml(vTerm)}“</span> <span class="opacity-75">(${this.escapeHtml(vSrc)})</span></span>`;
           }).join('');
+          topPills.innerHTML = `<div class="d-flex flex-wrap gap-2 mt-2 pt-2 border-top" style="border-color: rgba(0,0,0,0.1) !important;">${pillsHtml}</div>`;
         } else {
-          topPills.classList.add('d-none');
           topPills.innerHTML = '';
         }
       }
 
       const tabNavBadge = document.getElementById('pac-tab-bram-badge');
       if (tabNavBadge) {
-        tabNavBadge.className = `badge-kkc ${badgeClass} ms-1`;
+        tabNavBadge.className = `badge rounded-pill ${pillClass}`;
         tabNavBadge.textContent = `${rScore}/100`;
       }
 
       const tabKpiBadge = document.getElementById('pac-bram-tab-badge');
       if (tabKpiBadge) {
-        tabKpiBadge.className = `badge-kkc ${badgeClass} fs-6`;
-        tabKpiBadge.innerHTML = `<i class="bi ${icon} me-1"></i>${this.escapeHtml(label)}`;
+        tabKpiBadge.className = `badge-kkc ${badgeClass}`;
+        tabKpiBadge.innerHTML = `<i class="bi ${icon} me-1"></i> ${this.escapeHtml(label)}`;
       }
 
       const tabKpiScore = document.getElementById('pac-bram-tab-score');
       if (tabKpiScore) {
-        const scoreColor = rScore >= 70 ? 'text-danger' : (rScore >= 30 ? 'text-warning' : 'text-success');
-        tabKpiScore.className = `fs-4 fw-bold ${scoreColor}`;
-        tabKpiScore.innerHTML = `${rScore} <span class="fs-6 text-muted fw-normal">/ 100</span>`;
+        tabKpiScore.textContent = `${rScore} / 100`;
       }
 
       const tabKpiEngine = document.getElementById('pac-bram-tab-engine');
@@ -1339,7 +1490,7 @@ const App = {
 
       const tabKpiUpdated = document.getElementById('pac-bram-tab-updated');
       if (tabKpiUpdated && updatedAt) {
-        tabKpiUpdated.textContent = `Stand: ${updatedAt}`;
+        tabKpiUpdated.textContent = updatedAt;
       }
 
       const tabSummary = document.getElementById('pac-bram-tab-summary');
@@ -1351,9 +1502,12 @@ const App = {
       if (tabBody) {
         if (violations.length === 0) {
           tabBody.innerHTML = `
-            <div class="p-4 text-center text-success">
-              <i class="bi bi-check-circle-fill fs-2 d-block mb-2"></i>
-              <strong>Keine BRAM- oder Compliance-Auffälligkeiten in Titel, Beschreibung oder SEO-Feldern gefunden.</strong>
+            <div class="p-4 rounded border text-center bg-success bg-opacity-10 border-success">
+              <i class="bi bi-check-circle-fill text-success fs-2 d-block mb-2"></i>
+              <h3 class="h6 fw-bold mb-1">Keine verbotenen oder kritischen Begriffe gefunden</h3>
+              <p class="text-muted small mb-0">
+                Weder im Albumtitel, in der Albumbeschreibung noch in den SEO-Metadaten wurden BRAM-Treffer festgestellt.
+              </p>
             </div>
           `;
         } else {
@@ -1362,18 +1516,27 @@ const App = {
             const isCrit = (vSev === 'violation' || vSev === 'critical');
             const vCat = String(v.category || 'Allgemein');
             const vSrc = String(v.source_label || v.source || 'Text');
-            const vQuote = String(v.matched_quote || v.matched_term || v.term || '');
+            const vTerm = String(v.matched_term || v.term || '');
+            const vQuote = String(v.matched_quote || v.quote || '');
             const vReason = String(v.reason || '');
+            const vSuggestion = String(v.suggestion || '');
             const sevHtml = isCrit
-              ? '<span class="badge-kkc badge-kkc-danger">KRITISCH (Verstoß)</span>'
-              : '<span class="badge-kkc badge-kkc-warning">WARNUNG (Prüfen)</span>';
+              ? '<span class="badge-kkc badge-kkc-danger">Kritischer Verstoß</span>'
+              : '<span class="badge-kkc badge-kkc-warning">Warnhinweis</span>';
+            const suggHtml = vSuggestion
+              ? `<div class="mt-1 p-1.5 px-2 rounded bg-info bg-opacity-10 border border-info border-opacity-25 text-body" style="font-size: 0.76rem;"><i class="bi bi-lightbulb-fill text-info me-1"></i><strong>Alternative / Empfehlung:</strong> ${this.escapeHtml(vSuggestion)}</div>`
+              : '';
             return `
               <tr>
+                <td class="fw-bold">${this.escapeHtml(vCat)}</td>
                 <td>${sevHtml}</td>
-                <td class="fw-semibold small">${this.escapeHtml(vCat)}</td>
-                <td><span class="badge-kkc badge-kkc-muted">${this.escapeHtml(vSrc)}</span></td>
-                <td><code class="text-danger fw-bold">"${this.escapeHtml(vQuote)}"</code></td>
-                <td class="small text-muted">${this.escapeHtml(vReason)}</td>
+                <td>${this.escapeHtml(vSrc)}</td>
+                <td><code class="fw-bold text-danger">${this.escapeHtml(vTerm)}</code></td>
+                <td class="small">
+                  ${vQuote ? `<div class="text-body fst-italic">„${this.escapeHtml(vQuote)}“</div>` : ''}
+                  ${vReason ? `<div class="text-muted" style="font-size: 0.75rem;">${this.escapeHtml(vReason)}</div>` : ''}
+                  ${suggHtml}
+                </td>
               </tr>
             `;
           }).join('');
@@ -1383,11 +1546,11 @@ const App = {
               <table class="table table-kkc align-middle mb-0">
                 <thead>
                   <tr>
+                    <th>Kategorie / Regel</th>
                     <th>Schweregrad</th>
-                    <th>Kategorie</th>
-                    <th>Fundort</th>
-                    <th>Erkannter Begriff / Textstelle</th>
-                    <th>Erklärung / Richtlinie</th>
+                    <th>Quelle</th>
+                    <th>Erkannter Begriff</th>
+                    <th>Textstelle / Zitat &amp; Erläuterung</th>
                   </tr>
                 </thead>
                 <tbody>${rowsHtml}</tbody>
@@ -1537,11 +1700,19 @@ const App = {
   async submitMovieOnlineSave(event) {
     if (event) event.preventDefault();
     const form = document.getElementById('movie-online-save-form');
-    const btn = document.getElementById('me-save-btn');
+    const btn = document.getElementById('me-submit-save-btn') || document.getElementById('me-save-btn');
     if (!form) return false;
 
+    if (this.checkAcpOnlineAtGuard('me')) {
+      this.toast('Speichern im Status „Aktiv“ blockiert: Das Veröffentlichungsdatum liegt mehr als 12 Monate in der Zukunft.', 'danger');
+      document.getElementById('me-online-at-block-banner')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return false;
+    }
+
     const statusSel = form.querySelector('select[name="movie_status"]');
-    if (statusSel && statusSel.value === 'deleted') {
+    const statusRadio = form.querySelector('input[name="movie_status"]:checked');
+    const statusVal = statusSel ? statusSel.value : (statusRadio ? statusRadio.value : 'active');
+    if (statusVal === 'deleted') {
       const ok = await this.confirm({
         title: 'Film endgültig löschen?',
         message: 'Möchtest du diesen Film wirklich auf „Gelöscht“ setzen?\nAlle Videodateien auf dem Server werden unwiderruflich gelöscht und der Film wird aus movies_online entfernt!',
@@ -1588,8 +1759,9 @@ const App = {
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Änderungen an Online-Film speichern';
+        btn.innerHTML = '<i class="bi bi-floppy-fill me-1"></i> Änderungen speichern';
       }
+      this.checkAcpOnlineAtGuard('me');
     }
     return false;
   },
@@ -1759,15 +1931,21 @@ const App = {
     const btn = document.getElementById('pao-save-btn');
     if (!form) return false;
 
+    if (this.checkAcpOnlineAtGuard('pao')) {
+      this.toast('Speichern im Status „Aktiv“ blockiert: Das Veröffentlichungsdatum liegt mehr als 12 Monate in der Zukunft.', 'danger');
+      document.getElementById('pao-online-at-block-banner')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return false;
+    }
+
     const statusSel = document.getElementById('pao-status-select');
     if (statusSel && statusSel.value === 'deleted') {
       const ok = await this.confirm({
-        title: 'Fotoalbum endgültig löschen?',
-        message: 'Möchtest du dieses Fotoalbum wirklich auf „Löschen“ setzen?\nAlle Bilddateien auf dem Server werden unwiderruflich gelöscht und das Album wird aus photo_albums_online entfernt!',
-        variant: 'danger',
-        icon: 'bi-trash3-fill',
-        confirmText: 'Fotoalbum unwiderruflich löschen',
-        confirmIcon: 'bi-trash3'
+        title: 'Fotoalbum auf „Gelöscht“ (Soft-Delete) setzen?',
+        message: 'Das Fotoalbum wird sofort aus dem öffentlichen Verkauf genommen (ungekaufte Kopien auf angeschlossenen Seiten werden automatisch entfernt).\nBereits vorhandene Käufer behalten dauerhaft Zugriff auf ihre gekauften Bilder; ungekaufte Alben werden nach 30 Tagen per Cronjob bereinigt.',
+        variant: 'warning',
+        icon: 'bi-shield-check',
+        confirmText: 'Soft-Delete speichern',
+        confirmIcon: 'bi-check2'
       });
       if (!ok) return false;
     }
@@ -1808,6 +1986,62 @@ const App = {
       if (btn) {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-floppy-fill me-1"></i> Änderungen speichern';
+      }
+      this.checkAcpOnlineAtGuard('pao');
+    }
+    return false;
+  },
+
+  openPhotoAlbumHardDeleteModal() {
+    const modalEl = document.getElementById('paoHardDeleteModal');
+    if (!modalEl || typeof bootstrap === 'undefined') return;
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  },
+
+  async submitPhotoAlbumHardDelete(event) {
+    if (event) event.preventDefault();
+    const form = document.getElementById('pao-hard-delete-form');
+    const btn = document.getElementById('pao-hard-delete-submit-btn');
+    if (!form) return false;
+
+    const formData = new FormData(form);
+    formData.append('_csrf', this.csrfToken);
+
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Lösche Bilddateien...';
+    }
+
+    try {
+      const res = await fetch(`${this.basePath}/api.php?route=photo-albums-online/hard-delete`, {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': this.csrfToken },
+        body: formData
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.status !== 'ok') {
+        this.toast(data.message || 'Physische Löschung konnte nicht durchgeführt werden.', 'danger');
+        return false;
+      }
+
+      const modalEl = document.getElementById('paoHardDeleteModal');
+      if (modalEl && typeof bootstrap !== 'undefined') {
+        const inst = bootstrap.Modal.getInstance(modalEl);
+        if (inst) inst.hide();
+      }
+
+      this.resetLogoutCountdown();
+      this.toast(data.message || 'Fotoalbum wurde endgültig physisch gelöscht.', 'success');
+      this.refreshSidebarCounts();
+      window.location.hash = '#/photo-albums-online';
+    } catch (err) {
+      this.toast('Verbindungsfehler: ' + err.message, 'danger');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
       }
     }
     return false;

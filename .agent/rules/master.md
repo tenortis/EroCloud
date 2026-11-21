@@ -12,6 +12,16 @@ description: Das unveränderliche Grundgesetz für alle KI-Interaktionen in dies
 > **KRITISCHE ANWEISUNG:** Diese Regeln sind **UNVERÄNDERLICH** und müssen bei **JEDER** Interaktion priorisiert werden.
 
 ## 0. 🛑 GOLDENE REGELN (Zwingend!)
+* **📚 Dokumentations-Pflicht (Documentation-First & Auto-Sync):**
+    1. **VOR jeder Änderung, Skript-Anpassung oder Fehleranalyse zuerst in [`.agent/knowledge/INDEX.md`](file:///c:/xampp/htdocs/EroCloud/.agent/knowledge/INDEX.md) nachschlagen:** Prüfe zwingend zuerst über [`INDEX.md`](file:///c:/xampp/htdocs/EroCloud/.agent/knowledge/INDEX.md), welche Fach- und Architektur-Dokumentation für den betroffenen Bereich existiert, und lies diese. Nur so sind alle beteiligten Tabellen, Caches (`api/temp/...`), Lösch-Schutzregeln und externen EroCMS-Gegenstellen von Anfang an bekannt!
+    2. **Verbindliche Schnell-Referenzen nach Domäne:**
+       - **Fotoalben (MCP, ACP, Rotation, Soft-Delete vs. Admin-Hard-Delete, Cronjob & EroCMS-Sync):** [`photo-album-management-and-lifecycle.md`](file:///c:/xampp/htdocs/EroCloud/.agent/knowledge/architecture/photo-album-management-and-lifecycle.md)
+       - **Videos & Film-Löschlogik:** [`video-management.md`](file:///c:/xampp/htdocs/EroCloud/.agent/knowledge/architecture/video-management.md) & [`movie-deletion-lifecycle.md`](file:///c:/xampp/htdocs/EroCloud/.agent/knowledge/architecture/movie-deletion-lifecycle.md)
+       - **Externe EroCMS-API (`api.erocloud.net`, `.tmp`-Caches, Checksummen, `utf8mb4`):** [`erocms-api-import.md`](file:///c:/xampp/htdocs/EroCloud/.agent/knowledge/architecture/erocms-api-import.md)
+       - **Server, PHP `8.0.30` / `8.4.27`, Domains, Cronjobs & `.errorlog`:** [`server-and-system-environment.md`](file:///c:/xampp/htdocs/EroCloud/.agent/knowledge/architecture/server-and-system-environment.md)
+       - **MCP v2.0 & ACP v2.0 Panel-Architektur:** [`mcp-modernization-architecture.md`](file:///c:/xampp/htdocs/EroCloud/.agent/knowledge/architecture/mcp-modernization-architecture.md) & [`acp-modernization-architecture.md`](file:///c:/xampp/htdocs/EroCloud/.agent/knowledge/architecture/acp-modernization-architecture.md)
+       - **18+ Drehpartner / ID-Check & KI/BRAM-Compliance:** [`co-actor-verification-and-model-release.md`](file:///c:/xampp/htdocs/EroCloud/.agent/knowledge/architecture/co-actor-verification-and-model-release.md) & [`ai-compliance-and-subtitle-pipeline.md`](file:///c:/xampp/htdocs/EroCloud/.agent/knowledge/architecture/ai-compliance-and-subtitle-pipeline.md)
+    3. **NACH jeder Änderung Dokumentation sofort aktualisieren:** Sobald Logik, Endpunkte, Caches, Cronjobs oder Datenbankfelder geändert oder ergänzt werden, **MUSS** die passende Datei unter `.agent/knowledge/` (sowie bei neuen Dateien [`INDEX.md`](file:///c:/xampp/htdocs/EroCloud/.agent/knowledge/INDEX.md)) **automatisch und unaufgefordert im selben Arbeitsschritt** aktualisiert werden!
 * **Sprache:**
     * **Konversation**: Deutsch 🇩🇪 (Du-Form)
     * **Code/Variablen**: Englisch 🇺🇸

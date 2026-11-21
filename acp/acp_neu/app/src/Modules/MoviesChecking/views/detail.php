@@ -57,6 +57,18 @@ $categoryGroupLabels = [
     'fetish'           => ['label' => 'Fetisch & BDSM',      'icon' => 'bi-fire'],
     'porn'             => ['label' => 'Porno & Praktiken',   'icon' => 'bi-film'],
 ];
+
+$isOnlineAtTooFar = !empty($movie['online_at_too_far']);
+$maxOnlineAtInput = (string)($movie['max_online_at_input'] ?? date('Y-m-d\T23:59', strtotime('+12 months')));
+$maxOnlineAtDe    = (string)($movie['max_online_at_de'] ?? date('d.m.Y', strtotime('+12 months')));
+$onlineAtDisplay  = (string)($movie['online_at_display'] ?? '-');
+$hasOnlineTooFarOpt = false;
+foreach ($rejectionReasons as $rrCheck) {
+    if ((string)($rrCheck['id_name'] ?? '') === 'online_at_too_far') {
+        $hasOnlineTooFarOpt = true;
+        break;
+    }
+}
 ?>
 
 <!-- ==========================================================================
@@ -181,6 +193,27 @@ $categoryGroupLabels = [
         <?php endforeach; ?>
       </div>
       <?php endif; ?>
+    </div>
+
+    <!-- Sperr-Warnbox falls Veröffentlichungsdatum > 12 Monate in der Zukunft liegt -->
+    <div class="alert alert-danger d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 <?= $isOnlineAtTooFar ? '' : 'd-none' ?>" id="mc-online-at-block-banner">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-calendar-x-fill fs-4 flex-shrink-0"></i>
+        <div>
+          <strong>Freigabe gesperrt: Veröffentlichungsdatum liegt zu weit in der Zukunft!</strong>
+          <div class="small">
+            Das gewählte Datum (<strong id="mc-online-at-block-date"><?= View::e($onlineAtDisplay) ?></strong>) liegt mehr als 12 Monate in der Zukunft (spätestens zulässig: <?= View::e($maxOnlineAtDe) ?>) und darf nicht freigegeben werden.
+          </div>
+        </div>
+      </div>
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <button type="button" class="btn btn-sm btn-danger fw-semibold" onclick="App.prefillOnlineAtRejection('mc')">
+          <i class="bi bi-slash-circle me-1"></i> Jetzt wegen Datum ablehnen
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-danger bg-body" onclick="App.setAcpOnlineAtNow('mc')">
+          <i class="bi bi-clock me-1"></i> Datum auf jetzt setzen
+        </button>
+      </div>
     </div>
 
     <!-- Warnhinweis falls kein gültiger Darsteller zugeordnet ist -->
@@ -620,8 +653,16 @@ $categoryGroupLabels = [
                 <!-- Online ab & Streaming-Preis -->
                 <div class="col-md-5">
                   <label class="form-label small fw-bold mb-1">Online ab Datum *</label>
-                  <input type="datetime-local" name="online_at" class="form-control form-control-sm"
-                         value="<?= View::e((string)$movie['online_at']) ?>" required>
+                  <input type="datetime-local" name="online_at" id="mc-input-online-at"
+                         class="form-control form-control-sm <?= $isOnlineAtTooFar ? 'is-invalid' : '' ?>"
+                         data-max-online-at="<?= View::e($maxOnlineAtInput) ?>"
+                         data-max-online-at-de="<?= View::e($maxOnlineAtDe) ?>"
+                         value="<?= View::e((string)$movie['online_at']) ?>"
+                         oninput="App.checkAcpOnlineAtGuard('mc')"
+                         onchange="App.checkAcpOnlineAtGuard('mc')" required>
+                  <div class="invalid-feedback <?= $isOnlineAtTooFar ? 'd-block' : '' ?>" id="mc-online-at-error">
+                    Maximal 12 Monate im Voraus zulässig (bis <?= View::e($maxOnlineAtDe) ?>).
+                  </div>
                 </div>
 
                 <div class="col-md-7">
@@ -702,7 +743,8 @@ $categoryGroupLabels = [
 
                 <div class="col-md-4">
                   <label class="form-label small fw-bold mb-1">Film-Status *</label>
-                  <select name="movie_status" class="form-select form-select-sm">
+                  <select name="movie_status" id="mc-input-status" class="form-select form-select-sm"
+                          onchange="App.checkAcpOnlineAtGuard('mc')">
                     <option value="active" <?= $movie['status'] === 'active' ? 'selected' : '' ?>>Aktiv (Freigeben)</option>
                     <option value="blocked" <?= $movie['status'] === 'blocked' ? 'selected' : '' ?>>Gesperrt</option>
                     <?php if ($employeeRule === 'write'): ?>
@@ -865,9 +907,13 @@ $categoryGroupLabels = [
                     Nach Freigabe direkt nächsten offenen Film öffnen
                   </label>
                 </div>
-                <button type="submit" id="mc-submit-approve-btn" class="btn btn-kkc px-4 py-2 fw-bold">
+                <button type="submit" id="mc-submit-approve-btn" class="btn btn-kkc px-4 py-2 fw-bold"
+                        <?= ($isOnlineAtTooFar && $movie['status'] === 'active') ? 'disabled' : '' ?>>
                   <i class="bi bi-check2-circle me-1"></i> Film speichern &amp; freigeben
                 </button>
+                <div class="small text-danger fw-semibold mt-2 w-100 text-end <?= ($isOnlineAtTooFar && $movie['status'] === 'active') ? '' : 'd-none' ?>" id="mc-approve-blocked-hint">
+                  <i class="bi bi-lock-fill me-1"></i>Freigabe blockiert: Datum liegt &gt; 12 Monate in der Zukunft.
+                </div>
               </div>
             </div>
           </div>
@@ -903,6 +949,11 @@ $categoryGroupLabels = [
                   <?= View::e((string)$rr['de_short']) ?>
                 </option>
                 <?php endforeach; ?>
+                <?php if (!$hasOnlineTooFarOpt): ?>
+                <option value="online_at_too_far" data-long-text="Das gewählte Veröffentlichungsdatum liegt zu weit in der Zukunft. Eine Vorausplanung ist maximal 12 Monate im Voraus möglich. Bitte passe das Datum an (oder belasse den Film vorerst als Entwurf) und reiche ihn erneut ein.">
+                  Veröffentlichungsdatum zu weit in der Zukunft (max. 12 Monate)
+                </option>
+                <?php endif; ?>
               </select>
             </div>
             <div class="col-md-7">
@@ -997,12 +1048,15 @@ $categoryGroupLabels = [
                   <th>Quelle</th>
                   <th>Zeitstempel</th>
                   <th>Erkannter Begriff</th>
-                  <th>Textstelle / Zitat</th>
+                  <th>Textstelle / Zitat &amp; Erläuterung</th>
                 </tr>
               </thead>
               <tbody>
                 <?php foreach ($violations as $v):
-                    $isCrit = in_array((string)($v['severity'] ?? ''), ['violation', 'critical'], true);
+                    $isCrit     = in_array((string)($v['severity'] ?? ''), ['violation', 'critical'], true);
+                    $quote      = (string)($v['matched_quote'] ?? $v['quote'] ?? '');
+                    $reason     = (string)($v['reason'] ?? '');
+                    $suggestion = (string)($v['suggestion'] ?? '');
                 ?>
                 <tr>
                   <td class="fw-bold"><?= View::e((string)($v['category'] ?? '')) ?></td>
@@ -1014,7 +1068,19 @@ $categoryGroupLabels = [
                   <td><?= View::e((string)($v['source_label'] ?? $v['source'] ?? 'Text')) ?></td>
                   <td class="font-monospace"><?= View::e((string)($v['timestamp'] ?? '-')) ?></td>
                   <td><code class="fw-bold text-danger"><?= View::e((string)($v['matched_term'] ?? '')) ?></code></td>
-                  <td class="small text-muted">„<?= View::e((string)($v['matched_quote'] ?? $v['quote'] ?? '')) ?>“</td>
+                  <td class="small">
+                    <?php if ($quote !== ''): ?>
+                      <div class="text-body fst-italic">„<?= View::e($quote) ?>“</div>
+                    <?php endif; ?>
+                    <?php if ($reason !== ''): ?>
+                      <div class="text-muted" style="font-size: 0.75rem;"><?= View::e($reason) ?></div>
+                    <?php endif; ?>
+                    <?php if ($suggestion !== ''): ?>
+                      <div class="mt-1 p-1.5 px-2 rounded bg-info bg-opacity-10 border border-info border-opacity-25 text-body" style="font-size: 0.76rem;">
+                        <i class="bi bi-lightbulb-fill text-info me-1"></i><strong>Alternative / Empfehlung:</strong> <?= View::e($suggestion) ?>
+                      </div>
+                    <?php endif; ?>
+                  </td>
                 </tr>
                 <?php endforeach; ?>
               </tbody>

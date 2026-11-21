@@ -11,10 +11,11 @@ Diese Regel definiert den Standard für alle neuen Markdown-Dateien im Projekt E
 ## 1. Sprache
 - **Deutsch-Pflicht**: Alle neuen Markdown-Dateien müssen zwingend auf **Deutsch** erstellt werden.
 
-## 2. Speicherort & Kategorisierung
-Alle `.md`-Dateien müssen im Verzeichnis `.agent/` abgelegt werden:
-- `.agent/rules/`: Für dauerhafte Verhaltensregeln und Coding-Standards (z. B. `PHP_Standards.md`). Diese sind "Always On".
-- `.agent/knowledge/`: Für Architektur-Dokumentation, Fachwissen, Datenbanken und allgemeine Systeminfos (z. B. `schema.md`, `project-architecture.md`).
+## 2. Speicherort, Zentraler Index & Kategorisierung
+Alle `.md`-Dateien müssen im Verzeichnis `.agent/` abgelegt und über den zentralen Wissens-Index auffindbar sein:
+- **Zentrales Inhaltsverzeichnis (`.agent/knowledge/INDEX.md`)**: Jede neue oder umbenannte Datei unter `.agent/knowledge/` **muss zwingend sofort** in [`.agent/knowledge/INDEX.md`](file:///c:/xampp/htdocs/EroCloud/.agent/knowledge/INDEX.md) eingetragen werden, damit KI-Agenten bei zukünftigen Aufgaben alle Zusammenhänge sofort finden.
+- `.agent/rules/`: Für dauerhafte Verhaltensregeln und Coding-Standards (z. B. `master.md`). Diese sind "Always On".
+- `.agent/knowledge/`: Für Architektur-Dokumentation, Fachwissen, Datenbanken, API-Schnittstellen, Lösch-Lebenszyklen und allgemeine Systeminfos (z. B. `photo-album-management-and-lifecycle.md`, `erocms-api-import.md`).
 - `.agent/skills/`: Für spezifische Aufgabenbeschreibungen. Jeder Skill erhält einen eigenen Unterordner.
 - `.agent/workflows/`: Für komplexe Prozesse, die mehrere Schritte erfordern.
 

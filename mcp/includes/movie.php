@@ -162,7 +162,17 @@ if (isset($_POST['edit_movie']) OR isset($_POST['save_movie'])) {
         }
         
         if(isset($_POST['online_at'])) {
-            $movie['online_at'] = date("Y-m-d H:i", strtotime($_POST['online_at']));
+            if (function_exists('ec_validate_online_at_future')) {
+                $date_chk = ec_validate_online_at_future($_POST['online_at'], 'Film', false);
+                if (!$date_chk['ok']) {
+                    $error = htmlentities($date_chk['error'], ENT_QUOTES, 'UTF-8');
+                    $movie['online_at'] = date("Y-m-d H:i", strtotime($m->field('online_at')));
+                } else {
+                    $movie['online_at'] = date("Y-m-d H:i", (int)$date_chk['timestamp']);
+                }
+            } else {
+                $movie['online_at'] = date("Y-m-d H:i", strtotime($_POST['online_at']));
+            }
         }
 
         if(!isset($_POST['amount_second'])) {
@@ -376,6 +386,7 @@ $site .= '
                     altInput: true,
                     altFormat: "Y-m-d H:i",
                     minDate: "'.$min_online_at.'",
+                    maxDate: "'.(function_exists('ec_get_max_online_at_timestamp') ? date("Y-m-d 23:59", ec_get_max_online_at_timestamp()) : date("Y-m-d 23:59", strtotime("+12 months"))).'",
                     time_24hr: true,
                     defaultDate: "'.$movie['online_at'].'",
                     "locale": "de"

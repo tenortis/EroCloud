@@ -99,14 +99,14 @@ Ein Hintergrund-Cronjob kümmert sich um die automatische Aufbereitung der hochg
 * **Timeout-Schutz**: Läuft eine Konvertierung (`convert_status = '1'`) länger als **4 Stunden** ohne Abschluss (`convert_endtime == '0000-00-00 00:00:00'`), bricht der Cronjob diese automatisch ab und setzt `convert_status = '3'` (Fehler).
 * **Ablauf & erzeugte Dateien im Ordner `MOVIES_PATH/{storage_location}/{merchant_id}/{movie_id}/`**:
   * Liest den ältesten Film mit `convert_status = '0'` und setzt ihn auf `convert_status = '1'`.
-  * **1. Einzige Streaming-MP4 (`{id}_{file_id}.mp4`) mit auflösungsabhängigem Constrained CRF (`-crf 23`)**:
-    * **Erhalt von Original-Auflösung (inkl. 4K & 9:16 Hochkant):** Über `-vf "scale=trunc(iw/2)*2:trunc(ih/2)*2"` bleibt die Original-Auflösung (4K, Full-HD, HD, SD sowie Smartphone-Hochkant-Reels) erhalten.
+  * **1. Einzige Streaming-MP4 (`{id}_{file_id}.mp4`) mit auflösungsabhängigem Constrained CRF (`-crf 23`) & Apple-`VideoToolbox`-Schutz**:
+    * **Erhalt von Original-Auflösung (inkl. 4K UHD & 9:16 Hochkant) mit `3840px`-Obergrenze:** Über `-vf 'scale=trunc((iw*min(1\,min(3840/iw\,3840/ih))+0.5)/2)*2:trunc((ih*min(1\,min(3840/iw\,3840/ih))+0.5)/2)*2'` bleiben 4K (`3840x2160`), Full-HD, HD, SD sowie Smartphone-Hochkant-Reels (`1080x1920`, `2160x3840`) exakt erhalten, während überbreite `5K`/`6K`-Uploads proportional unter Apples `4096px`-Hardwarelimit auf max. `3840px` heruntergerechnet werden.
     * **Dynamische Bitraten-Deckelung (`max($pre_width, $pre_height)`):**
       * **2K / 4K Ultra-HD:** `-crf 23 -maxrate 6500k -bufsize 13000k -preset medium`
       * **Full-HD 1080p *(inkl. Fallback bei fehlenden Metadaten)*:** `-crf 23 -maxrate 3200k -bufsize 6400k -preset slow`
       * **HD 720p:** `-crf 23 -maxrate 2000k -bufsize 4000k -preset slow`
       * **SD (`< 720p`):** `-crf 23 -maxrate 1200k -bufsize 2400k -preset slow`
-    * **Maximale Fehlertoleranz:** `-fflags +genpts+igndts` (repariert defekte Zeitstempel), `-pix_fmt yuv420p` (konvertiert 10-Bit-iPhone-Videos in universelles 8-Bit), `-acodec aac -strict -2 -b:a 128k -ac 2 -ar 44100` (normiert jede Tonspur und ignoriert fehlende Tonspuren bei Stummvideos), `-max_muxing_queue_size 4096` und `-movflags +faststart`.
+    * **Maximale Fehlertoleranz & iPhone-4K-Kompatibilität:** `-fflags +genpts+igndts` (repariert defekte Zeitstempel), `-pix_fmt yuv420p -profile:v high -refs 4` (erzwingt 8-Bit High Profile mit max. `4` Reference-Frames für 100 % Apple-`VideoToolbox`-Kompatibilität auf iPhone/iPad/Safari ohne Level-6.0-Abbruch), `-acodec aac -strict -2 -b:a 128k -ac 2 -ar 44100` (normiert jede Tonspur und ignoriert fehlende Tonspuren bei Stummvideos), `-max_muxing_queue_size 4096` und `-movflags +faststart`.
     * **Post-Conversion-Re-Analyze:** Nach Abschluss liest `getID3` Auflösung und Spieldauer frisch aus der fertigen `.mp4`-Datei aus und berechnet bei Bedarf `amount_own` nach, falls die Rohdatei beim Upload keine Header-Metadaten hatte.
   * **2. Vorschaubilder (`thumb_{id}_{file_id}_1..10.jpg`)**:
     * Sobald die fertige MP4-Datei (`{id}_{file_id}.mp4`) existiert, wird `convert_status = '2'` gesetzt und FFmpeg extrahiert 10 gleichmäßig über die Laufzeit verteilte Screenshots mit max. `1024px` Breite (`scale=min(1024\,iw):-2`).

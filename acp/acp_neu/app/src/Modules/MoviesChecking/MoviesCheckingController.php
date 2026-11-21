@@ -88,7 +88,7 @@ final class MoviesCheckingController
                 $fileId     = (string)($row->file_id ?? '');
 
                 $title       = self::decodeText((string)($row->title ?? ''));
-                $description = self::decodeText((string)($row->description ?? ''));
+                $description = self::decodeDescription((string)($row->description ?? ''));
                 $metaTitle   = self::decodeText((string)($row->meta_title ?? ''));
                 $metaDesc    = self::decodeText((string)($row->meta_description ?? ''));
                 $actorName   = self::decodeText((string)($row->actor_name ?? ''));
@@ -220,6 +220,7 @@ final class MoviesCheckingController
                     'language_label'      => self::LANGUAGE_LABELS[$langCode] ?? strtoupper($langCode),
                     'category_master'     => $catMaster,
                     'online_at'           => (string)($row->online_at ?? ''),
+                    'online_at_too_far'   => function_exists('ec_is_online_at_too_far_in_future') && ec_is_online_at_too_far_in_future((string)($row->online_at ?? '')),
                     'create_datetime'     => (string)($row->create_datetime ?? ''),
                     'preview_image_fsk16' => $fsk16Num,
                     'preview_image_fsk18' => $fsk18Num,
@@ -411,7 +412,7 @@ final class MoviesCheckingController
 
         // Film-Texte dekodieren
         $title       = self::decodeText((string)($m->title ?? ''));
-        $description = self::decodeText((string)($m->description ?? ''));
+        $description = self::decodeDescription((string)($m->description ?? ''));
         $metaTitle   = self::decodeText((string)($m->meta_title ?? ''));
         $metaDesc    = self::decodeText((string)($m->meta_description ?? ''));
         $seoUrl      = self::decodeText((string)($m->seo_url ?? ''));
@@ -488,9 +489,16 @@ final class MoviesCheckingController
         );
         if ($rsHist && p4c_num_rows($rsHist) > 0) {
             while ($h = p4c_fetch_object($rsHist)) {
+                $histIdName = (string)($h->id_name ?? '');
+                $histShort  = self::decodeText((string)($h->de_short ?? ''));
+                if ($histShort === '') {
+                    $histShort = $histIdName === 'online_at_too_far'
+                        ? 'Veröffentlichungsdatum zu weit in der Zukunft'
+                        : $histIdName;
+                }
                 $rejectionHistory[] = [
-                    'id_name'  => (string)($h->id_name ?? ''),
-                    'de_short' => self::decodeText((string)($h->de_short ?? $h->id_name ?? '')),
+                    'id_name'  => $histIdName,
+                    'de_short' => $histShort,
                     'text'     => self::decodeText((string)($h->text ?? '')),
                     'datetime' => (string)($h->datetime ?? ''),
                 ];
@@ -511,9 +519,13 @@ final class MoviesCheckingController
         $playtimeSec = abs((int)($m->playtime_seconds ?? 0));
         $amountSec   = (float)($m->amount_second ?? 0.0);
 
-        $rawOnlineAt = trim((string)($m->online_at ?? ''));
-        $onlineAtTs  = ($rawOnlineAt !== '' && !str_starts_with($rawOnlineAt, '0000')) ? strtotime($rawOnlineAt) : false;
-        $onlineAtInput = $onlineAtTs !== false ? date('Y-m-d\TH:i', $onlineAtTs) : date('Y-m-d\TH:i');
+        $rawOnlineAt      = trim((string)($m->online_at ?? ''));
+        $onlineAtTs       = ($rawOnlineAt !== '' && !str_starts_with($rawOnlineAt, '0000') && !str_starts_with($rawOnlineAt, '000-')) ? strtotime($rawOnlineAt) : false;
+        $onlineAtInput    = $onlineAtTs !== false ? date('Y-m-d\TH:i', $onlineAtTs) : date('Y-m-d\TH:i');
+        $onlineAtDisplay  = $onlineAtTs !== false ? date('d.m.Y H:i', $onlineAtTs) : '-';
+        $onlineAtTooFar   = function_exists('ec_is_online_at_too_far_in_future') && ec_is_online_at_too_far_in_future($rawOnlineAt);
+        $maxOnlineAtInput = function_exists('ec_get_max_online_at_input') ? ec_get_max_online_at_input() : date('Y-m-d\T23:59', strtotime('+12 months'));
+        $maxOnlineAtDe    = function_exists('ec_get_max_online_at_timestamp') ? date('d.m.Y', ec_get_max_online_at_timestamp()) : date('d.m.Y', strtotime('+12 months'));
 
         $rawQuality = strtolower(trim((string)($m->quality ?? '')));
         if (!in_array($rawQuality, ['sd', 'hd', 'fhd', '2k', '4k', '6k'], true)) {
@@ -550,6 +562,11 @@ final class MoviesCheckingController
             'category_master'     => (string)($m->category_master ?: 'porn'),
             'selected_slaves'     => $selectedSlaves,
             'online_at'           => $onlineAtInput,
+            'online_at_raw'       => $rawOnlineAt,
+            'online_at_display'   => $onlineAtDisplay,
+            'online_at_too_far'   => $onlineAtTooFar,
+            'max_online_at_input' => $maxOnlineAtInput,
+            'max_online_at_de'    => $maxOnlineAtDe,
             'amount_second'       => number_format($amountSec, 1, '.', ''),
             'total_coins'         => (int)round($playtimeSec * $amountSec),
             'as_download'         => abs((int)($m->as_download ?? 0)) === 1,
@@ -674,9 +691,8 @@ final class MoviesCheckingController
             $errors[] = 'Bitte gib einen Filmtitel ein.';
         }
 
-        $description = trim((string)$this->request->post('description', ''));
-        $description = str_replace(['€', "\xe2\x80\x8b"], ['Euro', ''], $description);
-        $description = trim(strip_tags($description, '<a><br><p><ul><ol><li><b><i><h1><h2><h3><h4><h5><h6><u><em><strong><pre><address>'));
+        $description = self::decodeDescription((string)$this->request->post('description', ''));
+        $description = str_replace('€', 'Euro', $description);
         if ($description === '') {
             $errors[] = 'Bitte gib eine Filmbeschreibung ein.';
         }
@@ -759,6 +775,12 @@ final class MoviesCheckingController
         $movieStatus = trim((string)$this->request->post('movie_status', 'active'));
         if (!in_array($movieStatus, $allowedStatuses, true)) {
             $errors[] = 'Ungültiger Film-Status ausgewählt.';
+        }
+        if ($movieStatus === 'active' && $onlineAtTs !== false && function_exists('ec_validate_online_at_future')) {
+            $dateCheck = ec_validate_online_at_future($onlineAtRaw, 'Film', true);
+            if (!$dateCheck['ok']) {
+                $errors[] = $dateCheck['error'];
+            }
         }
 
         $adminInfos = trim(strip_tags((string)$this->request->post('admin_infos', '')));
@@ -1061,6 +1083,9 @@ final class MoviesCheckingController
                 $reasonShort = self::decodeText((string)$rObj->de_short);
             }
         }
+        if ($reasonShort === $reasonCode && $reasonCode === 'online_at_too_far') {
+            $reasonShort = 'Veröffentlichungsdatum zu weit in der Zukunft';
+        }
 
         p4c_query(
             "INSERT INTO `rejection_reason_movie_history`
@@ -1231,7 +1256,7 @@ final class MoviesCheckingController
         $customTranscript = $this->request->post('spoken_transcript', null);
 
         $titleToCheck     = $customTitle !== null ? trim((string)$customTitle) : self::decodeText((string)$m->title);
-        $descToCheck      = $customDesc !== null ? trim((string)$customDesc) : self::decodeText((string)$m->description);
+        $descToCheck      = $customDesc !== null ? self::decodeDescription((string)$customDesc) : self::decodeDescription((string)$m->description);
         $metaTitleToCheck = $customMetaTitle !== null ? trim((string)$customMetaTitle) : self::decodeText((string)$m->meta_title);
         $metaDescToCheck  = $customMetaDesc !== null ? trim((string)$customMetaDesc) : self::decodeText((string)$m->meta_description);
 
@@ -1269,7 +1294,7 @@ final class MoviesCheckingController
             'description'      => $descToCheck,
             'meta_title'       => $metaTitleToCheck,
             'meta_description' => $metaDescToCheck,
-        ], true);
+        ], true, $env);
 
         Response::json([
             'status'  => 'ok',
@@ -1446,9 +1471,10 @@ final class MoviesCheckingController
         string $fileId,
         string $movieDir,
         array $textInput,
-        bool $forceRecheck = false
+        bool $forceRecheck = false,
+        ?array $envOverride = null
     ): array {
-        $env = ['llm_ready' => false];
+        $env = is_array($envOverride) ? $envOverride : ['llm_ready' => false];
 
         $rsAi = p4c_query("SELECT * FROM `movies_ai_analysis` WHERE `movie_id` = '" . $movieId . "' LIMIT 1;", __FILE__, __LINE__);
         $aiRow = ($rsAi && p4c_num_rows($rsAi) > 0) ? p4c_fetch_object($rsAi) : null;
@@ -1566,12 +1592,70 @@ final class MoviesCheckingController
             . '</div></div>';
     }
 
+    private static function decodeDescription(string $str): string
+    {
+        if ($str === '') {
+            return '';
+        }
+        if (function_exists('ec_html_to_plain_text')) {
+            return \ec_html_to_plain_text($str);
+        }
+        if (!mb_check_encoding($str, 'UTF-8') && function_exists('mb_convert_encoding')) {
+            $converted = @mb_convert_encoding($str, 'UTF-8', 'ISO-8859-1, WINDOWS-1252, ASCII');
+            if (is_string($converted)) {
+                $str = $converted;
+            }
+        }
+        $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if (strpos($str, '&') !== false) {
+            $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+        $str = str_replace(["\r\n", "\r"], "\n", $str);
+        foreach ([
+            '/<\s*(script|style)\b[^>]*>.*?<\s*\/\s*\1\s*>/is' => '',
+            '/<!--.*?-->/s' => '',
+            '/<\s*br\s*\/?\s*>/i' => "\n",
+            '/<\s*\/\s*li\s*>\s*<\s*li\b[^>]*>/i' => "\n- ",
+            '/<\s*li\b[^>]*>/i' => "\n- ",
+            '/<\s*\/\s*li\s*>/i' => "\n",
+            '/<\s*\/\s*tr\s*>/i' => "\n",
+            '/<\/\s*(?:p|div|h[1-6]|ul|ol|blockquote|pre|address|table|section|article)\s*>\s*<\s*(?:p|div|h[1-6]|ul|ol|blockquote|pre|address|table|section|article)\b[^>]*>/i' => "\n\n",
+            '/<\/?\s*(?:p|div|h[1-6]|ul|ol|blockquote|pre|address|table|section|article|hr)\b[^>]*\/?>/i' => "\n\n",
+            '/<\/?[a-zA-Z][a-zA-Z0-9:-]*(?:\s+[^<>]*)?\/?>/' => '',
+        ] as $pattern => $replacement) {
+            $res = preg_replace($pattern, $replacement, $str);
+            if (is_string($res)) {
+                $str = $res;
+            }
+        }
+        $str = str_replace(["\xC2\xA0", "\xE2\x80\x8B", "\xE2\x80\x8C", "\xE2\x80\x8D", "\xEF\xBB\xBF"], [' ', '', '', '', ''], $str);
+        foreach (['/[ \t]{2,}/' => ' ', '/^[ \t]+|[ \t]+$/m' => '', "/\n{3,}/" => "\n\n"] as $pattern => $replacement) {
+            $res = preg_replace($pattern, $replacement, $str);
+            if (is_string($res)) {
+                $str = $res;
+            }
+        }
+        return trim($str);
+    }
+
     private static function decodeText(string $str): string
     {
         if ($str === '') {
             return '';
         }
-        $decoded = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        return html_entity_decode($decoded, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if (function_exists('ec_decode_text')) {
+            return \ec_decode_text($str);
+        }
+        if (!mb_check_encoding($str, 'UTF-8') && function_exists('mb_convert_encoding')) {
+            $converted = @mb_convert_encoding($str, 'UTF-8', 'ISO-8859-1, WINDOWS-1252, ASCII');
+            if (is_string($converted)) {
+                $str = $converted;
+            }
+        }
+        $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if (strpos($str, '&') !== false) {
+            $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+        return str_replace(["\xC2\xA0", "\xE2\x80\x8B", "\xE2\x80\x8C", "\xE2\x80\x8D", "\xEF\xBB\xBF"], [' ', '', '', '', ''], $str);
     }
 }

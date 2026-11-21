@@ -308,6 +308,9 @@ class MoviesController
                         $shortObj   = p4c_fetch_object($rsRejShort);
                         $shortTitle = self::decodeLegacyText((string)$shortObj->de_short);
                     }
+                    if ($shortTitle === '' && (string)$rejHistObj->id_name === 'online_at_too_far') {
+                        $shortTitle = 'Veröffentlichungsdatum zu weit in der Zukunft';
+                    }
                 }
                 $rejectionInfo = [
                     'reason' => $shortTitle,
@@ -651,8 +654,7 @@ class MoviesController
             $errors[] = 'Der Filmtitel darf maximal 65 Zeichen lang sein.';
         }
 
-        $allowedTags = '<ul><ol><li><u><em><strong><h1><h2><h3><h4><h5><h6><pre><address><p><br>';
-        $description = trim(strip_tags((string)$this->request->post('description', ''), $allowedTags));
+        $description = self::decodeLegacyText((string)$this->request->post('description', ''));
         $description = str_replace(self::ZERO_WIDTH_SPACES, '', $description);
         $description = str_replace(['#?', '?en'], ['#', 'en'], $description);
         if ($description === '') {
@@ -693,7 +695,21 @@ class MoviesController
         }
 
         $rawOnlineAt = trim((string)$this->request->post('online_at', ''));
-        $onlineAt    = $rawOnlineAt !== '' ? date('Y-m-d H:i', strtotime($rawOnlineAt)) : date('Y-m-d H:i', strtotime('+90 minutes'));
+        if ($rawOnlineAt !== '') {
+            if (function_exists('ec_validate_online_at_future')) {
+                $dateCheck = ec_validate_online_at_future($rawOnlineAt, 'Film', false);
+                if (!$dateCheck['ok']) {
+                    $errors[] = $dateCheck['error'];
+                    $onlineAt = date('Y-m-d H:i', strtotime('+90 minutes'));
+                } else {
+                    $onlineAt = date('Y-m-d H:i', (int)$dateCheck['timestamp']);
+                }
+            } else {
+                $onlineAt = date('Y-m-d H:i', strtotime($rawOnlineAt));
+            }
+        } else {
+            $onlineAt = date('Y-m-d H:i', strtotime('+90 minutes'));
+        }
 
         $isTrailer = ($this->request->post('trailer') !== null || $this->request->post('preview') !== null);
         $amountSecond = $isTrailer
@@ -777,7 +793,7 @@ class MoviesController
         $metaDesc = trim(strip_tags((string)$this->request->post('meta_description', '')));
         $metaDesc = str_replace(["\n", "\r"], ' ', $metaDesc);
         if ($metaDesc === '') {
-            $metaDesc = mb_substr(trim(strip_tags($description)), 0, 156, 'UTF-8');
+            $metaDesc = mb_substr(trim((string)preg_replace('/\s+/u', ' ', $description)), 0, 156, 'UTF-8');
         } else {
             $metaDesc = mb_substr($metaDesc, 0, 156, 'UTF-8');
         }
@@ -1327,8 +1343,7 @@ class MoviesController
             }
         }
 
-        $allowedTags = '<ul><ol><li><u><em><strong><h1><h2><h3><h4><h5><h6><pre><address><p><br>';
-        $description = trim(strip_tags((string)$this->request->post('description', ''), $allowedTags));
+        $description = self::decodeLegacyText((string)$this->request->post('description', ''));
         $description = str_replace(self::ZERO_WIDTH_SPACES, '', $description);
         $description = str_replace(['#?', '?en'], ['#', 'en'], $description);
         if ($description === '') {
@@ -1406,15 +1421,34 @@ class MoviesController
             }
         }
 
+        $rsOnlineCheck = p4c_query("SELECT `id` FROM `movies_online` WHERE `file_id` = '" . p4c_escape_string((string)$mObj->file_id) . "' AND `merchant_id` = '" . $merchantId . "' LIMIT 1;", __FILE__, __LINE__);
+        $isMovieOnline = ($rsOnlineCheck && p4c_num_rows($rsOnlineCheck) > 0);
+        $canEditOnline = (((string)$mObj->movie_checked === '0000-00-00 00:00:00' && !$isMovieOnline) || strtotime((string)$mObj->online_at) > time());
+
+        $rawOnlineAt = trim((string)$this->request->post('online_at', ''));
+        if ($canEditOnline) {
+            $toValidateOnlineAt = $rawOnlineAt !== '' ? $rawOnlineAt : (string)$mObj->online_at;
+            if (function_exists('ec_validate_online_at_future')) {
+                $dateCheck = ec_validate_online_at_future($toValidateOnlineAt, 'Film', false);
+                if (!$dateCheck['ok']) {
+                    $errors[] = $dateCheck['error'];
+                    $onlineAt = date('Y-m-d H:i', strtotime((string)$mObj->online_at));
+                } else {
+                    $onlineAt = date('Y-m-d H:i', (int)$dateCheck['timestamp']);
+                }
+            } else {
+                $onlineAt = $rawOnlineAt !== ''
+                    ? date('Y-m-d H:i', strtotime($rawOnlineAt))
+                    : date('Y-m-d H:i', strtotime((string)$mObj->online_at));
+            }
+        } else {
+            $onlineAt = date('Y-m-d H:i', strtotime((string)$mObj->online_at));
+        }
+
         if (!empty($errors)) {
             Response::error(implode(' ', $errors), 400);
             return;
         }
-
-        $rawOnlineAt = trim((string)$this->request->post('online_at', ''));
-        $onlineAt    = $rawOnlineAt !== ''
-            ? date('Y-m-d H:i', strtotime($rawOnlineAt))
-            : date('Y-m-d H:i', strtotime((string)$mObj->online_at));
 
         $isTrailer = ($this->request->post('trailer') !== null || $this->request->post('preview') !== null);
         $amountSecond = $isTrailer
@@ -1461,7 +1495,7 @@ class MoviesController
         $metaDesc = trim(strip_tags((string)$this->request->post('meta_description', '')));
         $metaDesc = str_replace(["\n", "\r"], ' ', $metaDesc);
         if ($metaDesc === '') {
-            $metaDesc = mb_substr(trim(strip_tags($description)), 0, 156, 'UTF-8');
+            $metaDesc = mb_substr(trim((string)preg_replace('/\s+/u', ' ', $description)), 0, 156, 'UTF-8');
         } else {
             $metaDesc = mb_substr($metaDesc, 0, 156, 'UTF-8');
         }
@@ -2169,13 +2203,44 @@ class MoviesController
         if ($text === '') {
             return '';
         }
-        $decoded = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $decoded = html_entity_decode($decoded, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $decoded = (string)preg_replace('/<\s*br\s*\/?\s*>/i', "\n", $decoded);
-        $decoded = (string)preg_replace('/<\/\s*p\s*>\s*<\s*p[^>]*>/i', "\n\n", $decoded);
-        $decoded = (string)preg_replace('/<\/?\s*p[^>]*>/i', '', $decoded);
-        $decoded = str_replace(["\r\n", "\r"], "\n", $decoded);
-        $decoded = (string)preg_replace("/\n{3,}/", "\n\n", $decoded);
-        return trim($decoded);
+        if (function_exists('ec_html_to_plain_text')) {
+            return \ec_html_to_plain_text($text);
+        }
+        if (!mb_check_encoding($text, 'UTF-8') && function_exists('mb_convert_encoding')) {
+            $converted = @mb_convert_encoding($text, 'UTF-8', 'ISO-8859-1, WINDOWS-1252, ASCII');
+            if (is_string($converted)) {
+                $text = $converted;
+            }
+        }
+        $str = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if (strpos($str, '&') !== false) {
+            $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+        $str = str_replace(["\r\n", "\r"], "\n", $str);
+        foreach ([
+            '/<\s*(script|style)\b[^>]*>.*?<\s*\/\s*\1\s*>/is' => '',
+            '/<!--.*?-->/s' => '',
+            '/<\s*br\s*\/?\s*>/i' => "\n",
+            '/<\s*\/\s*li\s*>\s*<\s*li\b[^>]*>/i' => "\n- ",
+            '/<\s*li\b[^>]*>/i' => "\n- ",
+            '/<\s*\/\s*li\s*>/i' => "\n",
+            '/<\s*\/\s*tr\s*>/i' => "\n",
+            '/<\/\s*(?:p|div|h[1-6]|ul|ol|blockquote|pre|address|table|section|article)\s*>\s*<\s*(?:p|div|h[1-6]|ul|ol|blockquote|pre|address|table|section|article)\b[^>]*>/i' => "\n\n",
+            '/<\/?\s*(?:p|div|h[1-6]|ul|ol|blockquote|pre|address|table|section|article|hr)\b[^>]*\/?>/i' => "\n\n",
+            '/<\/?[a-zA-Z][a-zA-Z0-9:-]*(?:\s+[^<>]*)?\/?>/' => '',
+        ] as $pattern => $replacement) {
+            $res = preg_replace($pattern, $replacement, $str);
+            if (is_string($res)) {
+                $str = $res;
+            }
+        }
+        $str = str_replace(["\xC2\xA0", "\xE2\x80\x8B", "\xE2\x80\x8C", "\xE2\x80\x8D", "\xEF\xBB\xBF"], [' ', '', '', '', ''], $str);
+        foreach (['/[ \t]{2,}/' => ' ', '/^[ \t]+|[ \t]+$/m' => '', "/\n{3,}/" => "\n\n"] as $pattern => $replacement) {
+            $res = preg_replace($pattern, $replacement, $str);
+            if (is_string($res)) {
+                $str = $res;
+            }
+        }
+        return trim($str);
     }
 }

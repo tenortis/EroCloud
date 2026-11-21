@@ -59,6 +59,13 @@ $categoryGroupLabels = [
 ];
 
 $buysCount = (int)($purchasesData['total_buys'] ?? 0);
+$isOnlineAtTooFar = !empty($movie['online_at_too_far']);
+$maxOnlineAtInput = (string)($movie['max_online_at_input'] ?? date('Y-m-d\T23:59', strtotime('+12 months')));
+$maxOnlineAtDe    = (string)($movie['max_online_at_de'] ?? date('d.m.Y', strtotime('+12 months')));
+$onlineAtRawStr   = (string)($movie['online_at_raw'] ?? '');
+$onlineAtDisplay  = ($onlineAtRawStr !== '' && !str_starts_with($onlineAtRawStr, '0000') && !str_starts_with($onlineAtRawStr, '000-') && strtotime($onlineAtRawStr) !== false)
+    ? date('d.m.Y H:i', (int)strtotime($onlineAtRawStr))
+    : '-';
 ?>
 <div class="container-fluid py-3" data-page-width="full">
 
@@ -196,6 +203,22 @@ $buysCount = (int)($purchasesData['total_buys'] ?? 0);
             Details öffnen <i class="bi bi-arrow-right"></i>
           </button>
         </div>
+      </div>
+
+      <!-- Sperr-Warnbox falls Veröffentlichungsdatum > 12 Monate in der Zukunft liegt -->
+      <div class="alert alert-danger d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 <?= $isOnlineAtTooFar ? '' : 'd-none' ?>" id="me-online-at-block-banner">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-calendar-x-fill fs-4 flex-shrink-0"></i>
+          <div>
+            <strong>Speichern im Status „Aktiv“ gesperrt: Veröffentlichungsdatum liegt zu weit in der Zukunft!</strong>
+            <div class="small">
+              Das gewählte Datum (<strong id="me-online-at-block-date"><?= View::e($onlineAtDisplay) ?></strong>) liegt mehr als 12 Monate in der Zukunft (spätestens zulässig: <?= View::e($maxOnlineAtDe) ?>).
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-danger bg-body" onclick="App.setAcpOnlineAtNow('me')">
+          <i class="bi bi-clock me-1"></i> Datum auf jetzt setzen
+        </button>
       </div>
 
       <form id="movie-online-save-form" onsubmit="App.submitMovieOnlineSave(event)">
@@ -466,19 +489,19 @@ $buysCount = (int)($purchasesData['total_buys'] ?? 0);
                   <label class="d-flex align-items-center gap-2 px-3 py-2 rounded border" style="background: var(--kkc-surface-hover); cursor: pointer;">
                     <input type="radio" name="movie_status" value="active" class="form-check-input mt-0"
                            <?= $movie['status'] === 'active' ? 'checked' : '' ?>
-                           onchange="document.getElementById('me-delete-warning').classList.add('d-none')">
+                           onchange="document.getElementById('me-delete-warning').classList.add('d-none'); App.checkAcpOnlineAtGuard('me');">
                     <span class="fw-bold text-success"><i class="bi bi-check-circle-fill me-1"></i>Aktiv</span>
                   </label>
                   <label class="d-flex align-items-center gap-2 px-3 py-2 rounded border" style="background: var(--kkc-surface-hover); cursor: pointer;">
                     <input type="radio" name="movie_status" value="blocked" class="form-check-input mt-0"
                            <?= $movie['status'] === 'blocked' ? 'checked' : '' ?>
-                           onchange="document.getElementById('me-delete-warning').classList.add('d-none')">
+                           onchange="document.getElementById('me-delete-warning').classList.add('d-none'); App.checkAcpOnlineAtGuard('me');">
                     <span class="fw-bold text-warning"><i class="bi bi-pause-circle-fill me-1"></i>Gesperrt</span>
                   </label>
                   <label class="d-flex align-items-center gap-2 px-3 py-2 rounded border" style="background: var(--kkc-surface-hover); cursor: pointer;">
                     <input type="radio" name="movie_status" value="deleted" class="form-check-input mt-0"
                            <?= $movie['status'] === 'deleted' ? 'checked' : '' ?>
-                           onchange="document.getElementById('me-delete-warning').classList.remove('d-none')">
+                           onchange="document.getElementById('me-delete-warning').classList.remove('d-none'); App.checkAcpOnlineAtGuard('me');">
                     <span class="fw-bold text-danger"><i class="bi bi-trash3-fill me-1"></i>Gelöscht</span>
                   </label>
                 </div>
@@ -574,8 +597,16 @@ $buysCount = (int)($purchasesData['total_buys'] ?? 0);
                   <!-- Online ab & Streaming-Preis -->
                   <div class="col-md-5">
                     <label class="form-label small fw-bold mb-1">Frühestens online ab *</label>
-                    <input type="datetime-local" name="online_at" class="form-control form-control-sm"
-                           value="<?= View::e((string)$movie['online_at_input']) ?>" required>
+                    <input type="datetime-local" name="online_at" id="me-input-online-at"
+                           class="form-control form-control-sm <?= $isOnlineAtTooFar ? 'is-invalid' : '' ?>"
+                           data-max-online-at="<?= View::e($maxOnlineAtInput) ?>"
+                           data-max-online-at-de="<?= View::e($maxOnlineAtDe) ?>"
+                           value="<?= View::e((string)$movie['online_at_input']) ?>"
+                           oninput="App.checkAcpOnlineAtGuard('me')"
+                           onchange="App.checkAcpOnlineAtGuard('me')" required>
+                    <div class="invalid-feedback <?= $isOnlineAtTooFar ? 'd-block' : '' ?>" id="me-online-at-error">
+                      Maximal 12 Monate im Voraus zulässig (bis <?= View::e($maxOnlineAtDe) ?>).
+                    </div>
                   </div>
 
                   <div class="col-md-7">
@@ -787,10 +818,14 @@ $buysCount = (int)($purchasesData['total_buys'] ?? 0);
                   <?php endforeach; ?>
                 </div>
 
-                <div class="mt-4 pt-3 border-top d-flex justify-content-end" style="border-color: var(--kkc-border) !important;">
-                  <button type="submit" id="me-submit-save-btn" class="btn btn-kkc px-4 py-2 fw-bold">
+                <div class="mt-4 pt-3 border-top d-flex flex-wrap justify-content-end" style="border-color: var(--kkc-border) !important;">
+                  <button type="submit" id="me-submit-save-btn" class="btn btn-kkc px-4 py-2 fw-bold"
+                          <?= ($isOnlineAtTooFar && $movie['status'] === 'active') ? 'disabled' : '' ?>>
                     <i class="bi bi-floppy-fill me-1"></i> Änderungen speichern
                   </button>
+                  <div class="small text-danger fw-semibold mt-2 w-100 text-end <?= ($isOnlineAtTooFar && $movie['status'] === 'active') ? '' : 'd-none' ?>" id="me-approve-blocked-hint">
+                    <i class="bi bi-lock-fill me-1"></i>Speichern als „Aktiv“ blockiert: Datum liegt &gt; 12 Monate in der Zukunft.
+                  </div>
                 </div>
               </div>
             </div>
@@ -887,17 +922,19 @@ $buysCount = (int)($purchasesData['total_buys'] ?? 0);
                     <th>Schweregrad</th>
                     <th>Quelle</th>
                     <th>Zeitstempel</th>
-                    <th>Kontext / Zitat</th>
+                    <th>Kontext / Zitat &amp; Erläuterung</th>
                   </tr>
                 </thead>
                 <tbody>
                   <?php foreach ($violations as $v):
-                      $sev   = (string)($v['severity'] ?? 'warning');
-                      $isCrit = in_array($sev, ['violation', 'critical'], true);
-                      $vTime = isset($v['timestamp_sec']) && $v['timestamp_sec'] !== null ? (float)$v['timestamp_sec'] : null;
-                      $vTerm = (string)($v['matched_term'] ?? $v['term'] ?? '');
-                      $vSrc  = (string)($v['source_label'] ?? $v['source'] ?? 'Text');
-                      $vQuote = (string)($v['matched_quote'] ?? $v['snippet'] ?? $v['quote'] ?? '');
+                      $sev         = (string)($v['severity'] ?? 'warning');
+                      $isCrit      = in_array($sev, ['violation', 'critical'], true);
+                      $vTime       = isset($v['timestamp_sec']) && $v['timestamp_sec'] !== null ? (float)$v['timestamp_sec'] : null;
+                      $vTerm       = (string)($v['matched_term'] ?? $v['term'] ?? '');
+                      $vSrc        = (string)($v['source_label'] ?? $v['source'] ?? 'Text');
+                      $vQuote      = (string)($v['matched_quote'] ?? $v['snippet'] ?? $v['quote'] ?? '');
+                      $vReason     = (string)($v['reason'] ?? '');
+                      $vSuggestion = (string)($v['suggestion'] ?? '');
                   ?>
                   <tr>
                     <td class="fw-bold text-danger">„<?= View::e($vTerm) ?>“</td>
@@ -918,7 +955,19 @@ $buysCount = (int)($purchasesData['total_buys'] ?? 0);
                         <span class="text-muted"><?= View::e((string)($v['timestamp'] ?? '-')) ?></span>
                       <?php endif; ?>
                     </td>
-                    <td class="small text-muted font-monospace"><?= View::e($vQuote) ?></td>
+                    <td class="small">
+                      <?php if ($vQuote !== ''): ?>
+                        <div class="text-body font-monospace"><?= View::e($vQuote) ?></div>
+                      <?php endif; ?>
+                      <?php if ($vReason !== ''): ?>
+                        <div class="text-muted" style="font-size: 0.75rem;"><?= View::e($vReason) ?></div>
+                      <?php endif; ?>
+                      <?php if ($vSuggestion !== ''): ?>
+                        <div class="mt-1 p-1.5 px-2 rounded bg-info bg-opacity-10 border border-info border-opacity-25 text-body" style="font-size: 0.76rem;">
+                          <i class="bi bi-lightbulb-fill text-info me-1"></i><strong>Alternative / Empfehlung:</strong> <?= View::e($vSuggestion) ?>
+                        </div>
+                      <?php endif; ?>
+                    </td>
                   </tr>
                   <?php endforeach; ?>
                 </tbody>

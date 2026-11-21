@@ -1,114 +1,75 @@
 ---
 name: erocms-api-import
-description: Dokumentation über die API-Schnittstelle zur Anbindung und zum Import von Filmen in externe EroCMS-Seiten.
-usage: 'Referenz für Schnittstellen-Entwicklung, API-Debugging und Fehleranalyse bei Filmimporten.'
+description: Vollstaendige Dokumentation ueber die EroCloud-API (api.erocloud.net) zur Anbindung, Synchronisation und Auslieferung von Filmen UND Fotoalben an externe EroCMS-Seiten.
+usage: 'Referenz fuer Schnittstellen-Entwicklung, API-Debugging, Cache-Invalidierung und Fehleranalyse bei Film- und Fotoalben-Importen.'
 ---
 
-# 🔌 EroCMS API & Film-Import (EroCloud API)
+# 🔌 EroCMS API & Content-Import (Filme & Fotoalben)
 
-Dieses Dokument beschreibt die technische Funktionsweise der API-Schnittstelle von EroCloud, über die sich externe EroCMS-Webseiten per API-Key mit der Cloud verbinden, Creator-Videos (Filme) abfragen, importieren und diese für das Endkunden-Streaming sowie den Download bereitstellen.
+> **Kontext-Referenz:** Ergänzt `@master.md`, `@video-management.md`, `@movie-deletion-lifecycle.md` und `@photo-album-management-and-lifecycle.md`.
 
----
-
-## 1. 🛡️ Authentifizierung & API-Key-Validierung
-Jede Anfrage an die API muss durch einen API-Key legitimiert werden. Dieser Key ist einem bestimmten Creator (Merchant) zugeordnet.
-
-* **Speicherung in der DB:** Der API-Key ist in der Spalte `api_key` der Tabelle `merchants` verschlüsselt hinterlegt und wird per `AES_DECRYPT(api_key, 'AES_KEY')` abgeglichen.
-* **Verifikations-Funktion:** `check_api_key_exists($api_key)` in [api/index.php](file:///c:/xampp/htdocs/EroCloud/api/index.php).
-* **Datenbank-Schutz (Session-Caching):**
-  Um bei aufeinanderfolgenden API-Abrufen nicht bei jedem Request die MySQL-Datenbank belasten zu müssen, wird ein erfolgreicher Key-Abgleich in der PHP-Session (`$_SESSION['api_key']`) gespeichert. Bei weiteren Anfragen wird direkt gegen die Session validiert.
+Dieses Dokument beschreibt die technische Funktionsweise der zentralen API-Schnittstelle unter `https://api.erocloud.net` ([`api/index.php`](file:///c:/xampp/htdocs/EroCloud/api/index.php)), über die externe **EroCMS**-Webseiten Creator-Videos und Fotoalben abfragen, synchronisieren, abrechnen und für Endkunden ausliefern.
 
 ---
 
-## 2. 🗂️ API-Endpunkte und Datenfluss
+## 1. 🛡️ Authentifizierung & Zeichenkodierung (`utf8mb4`)
 
-Der API-Zentralrouter liegt in [api/index.php](file:///c:/xampp/htdocs/EroCloud/api/index.php). Folgende Endpunkte steuern den Import und Abruf:
-
-### A. API-Key prüfen (`check_api_key`)
-Prüft die grundsätzliche Gültigkeit des Schlüssels und registriert die Verbindung in der Session.
-* **Request:**
-  `GET https://api.erocloud.net/index.php?api_name=check_api_key&api_key={API_KEY}&domain={DOMAIN}`
-* **Verarbeitung:** Ruft [api/includes/check_api_key.inc.php](file:///c:/xampp/htdocs/EroCloud/api/includes/check_api_key.inc.php) auf.
-* **Response (XML):**
-  ```xml
-  <api>
-      <version>1.0</version>
-      <status>ok</status>
-  </api>
-  ```
-
-### B. Filmliste abrufen (`get_movies`)
-Gibt eine Liste aller online verfügbaren Filme eines bestimmten Darstellers (`actor_id`) aus.
-* **Request:**
-  `GET https://api.erocloud.net/index.php?api_name=get_movies&api_key={API_KEY}&domain={DOMAIN}&actor_id={ACTOR_ID}`
-* **Verarbeitung:** Ruft [api/includes/get_movies.inc.php](file:///c:/xampp/htdocs/EroCloud/api/includes/get_movies.inc.php) auf.
-* **Caching-Mechanismus (50-Minuten-Cache):**
-  * Das JSON-Ergebnis der Query auf `movies_online` wird in einer temporären Datei unter `api/temp/get_movies_by_actor_id/{ACTOR_ID}.tmp` abgelegt.
-  * Existiert diese Datei und ist jünger als 50 Minuten, wird sie ohne Datenbankzugriff direkt geladen.
-* **Domain-Whitelisting (Sichtbarkeitsprüfung):**
-  * Es wird geprüft, ob die Spalte `visible_for_website` auf `public` steht oder exakt mit der anfragenden `domain` übereinstimmt.
-  * Falls die Domain keine Berechtigung für das Video besitzt, wird der Status in der Ausgabe auf `deleted` maskiert.
-* **Response (XML):**
-  ```xml
-  <api>
-      <version>1.0</version>
-      <number_of_movies>1</number_of_movies>
-      <movies>
-          <item>
-              <movie_id>12345</movie_id>
-              <actor_id>98</actor_id>
-              <checksum>abc123xyz...</checksum>
-              <online_since>2026-07-02T11:00:00+02:00</online_since>
-              <status>online</status>
-              <domain>public</domain>
-          </item>
-      </movies>
-  </api>
-  ```
-
-### C. Filmdetails importieren (`get_movie`)
-Gibt alle vertriebs- und SEO-relevanten Details für ein spezifisches Video (`movie_id`) aus.
-* **Request:**
-  `GET https://api.erocloud.net/index.php?api_name=get_movie&api_key={API_KEY}&domain={DOMAIN}&movie_id={MOVIE_ID}`
-* **Verarbeitung:** Ruft [api/includes/get_movie.inc.php](file:///c:/xampp/htdocs/EroCloud/api/includes/get_movie.inc.php) auf.
-* **Caching-Mechanismus (50-Minuten-Cache & 7-Stunden-Cleanup):**
-  * Das Ergebnis wird in `api/temp/get_movie/{MOVIE_ID}.tmp` gecached (Gültigkeit: 50 Minuten).
-  * Cache-Dateien, die älter als 7 Stunden sind, werden beim nächsten Aufruf physisch per `unlink()` gelöscht.
-* **Ausgelesene Datenfelder:**
-  * **Grunddaten:** Titel (`title`), Beschreibung (`description`), Sprache (`movie_language`), Kategorien (`category_slave`).
-  * **Technisches:** Auflösung (`resolution`), Länge in Zeichenkette (`playtime_string`) und Sekunden (`playtime_seconds`), Checksumme (`checksum`).
-  * **Bilder:** Direkte Links zum FSK16- und FSK18-Poster.
-  * **Finanzen & Vertrieb:** Coin-Preise pro Sekunde (`amount_second`), Webmaster-Provision (`amount_webmaster`), Download-Erlaubnis (`as_download`) und Download-Preis (`amount_download`).
-  * **SEO:** Meta-Title, Meta-Description und die SEO-URL (`seo_url`).
-* **Response (XML):** Enthält alle oben genannten Eigenschaften im XML-Format zur Weiterverarbeitung im EroCMS.
+* **API-Key-Validierung:** Der API-Key ist in `merchants.api_key` verschlüsselt gespeichert (`AES_DECRYPT(api_key, 'AES_KEY')`) und wird in `check_api_key_exists($api_key)` ([`api/index.php`](file:///c:/xampp/htdocs/EroCloud/api/index.php)) geprüft sowie zur DB-Entlastung in `$_SESSION['api_key']` gecached.
+* **Ausgabeformat:** Standardmäßig XML über `print_xml($api)` aus [`includes/functions.inc.php`](file:///c:/xampp/htdocs/EroCloud/includes/functions.inc.php) (bzw. JSON wenn `output_format=json`, wie vom EroCMS über `get_erocloud_result()` in `EroCMS/erocloud_api/config.inc.php` angefordert).
+* **Zwingende `utf8mb4`-Kette (4-Byte-Emojis):** Da MCP v2.0 & ACP v2.0 echte UTF-8-Emojis (z. B. `👠🔥`) in Titeln, Beschreibungen und Meta-Feldern speichern, liefert `api.erocloud.net` volle 4-Byte-UTF-8-Strings aus. Alle konsumierenden EroCMS-Skripte (`EroCMS/erocloud_api/*.php`, `EroCMS/includes/cronjobs/import_*.php`) **müssen** zwingend mit `SET NAMES 'utf8mb4'` arbeiten (niemals `SET NAMES 'utf8'`, da MySQL `utf8mb3` sonst mit `1366 Incorrect string value` abbricht!).
 
 ---
 
-## 3. 🎥 Auslieferung (Streaming und Download)
-Die physischen Videodateien verbleiben permanent in der EroCloud-Infrastruktur und werden nicht an das EroCMS übertragen. Beim Kauf oder Aufruf eines Videos generiert das EroCMS eine Token-Anfrage für den Kunden:
+## 2. 🎥 Film-Endpunkte (`movies_online`)
 
-* **Endpunkt:**
-  `GET https://api.erocloud.net/get_movie_url.php?user_streaming_key={KEY}&movie_id={MOVIE_ID}&buy_as={streaming|download}`
-* **Verarbeitung in [api/get_movie_url.php](file:///c:/xampp/htdocs/EroCloud/api/get_movie_url.php):**
-  1. Validiert den `user_streaming_key` gegen die Tabelle `movies_access`.
-  2. Generiert ein zufälliges Einweg-Token (`access_token`) mit einer Gültigkeit von **30 Minuten** (`access_token_datetime`).
-  3. Liefert die geschützten Links zum Cloud-Player oder Cloud-Downloader zurück.
-* **Response (XML):**
-  ```xml
-  <api>
-      <version>1.0</version>
-      <!-- Für Downloads -->
-      <movie_url>https://api.erocloud.net/Downloader/{user_streaming_key}/{movie_id}/{access_token}</movie_url>
-      <!-- Für Streaming -->
-      <movie_url>https://api.erocloud.net/Player/{user_streaming_key}/{movie_id}/{access_token}</movie_url>
-      <poster_url_fsk16>https://api.erocloud.net/PlayerPoster/FSK16/{movie_id}</poster_url_fsk16>
-      <poster_url_fsk18>https://api.erocloud.net/PlayerPoster/FSK18/{movie_id}</poster_url_fsk18>
-      <width>1920</width>
-      <height>1080</height>
-  </api>
-  ```
+### A. Filmliste abrufen (`get_movies`)
+* **Datei:** [`api/includes/get_movies.inc.php`](file:///c:/xampp/htdocs/EroCloud/api/includes/get_movies.inc.php)
+* **Request:** `GET /index.php?api_name=get_movies&api_key={KEY}&domain={DOMAIN}&actor_id={ACTOR_ID}`
+* **Cache:** `api/temp/get_movies_by_actor_id/{ACTOR_ID}.tmp` (Gültigkeit: **50 Minuten**).
+* **Domain-Whitelisting:** Ist `visible_for_website` weder `'public'` noch identisch mit `domain`, wird `status` in der API-Antwort auf `'deleted'` maskiert.
+
+### B. Filmdetails abrufen (`get_movie`)
+* **Datei:** [`api/includes/get_movie.inc.php`](file:///c:/xampp/htdocs/EroCloud/api/includes/get_movie.inc.php)
+* **Request:** `GET /index.php?api_name=get_movie&api_key={KEY}&domain={DOMAIN}&movie_id={FILE_ID}`
+* **Cache:** `api/temp/get_movie/{FILE_ID}.tmp` (Gültigkeit: **50 Minuten**, Cleanup > 7 Stunden).
+* **Checksummen-Funktion:** `movie_checksum($movie)` in [`includes/functions.inc.php`](file:///c:/xampp/htdocs/EroCloud/includes/functions.inc.php).
+
+### C. Film-Kauf & Streaming-/Download-Auslieferung
+* **Kauf:** [`api/buy_movie_erocms.php`](file:///c:/xampp/htdocs/EroCloud/api/buy_movie_erocms.php) $\rightarrow$ schreibt `movies_access`.
+* **Token & Player/Downloader:** [`api/get_movie_url.php`](file:///c:/xampp/htdocs/EroCloud/api/get_movie_url.php) validiert `user_streaming_key` gegen `movies_access` und generiert ein **30 Minuten** gültiges Einweg-`access_token` für `/Player/...` bzw. `/Downloader/...`.
 
 ---
 
-## 4. 🛠️ Hilfsfunktionen und Ausgabeformat
-* **Ausgabeformat:** Die Hilfsfunktion `print_xml($api)` in [includes/functions.inc.php](file:///c:/xampp/htdocs/EroCloud/includes/functions.inc.php) konvertiert das `$api`-Array rekursiv in ein standardkonformes XML-Dokument und sendet den entsprechenden HTTP-Header.
+## 3. 📸 Fotoalben-Endpunkte (`photo_albums_online`)
+
+Vollständige Details zum Lebenszyklus siehe `@photo-album-management-and-lifecycle.md`.
+
+### A. Fotoalben-Liste eines Darstellers (`get_photo_albums`)
+* **Datei:** [`api/includes/get_photo_albums.inc.php`](file:///c:/xampp/htdocs/EroCloud/api/includes/get_photo_albums.inc.php)
+* **Request:** `GET /index.php?api_name=get_photo_albums&api_key={KEY}&domain={DOMAIN}&actor_id={ACTOR_ID}`
+* **Verhalten:** Liest **direkt und ohne Datei-Cache** `checksum, album_id, actor_id, online_at, status` aus `photo_albums_online`.
+* **WICHTIGE LÖSCH-REGEL:** Damit externe EroCMS-Seiten erfahren, dass ein Album gelöscht oder gesperrt wurde (`<status>deleted</status>` bzw. `<status>blocked</status>`), **muss** die Zeile beim Soft-Delete (und als 30-Tage-Tombstone auch beim Admin-Hard-Delete) in `photo_albums_online` verbleiben!
+
+### B. Fotoalbum-Details abrufen (`get_photo_album`)
+* **Datei:** [`api/includes/get_photo_album.inc.php`](file:///c:/xampp/htdocs/EroCloud/api/includes/get_photo_album.inc.php)
+* **Request:** `GET /index.php?api_name=get_photo_album&api_key={KEY}&domain={DOMAIN}&album_id={ALBUM_HASH}`
+* **Cache & Pflicht-Invalidierung:**
+  * Speichert das JSON-Ergebnis für **50 Minuten** unter `api/temp/get_photo_album/{ALBUM_HASH}.tmp`.
+  * **PFLICHT:** Jede Änderung an einem Online-Fotoalbum (Freigabe, Bearbeitung, Statuswechsel auf `blocked`/`deleted`, Hard-Delete, Foto-Rotation) **muss** `ec_invalidate_photo_album_api_cache($albumIdHash)` aus [`includes/functions.inc.php`](file:///c:/xampp/htdocs/EroCloud/includes/functions.inc.php) aufrufen, damit EroCMS-Portale keine veralteten Status- oder Textdaten aus dem `.tmp`-Cache erhalten!
+* **Checksummen-Funktion (`photo_album_checksum()`):** Berechnet den MD5-Hash über Metadaten, Preise, Cover, Fotoanzahl **sowie** (sofern `status != 'active'`) das Suffix `|{status}`, sodass reine Statusänderungen (`blocked` / `deleted`) sofort einen Sync auf allen EroCMS-Portalen auslösen.
+
+### C. Verpixelte Vorschaubilder, Kauf & Kunden-Download
+* **Vorschau-Liste & Thumbnails:** [`api/includes/get_photo_album_thumbs.inc.php`](file:///c:/xampp/htdocs/EroCloud/api/includes/get_photo_album_thumbs.inc.php) liefert alle `file_id`s; [`api/album_photo_thumb.php`](file:///c:/xampp/htdocs/EroCloud/api/album_photo_thumb.php) (`/AlbumPhoto/{file_id}`) erzeugt beim ersten Abruf `images/thumb_{filename}` (200px, verpixelt, EXIF-korrigiert). Cover werden über [`api/photo_album_poster.php`](file:///c:/xampp/htdocs/EroCloud/api/photo_album_poster.php) (`/PhotoAlbumPoster/FSK16|FSK18/{album_id}`) ausgeliefert.
+* **Kauf-Registrierung:** [`api/buy_photo_album_erocms.php`](file:///c:/xampp/htdocs/EroCloud/api/buy_photo_album_erocms.php) legt den Kundenzugriff in `photo_albums_access` an.
+* **Kunden-Abruf (ZIP & Einzelbild):** [`api/get_photo_album_url.php`](file:///c:/xampp/htdocs/EroCloud/api/get_photo_album_url.php) prüft `photo_albums_access`, vergibt ein 30-Minuten-`access_token` für den ZIP-Stream ([`api/photo_album_downloader.php`](file:///c:/xampp/htdocs/EroCloud/api/photo_album_downloader.php)) und autorisiert die unzensierte Einzelbild-Anzeige über [`api/my_album_photo.php`](file:///c:/xampp/htdocs/EroCloud/api/my_album_photo.php).
+
+---
+
+## 4. 🔗 Gegenstellen im EroCMS (`c:\xampp\htdocs\EroCMS`)
+
+| Aufgabe im EroCMS | Zuständige Datei im Projekt `EroCMS` |
+| :--- | :--- |
+| **Zentraler API-Client & Update-Funktionen** | `erocloud_api/config.inc.php` (`get_erocloud_result()`, `update_erocloud_movie()`, `update_erocloud_photo_album()`) |
+| **Stündlicher Fotoalben-Import & Selbstheilung** | `includes/cronjobs/import_new_photo_albums.php` (inkl. `try/catch`, Geister-Schutz bei leerer `headline` und `0-DDL` Käuferschutz via `online_ab = '999912312359'` für gekaufte `deleted`/`blocked`-Alben) |
+| **Film-Import & Delta-Sync** | `includes/cronjobs/import_new_movies.php` & `includes/cronjobs/erocloud_sync_movies.php` |
+| **Darsteller- & Kategorie-Import** | `includes/cronjobs/import_new_actors.php`, `update_actor_profiles.php`, `import_movie_categories.php` |

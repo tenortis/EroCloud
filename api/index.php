@@ -57,6 +57,9 @@ function check_api_key_exists($api_key) {
         $_SESSION['api_key'] = $api_key;
         //$class_errorlog->log(session_id().' - '.$_SESSION['api_key'],__FILE__,__LINE__);
     }
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        @session_write_close();
+    }
 }
 
 // Alle Filme

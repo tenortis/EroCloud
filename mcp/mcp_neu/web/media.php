@@ -134,7 +134,15 @@ function mcp_media_output_resized_image(
         $targetWidth = min(1024, $maxWidth);
     }
 
-    if ($targetWidth >= $srcWidth) {
+    $hasExifRotation = false;
+    if (($mimeType === 'image/jpeg' || $mimeType === 'image/jpg') && function_exists('exif_read_data')) {
+        $exifCheck = @exif_read_data($filePath);
+        if (is_array($exifCheck) && in_array((int)($exifCheck['Orientation'] ?? 1), [3, 6, 8], true)) {
+            $hasExifRotation = true;
+        }
+    }
+
+    if ($targetWidth >= $srcWidth && !$hasExifRotation) {
         while (ob_get_level() > 0) {
             @ob_end_clean();
         }
@@ -144,8 +152,9 @@ function mcp_media_output_resized_image(
         exit;
     }
 
+    $effectiveWidth = min($targetWidth, $srcWidth);
     $ratio = $srcHeight / max(1, $srcWidth);
-    $newWidth = max(1, $targetWidth);
+    $newWidth = max(1, $effectiveWidth);
     $newHeight = max(1, (int)round($newWidth * $ratio));
 
     $cacheFile = '';

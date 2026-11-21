@@ -6,13 +6,15 @@ if (!defined('SAFE_INC'))
 
 include_once(SOURCEDIR."/includes/functions.inc.php");
 
-// SESSION starten
+// SESSION starten (nur wenn Endpunkt nicht per $no_session = true als stateless markiert ist)
 ##############################################
-if (session_status() !== PHP_SESSION_ACTIVE && !headers_sent()) {
+if (empty($no_session) && session_status() !== PHP_SESSION_ACTIVE && !headers_sent()) {
     session_save_path(TEMP_DIR.'/');
     ini_set('session.gc_probability', 1);
+    if (!isset($_SESSION)) {
+        p4c_session_start(!empty($session_write_close));
+    }
 }
-if(!isset($_SESSION) && session_status() !== PHP_SESSION_ACTIVE && !headers_sent()) {p4c_session_start();}
 
 // Error-Handler einbinden
 include_once(SOURCEDIR.'/includes/klassen/errorlog.inc.php');

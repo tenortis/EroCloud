@@ -179,7 +179,7 @@ final class PhotoAlbumsOnlineController
                 $albumDbId = abs((int)($row->album_db_id ?? 0));
                 $albumHash = (string)($row->album_id ?? '');
                 $title     = self::decodeText((string)($row->title ?? ''));
-                $desc      = self::decodeText((string)($row->description ?? ''));
+                $desc      = self::decodeDescription((string)($row->description ?? ''));
                 $metaTitle = self::decodeText((string)($row->meta_title ?? ''));
                 $metaDesc  = self::decodeText((string)($row->meta_description ?? ''));
 
@@ -430,19 +430,20 @@ final class PhotoAlbumsOnlineController
 
         // Texte dekodieren
         $title       = self::decodeText((string)($ao->title ?? ''));
-        $description = self::decodeText((string)($ao->description ?? ''));
+        $description = self::decodeDescription((string)($ao->description ?? ''));
         $metaTitle   = self::decodeText((string)($ao->meta_title ?? ''));
         $metaDesc    = self::decodeText((string)($ao->meta_description ?? ''));
         $seoUrl      = self::decodeText((string)($ao->seo_url ?? ''));
         $adminInfos  = self::decodeText((string)($ao->admin_infos ?? ''));
 
-        // Duplikat-Prüfung (anderes Online-Album mit identischem Titel)
+        // Duplikat-Prüfung (anderes aktives/gesperrtes Online-Album mit identischem Titel; gelöschte Alben ignorieren)
         $duplicateAlbum = null;
-        if ($title !== '') {
+        if ($title !== '' && (string)($ao->status ?? '') !== 'deleted') {
             $rsDup = p4c_query(
                 "SELECT `id`, `album_id`, `title`, `merchant_id`
                  FROM `photo_albums_online`
                  WHERE `title` = '" . p4c_escape_string((string)$ao->title) . "'
+                   AND `status` != 'deleted'
                    AND `id` != '" . $onlineId . "'
                  LIMIT 1;",
                 __FILE__,
@@ -458,6 +459,23 @@ final class PhotoAlbumsOnlineController
                 ];
             }
         }
+
+        // Reale Käuferanzahl in photo_albums_access prüfen (verbindlicher Käuferschutz)
+        $accessCount = 0;
+        $lastAccessBuy = '';
+        $rsAccessCnt = p4c_query(
+            "SELECT COUNT(*) AS `cnt`, MAX(`buy_timestamp`) AS `last_buy`
+             FROM `photo_albums_access`
+             WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "';",
+            __FILE__,
+            __LINE__
+        );
+        if ($rsAccessCnt && p4c_num_rows($rsAccessCnt) > 0) {
+            $accRow        = p4c_fetch_object($rsAccessCnt);
+            $accessCount   = abs((int)($accRow->cnt ?? 0));
+            $lastAccessBuy = (string)($accRow->last_buy ?? '');
+        }
+        $effectivePurchases = max(abs((int)($ao->purchases ?? 0)), $accessCount);
 
         // Alle Fotos des Albums laden
         $photos = [];
@@ -560,10 +578,19 @@ final class PhotoAlbumsOnlineController
             __LINE__
         );
         if ($rsHist && p4c_num_rows($rsHist) > 0) {
+            $histFallbacks = [
+                'online_at_too_far' => 'Veröffentlichungsdatum zu weit in der Zukunft',
+                'free_text'         => 'Sonstiges / Mehrere Gründe (Freitext)',
+            ];
             while ($h = p4c_fetch_object($rsHist)) {
+                $histIdName = (string)($h->id_name ?? '');
+                $histShort  = self::decodeText((string)($h->de_short ?? ''));
+                if ($histShort === '') {
+                    $histShort = $histFallbacks[$histIdName] ?? ($histIdName !== '' ? $histIdName : 'Ablehnung');
+                }
                 $rejectionHistory[] = [
-                    'id_name'     => (string)($h->id_name ?? ''),
-                    'short_title' => self::decodeText((string)($h->de_short ?? $h->id_name ?? 'Ablehnung')),
+                    'id_name'     => $histIdName,
+                    'short_title' => $histShort,
                     'text'        => self::decodeText((string)($h->text ?? '')),
                     'datetime'    => (string)($h->datetime ?? ''),
                 ];
@@ -623,9 +650,15 @@ final class PhotoAlbumsOnlineController
         }
 
         $onlineAtRaw = (string)($ao->online_at ?? '');
-        $onlineAtFormatted = ($onlineAtRaw !== '' && $onlineAtRaw !== '0000-00-00 00:00:00')
-            ? date('Y-m-d\TH:i', strtotime($onlineAtRaw))
+        $onlineAtTs  = ($onlineAtRaw !== '' && $onlineAtRaw !== '0000-00-00 00:00:00' && $onlineAtRaw !== '000-00-00 00:00:00')
+            ? strtotime($onlineAtRaw)
+            : false;
+        $onlineAtFormatted = $onlineAtTs !== false
+            ? date('Y-m-d\TH:i', $onlineAtTs)
             : date('Y-m-d\TH:i');
+        $onlineAtTooFar    = function_exists('ec_is_online_at_too_far_in_future') && ec_is_online_at_too_far_in_future($onlineAtRaw);
+        $maxOnlineAtInput  = function_exists('ec_get_max_online_at_input') ? ec_get_max_online_at_input() : date('Y-m-d\T23:59', strtotime('+12 months'));
+        $maxOnlineAtDe     = function_exists('ec_get_max_online_at_timestamp') ? date('d.m.Y', ec_get_max_online_at_timestamp()) : date('d.m.Y', strtotime('+12 months'));
 
         return View::render('PhotoAlbumsOnline', 'edit', [
             'album' => [
@@ -650,10 +683,17 @@ final class PhotoAlbumsOnlineController
                 'selected_slaves'      => $selectedSlaves,
                 'online_at_input'      => $onlineAtFormatted,
                 'online_at_raw'        => $onlineAtRaw,
+                'online_at_too_far'    => $onlineAtTooFar,
+                'max_online_at_input'  => $maxOnlineAtInput,
+                'max_online_at_de'     => $maxOnlineAtDe,
                 'amount_download'      => abs((int)($ao->amount_download ?? 0)),
                 'views'                => abs((int)($ao->views ?? 0)),
                 'purchases'            => abs((int)($ao->purchases ?? 0)),
+                'access_count'         => $accessCount,
+                'effective_purchases'  => $effectivePurchases,
+                'last_access_buy'      => $lastAccessBuy,
                 'status'               => (string)($ao->status ?? 'active'),
+                'deleted_datetime'     => (string)($ao->deleted_datetime ?? $pa->deleted_datetime ?? ''),
                 'admin_infos'          => $adminInfos,
                 'create_datetime'      => (string)($ao->create_datetime ?? $pa->create_datetime ?? ''),
                 'album_checked'        => (string)($ao->album_checked ?? ''),
@@ -756,7 +796,8 @@ final class PhotoAlbumsOnlineController
             $errors[] = 'Bitte wähle alle Kategorien aus, die zum Fotoalbum passen.';
         }
 
-        // 3. Titel & Beschreibung bereinigen + Duplikat-Prüfung
+        // 3. Titel & Beschreibung bereinigen + Duplikat-Prüfung (gelöschte Alben ignorieren)
+        $requestedStatusPreview = trim((string)$this->request->post('album_status', $this->request->post('status', 'active')));
         $title = trim(str_replace(self::REPLACE_TITLE_CHARS, '', (string)$this->request->post('title', '')));
         $title = str_replace(['&#8364;', '&euro;', 'Â€', '€', 'â‚¬', '&#x20AC;'], 'EUR', $title);
         $title = trim(strip_tags($title));
@@ -764,10 +805,11 @@ final class PhotoAlbumsOnlineController
             $errors[] = 'Bitte gib einen aussagekräftigen Titel für das Fotoalbum an.';
         } elseif (mb_strlen($title, 'UTF-8') > 65) {
             $errors[] = 'Der Albumtitel darf maximal 65 Zeichen lang sein.';
-        } else {
+        } elseif ($requestedStatusPreview !== 'deleted') {
             $rsDup = p4c_query(
                 "SELECT `id` FROM `photo_albums_online`
                  WHERE `title` = '" . p4c_escape_string($title) . "'
+                   AND `status` != 'deleted'
                    AND `id` != '" . $onlineId . "'
                  LIMIT 1;",
                 __FILE__,
@@ -779,8 +821,8 @@ final class PhotoAlbumsOnlineController
             }
         }
 
-        $allowedTags = '<ul><ol><li><u><em><strong><h1><h2><h3><h4><h5><h6><pre><address><p><br><a><b><i>';
-        $description = trim(strip_tags((string)$this->request->post('description', ''), $allowedTags));
+        $description = self::decodeDescription((string)$this->request->post('description', ''));
+        $description = str_replace('€', 'EUR', $description);
         if ($description === '') {
             $errors[] = 'Bitte gib eine aussagekräftige Beschreibung für das Fotoalbum an.';
         }
@@ -806,7 +848,7 @@ final class PhotoAlbumsOnlineController
 
         $metaDesc = trim(strip_tags(str_replace(["\n", "\r"], ' ', (string)$this->request->post('meta_description', ''))));
         if ($metaDesc === '') {
-            $metaDesc = mb_substr(trim(strip_tags($description)), 0, 156, 'UTF-8');
+            $metaDesc = mb_substr(trim((string)preg_replace('/\s+/u', ' ', $description)), 0, 156, 'UTF-8');
         } else {
             $metaDesc = mb_substr($metaDesc, 0, 156, 'UTF-8');
         }
@@ -826,6 +868,13 @@ final class PhotoAlbumsOnlineController
             && (string)($ao->status ?? '') !== 'deleted'
         ) {
             $errors[] = 'Du besitzt keine Schreib-/Löschberechtigung (Administrator-Status), um Fotoalben auf den Status „Gelöscht“ zu setzen.';
+        }
+        if ($albumStatus === 'active' && function_exists('ec_validate_online_at_future')) {
+            $toCheckOnlineAt = $onlineAtRaw !== '' ? $onlineAtRaw : (string)($ao->online_at ?? '');
+            $dateCheck       = ec_validate_online_at_future($toCheckOnlineAt, 'Fotoalbum', true);
+            if (!empty($dateCheck['too_far'])) {
+                $errors[] = $dateCheck['error'];
+            }
         }
         $adminInfos = trim(strip_tags((string)$this->request->post('admin_infos', '')));
 
@@ -853,6 +902,10 @@ final class PhotoAlbumsOnlineController
 
         $categorySlaveStr = implode(',', $validCategories);
         $now              = date('Y-m-d H:i:s');
+        $prevDeletedDt    = (string)($ao->deleted_datetime ?? '');
+        $deletedDtSql     = ($albumStatus === 'deleted')
+            ? (($prevDeletedDt !== '' && $prevDeletedDt !== '0000-00-00 00:00:00') ? $prevDeletedDt : $now)
+            : '0000-00-00 00:00:00';
 
         $checksumData = [
             'merchant_id'         => $merchantId,
@@ -867,10 +920,11 @@ final class PhotoAlbumsOnlineController
             'online_at'           => $onlineAtSql,
             'amount_webmaster'    => abs((int)($ao->amount_webmaster ?? 0)),
             'amount_download'     => $amountDownload,
+            'status'              => $albumStatus,
         ];
-        $checksum = function_exists('photo_album_checksum') ? (string)photo_album_checksum($checksumData) : md5($albumIdHash . $now);
+        $checksum = function_exists('photo_album_checksum') ? (string)photo_album_checksum($checksumData) : md5($albumIdHash . $now . $albumStatus);
 
-        // 1. Update photo_albums_online
+        // 1. Update photo_albums_online (Soft-Delete belässt Zeile mit status='deleted' zur Synchronisation an EroCMS-Portale)
         p4c_query(
             "UPDATE `photo_albums_online` SET
                 `actor_id`              = '" . $actorId . "',
@@ -887,6 +941,7 @@ final class PhotoAlbumsOnlineController
                 `amount_download`       = '" . $amountDownload . "',
                 `album_checked`         = '" . $now . "',
                 `status`                = '" . p4c_escape_string($albumStatus) . "',
+                `deleted_datetime`      = '" . p4c_escape_string($deletedDtSql) . "',
                 `admin_infos`           = '" . p4c_escape_string($adminInfos) . "',
                 `last_updated_by`       = '" . $employeeId . "',
                 `last_updated_datetime` = '" . $now . "'
@@ -913,6 +968,7 @@ final class PhotoAlbumsOnlineController
                 `amount_download`       = '" . $amountDownload . "',
                 `album_checked`         = '" . $now . "',
                 `status`                = '" . p4c_escape_string($albumStatus) . "',
+                `deleted_datetime`      = '" . p4c_escape_string($deletedDtSql) . "',
                 `admin_infos`           = '" . p4c_escape_string($adminInfos) . "',
                 `last_updated_by`       = '" . $employeeId . "',
                 `last_updated_datetime` = '" . $now . "'
@@ -922,12 +978,184 @@ final class PhotoAlbumsOnlineController
             __LINE__
         );
 
+        if (function_exists('ec_invalidate_photo_album_api_cache')) {
+            \ec_invalidate_photo_album_api_cache($albumIdHash);
+        }
+
         if (function_exists('log_action')) {
             log_action('Online-Fotoalbum #' . $onlineId . ' ("' . $title . '") bearbeitet [Status: ' . $albumStatus . '].');
         }
 
         Response::success([
-            'message'   => 'Die Änderungen am Fotoalbum #' . $onlineId . ' wurden erfolgreich gespeichert.',
+            'message'   => $albumStatus === 'deleted'
+                ? 'Fotoalbum #' . $onlineId . ' wurde auf „Gelöscht“ (Soft-Delete mit Käuferschutz) gesetzt.'
+                : 'Die Änderungen am Fotoalbum #' . $onlineId . ' wurden erfolgreich gespeichert.',
+            'online_id' => $onlineId,
+        ]);
+    }
+
+    /**
+     * 5. AJAX-Aktion: Manuelle physische Endgültig-Löschung (Hard-Delete) durch einen Administrator (?route=photo-albums-online/hard-delete)
+     *
+     * Ausschließlich zulässig für Administratoren (employee_rule === 'write'):
+     *  - Bei 0 Käufen: sofortige physische Entfernung aller Bilddateien (z. B. versehentliche Dubletten/Testalben).
+     *  - Bei vorhandenen Käufen (> 0): nur mit expliziter Rechts-/Persönlichkeitsrechts-/DSGVO-Bestätigung + Pflichtbegründung.
+     *  - In photo_albums_online und photo_albums verbleibt ein leerer Tombstone (status='deleted', 0 Fotos), damit angeschlossene
+     *    EroCMS-Seiten das Löschsignal sicher erhalten; nach 30 Tagen räumt cronjobs/delete_photo_album.php den Tombstone ab.
+     */
+    public function hardDelete(): void
+    {
+        if (!$this->request->isPost()) {
+            Response::error('Ungültige Anfrage-Methode.', 405);
+            return;
+        }
+        if (!Csrf::validate($this->request->csrfToken())) {
+            Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte lade die Seite neu.', 403);
+            return;
+        }
+        if ((string)($_SESSION['employee_rule'] ?? '') !== 'write') {
+            Response::error('Nur Administratoren mit voller Schreibberechtigung dürfen Fotoalben manuell endgültig physisch löschen.', 403);
+            return;
+        }
+
+        $employeeId       = abs((int)($_SESSION['employee_id'] ?? 0));
+        $onlineId         = abs((int)$this->request->post('online_id', 0));
+        $albumHash        = trim((string)$this->request->post('album_id', ''));
+        $forceLegalDelete = (string)$this->request->post('force_legal_delete', '0') === '1';
+        $deleteReason     = trim(strip_tags((string)$this->request->post('delete_reason', '')));
+
+        if ($onlineId <= 0 && $albumHash === '') {
+            Response::error('Ungültige Fotoalbum-ID.', 400);
+            return;
+        }
+
+        $whereAo = $onlineId > 0
+            ? "`id` = '" . $onlineId . "'"
+            : "`album_id` = '" . p4c_escape_string($albumHash) . "'";
+
+        $rsAo = p4c_query("SELECT * FROM `photo_albums_online` WHERE " . $whereAo . " LIMIT 1;", __FILE__, __LINE__);
+        if (!$rsAo || p4c_num_rows($rsAo) === 0) {
+            Response::error('Das Online-Fotoalbum wurde nicht in der Datenbank gefunden.', 404);
+            return;
+        }
+
+        $ao          = p4c_fetch_object($rsAo);
+        $onlineId    = abs((int)$ao->id);
+        $albumIdHash = (string)$ao->album_id;
+        $merchantId  = abs((int)$ao->merchant_id);
+
+        $rsPa      = p4c_query("SELECT * FROM `photo_albums` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "' LIMIT 1;", __FILE__, __LINE__);
+        $pa        = ($rsPa && p4c_num_rows($rsPa) > 0) ? p4c_fetch_object($rsPa) : null;
+        $albumDbId = $pa ? abs((int)$pa->id) : 0;
+
+        $rsAccCnt = p4c_query(
+            "SELECT COUNT(*) AS `cnt` FROM `photo_albums_access` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "';",
+            __FILE__,
+            __LINE__
+        );
+        $accessCount        = ($rsAccCnt && p4c_num_rows($rsAccCnt) > 0) ? abs((int)(p4c_fetch_object($rsAccCnt)->cnt ?? 0)) : 0;
+        $effectivePurchases = max(abs((int)($ao->purchases ?? 0)), $accessCount);
+
+        if ($effectivePurchases > 0) {
+            if (!$forceLegalDelete) {
+                Response::error(
+                    'Dieses Fotoalbum wurde bereits ' . $effectivePurchases . '-mal gekauft! Zum Schutz der Käufer ist nur Soft-Delete („Gelöscht“) erlaubt – es sei denn, du bestätigst ausdrücklich eine zwingende Löschung aus Rechts-/Persönlichkeitsrechts- oder Datenschutzgründen.',
+                    422
+                );
+                return;
+            }
+            if (mb_strlen($deleteReason, 'UTF-8') < 5) {
+                Response::error('Bitte gib bei einem bereits gekauften Fotoalbum zwingend den rechtlichen Löschgrund (mind. 5 Zeichen, z. B. Persönlichkeitsrecht / DSGVO) an.', 422);
+                return;
+            }
+        }
+
+        // 1. Physische Bilddateien und Verzeichnis vollständig löschen
+        $storageLoc = trim((string)($pa->storage_location ?? $ao->storage_location ?? ''));
+        if ($storageLoc === '') {
+            $storageLoc = defined('PHOTO_ALBUMS_DEFAULT_DIR') ? (string)PHOTO_ALBUMS_DEFAULT_DIR : 'photo_albums';
+        }
+        $deletedFilesCount = 0;
+        if ($albumDbId > 0 && $merchantId > 0 && defined('PHOTO_ALBUMS_PATH')) {
+            $albumDir = rtrim((string)PHOTO_ALBUMS_PATH, '/\\') . '/' . trim($storageLoc, '/\\') . '/' . $merchantId . '/' . $albumDbId;
+            if (is_dir($albumDir)) {
+                $imagesDir = $albumDir . '/images';
+                if (is_dir($imagesDir)) {
+                    foreach ((array)@glob($imagesDir . '/*') as $f) {
+                        if (is_string($f) && is_file($f) && @unlink($f)) {
+                            $deletedFilesCount++;
+                        }
+                    }
+                    @rmdir($imagesDir);
+                }
+                foreach ((array)@glob($albumDir . '/*') as $f) {
+                    if (is_string($f) && is_file($f) && @unlink($f)) {
+                        $deletedFilesCount++;
+                    }
+                }
+                @rmdir($albumDir);
+            }
+        }
+
+        // 2. Einzelfoto-Datensätze (und bei Rechts-/DSGVO-Zwangslöschung auch Kundenzugriffe) entfernen
+        p4c_query("DELETE FROM `photo_albums_photos` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "';", __FILE__, __LINE__);
+        if ($effectivePurchases > 0 && $forceLegalDelete) {
+            p4c_query("DELETE FROM `photo_albums_access` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "';", __FILE__, __LINE__);
+        }
+
+        // 3. Synchronisations-Tombstone in photo_albums_online & photo_albums setzen
+        $now       = date('Y-m-d H:i:s');
+        $reasonTxt = $deleteReason !== '' ? $deleteReason : 'Ungekauftes Album manuell durch Admin gelöscht';
+        $auditLine = '[ADMIN HARD-DELETE ' . $now . ' (Admin #' . $employeeId . ', Käufe: ' . $effectivePurchases . '): ' . $reasonTxt . ']';
+        $prevInfos = trim((string)($ao->admin_infos ?? ''));
+        $newInfos  = $prevInfos !== '' ? ($prevInfos . "\n" . $auditLine) : $auditLine;
+        $tombstoneChecksum = md5($albumIdHash . '|hard_deleted|' . $now);
+
+        p4c_query(
+            "UPDATE `photo_albums_online` SET
+                `status`                = 'deleted',
+                `deleted_datetime`      = '" . $now . "',
+                `number_of_photos`      = '0',
+                `preview_image_fsk16`   = '',
+                `preview_image_fsk18`   = '',
+                `checksum`              = '" . p4c_escape_string($tombstoneChecksum) . "',
+                `admin_infos`           = '" . p4c_escape_string($newInfos) . "',
+                `last_updated_by`       = '" . $employeeId . "',
+                `last_updated_datetime` = '" . $now . "'
+             WHERE `id` = '" . $onlineId . "'
+             LIMIT 1;",
+            __FILE__,
+            __LINE__
+        );
+
+        p4c_query(
+            "UPDATE `photo_albums` SET
+                `status`                = 'deleted',
+                `deleted_datetime`      = '" . $now . "',
+                `number_of_photos`      = '0',
+                `preview_image_fsk16`   = '',
+                `preview_image_fsk18`   = '',
+                `checksum`              = '" . p4c_escape_string($tombstoneChecksum) . "',
+                `admin_infos`           = '" . p4c_escape_string($newInfos) . "',
+                `last_updated_by`       = '" . $employeeId . "',
+                `last_updated_datetime` = '" . $now . "'
+             WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "'
+             LIMIT 1;",
+            __FILE__,
+            __LINE__
+        );
+
+        if (function_exists('ec_invalidate_photo_album_api_cache')) {
+            \ec_invalidate_photo_album_api_cache($albumIdHash);
+        }
+
+        if (function_exists('log_action')) {
+            log_action('ADMIN HARD-DELETE Fotoalbum Online-ID #' . $onlineId . ' (Album-ID: ' . $albumIdHash . ', Dateien gelöscht: ' . $deletedFilesCount . ', Käufe: ' . $effectivePurchases . ', Grund: ' . $reasonTxt . ').');
+        }
+
+        Response::success([
+            'message'   => 'Das Fotoalbum #' . $onlineId . ' und alle zugehörigen Bilddateien (' . $deletedFilesCount . ') wurden endgültig physisch gelöscht.',
+            'deleted'   => true,
             'online_id' => $onlineId,
         ]);
     }
@@ -943,20 +1171,70 @@ final class PhotoAlbumsOnlineController
         return MoviesOnlineController::formatBytes($bytes);
     }
 
+    private static function decodeDescription(string $str): string
+    {
+        if ($str === '') {
+            return '';
+        }
+        if (function_exists('ec_html_to_plain_text')) {
+            return \ec_html_to_plain_text($str);
+        }
+        if (!mb_check_encoding($str, 'UTF-8') && function_exists('mb_convert_encoding')) {
+            $converted = @mb_convert_encoding($str, 'UTF-8', 'ISO-8859-1, WINDOWS-1252, ASCII');
+            if (is_string($converted)) {
+                $str = $converted;
+            }
+        }
+        $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if (strpos($str, '&') !== false) {
+            $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+        $str = str_replace(["\r\n", "\r"], "\n", $str);
+        foreach ([
+            '/<\s*(script|style)\b[^>]*>.*?<\s*\/\s*\1\s*>/is' => '',
+            '/<!--.*?-->/s' => '',
+            '/<\s*br\s*\/?\s*>/i' => "\n",
+            '/<\s*\/\s*li\s*>\s*<\s*li\b[^>]*>/i' => "\n- ",
+            '/<\s*li\b[^>]*>/i' => "\n- ",
+            '/<\s*\/\s*li\s*>/i' => "\n",
+            '/<\s*\/\s*tr\s*>/i' => "\n",
+            '/<\/\s*(?:p|div|h[1-6]|ul|ol|blockquote|pre|address|table|section|article)\s*>\s*<\s*(?:p|div|h[1-6]|ul|ol|blockquote|pre|address|table|section|article)\b[^>]*>/i' => "\n\n",
+            '/<\/?\s*(?:p|div|h[1-6]|ul|ol|blockquote|pre|address|table|section|article|hr)\b[^>]*\/?>/i' => "\n\n",
+            '/<\/?[a-zA-Z][a-zA-Z0-9:-]*(?:\s+[^<>]*)?\/?>/' => '',
+        ] as $pattern => $replacement) {
+            $res = preg_replace($pattern, $replacement, $str);
+            if (is_string($res)) {
+                $str = $res;
+            }
+        }
+        $str = str_replace(["\xC2\xA0", "\xE2\x80\x8B", "\xE2\x80\x8C", "\xE2\x80\x8D", "\xEF\xBB\xBF"], [' ', '', '', '', ''], $str);
+        foreach (['/[ \t]{2,}/' => ' ', '/^[ \t]+|[ \t]+$/m' => '', "/\n{3,}/" => "\n\n"] as $pattern => $replacement) {
+            $res = preg_replace($pattern, $replacement, $str);
+            if (is_string($res)) {
+                $str = $res;
+            }
+        }
+        return trim($str);
+    }
+
     private static function decodeText(string $str): string
     {
         if ($str === '') {
             return '';
         }
-        if (function_exists('utf8_to_latin1swedishci')) {
-            $converted = (string)utf8_to_latin1swedishci($str);
-            if (mb_check_encoding($converted, 'UTF-8')) {
-                return $converted;
+        if (function_exists('ec_decode_text')) {
+            return \ec_decode_text($str);
+        }
+        if (!mb_check_encoding($str, 'UTF-8') && function_exists('mb_convert_encoding')) {
+            $converted = @mb_convert_encoding($str, 'UTF-8', 'ISO-8859-1, WINDOWS-1252, ASCII');
+            if (is_string($converted)) {
+                $str = $converted;
             }
         }
-        if (!mb_check_encoding($str, 'UTF-8')) {
-            return mb_convert_encoding($str, 'UTF-8', 'ISO-8859-1, WINDOWS-1252, ASCII');
+        $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if (strpos($str, '&') !== false) {
+            $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         }
-        return $str;
+        return str_replace(["\xC2\xA0", "\xE2\x80\x8B", "\xE2\x80\x8C", "\xE2\x80\x8D", "\xEF\xBB\xBF"], [' ', '', '', '', ''], $str);
     }
 }

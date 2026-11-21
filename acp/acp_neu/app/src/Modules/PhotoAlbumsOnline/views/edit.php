@@ -61,6 +61,14 @@ foreach ($categoriesByType as $grpItems) {
         }
     }
 }
+
+$isOnlineAtTooFar = !empty($album['online_at_too_far']);
+$maxOnlineAtInput = (string)($album['max_online_at_input'] ?? date('Y-m-d\T23:59', strtotime('+12 months')));
+$maxOnlineAtDe    = (string)($album['max_online_at_de'] ?? date('d.m.Y', strtotime('+12 months')));
+$onlineAtRawStr   = (string)($album['online_at_raw'] ?? '');
+$onlineAtDisplay  = ($onlineAtRawStr !== '' && !str_starts_with($onlineAtRawStr, '0000') && !str_starts_with($onlineAtRawStr, '000-') && strtotime($onlineAtRawStr) !== false)
+    ? date('d.m.Y H:i', (int)strtotime($onlineAtRawStr))
+    : '-';
 ?>
 <div class="container-fluid py-3" data-page-width="full">
 
@@ -177,6 +185,22 @@ foreach ($categoriesByType as $grpItems) {
             </div>
           <?php endif; ?>
         </div>
+      </div>
+
+      <!-- Sperr-Warnbox falls Veröffentlichungsdatum > 12 Monate in der Zukunft liegt -->
+      <div class="alert alert-danger d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 <?= $isOnlineAtTooFar ? '' : 'd-none' ?>" id="pao-online-at-block-banner">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-calendar-x-fill fs-4 flex-shrink-0"></i>
+          <div>
+            <strong>Speichern im Status „Aktiv“ gesperrt: Veröffentlichungsdatum liegt zu weit in der Zukunft!</strong>
+            <div class="small">
+              Das gewählte Datum (<strong id="pao-online-at-block-date"><?= View::e($onlineAtDisplay) ?></strong>) liegt mehr als 12 Monate in der Zukunft (spätestens zulässig: <?= View::e($maxOnlineAtDe) ?>).
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-danger bg-body" onclick="App.setAcpOnlineAtNow('pao')">
+          <i class="bi bi-clock me-1"></i> Datum auf jetzt setzen
+        </button>
       </div>
 
   <!-- Warnhinweis bei doppeltem Albumtitel -->
@@ -544,20 +568,22 @@ foreach ($categoriesByType as $grpItems) {
               <!-- Album-Status -->
               <div class="col-md-5">
                 <label class="form-label small fw-bold mb-1">Album-Status *</label>
-                <select name="album_status" id="pao-status-select" class="form-select form-select-sm" onchange="const w = document.getElementById('pao-delete-warning'); if(w) w.classList.toggle('d-none', this.value !== 'deleted');">
+                <select name="album_status" id="pao-status-select" class="form-select form-select-sm"
+                        onchange="const w = document.getElementById('pao-delete-warning'); if(w) w.classList.toggle('d-none', this.value !== 'deleted'); App.checkAcpOnlineAtGuard('pao');">
                   <option value="active" <?= $album['status'] === 'active' ? 'selected' : '' ?>>Aktiv (Online)</option>
                   <option value="blocked" <?= $album['status'] === 'blocked' ? 'selected' : '' ?>>Gesperrt</option>
                   <?php if ((string)($employeeRule ?? '') === 'write' || $album['status'] === 'deleted'): ?>
-                    <option value="deleted" <?= $album['status'] === 'deleted' ? 'selected' : '' ?>>Löschen (Physisch entfernen)</option>
+                    <option value="deleted" <?= $album['status'] === 'deleted' ? 'selected' : '' ?>>Gelöscht (Soft-Delete / Käuferschutz)</option>
                   <?php endif; ?>
                 </select>
               </div>
 
-              <!-- Warnung bei Auswahl von "Löschen" -->
+              <!-- Hinweis bei Auswahl von "Gelöscht (Soft-Delete)" -->
               <div class="col-12 <?= $album['status'] === 'deleted' ? '' : 'd-none' ?>" id="pao-delete-warning">
-                <div class="alert alert-danger mb-0 py-2 small">
-                  <i class="bi bi-exclamation-octagon-fill me-1"></i>
-                  <strong>Achtung:</strong> Wenn du den Status auf „Löschen“ setzt und speicherst, werden alle Bilddateien dieses Fotoalbums auf dem Server unwiderruflich gelöscht und das Album aus <code>photo_albums_online</code> entfernt!
+                <div class="alert alert-warning mb-0 py-2 small">
+                  <i class="bi bi-shield-check me-1"></i>
+                  <strong>Soft-Delete (Käuferschutz aktiv):</strong> Beim Speichern auf „Gelöscht“ wird das Fotoalbum sofort aus dem öffentlichen Verkauf genommen (ungekaufte Kopien auf angeschlossenen EroCMS-Seiten werden automatisch entfernt).
+                  Bereits vorhandene Käufer (aktuell <strong><?= (int)($album['effective_purchases'] ?? $album['purchases'] ?? 0) ?></strong>) behalten dauerhaft Zugriff auf ihre gekauften Bilder. Ungekaufte Soft-Delete-Alben werden nach 30 Tagen automatisch per Cronjob physisch bereinigt.
                 </div>
               </div>
 
@@ -585,8 +611,16 @@ foreach ($categoriesByType as $grpItems) {
               <!-- Online ab & Verkaufspreis -->
               <div class="col-md-6">
                 <label class="form-label small fw-bold mb-1">Veröffentlichung ab *</label>
-                <input type="datetime-local" name="online_at" class="form-control form-control-sm"
-                       value="<?= View::e((string)$album['online_at_input']) ?>" required>
+                <input type="datetime-local" name="online_at" id="pao-input-online-at"
+                       class="form-control form-control-sm <?= $isOnlineAtTooFar ? 'is-invalid' : '' ?>"
+                       data-max-online-at="<?= View::e($maxOnlineAtInput) ?>"
+                       data-max-online-at-de="<?= View::e($maxOnlineAtDe) ?>"
+                       value="<?= View::e((string)$album['online_at_input']) ?>"
+                       oninput="App.checkAcpOnlineAtGuard('pao')"
+                       onchange="App.checkAcpOnlineAtGuard('pao')" required>
+                <div class="invalid-feedback <?= $isOnlineAtTooFar ? 'd-block' : '' ?>" id="pao-online-at-error">
+                  Maximal 12 Monate im Voraus zulässig (bis <?= View::e($maxOnlineAtDe) ?>).
+                </div>
               </div>
 
               <div class="col-md-6">
@@ -741,10 +775,14 @@ foreach ($categoriesByType as $grpItems) {
             </div>
 
             <!-- SPEICHERN-BUTTON -->
-            <div class="mt-4 pt-3 border-top d-flex justify-content-end" style="border-color: var(--kkc-border) !important;">
-              <button type="submit" id="pao-save-btn" class="btn btn-kkc px-4 py-2 fw-bold">
+            <div class="mt-4 pt-3 border-top d-flex flex-wrap justify-content-end" style="border-color: var(--kkc-border) !important;">
+              <button type="submit" id="pao-save-btn" class="btn btn-kkc px-4 py-2 fw-bold"
+                      <?= ($isOnlineAtTooFar && $album['status'] === 'active') ? 'disabled' : '' ?>>
                 <i class="bi bi-floppy-fill me-1"></i> Änderungen an Fotoalbum #<?= $onlineId ?> speichern
               </button>
+              <div class="small text-danger fw-semibold mt-2 w-100 text-end <?= ($isOnlineAtTooFar && $album['status'] === 'active') ? '' : 'd-none' ?>" id="pao-approve-blocked-hint">
+                <i class="bi bi-lock-fill me-1"></i>Speichern als „Aktiv“ blockiert: Datum liegt &gt; 12 Monate in der Zukunft.
+              </div>
             </div>
 
           </div>
@@ -771,6 +809,45 @@ foreach ($categoriesByType as $grpItems) {
                   </div>
                 <?php endforeach; ?>
               </div>
+            </div>
+          </div>
+        <?php endif; ?>
+
+        <!-- 4. Manuelle physische Endgültig-Löschung (STRIKT NUR FÜR ADMINISTRATOREN) -->
+        <?php if ((string)($employeeRule ?? '') === 'write'): ?>
+          <?php $effPurchases = (int)($album['effective_purchases'] ?? $album['purchases'] ?? 0); ?>
+          <div class="card-kkc mb-4 border-danger border-opacity-50">
+            <div class="card-kkc-header flex-wrap gap-2">
+              <div class="card-title text-danger">
+                <i class="bi bi-trash3-fill"></i>
+                <span>Endgültig physisch löschen (Nur Administrator)</span>
+              </div>
+              <?php if ($effPurchases > 0): ?>
+                <span class="badge-kkc badge-kkc-danger">
+                  <i class="bi bi-people-fill me-1"></i><?= $effPurchases ?> Kundenkäufe vorhanden
+                </span>
+              <?php else: ?>
+                <span class="badge-kkc badge-kkc-success">
+                  <i class="bi bi-check2-circle me-1"></i>0 Käufe (ungekauft)
+                </span>
+              <?php endif; ?>
+            </div>
+            <div class="card-kkc-body small">
+              <?php if ($effPurchases > 0): ?>
+                <p class="text-muted mb-2">
+                  Dieses Fotoalbum wurde bereits <strong><?= $effPurchases ?>-mal</strong> gekauft (Speicherbedarf: <code><?= View::e((string)$album['folder_size_text']) ?></code>).
+                  Verwende im Normalfall oben den Status <strong>„Gelöscht (Soft-Delete)“</strong>, damit die Käufer ihren Zugriff behalten.
+                  Eine sofortige physische Löschung darf nur bei zwingenden rechtlichen Gründen (z. B. Persönlichkeitsrechte, Urheberrecht oder Datenschutz/DSGVO) erfolgen.
+                </p>
+              <?php else: ?>
+                <p class="text-muted mb-2">
+                  Dieses Fotoalbum wurde noch <strong>nie gekauft</strong> (<code>0</code> Einträge in <code>photo_albums_access</code>, Speicherbedarf: <code><?= View::e((string)$album['folder_size_text']) ?></code>).
+                  Als Administrator kannst du versehentliche Dubletten oder Test-Alben hier sofort rückstandslos von der Festplatte entfernen.
+                </p>
+              <?php endif; ?>
+              <button type="button" class="btn btn-sm btn-outline-danger" onclick="App.openPhotoAlbumHardDeleteModal()">
+                <i class="bi bi-exclamation-octagon-fill me-1"></i> Bilddateien jetzt manuell physisch löschen…
+              </button>
             </div>
           </div>
         <?php endif; ?>
@@ -846,10 +923,11 @@ foreach ($categoriesByType as $grpItems) {
                   </thead>
                   <tbody>
                     <?php foreach ($violations as $v):
-                      $isCrit = in_array((string)($v['severity'] ?? ''), ['violation', 'critical'], true);
-                      $srcLbl = (string)($v['source_label'] ?? $v['source'] ?? 'Text');
-                      $quote  = (string)($v['matched_quote'] ?? $v['quote'] ?? '');
-                      $reason = (string)($v['reason'] ?? '');
+                      $isCrit     = in_array((string)($v['severity'] ?? ''), ['violation', 'critical'], true);
+                      $srcLbl     = (string)($v['source_label'] ?? $v['source'] ?? 'Text');
+                      $quote      = (string)($v['matched_quote'] ?? $v['quote'] ?? '');
+                      $reason     = (string)($v['reason'] ?? '');
+                      $suggestion = (string)($v['suggestion'] ?? '');
                     ?>
                     <tr>
                       <td class="fw-bold"><?= View::e((string)($v['category'] ?? '')) ?></td>
@@ -866,6 +944,11 @@ foreach ($categoriesByType as $grpItems) {
                         <?php endif; ?>
                         <?php if ($reason !== ''): ?>
                           <div class="text-muted" style="font-size: 0.75rem;"><?= View::e($reason) ?></div>
+                        <?php endif; ?>
+                        <?php if ($suggestion !== ''): ?>
+                          <div class="mt-1 p-1.5 px-2 rounded bg-info bg-opacity-10 border border-info border-opacity-25 text-body" style="font-size: 0.76rem;">
+                            <i class="bi bi-lightbulb-fill text-info me-1"></i><strong>Alternative / Empfehlung:</strong> <?= View::e($suggestion) ?>
+                          </div>
                         <?php endif; ?>
                       </td>
                     </tr>
@@ -920,3 +1003,68 @@ foreach ($categoriesByType as $grpItems) {
     </div>
   </div>
 </div>
+
+<?php if ((string)($employeeRule ?? '') === 'write'): ?>
+  <?php $effPurchasesModal = (int)($album['effective_purchases'] ?? $album['purchases'] ?? 0); ?>
+  <div class="modal fade" id="paoHardDeleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-danger" style="background: var(--kkc-surface, #ffffff);">
+        <form id="pao-hard-delete-form" onsubmit="return App.submitPhotoAlbumHardDelete(event)">
+          <input type="hidden" name="online_id" value="<?= $onlineId ?>">
+          <input type="hidden" name="album_id" value="<?= View::e((string)$album['album_id']) ?>">
+          <div class="modal-header border-bottom border-danger border-opacity-25">
+            <h5 class="modal-title h6 fw-bold text-danger mb-0">
+              <i class="bi bi-exclamation-octagon-fill me-2"></i>Fotoalbum #<?= $onlineId ?> endgültig physisch löschen
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+          </div>
+          <div class="modal-body small">
+            <p class="mb-2">
+              Alle Bilddateien, Vorschauen und Cover von <strong>„<?= View::e((string)$album['title']) ?>“</strong> (<code><?= View::e((string)$album['folder_size_text']) ?></code>) werden sofort unwiderruflich vom Cloud-Storage gelöscht und angeschlossene EroCMS-Seiten erhalten das Löschsignal.
+            </p>
+
+            <?php if ($effPurchasesModal > 0): ?>
+              <div class="alert alert-danger py-2 px-3 mb-3">
+                <div class="fw-bold mb-1">
+                  <i class="bi bi-people-fill me-1"></i>Achtung: <?= $effPurchasesModal ?> Kunden haben dieses Fotoalbum gekauft!
+                </div>
+                <div>
+                  Durch die physische Löschung verlieren diese Kunden dauerhaft den Zugriff auf ihr bezahltes Fotoalbum.
+                  Führe diesen Schritt nur bei zwingenden rechtlichen Gründen (Persönlichkeitsrecht, Urheberrecht, DSGVO) aus.
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-bold mb-1">Zwingender Löschgrund (Rechts-/DSGVO-Dokumentation) *</label>
+                <input type="text" name="delete_reason" id="pao-hard-delete-reason" class="form-control form-control-sm"
+                       minlength="5" maxlength="250" required
+                       placeholder="z. B. DSGVO-Löschanfrage / Persönlichkeitsrecht Mitwirkende">
+              </div>
+              <div class="form-check mb-1">
+                <input class="form-check-input" type="checkbox" name="force_legal_delete" value="1" id="pao-force-legal-delete" required>
+                <label class="form-check-label fw-semibold text-danger" for="pao-force-legal-delete">
+                  Ich bestätige als Administrator, dass die endgültige Löschung trotz <?= $effPurchasesModal ?> bestehender Kundenkäufe aus rechtlichen/datenschutzrechtlichen Gründen zwingend erforderlich ist.
+                </label>
+              </div>
+            <?php else: ?>
+              <div class="alert alert-secondary py-2 px-3 mb-3">
+                <i class="bi bi-check2-circle text-success me-1"></i>
+                Es liegen <strong>0 Kundenkäufe</strong> vor. Das ungekaufte Fotoalbum kann ohne Nachteile für Kunden physisch entfernt werden.
+              </div>
+              <div class="mb-1">
+                <label class="form-label fw-semibold mb-1">Interne Notiz / Grund (optional)</label>
+                <input type="text" name="delete_reason" id="pao-hard-delete-reason" class="form-control form-control-sm"
+                       maxlength="250" placeholder="z. B. Doppel-Upload auf Wunsch der Creatorin gelöscht">
+              </div>
+            <?php endif; ?>
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-sm btn-outline-kkc" data-bs-dismiss="modal">Abbrechen</button>
+            <button type="submit" class="btn btn-sm btn-danger" id="pao-hard-delete-submit-btn">
+              <i class="bi bi-trash3-fill me-1"></i> Jetzt unwiderruflich physisch löschen
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+<?php endif; ?>

@@ -485,7 +485,9 @@ function ec_ai_gateway_get_jobs_dir(): string
         : rtrim(sys_get_temp_dir(), '/');
     $jobsDir = $baseTmp . '/ec_ai_jobs';
     if (!@is_dir($jobsDir)) {
-        @mkdir($jobsDir, 0750, true);
+        @mkdir($jobsDir, 0700, true);
+    } else {
+        @chmod($jobsDir, 0700);
     }
     return $jobsDir;
 }
@@ -519,9 +521,11 @@ function ec_ai_gateway_write_job_state(string $jobFile, array $stateData): void
     $tmpWrite = $jobFile . '.tmp.' . getmypid();
     $jsonStr  = json_encode($stateData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     if ($jsonStr !== false && @file_put_contents($tmpWrite, $jsonStr) !== false) {
+        @chmod($tmpWrite, 0600);
         @rename($tmpWrite, $jobFile);
     } else {
         @file_put_contents($jobFile, (string)$jsonStr, LOCK_EX);
+        @chmod($jobFile, 0600);
     }
 }
 
@@ -550,7 +554,8 @@ function ec_ai_gateway_execute_ollama_chat(
     $throttleState  = (string)($jobParams['throttle_state'] ?? 'green');
     $workload       = is_array($jobParams['workload'] ?? null) ? $jobParams['workload'] : array();
     $keepAlive      = (string)($jobParams['keep_alive'] ?? '24h');
-    $timeoutSec     = max(60, min(540, (int)($jobParams['timeout_seconds'] ?? 360)));
+    $rawTimeout     = $jobParams['timeout_seconds'] ?? ($jobParams['timeout_sec'] ?? 360);
+    $timeoutSec     = max(60, min(540, (int)$rawTimeout));
     $jobId          = (string)($jobParams['job_id'] ?? '');
     $createdAt      = (int)($jobParams['created_at'] ?? time());
 
@@ -1249,10 +1254,11 @@ if ($action === 'chat' || $action === 'start_job') {
         'user_prompt'    => $userPrompt,
         'num_ctx'        => $numCtx,
         'num_predict'    => $numPredict,
-        'threads_to_use' => $threadsToUse,
-        'timeout_sec'    => $timeoutSec,
-        'throttle_state' => $throttleState,
-        'workload'       => $workload,
+        'threads_to_use'  => $threadsToUse,
+        'timeout_seconds' => $timeoutSec,
+        'timeout_sec'     => $timeoutSec,
+        'throttle_state'  => $throttleState,
+        'workload'        => $workload,
     );
 
     // 2A. ASYNCHRONER JOB-MODUS ('start_job'):
@@ -1274,7 +1280,9 @@ if ($action === 'chat' || $action === 'start_job') {
 
         // Dem entkoppelten Hintergrund-Worker auf t199 großzügiges Zeitbudget geben (kein HTTP-Timeout-Druck)
         $asyncJobParams = $jobParams;
-        $asyncJobParams['timeout_sec'] = max(420, $timeoutSec + 120);
+        $asyncBudgetSec = max(420, $timeoutSec + 120);
+        $asyncJobParams['timeout_seconds'] = $asyncBudgetSec;
+        $asyncJobParams['timeout_sec']     = $asyncBudgetSec;
 
         ec_ai_gateway_write_job_state($stateFile, array(
             'job_id'         => $jobId,
@@ -1291,6 +1299,7 @@ if ($action === 'chat' || $action === 'start_job') {
             'elapsed_ms'     => 0,
         ));
         @file_put_contents($reqFile, json_encode($asyncJobParams, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        @chmod($reqFile, 0600);
 
         $spawnedCliWorker = false;
         $disabledFuncs    = array_map('trim', explode(',', strtolower((string)ini_get('disable_functions'))));

@@ -156,6 +156,7 @@ class Router
         self::register('photo-albums-online/recalc-size', $photoAlbumsOnlineCtrl, 'recalcSize', 'content_online');
         self::register('photo-album-edit', $photoAlbumsOnlineCtrl, 'edit', 'content_online');
         self::register('photo-albums-online/save', $photoAlbumsOnlineCtrl, 'save', 'content_online');
+        self::register('photo-albums-online/hard-delete', $photoAlbumsOnlineCtrl, 'hardDelete', 'content_online');
         self::register('content-cleanup', $contentCleanupCtrl, 'index', 'admin');
         self::register('content-cleanup/orphan-scan', $contentCleanupCtrl, 'orphanScan', 'admin');
         self::register('storage-analytics', $storageAnalyticsCtrl, 'index', 'admin');

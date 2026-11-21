@@ -984,8 +984,16 @@ final class ActorsController
             $now = date('Y-m-d H:i:s');
             \p4c_query("UPDATE `movies` SET `status` = 'deleted', `deleted_datetime` = '{$now}' WHERE `actor_id` = '" . $actorId . "';", __FILE__, __LINE__);
             \p4c_query("UPDATE `movies_online` SET `status` = 'deleted', `deleted_datetime` = '{$now}' WHERE `actor_id` = '" . $actorId . "';", __FILE__, __LINE__);
-            \p4c_query("UPDATE `photo_albums` SET `status` = 'deleted', `deleted_datetime` = '{$now}' WHERE `actor_id` = '" . $actorId . "';", __FILE__, __LINE__);
-            \p4c_query("UPDATE `photo_albums_online` SET `status` = 'deleted', `deleted_datetime` = '{$now}' WHERE `actor_id` = '" . $actorId . "';", __FILE__, __LINE__);
+            \p4c_query("UPDATE `photo_albums` SET `status` = 'deleted', `deleted_datetime` = '{$now}', `checksum` = MD5(CONCAT(`checksum`, '|deleted')) WHERE `actor_id` = '" . $actorId . "' AND `status` != 'deleted';", __FILE__, __LINE__);
+            \p4c_query("UPDATE `photo_albums_online` SET `status` = 'deleted', `deleted_datetime` = '{$now}', `checksum` = MD5(CONCAT(`checksum`, '|deleted')) WHERE `actor_id` = '" . $actorId . "' AND `status` != 'deleted';", __FILE__, __LINE__);
+            if (function_exists('ec_invalidate_photo_album_api_cache')) {
+                $rsDelAlbs = \p4c_query("SELECT `album_id` FROM `photo_albums_online` WHERE `actor_id` = '" . $actorId . "';", __FILE__, __LINE__);
+                if ($rsDelAlbs) {
+                    while ($da = \p4c_fetch_object($rsDelAlbs)) {
+                        \ec_invalidate_photo_album_api_cache((string)($da->album_id ?? ''));
+                    }
+                }
+            }
         }
 
         if (function_exists('log_action')) {

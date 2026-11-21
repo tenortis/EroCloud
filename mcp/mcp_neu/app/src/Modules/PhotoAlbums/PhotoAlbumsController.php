@@ -252,6 +252,10 @@ final class PhotoAlbumsController
         $rejectionInfo = $this->loadAlbumRejectionInfo($albumIdHash, (int)$aObj->released, (string)($aObj->status ?? 'active'));
 
         // Alle Fotos des Albums laden
+        $albumsBasePath = defined('PHOTO_ALBUMS_PATH') ? PHOTO_ALBUMS_PATH : (dirname(__DIR__, 5) . '/priv');
+        $storageDir     = (string)$aObj->storage_location !== '' ? (string)$aObj->storage_location : (defined('PHOTO_ALBUMS_DEFAULT_DIR') ? PHOTO_ALBUMS_DEFAULT_DIR : 'photo_albums');
+        $imagesDir      = rtrim($albumsBasePath, '/\\') . '/' . $storageDir . '/' . $merchantId . '/' . $albumDbId . '/images';
+
         $photos        = [];
         $rejectedCount = 0;
         $rsPhotos      = p4c_query("SELECT *
@@ -265,6 +269,9 @@ final class PhotoAlbumsController
             while ($p = p4c_fetch_object($rsPhotos)) {
                 $photoIdx++;
                 $pFileId    = (string)$p->file_id;
+                $pFilename  = basename((string)$p->filename);
+                $pDiskFile  = $imagesDir . '/' . $pFilename;
+                $pVer       = is_file($pDiskFile) ? (int)@filemtime($pDiskFile) : time();
                 $isRejected = abs((int)($p->rejected ?? 0));
                 if ($isRejected === 1) {
                     $rejectedCount++;
@@ -277,9 +284,9 @@ final class PhotoAlbumsController
                     'file_id'    => $pFileId,
                     'filename'   => (string)$p->filename,
                     'rejected'   => $isRejected,
-                    'thumb_url'  => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=200',
-                    'zoom_url'   => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=900',
-                    'editor_url' => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=1024',
+                    'thumb_url'  => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=200&v=' . $pVer,
+                    'zoom_url'   => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=900&v=' . $pVer,
+                    'editor_url' => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=1024&v=' . $pVer,
                 ];
             }
         }
@@ -423,6 +430,10 @@ final class PhotoAlbumsController
                     'seo_url'                 => (string)$dObj->seo_url,
                 ];
 
+                $albumsBasePath = defined('PHOTO_ALBUMS_PATH') ? PHOTO_ALBUMS_PATH : (dirname(__DIR__, 5) . '/priv');
+                $storageDir     = (string)$dObj->storage_location !== '' ? (string)$dObj->storage_location : (defined('PHOTO_ALBUMS_DEFAULT_DIR') ? PHOTO_ALBUMS_DEFAULT_DIR : 'photo_albums');
+                $imagesDir      = rtrim($albumsBasePath, '/\\') . '/' . $storageDir . '/' . $merchantId . '/' . abs((int)$dObj->id) . '/images';
+
                 $rejectedCount = 0;
                 $rsPhotos      = p4c_query("SELECT *
                     FROM `photo_albums_photos`
@@ -435,6 +446,9 @@ final class PhotoAlbumsController
                     while ($p = p4c_fetch_object($rsPhotos)) {
                         $photoIdx++;
                         $pFileId    = (string)$p->file_id;
+                        $pFilename  = basename((string)$p->filename);
+                        $pDiskFile  = $imagesDir . '/' . $pFilename;
+                        $pVer       = is_file($pDiskFile) ? (int)@filemtime($pDiskFile) : $nowTs;
                         $isRejected = abs((int)($p->rejected ?? 0));
                         if ($isRejected === 1) {
                             $rejectedCount++;
@@ -447,9 +461,9 @@ final class PhotoAlbumsController
                             'file_id'    => $pFileId,
                             'filename'   => (string)$p->filename,
                             'rejected'   => $isRejected,
-                            'thumb_url'  => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=200',
-                            'zoom_url'   => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=900',
-                            'editor_url' => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=1024',
+                            'thumb_url'  => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=200&v=' . $pVer,
+                            'zoom_url'   => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=900&v=' . $pVer,
+                            'editor_url' => $mcpUrl . '/AlbumPhoto/' . rawurlencode($pFileId) . '?w=1024&v=' . $pVer,
                         ];
                     }
                 }
@@ -496,7 +510,7 @@ final class PhotoAlbumsController
 
         $existingId      = abs((int)$this->request->post('album_id', 0));
         $title           = self::cleanAlbumTitle(trim((string)$this->request->post('title', '')));
-        $description     = trim((string)$this->request->post('description', ''));
+        $description     = self::decodeLegacyText((string)$this->request->post('description', ''));
         $actorId         = abs((int)$this->request->post('actor_id', 0));
         $onlineAtRaw     = trim((string)$this->request->post('online_at', ''));
         $amountDownload  = abs((int)$this->request->post('amount_download', 500));
@@ -534,7 +548,7 @@ final class PhotoAlbumsController
             $metaTitle = function_exists('mb_substr') ? mb_substr($metaTitle, 0, 65, 'UTF-8') : substr($metaTitle, 0, 65);
         }
         if ($metaDescription === '') {
-            $cleanDesc = trim(strip_tags($description));
+            $cleanDesc = trim((string)preg_replace('/\s+/u', ' ', $description));
             $metaDescription = function_exists('mb_substr') ? mb_substr($cleanDesc, 0, 156, 'UTF-8') : substr($cleanDesc, 0, 156);
         } else {
             $metaDescription = function_exists('mb_substr') ? mb_substr($metaDescription, 0, 156, 'UTF-8') : substr($metaDescription, 0, 156);
@@ -628,7 +642,7 @@ final class PhotoAlbumsController
         $canEditOnline = (((string)$aObj->album_checked === '0000-00-00 00:00:00' && !$isAlbumOnline) || strtotime((string)$aObj->online_at) > time());
 
         $title           = self::cleanAlbumTitle(trim((string)$this->request->post('title', '')));
-        $description     = trim((string)$this->request->post('description', ''));
+        $description     = self::decodeLegacyText((string)$this->request->post('description', ''));
         $actorId         = abs((int)$this->request->post('actor_id', 0));
         $onlineAtRaw     = trim((string)$this->request->post('online_at', ''));
         $amountDownload  = abs((int)$this->request->post('amount_download', 500));
@@ -660,7 +674,7 @@ final class PhotoAlbumsController
             $metaTitle = function_exists('mb_substr') ? mb_substr($metaTitle, 0, 65, 'UTF-8') : substr($metaTitle, 0, 65);
         }
         if ($metaDescription === '') {
-            $cleanDesc = trim(strip_tags($description));
+            $cleanDesc = trim((string)preg_replace('/\s+/u', ' ', $description));
             $metaDescription = function_exists('mb_substr') ? mb_substr($cleanDesc, 0, 156, 'UTF-8') : substr($cleanDesc, 0, 156);
         } else {
             $metaDescription = function_exists('mb_substr') ? mb_substr($metaDescription, 0, 156, 'UTF-8') : substr($metaDescription, 0, 156);
@@ -920,6 +934,181 @@ final class PhotoAlbumsController
     }
 
     /**
+     * POST: Dreht ein einzelnes Foto im Foto-Album um 90° nach links oder rechts (photo-albums/rotate-photo)
+     */
+    public function rotatePhoto(): void
+    {
+        global $mysql;
+
+        $this->requireValidCsrf();
+        $merchantId = $this->requireMerchantId();
+
+        $albumDbId   = abs((int)$this->request->post('album_id', 0));
+        $photoFileId = trim((string)$this->request->post('file_id', ''));
+        $direction   = strtolower(trim((string)$this->request->post('direction', 'right')));
+
+        if ($albumDbId === 0 || $photoFileId === '' || !in_array($direction, ['left', 'right'], true)) {
+            Response::error('Ungültige Parameter zum Drehen des Fotos.', 400);
+        }
+
+        $rsAlbum = p4c_query(
+            "SELECT * FROM `photo_albums` WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "' AND `status` != 'deleted' LIMIT 1;",
+            __FILE__,
+            __LINE__
+        );
+        if (!$rsAlbum || p4c_num_rows($rsAlbum) === 0) {
+            Response::error('Das zugehörige Foto-Album wurde nicht gefunden.', 404);
+        }
+        $aObj        = p4c_fetch_object($rsAlbum);
+        $albumIdHash = (string)$aObj->album_id;
+
+        $rsPhoto = p4c_query(
+            "SELECT * FROM `photo_albums_photos` WHERE `file_id` = '" . p4c_escape_string($photoFileId) . "' AND `album_id` = '" . p4c_escape_string($albumIdHash) . "' AND `merchant_id` = '" . $merchantId . "' LIMIT 1;",
+            __FILE__,
+            __LINE__
+        );
+        if (!$rsPhoto || p4c_num_rows($rsPhoto) === 0) {
+            Response::error('Das gewählte Foto wurde nicht gefunden.', 404);
+        }
+        $pObj = p4c_fetch_object($rsPhoto);
+
+        $albumsBasePath = defined('PHOTO_ALBUMS_PATH') ? PHOTO_ALBUMS_PATH : (dirname(__DIR__, 5) . '/priv');
+        $storageDir     = (string)$aObj->storage_location !== '' ? (string)$aObj->storage_location : (defined('PHOTO_ALBUMS_DEFAULT_DIR') ? PHOTO_ALBUMS_DEFAULT_DIR : 'photo_albums');
+        $imagesDir      = rtrim($albumsBasePath, '/\\') . '/' . $storageDir . '/' . $merchantId . '/' . $albumDbId . '/images';
+        $safeFilename   = basename((string)$pObj->filename);
+        $filePath       = $imagesDir . '/' . $safeFilename;
+
+        if ($safeFilename === '' || !is_file($filePath) || (int)@filesize($filePath) === 0) {
+            Response::error('Die Bilddatei konnte auf dem Server nicht gefunden werden.', 404);
+        }
+
+        if (!function_exists('imagerotate') || !function_exists('imagecreatetruecolor')) {
+            Response::error('Die Bildbearbeitung ist auf diesem Server aktuell nicht verfügbar.', 500);
+        }
+
+        $imgInfo = @getimagesize($filePath);
+        if (!is_array($imgInfo) || empty($imgInfo['mime'])) {
+            Response::error('Die Bilddatei konnte nicht gelesen werden.', 400);
+        }
+
+        $mime   = strtolower((string)$imgInfo['mime']);
+        $srcImg = null;
+        if ($mime === 'image/jpeg' || $mime === 'image/jpg') {
+            $rawBytes = @file_get_contents($filePath);
+            if (is_string($rawBytes) && $rawBytes !== '') {
+                $srcImg = @imagecreatefromstring($rawBytes);
+                // Vorhandene EXIF-Ausrichtung zuerst normalisieren, damit die 90°-Drehung exakt der sichtbaren Darstellung entspricht
+                if ($srcImg instanceof \GdImage && function_exists('exif_read_data')) {
+                    $exif = @exif_read_data($filePath);
+                    if (is_array($exif) && !empty($exif['Orientation'])) {
+                        $orient = (int)$exif['Orientation'];
+                        if ($orient === 3) {
+                            $norm = @imagerotate($srcImg, 180, 0);
+                            if ($norm instanceof \GdImage) {
+                                $srcImg = $norm;
+                            }
+                        } elseif ($orient === 6) {
+                            $norm = @imagerotate($srcImg, -90, 0);
+                            if ($norm instanceof \GdImage) {
+                                $srcImg = $norm;
+                            }
+                        } elseif ($orient === 8) {
+                            $norm = @imagerotate($srcImg, 90, 0);
+                            if ($norm instanceof \GdImage) {
+                                $srcImg = $norm;
+                            }
+                        }
+                    }
+                }
+            }
+        } elseif ($mime === 'image/png') {
+            $srcImg = @imagecreatefrompng($filePath);
+        }
+
+        if (!($srcImg instanceof \GdImage)) {
+            Response::error('Das Bildformat konnte nicht zum Drehen geöffnet werden (unterstützt werden JPG und PNG).', 400);
+        }
+
+        // GD imagerotate dreht gegen den Uhrzeigersinn: +90 = nach links, -90 = nach rechts
+        $angle = ($direction === 'left') ? 90 : -90;
+        if ($mime === 'image/png') {
+            $bgAlpha = imagecolorallocatealpha($srcImg, 0, 0, 0, 127);
+            $rotated = @imagerotate($srcImg, $angle, $bgAlpha !== false ? $bgAlpha : 0);
+            if ($rotated instanceof \GdImage) {
+                imagealphablending($rotated, false);
+                imagesavealpha($rotated, true);
+            }
+        } else {
+            $rotated = @imagerotate($srcImg, $angle, 0);
+        }
+        unset($srcImg);
+
+        if (!($rotated instanceof \GdImage)) {
+            Response::error('Das Foto konnte technisch nicht gedreht werden.', 500);
+        }
+
+        $tmpOut = $filePath . '.rot_' . mt_rand(1000, 9999);
+        $saved  = ($mime === 'image/png')
+            ? @imagepng($rotated, $tmpOut, 8)
+            : @imagejpeg($rotated, $tmpOut, 92);
+        unset($rotated);
+
+        if (!$saved || !is_file($tmpOut) || (int)@filesize($tmpOut) === 0) {
+            if (is_file($tmpOut)) {
+                @unlink($tmpOut);
+            }
+            Response::error('Das gedrehte Foto konnte nicht gespeichert werden.', 500);
+        }
+
+        if (!@rename($tmpOut, $filePath)) {
+            if (@copy($tmpOut, $filePath)) {
+                @unlink($tmpOut);
+            } else {
+                @unlink($tmpOut);
+                Response::error('Die Bilddatei konnte nicht überschrieben werden.', 500);
+            }
+        }
+
+        $nowTs = time();
+        @chmod($filePath, 0777);
+        @touch($filePath, $nowTs);
+        clearstatcache(true, $filePath);
+
+        // Verpixeltes API-Vorschaubild (thumb_{filename}) löschen, damit es in der neuen Ausrichtung neu generiert wird
+        $thumbCacheFile = $imagesDir . '/thumb_' . $safeFilename;
+        if (is_file($thumbCacheFile)) {
+            @unlink($thumbCacheFile);
+        }
+        if (function_exists('ec_invalidate_photo_album_api_cache')) {
+            \ec_invalidate_photo_album_api_cache($albumIdHash);
+        }
+
+        $totalPhotos = $this->recalculatePhotoCount($albumDbId, $albumIdHash, $merchantId, $mysql);
+
+        if ((int)$aObj->released !== 0 || (string)$aObj->album_checked !== '0000-00-00 00:00:00') {
+            $hasFsk16 = trim((string)$aObj->preview_image_fsk16) !== '';
+            $hasFsk18 = trim((string)$aObj->preview_image_fsk18) !== '';
+            $nextRel  = ($hasFsk16 && $hasFsk18 && $totalPhotos >= 4) ? '1' : '0';
+            p4c_query(
+                "UPDATE `photo_albums` SET `album_checked` = '0000-00-00 00:00:00', `released` = '" . $nextRel . "', `last_updated_datetime` = '" . date('Y-m-d H:i:s', $nowTs) . "' WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "';",
+                __FILE__,
+                __LINE__
+            );
+        }
+
+        $mcpUrl = defined('MCP_URL') ? MCP_URL : 'https://erocloud.net';
+
+        Response::json([
+            'status'     => 'ok',
+            'message'    => $direction === 'left' ? 'Das Foto wurde um 90° nach links gedreht.' : 'Das Foto wurde um 90° nach rechts gedreht.',
+            'file_id'    => $photoFileId,
+            'thumb_url'  => $mcpUrl . '/AlbumPhoto/' . rawurlencode($photoFileId) . '?w=200&v=' . $nowTs,
+            'zoom_url'   => $mcpUrl . '/AlbumPhoto/' . rawurlencode($photoFileId) . '?w=900&v=' . $nowTs,
+            'editor_url' => $mcpUrl . '/AlbumPhoto/' . rawurlencode($photoFileId) . '?w=1024&v=' . $nowTs,
+        ]);
+    }
+
+    /**
      * POST: Löscht ein einzelnes Foto aus einem Foto-Album (photo-albums/delete-photo)
      */
     public function deletePhoto(): void
@@ -1023,6 +1212,11 @@ final class PhotoAlbumsController
         $rejPhotoRow = $rsRejPhotos ? p4c_fetch_object($rsRejPhotos) : null;
         if ($rejPhotoRow && abs((int)$rejPhotoRow->cnt) > 0) {
             Response::error('Bitte lösche zuerst die rot markierten (abgelehnten) Fotos aus dem Album, bevor du es erneut zur Prüfung einreichst.', 400);
+        }
+
+        if (function_exists('ec_is_online_at_too_far_in_future') && ec_is_online_at_too_far_in_future((string)($aObj->online_at ?? ''))) {
+            $dateCheck = ec_validate_online_at_future((string)$aObj->online_at, 'Foto-Album', false);
+            Response::error($dateCheck['error'] !== '' ? $dateCheck['error'] : 'Das gewählte Veröffentlichungsdatum liegt zu weit in der Zukunft (maximal 12 Monate im Voraus).', 400);
         }
 
         p4c_query("UPDATE `photo_albums` SET
@@ -1154,6 +1348,9 @@ final class PhotoAlbumsController
                     $shortObj   = p4c_fetch_object($rsRejShort);
                     $shortTitle = self::decodeLegacyText((string)$shortObj->de_short);
                 }
+                if ($shortTitle === '' && (string)$rejHistObj->id_name === 'online_at_too_far') {
+                    $shortTitle = 'Veröffentlichungsdatum zu weit in der Zukunft';
+                }
             }
             return [
                 'reason' => $shortTitle,
@@ -1246,9 +1443,16 @@ final class PhotoAlbumsController
         }
 
         if ($validateOnlineAt) {
-            $ts = strtotime($onlineAtRaw);
-            if ($ts === false) {
-                Response::error('Bitte gib ein gültiges Veröffentlichungsdatum an.', 400);
+            if (function_exists('ec_validate_online_at_future')) {
+                $dateCheck = ec_validate_online_at_future($onlineAtRaw, 'Foto-Album', false);
+                if (!$dateCheck['ok']) {
+                    Response::error($dateCheck['error'], 400);
+                }
+            } else {
+                $ts = strtotime($onlineAtRaw);
+                if ($ts === false) {
+                    Response::error('Bitte gib ein gültiges Veröffentlichungsdatum an.', 400);
+                }
             }
         }
 
@@ -1332,13 +1536,44 @@ final class PhotoAlbumsController
         if ($value === '') {
             return '';
         }
-        $decoded = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $decoded = html_entity_decode($decoded, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $decoded = (string)preg_replace('/<\s*br\s*\/?\s*>/i', "\n", $decoded);
-        $decoded = (string)preg_replace('/<\/\s*p\s*>\s*<\s*p[^>]*>/i', "\n\n", $decoded);
-        $decoded = (string)preg_replace('/<\/?\s*p[^>]*>/i', '', $decoded);
-        $decoded = str_replace(["\r\n", "\r"], "\n", $decoded);
-        $decoded = (string)preg_replace("/\n{3,}/", "\n\n", $decoded);
-        return trim($decoded);
+        if (function_exists('ec_html_to_plain_text')) {
+            return \ec_html_to_plain_text($value);
+        }
+        if (!mb_check_encoding($value, 'UTF-8') && function_exists('mb_convert_encoding')) {
+            $converted = @mb_convert_encoding($value, 'UTF-8', 'ISO-8859-1, WINDOWS-1252, ASCII');
+            if (is_string($converted)) {
+                $value = $converted;
+            }
+        }
+        $str = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if (strpos($str, '&') !== false) {
+            $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+        $str = str_replace(["\r\n", "\r"], "\n", $str);
+        foreach ([
+            '/<\s*(script|style)\b[^>]*>.*?<\s*\/\s*\1\s*>/is' => '',
+            '/<!--.*?-->/s' => '',
+            '/<\s*br\s*\/?\s*>/i' => "\n",
+            '/<\s*\/\s*li\s*>\s*<\s*li\b[^>]*>/i' => "\n- ",
+            '/<\s*li\b[^>]*>/i' => "\n- ",
+            '/<\s*\/\s*li\s*>/i' => "\n",
+            '/<\s*\/\s*tr\s*>/i' => "\n",
+            '/<\/\s*(?:p|div|h[1-6]|ul|ol|blockquote|pre|address|table|section|article)\s*>\s*<\s*(?:p|div|h[1-6]|ul|ol|blockquote|pre|address|table|section|article)\b[^>]*>/i' => "\n\n",
+            '/<\/?\s*(?:p|div|h[1-6]|ul|ol|blockquote|pre|address|table|section|article|hr)\b[^>]*\/?>/i' => "\n\n",
+            '/<\/?[a-zA-Z][a-zA-Z0-9:-]*(?:\s+[^<>]*)?\/?>/' => '',
+        ] as $pattern => $replacement) {
+            $res = preg_replace($pattern, $replacement, $str);
+            if (is_string($res)) {
+                $str = $res;
+            }
+        }
+        $str = str_replace(["\xC2\xA0", "\xE2\x80\x8B", "\xE2\x80\x8C", "\xE2\x80\x8D", "\xEF\xBB\xBF"], [' ', '', '', '', ''], $str);
+        foreach (['/[ \t]{2,}/' => ' ', '/^[ \t]+|[ \t]+$/m' => '', "/\n{3,}/" => "\n\n"] as $pattern => $replacement) {
+            $res = preg_replace($pattern, $replacement, $str);
+            if (is_string($res)) {
+                $str = $res;
+            }
+        }
+        return trim($str);
     }
 }

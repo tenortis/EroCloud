@@ -71,7 +71,7 @@ final class PhotoAlbumsCheckingController
                 $actorId     = abs((int)$row->actor_id);
 
                 $title       = self::decodeText((string)($row->title ?? ''));
-                $description = self::decodeText((string)($row->description ?? ''));
+                $description = self::decodeDescription((string)($row->description ?? ''));
                 $metaTitle   = self::decodeText((string)($row->meta_title ?? ''));
                 $metaDesc    = self::decodeText((string)($row->meta_description ?? ''));
                 $actorName   = self::decodeText((string)($row->actor_name ?? ''));
@@ -164,6 +164,7 @@ final class PhotoAlbumsCheckingController
                     'amount_download'  => $amountDownloadCent,
                     'price_eur'        => $priceEurFormatted,
                     'online_at'        => (string)($row->online_at ?? ''),
+                    'online_at_too_far'=> function_exists('ec_is_online_at_too_far_in_future') && ec_is_online_at_too_far_in_future((string)($row->online_at ?? '')),
                     'create_datetime'  => (string)($row->create_datetime ?? ''),
                     'bram_compliance'  => $bramComp,
                     'bram_risk_score'  => $bramScore,
@@ -321,7 +322,7 @@ final class PhotoAlbumsCheckingController
 
         // Texte dekodieren
         $title       = self::decodeText((string)($a->title ?? ''));
-        $description = self::decodeText((string)($a->description ?? ''));
+        $description = self::decodeDescription((string)($a->description ?? ''));
         $metaTitle   = self::decodeText((string)($a->meta_title ?? ''));
         $metaDesc    = self::decodeText((string)($a->meta_description ?? ''));
         $seoUrl      = self::decodeText((string)($a->seo_url ?? ''));
@@ -439,10 +440,19 @@ final class PhotoAlbumsCheckingController
             __LINE__
         );
         if ($rsHist && p4c_num_rows($rsHist) > 0) {
+            $histFallbacks = [
+                'online_at_too_far' => 'Veröffentlichungsdatum zu weit in der Zukunft',
+                'free_text'         => 'Sonstiges / Mehrere Gründe (Freitext)',
+            ];
             while ($h = p4c_fetch_object($rsHist)) {
+                $histIdName = (string)($h->id_name ?? '');
+                $histShort  = self::decodeText((string)($h->de_short ?? ''));
+                if ($histShort === '') {
+                    $histShort = $histFallbacks[$histIdName] ?? $histIdName;
+                }
                 $rejectionHistory[] = [
-                    'id_name'  => (string)($h->id_name ?? ''),
-                    'de_short' => self::decodeText((string)($h->de_short ?? $h->id_name ?? '')),
+                    'id_name'  => $histIdName,
+                    'de_short' => $histShort,
                     'text'     => self::decodeText((string)($h->text ?? '')),
                     'datetime' => (string)($h->datetime ?? ''),
                 ];
@@ -460,9 +470,17 @@ final class PhotoAlbumsCheckingController
             'meta_description' => $metaDesc,
         ]);
 
-        $onlineAtFormatted = (!empty($a->online_at) && $a->online_at !== '0000-00-00 00:00:00')
-            ? date('Y-m-d\TH:i', strtotime((string)$a->online_at))
+        $rawOnlineAtDb     = (string)($a->online_at ?? '');
+        $onlineAtTsDb      = (!empty($rawOnlineAtDb) && $rawOnlineAtDb !== '0000-00-00 00:00:00' && $rawOnlineAtDb !== '000-00-00 00:00:00')
+            ? strtotime($rawOnlineAtDb)
+            : false;
+        $onlineAtFormatted = $onlineAtTsDb !== false
+            ? date('Y-m-d\TH:i', $onlineAtTsDb)
             : date('Y-m-d\TH:i');
+        $onlineAtDisplay   = $onlineAtTsDb !== false ? date('d.m.Y H:i', $onlineAtTsDb) : '-';
+        $onlineAtTooFar    = function_exists('ec_is_online_at_too_far_in_future') && ec_is_online_at_too_far_in_future($rawOnlineAtDb);
+        $maxOnlineAtInput  = function_exists('ec_get_max_online_at_input') ? ec_get_max_online_at_input() : date('Y-m-d\T23:59', strtotime('+12 months'));
+        $maxOnlineAtDe     = function_exists('ec_get_max_online_at_timestamp') ? date('d.m.Y', ec_get_max_online_at_timestamp()) : date('d.m.Y', strtotime('+12 months'));
 
         $albumData = [
             'id'                  => $albumDbId,
@@ -489,6 +507,11 @@ final class PhotoAlbumsCheckingController
             'category_master'     => (string)($a->category_master ?: 'porn'),
             'selected_slaves'     => $selectedSlaves,
             'online_at'           => $onlineAtFormatted,
+            'online_at_raw'       => $rawOnlineAtDb,
+            'online_at_display'   => $onlineAtDisplay,
+            'online_at_too_far'   => $onlineAtTooFar,
+            'max_online_at_input' => $maxOnlineAtInput,
+            'max_online_at_de'    => $maxOnlineAtDe,
             'amount_webmaster'    => abs((int)($a->amount_webmaster ?: 10)),
             'amount_download'     => abs((int)($a->amount_download ?? 500)),
             'status'              => (string)($a->status ?: 'active'),
@@ -692,9 +715,8 @@ final class PhotoAlbumsCheckingController
             $errors[] = 'Der Albumtitel darf maximal 65 Zeichen lang sein.';
         }
 
-        $allowedTags = '<ul><ol><li><u><em><strong><h1><h2><h3><h4><h5><h6><pre><address><p><br><b><i>';
-        $description = trim(strip_tags((string)$this->request->post('description', ''), $allowedTags));
-        $description = str_replace(['€', "\xe2\x80\x8b"], ['EUR', ''], $description);
+        $description = self::decodeDescription((string)$this->request->post('description', ''));
+        $description = str_replace('€', 'EUR', $description);
         if ($description === '') {
             $errors[] = 'Bitte gib eine aussagekräftige Beschreibung für das Fotoalbum ein.';
         }
@@ -725,7 +747,7 @@ final class PhotoAlbumsCheckingController
 
         $metaDesc = trim(strip_tags(str_replace(["\n", "\r"], ' ', (string)$this->request->post('meta_description', ''))));
         if ($metaDesc === '') {
-            $metaDesc = mb_substr(trim(strip_tags($description)), 0, 156, 'UTF-8');
+            $metaDesc = mb_substr(trim((string)preg_replace('/\s+/u', ' ', $description)), 0, 156, 'UTF-8');
         } elseif (mb_strlen($metaDesc, 'UTF-8') > 156) {
             $metaDesc = mb_substr($metaDesc, 0, 156, 'UTF-8');
         }
@@ -743,6 +765,12 @@ final class PhotoAlbumsCheckingController
         $albumStatus = trim((string)$this->request->post('album_status', 'active'));
         if (!in_array($albumStatus, $allowedStatuses, true)) {
             $errors[] = 'Ungültiger Album-Status ausgewählt.';
+        }
+        if ($albumStatus === 'active' && $onlineAtTs !== false && function_exists('ec_validate_online_at_future')) {
+            $dateCheck = ec_validate_online_at_future($onlineAtRaw, 'Fotoalbum', true);
+            if (!$dateCheck['ok']) {
+                $errors[] = $dateCheck['error'];
+            }
         }
         $adminInfos = trim(strip_tags((string)$this->request->post('admin_infos', '')));
 
@@ -924,6 +952,10 @@ final class PhotoAlbumsCheckingController
             }
         }
 
+        if (function_exists('ec_invalidate_photo_album_api_cache')) {
+            \ec_invalidate_photo_album_api_cache($albumIdHash);
+        }
+
         log_action("Fotoalbum geprüft & gespeichert (ID: #{$albumDbId}, Album-ID: {$albumIdHash}, Status: {$albumStatus}).");
 
         // Partner per E-Mail über die Freigabe des Foto-Albums informieren
@@ -1009,6 +1041,13 @@ final class PhotoAlbumsCheckingController
             $rObj = p4c_fetch_object($rsReason);
             if (!empty($rObj->de_short)) {
                 $reasonShort = self::decodeText((string)$rObj->de_short);
+            }
+        }
+        if ($reasonShort === $reasonCode) {
+            if ($reasonCode === 'online_at_too_far') {
+                $reasonShort = 'Veröffentlichungsdatum zu weit in der Zukunft';
+            } elseif ($reasonCode === 'free_text') {
+                $reasonShort = 'Hinweis / Korrektur erforderlich';
             }
         }
 
@@ -1142,7 +1181,7 @@ final class PhotoAlbumsCheckingController
             if ($rsAlb && p4c_num_rows($rsAlb) > 0) {
                 $albObj      = p4c_fetch_object($rsAlb);
                 $dbTitle     = self::decodeText((string)($albObj->title ?? ''));
-                $dbDesc      = self::decodeText((string)($albObj->description ?? ''));
+                $dbDesc      = self::decodeDescription((string)($albObj->description ?? ''));
                 $dbMetaTitle = self::decodeText((string)($albObj->meta_title ?? ''));
                 $dbMetaDesc  = self::decodeText((string)($albObj->meta_description ?? ''));
             }
@@ -1154,16 +1193,17 @@ final class PhotoAlbumsCheckingController
         $customMetaDesc  = $this->request->post('meta_description', null);
 
         $titleToCheck     = $customTitle !== null ? trim((string)$customTitle) : $dbTitle;
-        $descToCheck      = $customDesc !== null ? trim((string)$customDesc) : $dbDesc;
+        $descToCheck      = $customDesc !== null ? self::decodeDescription((string)$customDesc) : $dbDesc;
         $metaTitleToCheck = $customMetaTitle !== null ? trim((string)$customMetaTitle) : $dbMetaTitle;
         $metaDescToCheck  = $customMetaDesc !== null ? trim((string)$customMetaDesc) : $dbMetaDesc;
 
+        $env    = function_exists('aic_check_environment') ? aic_check_environment() : ['llm_ready' => false];
         $aiData = $this->analyzeAlbumTexts([
             'title'            => $titleToCheck,
             'description'      => $descToCheck,
             'meta_title'       => $metaTitleToCheck,
             'meta_description' => $metaDescToCheck,
-        ]);
+        ], $env);
 
         Response::json([
             'status'  => 'ok',
@@ -1256,7 +1296,7 @@ final class PhotoAlbumsCheckingController
      * @param array<string, string> $textInput
      * @return array<string, mixed>
      */
-    private function analyzeAlbumTexts(array $textInput): array
+    private function analyzeAlbumTexts(array $textInput, ?array $envOverride = null): array
     {
         if (!function_exists('aic_analyze_texts')) {
             return [
@@ -1269,14 +1309,14 @@ final class PhotoAlbumsCheckingController
             ];
         }
 
-        $env = ['llm_ready' => false];
+        $env = is_array($envOverride) ? $envOverride : ['llm_ready' => false];
         $rep = aic_analyze_texts($textInput, [], '', $env, 'photo_album');
 
         return [
             'text_compliance'  => (string)($rep['compliance_status'] ?? 'ok'),
             'text_risk_score'  => abs((int)($rep['risk_score'] ?? 0)),
             'text_summary'     => (string)($rep['summary_de'] ?? 'Keine Verstöße erkannt.'),
-            'text_engine_used' => (string)($rep['engine_used'] ?? 'BRAM-Regel-Engine (JSON v1.1)'),
+            'text_engine_used' => (string)($rep['engine_used'] ?? 'BRAM-Regel-Engine (JSON v1.2)'),
             'updated_at'       => date('d.m.Y H:i:s'),
             'violations'       => is_array($rep['violations'] ?? null) ? $rep['violations'] : [],
         ];
@@ -1292,12 +1332,70 @@ final class PhotoAlbumsCheckingController
             . '</div></div>';
     }
 
+    private static function decodeDescription(string $str): string
+    {
+        if ($str === '') {
+            return '';
+        }
+        if (function_exists('ec_html_to_plain_text')) {
+            return \ec_html_to_plain_text($str);
+        }
+        if (!mb_check_encoding($str, 'UTF-8') && function_exists('mb_convert_encoding')) {
+            $converted = @mb_convert_encoding($str, 'UTF-8', 'ISO-8859-1, WINDOWS-1252, ASCII');
+            if (is_string($converted)) {
+                $str = $converted;
+            }
+        }
+        $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if (strpos($str, '&') !== false) {
+            $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+        $str = str_replace(["\r\n", "\r"], "\n", $str);
+        foreach ([
+            '/<\s*(script|style)\b[^>]*>.*?<\s*\/\s*\1\s*>/is' => '',
+            '/<!--.*?-->/s' => '',
+            '/<\s*br\s*\/?\s*>/i' => "\n",
+            '/<\s*\/\s*li\s*>\s*<\s*li\b[^>]*>/i' => "\n- ",
+            '/<\s*li\b[^>]*>/i' => "\n- ",
+            '/<\s*\/\s*li\s*>/i' => "\n",
+            '/<\s*\/\s*tr\s*>/i' => "\n",
+            '/<\/\s*(?:p|div|h[1-6]|ul|ol|blockquote|pre|address|table|section|article)\s*>\s*<\s*(?:p|div|h[1-6]|ul|ol|blockquote|pre|address|table|section|article)\b[^>]*>/i' => "\n\n",
+            '/<\/?\s*(?:p|div|h[1-6]|ul|ol|blockquote|pre|address|table|section|article|hr)\b[^>]*\/?>/i' => "\n\n",
+            '/<\/?[a-zA-Z][a-zA-Z0-9:-]*(?:\s+[^<>]*)?\/?>/' => '',
+        ] as $pattern => $replacement) {
+            $res = preg_replace($pattern, $replacement, $str);
+            if (is_string($res)) {
+                $str = $res;
+            }
+        }
+        $str = str_replace(["\xC2\xA0", "\xE2\x80\x8B", "\xE2\x80\x8C", "\xE2\x80\x8D", "\xEF\xBB\xBF"], [' ', '', '', '', ''], $str);
+        foreach (['/[ \t]{2,}/' => ' ', '/^[ \t]+|[ \t]+$/m' => '', "/\n{3,}/" => "\n\n"] as $pattern => $replacement) {
+            $res = preg_replace($pattern, $replacement, $str);
+            if (is_string($res)) {
+                $str = $res;
+            }
+        }
+        return trim($str);
+    }
+
     private static function decodeText(string $str): string
     {
         if ($str === '') {
             return '';
         }
-        $decoded = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        return html_entity_decode($decoded, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if (function_exists('ec_decode_text')) {
+            return \ec_decode_text($str);
+        }
+        if (!mb_check_encoding($str, 'UTF-8') && function_exists('mb_convert_encoding')) {
+            $converted = @mb_convert_encoding($str, 'UTF-8', 'ISO-8859-1, WINDOWS-1252, ASCII');
+            if (is_string($converted)) {
+                $str = $converted;
+            }
+        }
+        $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if (strpos($str, '&') !== false) {
+            $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+        return str_replace(["\xC2\xA0", "\xE2\x80\x8B", "\xE2\x80\x8C", "\xE2\x80\x8D", "\xEF\xBB\xBF"], [' ', '', '', '', ''], $str);
     }
 }

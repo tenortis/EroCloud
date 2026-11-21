@@ -257,7 +257,7 @@ final class MoviesOnlineController
                     'actor_id'        => abs((int)$row->actor_id),
                     'actor_name'      => self::decodeText((string)($row->actor_username ?? '')),
                     'title'           => self::decodeText((string)($row->title ?? '')),
-                    'description'     => self::decodeText((string)($row->description ?? '')),
+                    'description'     => self::decodeDescription((string)($row->description ?? '')),
                     'status'          => (string)($row->status ?? 'active'),
                     'quality_key'     => $qKey,
                     'quality_label'   => self::QUALITY_LABELS[$qKey] ?? strtoupper($qKey ?: '-'),
@@ -595,7 +595,7 @@ final class MoviesOnlineController
 
         // Texte dekodieren
         $title       = self::decodeText((string)($mo->title ?? ''));
-        $description = self::decodeText((string)($mo->description ?? ''));
+        $description = self::decodeDescription((string)($mo->description ?? ''));
         $metaTitle   = self::decodeText((string)($mo->meta_title ?? ''));
         $metaDesc    = self::decodeText((string)($mo->meta_description ?? ''));
         $seoUrl      = self::decodeText((string)($mo->seo_url ?? ''));
@@ -722,9 +722,15 @@ final class MoviesOnlineController
         $totalCoins      = (int)round($playtimeSeconds * $amountSecond);
 
         $onlineAtRaw = (string)($mo->online_at ?? '');
-        $onlineAtFormatted = ($onlineAtRaw !== '' && $onlineAtRaw !== '0000-00-00 00:00:00')
-            ? date('Y-m-d\TH:i', strtotime($onlineAtRaw))
+        $onlineAtTs  = ($onlineAtRaw !== '' && $onlineAtRaw !== '0000-00-00 00:00:00' && $onlineAtRaw !== '000-00-00 00:00:00')
+            ? strtotime($onlineAtRaw)
+            : false;
+        $onlineAtFormatted = $onlineAtTs !== false
+            ? date('Y-m-d\TH:i', $onlineAtTs)
             : date('Y-m-d\TH:i');
+        $onlineAtTooFar    = function_exists('ec_is_online_at_too_far_in_future') && ec_is_online_at_too_far_in_future($onlineAtRaw);
+        $maxOnlineAtInput  = function_exists('ec_get_max_online_at_input') ? ec_get_max_online_at_input() : date('Y-m-d\T23:59', strtotime('+12 months'));
+        $maxOnlineAtDe     = function_exists('ec_get_max_online_at_timestamp') ? date('d.m.Y', ec_get_max_online_at_timestamp()) : date('d.m.Y', strtotime('+12 months'));
 
         $employeeRule = (string)($_SESSION['employee_rule'] ?? '');
 
@@ -763,6 +769,9 @@ final class MoviesOnlineController
                 'selected_slaves'      => $selectedSlaves,
                 'online_at_input'      => $onlineAtFormatted,
                 'online_at_raw'        => $onlineAtRaw,
+                'online_at_too_far'    => $onlineAtTooFar,
+                'max_online_at_input'  => $maxOnlineAtInput,
+                'max_online_at_de'     => $maxOnlineAtDe,
                 'amount_second'        => number_format($amountSecond, 1, '.', ''),
                 'total_coins'          => $totalCoins,
                 'as_download'          => abs((int)($mo->as_download ?? 0)),
@@ -892,8 +901,7 @@ final class MoviesOnlineController
             $errors[] = 'Bitte gib einen aussagekräftigen Filmtitel an.';
         }
 
-        $allowedTags = '<p><ul><ol><li><u><em><strong><h1><h2><h3><h4><h5><h6><pre><address><br><a><b><i>';
-        $description = trim(strip_tags((string)$this->request->post('description', ''), $allowedTags));
+        $description = self::decodeDescription((string)$this->request->post('description', ''));
         $description = str_replace($zeroWidthChars, '', $description);
         $description = str_replace(['#?', '?en'], ['#', 'en'], $description);
         if ($description === '') {
@@ -944,7 +952,7 @@ final class MoviesOnlineController
 
         $metaDesc = trim(strip_tags(str_replace(["\n", "\r"], ' ', (string)$this->request->post('meta_description', ''))));
         if ($metaDesc === '') {
-            $metaDesc = mb_substr(trim(strip_tags($description)), 0, 156, 'UTF-8');
+            $metaDesc = mb_substr(trim((string)preg_replace('/\s+/u', ' ', $description)), 0, 156, 'UTF-8');
         } else {
             $metaDesc = mb_substr($metaDesc, 0, 156, 'UTF-8');
         }
@@ -984,6 +992,14 @@ final class MoviesOnlineController
             && (string)($m->status ?? '') !== 'deleted'
         ) {
             $errors[] = 'Du besitzt keine Schreib-/Löschberechtigung (Administrator-Status), um Filme auf den Status „Gelöscht“ zu setzen.';
+        }
+
+        if ($movieStatus === 'active' && function_exists('ec_validate_online_at_future')) {
+            $toCheckOnlineAt = $onlineAtRaw !== '' ? $onlineAtRaw : (string)($mo->online_at ?? '');
+            $dateCheck       = ec_validate_online_at_future($toCheckOnlineAt, 'Film', true);
+            if (!empty($dateCheck['too_far'])) {
+                $errors[] = $dateCheck['error'];
+            }
         }
 
         $adminInfos = trim(strip_tags((string)$this->request->post('admin_infos', '')));
@@ -1410,7 +1426,7 @@ final class MoviesOnlineController
 
         // Texte dekodieren
         $title       = self::decodeText((string)($m->title ?? ''));
-        $description = self::decodeText((string)($m->description ?? ''));
+        $description = self::decodeDescription((string)($m->description ?? ''));
         $metaTitle   = self::decodeText((string)($m->meta_title ?? ''));
         $metaDesc    = self::decodeText((string)($m->meta_description ?? ''));
         $seoUrl      = self::decodeText((string)($m->seo_url ?? ''));
@@ -2070,20 +2086,70 @@ final class MoviesOnlineController
         ];
     }
 
+    private static function decodeDescription(string $str): string
+    {
+        if ($str === '') {
+            return '';
+        }
+        if (function_exists('ec_html_to_plain_text')) {
+            return \ec_html_to_plain_text($str);
+        }
+        if (!mb_check_encoding($str, 'UTF-8') && function_exists('mb_convert_encoding')) {
+            $converted = @mb_convert_encoding($str, 'UTF-8', 'ISO-8859-1, WINDOWS-1252, ASCII');
+            if (is_string($converted)) {
+                $str = $converted;
+            }
+        }
+        $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if (strpos($str, '&') !== false) {
+            $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+        $str = str_replace(["\r\n", "\r"], "\n", $str);
+        foreach ([
+            '/<\s*(script|style)\b[^>]*>.*?<\s*\/\s*\1\s*>/is' => '',
+            '/<!--.*?-->/s' => '',
+            '/<\s*br\s*\/?\s*>/i' => "\n",
+            '/<\s*\/\s*li\s*>\s*<\s*li\b[^>]*>/i' => "\n- ",
+            '/<\s*li\b[^>]*>/i' => "\n- ",
+            '/<\s*\/\s*li\s*>/i' => "\n",
+            '/<\s*\/\s*tr\s*>/i' => "\n",
+            '/<\/\s*(?:p|div|h[1-6]|ul|ol|blockquote|pre|address|table|section|article)\s*>\s*<\s*(?:p|div|h[1-6]|ul|ol|blockquote|pre|address|table|section|article)\b[^>]*>/i' => "\n\n",
+            '/<\/?\s*(?:p|div|h[1-6]|ul|ol|blockquote|pre|address|table|section|article|hr)\b[^>]*\/?>/i' => "\n\n",
+            '/<\/?[a-zA-Z][a-zA-Z0-9:-]*(?:\s+[^<>]*)?\/?>/' => '',
+        ] as $pattern => $replacement) {
+            $res = preg_replace($pattern, $replacement, $str);
+            if (is_string($res)) {
+                $str = $res;
+            }
+        }
+        $str = str_replace(["\xC2\xA0", "\xE2\x80\x8B", "\xE2\x80\x8C", "\xE2\x80\x8D", "\xEF\xBB\xBF"], [' ', '', '', '', ''], $str);
+        foreach (['/[ \t]{2,}/' => ' ', '/^[ \t]+|[ \t]+$/m' => '', "/\n{3,}/" => "\n\n"] as $pattern => $replacement) {
+            $res = preg_replace($pattern, $replacement, $str);
+            if (is_string($res)) {
+                $str = $res;
+            }
+        }
+        return trim($str);
+    }
+
     private static function decodeText(string $str): string
     {
         if ($str === '') {
             return '';
         }
-        if (function_exists('utf8_to_latin1swedishci')) {
-            $converted = (string)utf8_to_latin1swedishci($str);
-            if (mb_check_encoding($converted, 'UTF-8')) {
-                return $converted;
+        if (function_exists('ec_decode_text')) {
+            return \ec_decode_text($str);
+        }
+        if (!mb_check_encoding($str, 'UTF-8') && function_exists('mb_convert_encoding')) {
+            $converted = @mb_convert_encoding($str, 'UTF-8', 'ISO-8859-1, WINDOWS-1252, ASCII');
+            if (is_string($converted)) {
+                $str = $converted;
             }
         }
-        if (!mb_check_encoding($str, 'UTF-8')) {
-            return mb_convert_encoding($str, 'UTF-8', 'ISO-8859-1, WINDOWS-1252, ASCII');
+        $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if (strpos($str, '&') !== false) {
+            $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         }
-        return $str;
+        return str_replace(["\xC2\xA0", "\xE2\x80\x8B", "\xE2\x80\x8C", "\xE2\x80\x8D", "\xEF\xBB\xBF"], [' ', '', '', '', ''], $str);
     }
 }

@@ -59,7 +59,17 @@ if (isset($_POST['edit_album'])) {
         }
 
         if(isset($_POST['online_at'])) {
-            $album['online_at'] = date("Y-m-d H:i", strtotime($_POST['online_at']));
+            if (function_exists('ec_validate_online_at_future')) {
+                $date_chk = ec_validate_online_at_future($_POST['online_at'], 'Foto-Album', false);
+                if (!$date_chk['ok']) {
+                    $error = htmlentities($date_chk['error'], ENT_QUOTES, 'UTF-8');
+                    $album['online_at'] = $a->field('online_at');
+                } else {
+                    $album['online_at'] = date("Y-m-d H:i", (int)$date_chk['timestamp']);
+                }
+            } else {
+                $album['online_at'] = date("Y-m-d H:i", strtotime($_POST['online_at']));
+            }
         } else {
             $album['online_at'] = $a->field('online_at');
         }

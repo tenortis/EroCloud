@@ -359,6 +359,7 @@ function photo_album_checksum($album) {
                 'online_at'           => $album->field('online_at'),
                 'amount_webmaster'    => $album->field('amount_webmaster'),
                 'amount_download'     => $album->field('amount_download'),
+                'status'              => $album->field('status'),
             );
         } else {
             $album = (array)$album;
@@ -369,6 +370,8 @@ function photo_album_checksum($album) {
 
     $fsk16 = isset($album['fsk16']) ? $album['fsk16'] : (isset($album['preview_image_fsk16']) ? $album['preview_image_fsk16'] : '');
     $fsk18 = isset($album['fsk18']) ? $album['fsk18'] : (isset($album['preview_image_fsk18']) ? $album['preview_image_fsk18'] : '');
+    $statusVal = isset($album['status']) ? strtolower(trim((string)$album['status'])) : '';
+    $statusSuffix = ($statusVal !== '' && $statusVal !== 'active') ? ('|' . $statusVal) : '';
 
     return md5(
         (isset($album['merchant_id']) ? $album['merchant_id'] : '').
@@ -382,8 +385,28 @@ function photo_album_checksum($album) {
         (isset($album['seo_url']) ? $album['seo_url'] : '').
         (isset($album['online_at']) ? $album['online_at'] : '').
         (isset($album['amount_webmaster']) ? $album['amount_webmaster'] : '').
-        (isset($album['amount_download']) ? $album['amount_download'] : '')
+        (isset($album['amount_download']) ? $album['amount_download'] : '').
+        $statusSuffix
     );
+}
+
+/**
+ * Invalidiert den 50-Minuten-API-Cache (api/temp/get_photo_album/{album_id}.tmp) eines Fotoalbums,
+ * damit Statuswechsel (active/blocked/deleted) und Metadaten-Updates sofort an EroCMS-Portale ausgeliefert werden.
+ */
+function ec_invalidate_photo_album_api_cache($albumIdHash) {
+    $cleanId = preg_replace('/[^a-zA-Z0-9]/', '', (string)$albumIdHash);
+    if ($cleanId === '') {
+        return;
+    }
+    $apiBase = defined('API_DIR') ? rtrim((string)API_DIR, '/\\') : (defined('SOURCEDIR') ? rtrim((string)SOURCEDIR, '/\\') . '/api' : '');
+    if ($apiBase === '') {
+        return;
+    }
+    $tmpFile = $apiBase . '/temp/get_photo_album/' . $cleanId . '.tmp';
+    if (is_file($tmpFile)) {
+        @unlink($tmpFile);
+    }
 }
 
 // MD5-Hash for changing Profile-Check
@@ -641,5 +664,256 @@ function utf8_to_latin1swedishci($string = '') {
     return $string;
 }
 
-    
+if (!defined('EC_MAX_ONLINE_AT_FUTURE_MONTHS')) {
+    define('EC_MAX_ONLINE_AT_FUTURE_MONTHS', 12);
+}
+
+if (!function_exists('ec_get_max_online_at_timestamp')) {
+    /**
+     * Berechnet den maximal zulaessigen Zeitstempel fuer geplante Veroeffentlichungen (+12 Monate, Tagesende).
+     */
+    function ec_get_max_online_at_timestamp(?int $nowTs = null): int
+    {
+        $baseTs      = $nowTs ?? time();
+        $targetDayTs = strtotime('+' . EC_MAX_ONLINE_AT_FUTURE_MONTHS . ' months', $baseTs);
+        return (int)strtotime(date('Y-m-d 23:59:59', $targetDayTs !== false ? $targetDayTs : $baseTs));
+    }
+}
+
+if (!function_exists('ec_get_max_online_at_input')) {
+    /**
+     * Gibt das maximal zulaessige Veroeffentlichungsdatum im Format fuer HTML5 datetime-local zurueck.
+     */
+    function ec_get_max_online_at_input(?int $nowTs = null): string
+    {
+        return date('Y-m-d\T23:59', ec_get_max_online_at_timestamp($nowTs));
+    }
+}
+
+if (!function_exists('ec_is_online_at_too_far_in_future')) {
+    /**
+     * Prueft, ob ein online_at-Wert ueber dem maximalen Vorausplanungs-Zeitraum liegt.
+     */
+    function ec_is_online_at_too_far_in_future($onlineAtValue, ?int $nowTs = null): bool
+    {
+        $raw = trim((string)$onlineAtValue);
+        if ($raw === '' || $raw === '0000-00-00 00:00:00' || $raw === '000-00-00 00:00:00') {
+            return false;
+        }
+        $ts = strtotime($raw);
+        return ($ts !== false && $ts > ec_get_max_online_at_timestamp($nowTs));
+    }
+}
+
+if (!function_exists('ec_validate_online_at_future')) {
+    /**
+     * Validiert ein Veroeffentlichungsdatum gegen das maximale Vorausplanungs-Limit (12 Monate).
+     *
+     * @return array{ok:bool,timestamp:int|false,too_far:bool,max_ts:int,max_date_de:string,error:string}
+     */
+    function ec_validate_online_at_future($onlineAtValue, string $contentLabel = 'Inhalt', bool $forAdmin = false, ?int $nowTs = null): array
+    {
+        $maxTs     = ec_get_max_online_at_timestamp($nowTs);
+        $maxDateDe = date('d.m.Y', $maxTs);
+        $raw       = trim((string)$onlineAtValue);
+
+        if ($raw === '' || $raw === '0000-00-00 00:00:00' || $raw === '000-00-00 00:00:00') {
+            return [
+                'ok'          => false,
+                'timestamp'   => false,
+                'too_far'     => false,
+                'max_ts'      => $maxTs,
+                'max_date_de' => $maxDateDe,
+                'error'       => 'Bitte gib ein gültiges Veröffentlichungsdatum an.',
+            ];
+        }
+
+        $ts = strtotime($raw);
+        if ($ts === false) {
+            return [
+                'ok'          => false,
+                'timestamp'   => false,
+                'too_far'     => false,
+                'max_ts'      => $maxTs,
+                'max_date_de' => $maxDateDe,
+                'error'       => 'Bitte gib ein gültiges Veröffentlichungsdatum an.',
+            ];
+        }
+
+        if ($ts > $maxTs) {
+            if ($forAdmin) {
+                $err = 'Das Veröffentlichungsdatum (' . date('d.m.Y H:i', $ts) . ') liegt mehr als '
+                    . EC_MAX_ONLINE_AT_FUTURE_MONTHS . ' Monate in der Zukunft (spätestens zulässig: '
+                    . $maxDateDe . '). Eine Freigabe ist mit diesem Datum blockiert – bitte lehne den Inhalt ab oder korrigiere das Datum zuerst.';
+            } else {
+                $objPhrase = 'deinen Inhalt';
+                $pronoun   = 'ihn';
+                if ($contentLabel === 'Foto-Album' || $contentLabel === 'Fotoalbum') {
+                    $objPhrase = 'dein ' . $contentLabel;
+                    $pronoun   = 'es';
+                } elseif ($contentLabel === 'Film') {
+                    $objPhrase = 'deinen Film';
+                    $pronoun   = 'ihn';
+                } elseif ($contentLabel !== '') {
+                    $objPhrase = 'deinen ' . $contentLabel;
+                }
+
+                $err = 'Das gewählte Veröffentlichungsdatum liegt zu weit in der Zukunft. Du kannst '
+                    . $objPhrase . ' maximal ' . EC_MAX_ONLINE_AT_FUTURE_MONTHS
+                    . ' Monate im Voraus planen (spätestens bis ' . $maxDateDe
+                    . '). Wenn du ' . $pronoun . ' noch zurückhalten möchtest, belasse ' . $pronoun . ' stattdessen als Entwurf.';
+            }
+
+            return [
+                'ok'          => false,
+                'timestamp'   => $ts,
+                'too_far'     => true,
+                'max_ts'      => $maxTs,
+                'max_date_de' => $maxDateDe,
+                'error'       => $err,
+            ];
+        }
+
+        return [
+            'ok'          => true,
+            'timestamp'   => $ts,
+            'too_far'     => false,
+            'max_ts'      => $maxTs,
+            'max_date_de' => $maxDateDe,
+            'error'       => '',
+        ];
+    }
+}
+
+if (!function_exists('ec_decode_text')) {
+    /**
+     * Dekodiert historische HTML-Entities sowie potenzielle ISO-8859-1 Alt-Strings sauber nach UTF-8.
+     * Geeignet fuer einzeilige Textfelder (Titel, SEO-Felder, Darsteller- und Partnernamen).
+     */
+    function ec_decode_text($text): string
+    {
+        $str = (string)($text ?? '');
+        if ($str === '') {
+            return '';
+        }
+
+        if (function_exists('mb_check_encoding') && !mb_check_encoding($str, 'UTF-8') && function_exists('mb_convert_encoding')) {
+            $converted = @mb_convert_encoding($str, 'UTF-8', 'ISO-8859-1, WINDOWS-1252, ASCII');
+            if (is_string($converted)) {
+                $str = $converted;
+            }
+        }
+
+        $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if (strpos($str, '&') !== false) {
+            $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+
+        $str = str_replace(["\xC2\xA0", "\xE2\x80\x8B", "\xE2\x80\x8C", "\xE2\x80\x8D", "\xEF\xBB\xBF"], [' ', '', '', '', ''], $str);
+        return $str;
+    }
+}
+
+if (!function_exists('ec_html_to_plain_text')) {
+    /**
+     * Wandelt HTML-formatierte Beschreibungen (z. B. aus Legacy-CKEditor oder Copy-Paste)
+     * verlustfrei in sauberen Klartext mit erhaltenen Absaetzen und Zeilenumbruechen um.
+     * Verwendet gezielt keinen PHP strip_tags()-Aufruf auf Freitext, damit Konstrukte wie "<3" erhalten bleiben.
+     */
+    function ec_html_to_plain_text($text): string
+    {
+        $str = (string)($text ?? '');
+        if ($str === '') {
+            return '';
+        }
+
+        if (function_exists('mb_check_encoding') && !mb_check_encoding($str, 'UTF-8') && function_exists('mb_convert_encoding')) {
+            $converted = @mb_convert_encoding($str, 'UTF-8', 'ISO-8859-1, WINDOWS-1252, ASCII');
+            if (is_string($converted)) {
+                $str = $converted;
+            }
+        }
+
+        $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if (strpos($str, '&') !== false) {
+            $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+
+        $str = str_replace(["\r\n", "\r"], "\n", $str);
+
+        // Script/Style-Bloecke und HTML-Kommentare vollstaendig entfernen
+        $res = preg_replace('/<\s*(script|style)\b[^>]*>.*?<\s*\/\s*\1\s*>/is', '', $str);
+        if (is_string($res)) {
+            $str = $res;
+        }
+        $res = preg_replace('/<!--.*?-->/s', '', $str);
+        if (is_string($res)) {
+            $str = $res;
+        }
+
+        // Strukturelle HTML-Tags vor dem Entfernen sauber in Umbrueche/Listenpunkte umwandeln
+        $res = preg_replace('/<\s*br\s*\/?\s*>/i', "\n", $str);
+        if (is_string($res)) {
+            $str = $res;
+        }
+
+        $res = preg_replace('/<\s*\/\s*li\s*>\s*<\s*li\b[^>]*>/i', "\n- ", $str);
+        if (is_string($res)) {
+            $str = $res;
+        }
+        $res = preg_replace('/<\s*li\b[^>]*>/i', "\n- ", $str);
+        if (is_string($res)) {
+            $str = $res;
+        }
+        $res = preg_replace('/<\s*\/\s*li\s*>/i', "\n", $str);
+        if (is_string($res)) {
+            $str = $res;
+        }
+        $res = preg_replace('/<\s*\/\s*tr\s*>/i', "\n", $str);
+        if (is_string($res)) {
+            $str = $res;
+        }
+
+        $res = preg_replace(
+            '/<\/\s*(?:p|div|h[1-6]|ul|ol|blockquote|pre|address|table|section|article)\s*>\s*<\s*(?:p|div|h[1-6]|ul|ol|blockquote|pre|address|table|section|article)\b[^>]*>/i',
+            "\n\n",
+            $str
+        );
+        if (is_string($res)) {
+            $str = $res;
+        }
+        $res = preg_replace(
+            '/<\/?\s*(?:p|div|h[1-6]|ul|ol|blockquote|pre|address|table|section|article|hr)\b[^>]*\/?>/i',
+            "\n\n",
+            $str
+        );
+        if (is_string($res)) {
+            $str = $res;
+        }
+
+        // Verbleibende Inline-Tags (<strong>, <em>, <u>, <span>, <a>, ...) entfernen, ohne "<3" oder "<10" abzuschneiden
+        $res = preg_replace('/<\/?[a-zA-Z][a-zA-Z0-9:-]*(?:\s+[^<>]*)?\/?>/', '', $str);
+        if (is_string($res)) {
+            $str = $res;
+        }
+
+        $str = str_replace(["\xC2\xA0", "\xE2\x80\x8B", "\xE2\x80\x8C", "\xE2\x80\x8D", "\xEF\xBB\xBF"], [' ', '', '', '', ''], $str);
+
+        $res = preg_replace('/[ \t]{2,}/', ' ', $str);
+        if (is_string($res)) {
+            $str = $res;
+        }
+        $res = preg_replace('/^[ \t]+|[ \t]+$/m', '', $str);
+        if (is_string($res)) {
+            $str = $res;
+        }
+        $res = preg_replace("/\n{3,}/", "\n\n", $str);
+        if (is_string($res)) {
+            $str = $res;
+        }
+
+        return trim($str);
+    }
+}
+
 ?>

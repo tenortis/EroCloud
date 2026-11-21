@@ -130,6 +130,7 @@ class Router
         self::register('photo-albums/update', $photoAlbumsCtrl, 'update');
         self::register('photo-albums/upload-cover', $photoAlbumsCtrl, 'uploadCover');
         self::register('photo-albums/upload-photos', $photoAlbumsCtrl, 'uploadPhotos');
+        self::register('photo-albums/rotate-photo', $photoAlbumsCtrl, 'rotatePhoto');
         self::register('photo-albums/delete-photo', $photoAlbumsCtrl, 'deletePhoto');
         self::register('photo-albums/delete', $photoAlbumsCtrl, 'delete');
 

@@ -18,9 +18,12 @@ $movieId         = (int)($movie['id'] ?? 0);
 $fileId          = (string)($movie['file_id'] ?? '');
 $title           = (string)($movie['title'] ?? '');
 $description     = (string)($movie['description'] ?? '');
-$onlineAt        = (string)($movie['online_at'] ?? '');
-$onlineAtDisplay = (string)($movie['online_at_display'] ?? '-');
-$canEditOnlineAt = !empty($movie['can_edit_online_at']);
+$onlineAt         = (string)($movie['online_at'] ?? '');
+$onlineAtDisplay  = (string)($movie['online_at_display'] ?? '-');
+$canEditOnlineAt  = !empty($movie['can_edit_online_at']);
+$maxOnlineAtInput = function_exists('ec_get_max_online_at_input') ? ec_get_max_online_at_input() : date('Y-m-d\T23:59', strtotime('+12 months'));
+$maxOnlineAtDe    = function_exists('ec_get_max_online_at_timestamp') ? date('d.m.Y', ec_get_max_online_at_timestamp()) : date('d.m.Y', strtotime('+12 months'));
+$isOnlineAtTooFar = function_exists('ec_is_online_at_too_far_in_future') && ec_is_online_at_too_far_in_future($onlineAt);
 $playtimeSeconds = (int)($movie['playtime_seconds'] ?? 0);
 $playtimeString  = (string)($movie['playtime_string'] ?? '0:00');
 $resolution      = (string)($movie['resolution'] ?? '');
@@ -777,9 +780,16 @@ $downloadPercentOptions = range(0, 150);
             <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Veröffentlichungsdatum (Online ab)</label>
               <?php if ($canEditOnlineAt): ?>
-                <input type="datetime-local" name="online_at" class="form-control"
+                <input type="datetime-local" name="online_at"
+                       class="form-control <?= $isOnlineAtTooFar ? 'is-invalid' : '' ?>"
+                       max="<?= htmlspecialchars($maxOnlineAtInput, ENT_QUOTES, 'UTF-8') ?>"
+                       data-max-online-at="<?= htmlspecialchars($maxOnlineAtInput, ENT_QUOTES, 'UTF-8') ?>"
+                       data-max-online-at-de="<?= htmlspecialchars($maxOnlineAtDe, ENT_QUOTES, 'UTF-8') ?>"
                        value="<?= htmlspecialchars($onlineAt, ENT_QUOTES, 'UTF-8') ?>">
-                <div class="form-text">Mindestens 90 Minuten in der Zukunft für geplante Veröffentlichungen.</div>
+                <div class="form-text">Geplante Veröffentlichung mindestens 90 Minuten und maximal 12 Monate im Voraus (bis spätestens <?= htmlspecialchars($maxOnlineAtDe, ENT_QUOTES, 'UTF-8') ?>).</div>
+                <div class="invalid-feedback js-online-at-future-error <?= $isOnlineAtTooFar ? 'd-block' : '' ?>">
+                  Du kannst deinen Film maximal 12 Monate im Voraus planen (spätestens bis <?= htmlspecialchars($maxOnlineAtDe, ENT_QUOTES, 'UTF-8') ?>). Wenn du ihn noch zurückhalten möchtest, belasse ihn stattdessen als Entwurf.
+                </div>
               <?php else: ?>
                 <input type="text" class="form-control bg-light" value="<?= htmlspecialchars($onlineAtDisplay, ENT_QUOTES, 'UTF-8') ?>" readonly>
                 <div class="form-text">Der Film ist bereits online. Das Startdatum kann nicht mehr geändert werden.</div>

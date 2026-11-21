@@ -558,20 +558,63 @@ if ($type === 'album_poster' || $type === 'album_photo') {
     header('Cache-Control: private, max-age=3600');
     header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $mtime ?: time()) . ' GMT');
 
-    if ($reqWidth > 0 && $reqWidth <= 1024 && ($mime === 'image/jpeg' || $mime === 'image/png') && function_exists('imagecreatetruecolor')) {
+    if (($mime === 'image/jpeg' || $mime === 'image/jpg' || $mime === 'image/png') && function_exists('imagecreatetruecolor')) {
         $imgSize = @getimagesize($targetFile);
-        if (is_array($imgSize) && $imgSize[0] > $reqWidth && $imgSize[1] > 0) {
+        $exifOrientation = 1;
+        if (($mime === 'image/jpeg' || $mime === 'image/jpg') && function_exists('exif_read_data')) {
+            $exif = @exif_read_data($targetFile);
+            if (is_array($exif) && !empty($exif['Orientation'])) {
+                $exifOrientation = (int)$exif['Orientation'];
+            }
+        }
+        $needsResize = ($reqWidth > 0 && $reqWidth <= 1024 && is_array($imgSize) && $imgSize[0] > $reqWidth && $imgSize[1] > 0);
+        $needsExifRotate = in_array($exifOrientation, [3, 6, 8], true);
+
+        if (is_array($imgSize) && $imgSize[0] > 0 && $imgSize[1] > 0 && ($needsResize || $needsExifRotate)) {
             $srcImg = $mime === 'image/png' ? @imagecreatefrompng($targetFile) : @imagecreatefromjpeg($targetFile);
-            if ($srcImg !== false) {
-                $ratio     = $imgSize[0] / $imgSize[1];
-                $newWidth  = $reqWidth;
-                $newHeight = max(1, (int)round($newWidth / $ratio));
-                $dstImg    = imagecreatetruecolor($newWidth, $newHeight);
-                imagecopyresampled($dstImg, $srcImg, 0, 0, 0, 0, $newWidth, $newHeight, $imgSize[0], $imgSize[1]);
+            if ($srcImg instanceof \GdImage) {
+                if ($exifOrientation === 3) {
+                    $rot = @imagerotate($srcImg, 180, 0);
+                    if ($rot instanceof \GdImage) {
+                        $srcImg = $rot;
+                    }
+                } elseif ($exifOrientation === 6) {
+                    $rot = @imagerotate($srcImg, -90, 0);
+                    if ($rot instanceof \GdImage) {
+                        $srcImg = $rot;
+                    }
+                } elseif ($exifOrientation === 8) {
+                    $rot = @imagerotate($srcImg, 90, 0);
+                    if ($rot instanceof \GdImage) {
+                        $srcImg = $rot;
+                    }
+                }
+
+                $curW = imagesx($srcImg);
+                $curH = imagesy($srcImg);
+                if ($reqWidth > 0 && $reqWidth <= 1024 && $curW > $reqWidth && $curH > 0) {
+                    $newWidth  = $reqWidth;
+                    $newHeight = max(1, (int)round($newWidth * ($curH / max(1, $curW))));
+                    $dstImg    = imagecreatetruecolor($newWidth, $newHeight);
+                    if ($mime === 'image/png') {
+                        imagealphablending($dstImg, false);
+                        imagesavealpha($dstImg, true);
+                    }
+                    imagecopyresampled($dstImg, $srcImg, 0, 0, 0, 0, $newWidth, $newHeight, $curW, $curH);
+                    if ($mime === 'image/png') {
+                        header('Content-Type: image/png');
+                        imagepng($dstImg, null, 8);
+                    } else {
+                        header('Content-Type: image/jpeg');
+                        imagejpeg($dstImg, null, 88);
+                    }
+                    unset($dstImg, $srcImg);
+                    exit;
+                }
+
                 header('Content-Type: image/jpeg');
-                imagejpeg($dstImg, null, 88);
-                imagedestroy($dstImg);
-                imagedestroy($srcImg);
+                imagejpeg($srcImg, null, 90);
+                unset($srcImg);
                 exit;
             }
         }

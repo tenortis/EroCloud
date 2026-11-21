@@ -63,6 +63,21 @@ foreach ($categoriesByGroup as $grpItems) {
         }
     }
 }
+
+$isOnlineAtTooFar = !empty($album['online_at_too_far']);
+$maxOnlineAtInput = (string)($album['max_online_at_input'] ?? date('Y-m-d\T23:59', strtotime('+12 months')));
+$maxOnlineAtDe    = (string)($album['max_online_at_de'] ?? date('d.m.Y', strtotime('+12 months')));
+$onlineAtDisplay  = (string)($album['online_at_display'] ?? '-');
+$hasOnlineTooFarOpt = false;
+$hasFreeTextOpt     = false;
+foreach ($rejectionReasons as $rrCheck) {
+    $rrId = (string)($rrCheck['id_name'] ?? '');
+    if ($rrId === 'online_at_too_far') {
+        $hasOnlineTooFarOpt = true;
+    } elseif ($rrId === 'free_text') {
+        $hasFreeTextOpt = true;
+    }
+}
 ?>
 
 <!-- ==========================================================================
@@ -174,6 +189,27 @@ foreach ($categoriesByGroup as $grpItems) {
         <?php endif; ?>
       </div>
     </div>
+
+<!-- Sperr-Warnbox falls Veröffentlichungsdatum > 12 Monate in der Zukunft liegt -->
+<div class="alert alert-danger d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 <?= $isOnlineAtTooFar ? '' : 'd-none' ?>" id="pac-online-at-block-banner">
+  <div class="d-flex align-items-center gap-2">
+    <i class="bi bi-calendar-x-fill fs-4 flex-shrink-0"></i>
+    <div>
+      <strong>Freigabe gesperrt: Veröffentlichungsdatum liegt zu weit in der Zukunft!</strong>
+      <div class="small">
+        Das gewählte Datum (<strong id="pac-online-at-block-date"><?= View::e($onlineAtDisplay) ?></strong>) liegt mehr als 12 Monate in der Zukunft (spätestens zulässig: <?= View::e($maxOnlineAtDe) ?>) und darf nicht freigeschaltet werden.
+      </div>
+    </div>
+  </div>
+  <div class="d-flex flex-wrap align-items-center gap-2">
+    <button type="button" class="btn btn-sm btn-danger fw-semibold" onclick="App.prefillOnlineAtRejection('pac')">
+      <i class="bi bi-slash-circle me-1"></i> Jetzt wegen Datum ablehnen
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-danger bg-body" onclick="App.setAcpOnlineAtNow('pac')">
+      <i class="bi bi-clock me-1"></i> Datum auf jetzt setzen
+    </button>
+  </div>
+</div>
 
 <!-- Warnhinweis falls kein gültiger Darsteller zugeordnet ist -->
 <?php if (empty($album['actor_exists'])): ?>
@@ -552,7 +588,8 @@ foreach ($categoriesByGroup as $grpItems) {
             <!-- Album-Status -->
             <div class="col-md-5">
               <label class="form-label small fw-bold mb-1">Album-Status *</label>
-              <select name="album_status" class="form-select form-select-sm">
+              <select name="album_status" id="pac-input-status" class="form-select form-select-sm"
+                      onchange="App.checkAcpOnlineAtGuard('pac')">
                 <option value="active" <?= $album['status'] === 'active' ? 'selected' : '' ?>>Aktiv (Veröffentlichen)</option>
                 <option value="blocked" <?= $album['status'] === 'blocked' ? 'selected' : '' ?>>Gesperrt</option>
                 <?php if ($employeeRule === 'write'): ?>
@@ -585,8 +622,16 @@ foreach ($categoriesByGroup as $grpItems) {
             <!-- Online ab & Verkaufspreis -->
             <div class="col-md-6">
               <label class="form-label small fw-bold mb-1">Veröffentlichung ab *</label>
-              <input type="datetime-local" name="online_at" class="form-control form-control-sm"
-                     value="<?= View::e((string)$album['online_at']) ?>" required>
+              <input type="datetime-local" name="online_at" id="pac-input-online-at"
+                     class="form-control form-control-sm <?= $isOnlineAtTooFar ? 'is-invalid' : '' ?>"
+                     data-max-online-at="<?= View::e($maxOnlineAtInput) ?>"
+                     data-max-online-at-de="<?= View::e($maxOnlineAtDe) ?>"
+                     value="<?= View::e((string)$album['online_at']) ?>"
+                     oninput="App.checkAcpOnlineAtGuard('pac')"
+                     onchange="App.checkAcpOnlineAtGuard('pac')" required>
+              <div class="invalid-feedback <?= $isOnlineAtTooFar ? 'd-block' : '' ?>" id="pac-online-at-error">
+                Maximal 12 Monate im Voraus zulässig (bis <?= View::e($maxOnlineAtDe) ?>).
+              </div>
             </div>
 
             <div class="col-md-6">
@@ -750,9 +795,13 @@ foreach ($categoriesByGroup as $grpItems) {
                 Nach Freigabe direkt nächstes offenes Album öffnen
               </label>
             </div>
-            <button type="submit" id="pac-submit-approve-btn" class="btn btn-kkc px-4 py-2 fw-bold">
+            <button type="submit" id="pac-submit-approve-btn" class="btn btn-kkc px-4 py-2 fw-bold"
+                    <?= ($isOnlineAtTooFar && $album['status'] === 'active') ? 'disabled' : '' ?>>
               <i class="bi bi-check2-circle me-1"></i> Fotoalbum speichern &amp; veröffentlichen
             </button>
+            <div class="small text-danger fw-semibold mt-2 w-100 text-end <?= ($isOnlineAtTooFar && $album['status'] === 'active') ? '' : 'd-none' ?>" id="pac-approve-blocked-hint">
+              <i class="bi bi-lock-fill me-1"></i>Freigabe blockiert: Datum liegt &gt; 12 Monate in der Zukunft.
+            </div>
           </div>
 
         </div>
@@ -784,11 +833,21 @@ foreach ($categoriesByGroup as $grpItems) {
           <select name="rejection_reason" id="pac-rejection-reason-select" class="form-select form-select-sm"
                   onchange="App.onPhotoAlbumRejectionReasonChange(this)">
             <option value="0">-- Bitte Ablehnungsgrund wählen --</option>
+            <?php if (!$hasFreeTextOpt): ?>
+            <option value="free_text" data-long-text="">
+              Sonstiges / Mehrere Gründe (Freitext)
+            </option>
+            <?php endif; ?>
             <?php foreach ($rejectionReasons as $rr): ?>
             <option value="<?= View::e((string)$rr['id_name']) ?>" data-long-text="<?= View::e((string)$rr['de_long']) ?>">
               <?= View::e((string)$rr['de_short']) ?>
             </option>
             <?php endforeach; ?>
+            <?php if (!$hasOnlineTooFarOpt): ?>
+            <option value="online_at_too_far" data-long-text="Das gewählte Veröffentlichungsdatum liegt zu weit in der Zukunft. Eine Vorausplanung ist maximal 12 Monate im Voraus möglich. Bitte passe das Datum an (oder belasse das Fotoalbum vorerst als Entwurf) und reiche es erneut ein.">
+              Veröffentlichungsdatum zu weit in der Zukunft (max. 12 Monate)
+            </option>
+            <?php endif; ?>
           </select>
         </div>
         <div class="col-md-7">
@@ -892,10 +951,11 @@ foreach ($categoriesByGroup as $grpItems) {
                 </thead>
                 <tbody>
                   <?php foreach ($violations as $v):
-                      $isCrit = in_array((string)($v['severity'] ?? ''), ['violation', 'critical'], true);
-                      $srcLbl = (string)($v['source_label'] ?? $v['source'] ?? 'Text');
-                      $quote  = (string)($v['matched_quote'] ?? $v['quote'] ?? '');
-                      $reason = (string)($v['reason'] ?? '');
+                      $isCrit     = in_array((string)($v['severity'] ?? ''), ['violation', 'critical'], true);
+                      $srcLbl     = (string)($v['source_label'] ?? $v['source'] ?? 'Text');
+                      $quote      = (string)($v['matched_quote'] ?? $v['quote'] ?? '');
+                      $reason     = (string)($v['reason'] ?? '');
+                      $suggestion = (string)($v['suggestion'] ?? '');
                   ?>
                   <tr>
                     <td class="fw-bold"><?= View::e((string)($v['category'] ?? '')) ?></td>
@@ -912,6 +972,11 @@ foreach ($categoriesByGroup as $grpItems) {
                       <?php endif; ?>
                       <?php if ($reason !== ''): ?>
                         <div class="text-muted" style="font-size: 0.75rem;"><?= View::e($reason) ?></div>
+                      <?php endif; ?>
+                      <?php if ($suggestion !== ''): ?>
+                        <div class="mt-1 p-1.5 px-2 rounded bg-info bg-opacity-10 border border-info border-opacity-25 text-body" style="font-size: 0.76rem;">
+                          <i class="bi bi-lightbulb-fill text-info me-1"></i><strong>Alternative / Empfehlung:</strong> <?= View::e($suggestion) ?>
+                        </div>
                       <?php endif; ?>
                     </td>
                   </tr>

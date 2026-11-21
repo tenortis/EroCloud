@@ -122,10 +122,12 @@ if (isset($db_settings_ary['videothek_ffmpeg_on_off']) AND $db_settings_ary['vid
                     $temp_qt_file      = $file_path . 'neu_qt_' . $file_name_neu;
                     $final_mp4_file    = $file_path . $file_name_neu;
 
-                    // B) Fehlertoleranter FFmpeg-Befehl (inkl. -strict -2 für ältere FFmpeg-Pakete)
+                    $scale_filter = 'scale=trunc((iw*min(1\,min(3840/iw\,3840/ih))+0.5)/2)*2:trunc((ih*min(1\,min(3840/iw\,3840/ih))+0.5)/2)*2';
+
+                    // B) Fehlertoleranter FFmpeg-Befehl (inkl. -strict -2 für ältere FFmpeg-Pakete & Apple VideoToolbox 4K-Schutz)
                     $ffmpeg_cmd = $ffmpeg_pfad . 'ffmpeg -y -fflags +genpts+igndts -i ' . escapeshellarg($org_file)
-                        . ' -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2"'
-                        . ' -vcodec libx264 -pix_fmt yuv420p'
+                        . ' -vf ' . escapeshellarg($scale_filter)
+                        . ' -vcodec libx264 -pix_fmt yuv420p -profile:v high -refs 4'
                         . ' -crf ' . $crf . ' -maxrate ' . $maxrate . ' -bufsize ' . $bufsize
                         . ' -preset ' . $preset . ' -g 60'
                         . ' -acodec aac -strict -2 -b:a 128k -ac 2 -ar 44100'

@@ -17,7 +17,10 @@ $albumDbId       = (int)($album['id'] ?? 0);
 $title           = (string)($album['title'] ?? '');
 $description     = (string)($album['description'] ?? '');
 $actorId         = (int)($album['actor_id'] ?? 0);
-$onlineAt        = (string)($album['online_at'] ?? date('Y-m-d\TH:i', strtotime('+90 minutes')));
+$onlineAt         = (string)($album['online_at'] ?? date('Y-m-d\TH:i', strtotime('+90 minutes')));
+$maxOnlineAtInput = function_exists('ec_get_max_online_at_input') ? ec_get_max_online_at_input() : date('Y-m-d\T23:59', strtotime('+12 months'));
+$maxOnlineAtDe    = function_exists('ec_get_max_online_at_timestamp') ? date('d.m.Y', ec_get_max_online_at_timestamp()) : date('d.m.Y', strtotime('+12 months'));
+$isOnlineAtTooFar = function_exists('ec_is_online_at_too_far_in_future') && ec_is_online_at_too_far_in_future($onlineAt);
 $amountDownload  = (int)($album['amount_download'] ?? 500);
 $hasFsk16             = !empty($album['has_fsk16']);
 $hasFsk18             = !empty($album['has_fsk18']);
@@ -178,9 +181,16 @@ $priceCentsOptions = range(0, 5000, 100);
 
               <div class="col-12 <?= count($actors) === 1 ? 'col-md-6' : '' ?>">
                 <label class="form-label fw-semibold">Veröffentlichungsdatum (Online ab)</label>
-                <input type="datetime-local" name="online_at" class="form-control"
+                <input type="datetime-local" name="online_at"
+                       class="form-control <?= $isOnlineAtTooFar ? 'is-invalid' : '' ?>"
+                       max="<?= htmlspecialchars($maxOnlineAtInput, ENT_QUOTES, 'UTF-8') ?>"
+                       data-max-online-at="<?= htmlspecialchars($maxOnlineAtInput, ENT_QUOTES, 'UTF-8') ?>"
+                       data-max-online-at-de="<?= htmlspecialchars($maxOnlineAtDe, ENT_QUOTES, 'UTF-8') ?>"
                        value="<?= htmlspecialchars($onlineAt, ENT_QUOTES, 'UTF-8') ?>">
-                <div class="form-text">Geplante Veröffentlichung mindestens 90 Minuten in der Zukunft.</div>
+                <div class="form-text">Geplante Veröffentlichung mindestens 90 Minuten und maximal 12 Monate im Voraus (bis spätestens <?= htmlspecialchars($maxOnlineAtDe, ENT_QUOTES, 'UTF-8') ?>).</div>
+                <div class="invalid-feedback js-online-at-future-error <?= $isOnlineAtTooFar ? 'd-block' : '' ?>">
+                  Du kannst dein Foto-Album maximal 12 Monate im Voraus planen (spätestens bis <?= htmlspecialchars($maxOnlineAtDe, ENT_QUOTES, 'UTF-8') ?>). Wenn du es noch zurückhalten möchtest, belasse es stattdessen als Entwurf.
+                </div>
               </div>
             </div>
           </div>
@@ -443,13 +453,31 @@ $priceCentsOptions = range(0, 5000, 100);
                           <i class="bi bi-exclamation-octagon-fill me-1"></i>Abgelehnt – bitte löschen
                         </div>
                       <?php endif; ?>
-                      <button type="button"
-                              class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 py-0 px-1 js-delete-album-photo-btn"
-                              data-album-id="<?= $albumDbId ?>"
-                              data-file-id="<?= htmlspecialchars($phFileId, ENT_QUOTES, 'UTF-8') ?>"
-                              title="Dieses Foto löschen">
-                        <i class="bi bi-trash3"></i>
-                      </button>
+                      <div class="position-absolute top-0 end-0 m-1 d-flex gap-1">
+                        <button type="button"
+                                class="btn btn-sm btn-dark bg-opacity-75 border-0 py-0 px-1 js-rotate-album-photo-btn"
+                                data-album-id="<?= $albumDbId ?>"
+                                data-file-id="<?= htmlspecialchars($phFileId, ENT_QUOTES, 'UTF-8') ?>"
+                                data-direction="left"
+                                title="Foto um 90° nach links drehen">
+                          <i class="bi bi-arrow-counterclockwise"></i>
+                        </button>
+                        <button type="button"
+                                class="btn btn-sm btn-dark bg-opacity-75 border-0 py-0 px-1 js-rotate-album-photo-btn"
+                                data-album-id="<?= $albumDbId ?>"
+                                data-file-id="<?= htmlspecialchars($phFileId, ENT_QUOTES, 'UTF-8') ?>"
+                                data-direction="right"
+                                title="Foto um 90° nach rechts drehen">
+                          <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                        <button type="button"
+                                class="btn btn-sm btn-danger py-0 px-1 js-delete-album-photo-btn"
+                                data-album-id="<?= $albumDbId ?>"
+                                data-file-id="<?= htmlspecialchars($phFileId, ENT_QUOTES, 'UTF-8') ?>"
+                                title="Dieses Foto löschen">
+                          <i class="bi bi-trash3"></i>
+                        </button>
+                      </div>
                     </div>
                     <div class="p-1 bg-white border-top d-flex gap-1">
                       <button type="button"

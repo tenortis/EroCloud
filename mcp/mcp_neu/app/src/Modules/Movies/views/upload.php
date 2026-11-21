@@ -17,6 +17,9 @@ $movieId         = (int)($movie['id'] ?? 0);
 $title           = (string)($movie['title'] ?? '');
 $description     = (string)($movie['description'] ?? '');
 $onlineAt        = (string)($movie['online_at'] ?? date('Y-m-d\TH:i', strtotime('+90 minutes')));
+$maxOnlineAtInput = function_exists('ec_get_max_online_at_input') ? ec_get_max_online_at_input() : date('Y-m-d\T23:59', strtotime('+12 months'));
+$maxOnlineAtDe    = function_exists('ec_get_max_online_at_timestamp') ? date('d.m.Y', ec_get_max_online_at_timestamp()) : date('d.m.Y', strtotime('+12 months'));
+$isOnlineAtTooFar = function_exists('ec_is_online_at_too_far_in_future') && ec_is_online_at_too_far_in_future($onlineAt);
 $amountSecond    = (string)($movie['amount_second'] ?? '0.8');
 $asDownload      = (int)($movie['as_download'] ?? 1);
 $amountDownload  = (int)($movie['amount_download'] ?? 10);
@@ -168,9 +171,16 @@ $downloadPercentOptions = range(0, 150);
 
               <div class="col-12 col-md-6">
                 <label class="form-label fw-semibold">Veröffentlichungsdatum (Online ab)</label>
-                <input type="datetime-local" name="online_at" class="form-control"
+                <input type="datetime-local" name="online_at"
+                       class="form-control <?= $isOnlineAtTooFar ? 'is-invalid' : '' ?>"
+                       max="<?= htmlspecialchars($maxOnlineAtInput, ENT_QUOTES, 'UTF-8') ?>"
+                       data-max-online-at="<?= htmlspecialchars($maxOnlineAtInput, ENT_QUOTES, 'UTF-8') ?>"
+                       data-max-online-at-de="<?= htmlspecialchars($maxOnlineAtDe, ENT_QUOTES, 'UTF-8') ?>"
                        value="<?= htmlspecialchars($onlineAt, ENT_QUOTES, 'UTF-8') ?>">
-                <div class="form-text">Geplante Veröffentlichung mind. 90 Minuten in der Zukunft.</div>
+                <div class="form-text">Geplante Veröffentlichung mind. 90 Minuten und maximal 12 Monate im Voraus (bis spätestens <?= htmlspecialchars($maxOnlineAtDe, ENT_QUOTES, 'UTF-8') ?>).</div>
+                <div class="invalid-feedback js-online-at-future-error <?= $isOnlineAtTooFar ? 'd-block' : '' ?>">
+                  Du kannst deinen Film maximal 12 Monate im Voraus planen (spätestens bis <?= htmlspecialchars($maxOnlineAtDe, ENT_QUOTES, 'UTF-8') ?>). Wenn du ihn noch zurückhalten möchtest, belasse ihn stattdessen als Entwurf.
+                </div>
               </div>
 
               <div class="col-12 col-md-6">

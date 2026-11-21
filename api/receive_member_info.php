@@ -2,6 +2,10 @@
 
 define('SAFE_INC', 1);
 
+// Stateless Server-zu-Server-Endpunkt: keine PHP-Session / kein Datei-Lock (flock) auf sess_* starten
+$no_session = true;
+$_SESSION = array();
+
 include_once("../config.inc.php");
 include_once(API_DIR."/common.inc.php");
 
