@@ -1122,10 +1122,12 @@ foreach ($rejectionReasons as $rrCheck) {
                 <label class="form-label fw-bold mb-1">Zwingender Löschgrund (Rechts-/DSGVO-Dokumentation) *</label>
                 <input type="text" name="delete_reason" id="pac-hard-delete-reason" class="form-control form-control-sm"
                        minlength="5" maxlength="250" required
+                       oninput="App.updatePhotoAlbumHardDeleteButton('pac')"
                        placeholder="z. B. DSGVO-Löschanfrage / Persönlichkeitsrecht Mitwirkende">
               </div>
               <div class="form-check mb-1">
-                <input class="form-check-input" type="checkbox" name="force_legal_delete" value="1" id="pac-force-legal-delete" required>
+                <input class="form-check-input border-danger" type="checkbox" name="force_legal_delete" value="1" id="pac-force-legal-delete"
+                       onchange="App.updatePhotoAlbumHardDeleteButton('pac')" required>
                 <label class="form-check-label fw-semibold text-danger" for="pac-force-legal-delete">
                   Ich bestätige als Administrator, dass die unwiderrufliche Löschung trotz <?= $effPurchasesModal ?> bestehender Kundenkäufe aus rechtlichen/datenschutzrechtlichen Gründen zwingend erforderlich ist.
                 </label>
@@ -1138,10 +1140,12 @@ foreach ($rejectionReasons as $rrCheck) {
               <div class="mb-3">
                 <label class="form-label fw-semibold mb-1">Interne Notiz / Grund (optional)</label>
                 <input type="text" name="delete_reason" id="pac-hard-delete-reason" class="form-control form-control-sm"
-                       maxlength="250" placeholder="z. B. Doppel-Upload auf Wunsch der Creatorin">
+                       maxlength="250" oninput="App.updatePhotoAlbumHardDeleteButton('pac')"
+                       placeholder="z. B. Doppel-Upload auf Wunsch der Creatorin">
               </div>
               <div class="form-check mb-1">
-                <input class="form-check-input" type="checkbox" name="confirm_hard_delete" value="1" id="pac-confirm-hard-delete" required>
+                <input class="form-check-input border-danger" type="checkbox" name="confirm_hard_delete" value="1" id="pac-confirm-hard-delete"
+                       onchange="App.updatePhotoAlbumHardDeleteButton('pac')" required>
                 <label class="form-check-label fw-semibold text-danger" for="pac-confirm-hard-delete">
                   Ja, ich bestätige ausdrücklich, dass Fotoalbum #<?= $albumDbId ?> und alle Bilddateien unwiderruflich gelöscht werden.
                 </label>
@@ -1150,7 +1154,7 @@ foreach ($rejectionReasons as $rrCheck) {
           </div>
           <div class="modal-footer py-2">
             <button type="button" class="btn btn-sm btn-outline-kkc" data-bs-dismiss="modal">Abbrechen</button>
-            <button type="submit" class="btn btn-sm btn-danger" id="pac-hard-delete-submit-btn">
+            <button type="submit" class="btn btn-sm btn-danger" id="pac-hard-delete-submit-btn" disabled>
               <i class="bi bi-trash3-fill me-1"></i> Jetzt unwiderruflich löschen
             </button>
           </div>

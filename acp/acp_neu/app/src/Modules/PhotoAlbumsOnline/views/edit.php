@@ -1037,10 +1037,12 @@ $onlineAtDisplay  = ($onlineAtRawStr !== '' && !str_starts_with($onlineAtRawStr,
                 <label class="form-label fw-bold mb-1">Zwingender Löschgrund (Rechts-/DSGVO-Dokumentation) *</label>
                 <input type="text" name="delete_reason" id="pao-hard-delete-reason" class="form-control form-control-sm"
                        minlength="5" maxlength="250" required
+                       oninput="App.updatePhotoAlbumHardDeleteButton('pao')"
                        placeholder="z. B. DSGVO-Löschanfrage / Persönlichkeitsrecht Mitwirkende">
               </div>
               <div class="form-check mb-1">
-                <input class="form-check-input" type="checkbox" name="force_legal_delete" value="1" id="pao-force-legal-delete" required>
+                <input class="form-check-input border-danger" type="checkbox" name="force_legal_delete" value="1" id="pao-force-legal-delete"
+                       onchange="App.updatePhotoAlbumHardDeleteButton('pao')" required>
                 <label class="form-check-label fw-semibold text-danger" for="pao-force-legal-delete">
                   Ich bestätige als Administrator, dass die endgültige Löschung trotz <?= $effPurchasesModal ?> bestehender Kundenkäufe aus rechtlichen/datenschutzrechtlichen Gründen zwingend erforderlich ist.
                 </label>
@@ -1050,16 +1052,24 @@ $onlineAtDisplay  = ($onlineAtRawStr !== '' && !str_starts_with($onlineAtRawStr,
                 <i class="bi bi-check2-circle text-success me-1"></i>
                 Es liegen <strong>0 Kundenkäufe</strong> vor. Das ungekaufte Fotoalbum kann ohne Nachteile für Kunden physisch entfernt werden.
               </div>
-              <div class="mb-1">
+              <div class="mb-3">
                 <label class="form-label fw-semibold mb-1">Interne Notiz / Grund (optional)</label>
                 <input type="text" name="delete_reason" id="pao-hard-delete-reason" class="form-control form-control-sm"
-                       maxlength="250" placeholder="z. B. Doppel-Upload auf Wunsch der Creatorin gelöscht">
+                       maxlength="250" oninput="App.updatePhotoAlbumHardDeleteButton('pao')"
+                       placeholder="z. B. Doppel-Upload auf Wunsch der Creatorin gelöscht">
+              </div>
+              <div class="form-check mb-1">
+                <input class="form-check-input border-danger" type="checkbox" name="confirm_hard_delete" value="1" id="pao-confirm-hard-delete"
+                       onchange="App.updatePhotoAlbumHardDeleteButton('pao')" required>
+                <label class="form-check-label fw-semibold text-danger" for="pao-confirm-hard-delete">
+                  Ja, ich bestätige ausdrücklich, dass Fotoalbum #<?= $onlineId ?> und alle Bilddateien unwiderruflich physisch gelöscht werden.
+                </label>
               </div>
             <?php endif; ?>
           </div>
           <div class="modal-footer py-2">
             <button type="button" class="btn btn-sm btn-outline-kkc" data-bs-dismiss="modal">Abbrechen</button>
-            <button type="submit" class="btn btn-sm btn-danger" id="pao-hard-delete-submit-btn">
+            <button type="submit" class="btn btn-sm btn-danger" id="pao-hard-delete-submit-btn" disabled>
               <i class="bi bi-trash3-fill me-1"></i> Jetzt unwiderruflich physisch löschen
             </button>
           </div>

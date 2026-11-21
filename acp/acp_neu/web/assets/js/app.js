@@ -1302,9 +1302,29 @@ const App = {
     return false;
   },
 
+  updatePhotoAlbumHardDeleteButton(prefix) {
+    const btn = document.getElementById(`${prefix}-hard-delete-submit-btn`);
+    if (!btn) return;
+    const confirmCb = document.getElementById(`${prefix}-confirm-hard-delete`);
+    const legalCb = document.getElementById(`${prefix}-force-legal-delete`);
+    const reasonInput = document.getElementById(`${prefix}-hard-delete-reason`);
+
+    let canSubmit = false;
+    if (legalCb) {
+      const reasonOk = reasonInput ? reasonInput.value.trim().length >= 5 : false;
+      canSubmit = legalCb.checked && reasonOk;
+    } else if (confirmCb) {
+      canSubmit = confirmCb.checked;
+    }
+    btn.disabled = !canSubmit;
+  },
+
   openPhotoAlbumCheckingHardDeleteModal() {
     const modalEl = document.getElementById('pacHardDeleteModal');
     if (!modalEl || typeof bootstrap === 'undefined') return;
+    const form = document.getElementById('pac-hard-delete-form');
+    if (form) form.reset();
+    this.updatePhotoAlbumHardDeleteButton('pac');
     bootstrap.Modal.getOrCreateInstance(modalEl).show();
   },
 
@@ -1356,9 +1376,9 @@ const App = {
       this.toast('Verbindungsfehler: ' + err.message, 'danger');
     } finally {
       if (btn) {
-        btn.disabled = false;
         btn.innerHTML = origHtml;
       }
+      this.updatePhotoAlbumHardDeleteButton('pac');
     }
     return false;
   },
@@ -2056,6 +2076,9 @@ const App = {
   openPhotoAlbumHardDeleteModal() {
     const modalEl = document.getElementById('paoHardDeleteModal');
     if (!modalEl || typeof bootstrap === 'undefined') return;
+    const form = document.getElementById('pao-hard-delete-form');
+    if (form) form.reset();
+    this.updatePhotoAlbumHardDeleteButton('pao');
     bootstrap.Modal.getOrCreateInstance(modalEl).show();
   },
 
@@ -2101,9 +2124,9 @@ const App = {
       this.toast('Verbindungsfehler: ' + err.message, 'danger');
     } finally {
       if (btn) {
-        btn.disabled = false;
         btn.innerHTML = origHtml;
       }
+      this.updatePhotoAlbumHardDeleteButton('pao');
     }
     return false;
   },
