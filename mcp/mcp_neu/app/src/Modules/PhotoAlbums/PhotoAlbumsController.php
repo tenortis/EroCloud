@@ -997,27 +997,11 @@ final class PhotoAlbumsController
             $rawBytes = @file_get_contents($filePath);
             if (is_string($rawBytes) && $rawBytes !== '') {
                 $srcImg = @imagecreatefromstring($rawBytes);
-                // Vorhandene EXIF-Ausrichtung zuerst normalisieren, damit die 90°-Drehung exakt der sichtbaren Darstellung entspricht
-                if ($srcImg instanceof \GdImage && function_exists('exif_read_data')) {
-                    $exif = @exif_read_data($filePath);
-                    if (is_array($exif) && !empty($exif['Orientation'])) {
-                        $orient = (int)$exif['Orientation'];
-                        if ($orient === 3) {
-                            $norm = @imagerotate($srcImg, 180, 0);
-                            if ($norm instanceof \GdImage) {
-                                $srcImg = $norm;
-                            }
-                        } elseif ($orient === 6) {
-                            $norm = @imagerotate($srcImg, -90, 0);
-                            if ($norm instanceof \GdImage) {
-                                $srcImg = $norm;
-                            }
-                        } elseif ($orient === 8) {
-                            $norm = @imagerotate($srcImg, 90, 0);
-                            if ($norm instanceof \GdImage) {
-                                $srcImg = $norm;
-                            }
-                        }
+                // Vorhandene EXIF-Ausrichtung (2..8 inkl. Spiegelung) zuerst normalisieren, damit die 90°-Drehung exakt der sichtbaren Darstellung entspricht
+                if ($srcImg instanceof \GdImage && function_exists('ec_read_exif_orientation') && function_exists('ec_apply_exif_orientation')) {
+                    $orient = \ec_read_exif_orientation($filePath);
+                    if ($orient >= 2 && $orient <= 8) {
+                        $srcImg = \ec_apply_exif_orientation($srcImg, $orient);
                     }
                 }
             }

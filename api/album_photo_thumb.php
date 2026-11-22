@@ -20,12 +20,18 @@ function no_image()
     p4c_errorlog(error_get_last());
 }
 
+if (!defined('EC_THUMB_EXIF_FIX_TS')) {
+    // Alle vor diesem Zeitpunkt (2026-11-22) generierten Thumbs mit EXIF Orientation > 1 werden einmalig frisch erzeugt
+    define('EC_THUMB_EXIF_FIX_TS', 1795362100);
+}
+
 /**
  * Prüft, ob das verpixelte Vorschaubild (thumb_{filename}) neu generiert werden muss:
  *  1. Datei fehlt oder ist zu klein/beschädigt (<= 3100 Bytes)
  *  2. Das Originalbild wurde nach der Erstellung des Thumbnails geändert/gedreht (filemtime)
- *  3. Altbestand-Selbstheilung: Das Original-JPEG besitzt ein EXIF-Orientation-Tag (6/8 = 90° Hochformat),
- *     aber ein altes Thumbnail auf Disk hat noch das ungedrehte Sensor-Seitenverhältnis (oder Orientation=3 vor 2024).
+ *  3. Altbestand-Selbstheilung für alle EXIF-Orientierungen (2..8 inkl. 180°, 1:1-Quadrat & Frontkamera-Spiegelung):
+ *     - Jedes vor EC_THUMB_EXIF_FIX_TS erzeugte Thumbnail mit EXIF Orientation > 1 wird einmalig neu generiert.
+ *     - Bei 90°/270°-Drehungen (5/6/7/8) greift zusätzlich dauerhaft die Hoch-/Querformat-Prüfung.
  */
 function ec_album_thumb_needs_regeneration($image, $thumb_path, $ext)
 {
@@ -39,15 +45,17 @@ function ec_album_thumb_needs_regeneration($image, $thumb_path, $ext)
         return true;
     }
 
-    if (($ext === 'jpg' || $ext === 'jpeg') && function_exists('exif_read_data')) {
-        $exif = @exif_read_data($image);
-        if (is_array($exif) && !empty($exif['Orientation'])) {
-            $orient = (int)$exif['Orientation'];
-            if ($orient === 6 || $orient === 8) {
+    if ($ext === 'jpg' || $ext === 'jpeg') {
+        $orient = function_exists('ec_read_exif_orientation') ? ec_read_exif_orientation($image) : 1;
+        if ($orient >= 2 && $orient <= 8) {
+            if ($thumbMtime < EC_THUMB_EXIF_FIX_TS) {
+                return true;
+            }
+            if (in_array($orient, array(5, 6, 7, 8), true)) {
                 $origSize  = @getimagesize($image);
                 $thumbSize = @getimagesize($thumb_path);
                 if (is_array($origSize) && is_array($thumbSize) && $origSize[0] > 0 && $origSize[1] > 0 && $thumbSize[0] > 0 && $thumbSize[1] > 0) {
-                    // Nach 90°-EXIF-Drehung muss Hoch-/Querformat gegenüber den rohen Sensor-Pixeln getauscht sein
+                    // Nach 90°/270°-EXIF-Drehung muss Hoch-/Querformat gegenüber den rohen Sensor-Pixeln getauscht sein
                     $origIsLandscape  = ($origSize[0] > $origSize[1]);
                     $origIsPortrait   = ($origSize[1] > $origSize[0]);
                     $thumbIsLandscape = ($thumbSize[0] > $thumbSize[1]);
@@ -56,8 +64,6 @@ function ec_album_thumb_needs_regeneration($image, $thumb_path, $ext)
                         return true;
                     }
                 }
-            } elseif ($orient === 3 && $thumbMtime > 0 && $thumbMtime < 1704067200) {
-                return true;
             }
         }
     }
@@ -89,30 +95,9 @@ function pixelate($image, $thumb_path, $size = 200, $pixelate_x = 3, $pixelate_y
             $width     = 0;
             $height    = 0;
             if ($ext === 'jpg' || $ext === 'jpeg') {
-                if (function_exists('exif_read_data')) {
-                    $exif = @exif_read_data($image);
-                    if (is_array($exif) && !empty($exif['Orientation'])) {
-                        switch ((int)$exif['Orientation']) {
-                            case 3:
-                                $rot = @imagerotate($im, 180, 0);
-                                if ($rot) {
-                                    $im = $rot;
-                                }
-                                break;
-                            case 6:
-                                $rot = @imagerotate($im, -90, 0);
-                                if ($rot) {
-                                    $im = $rot;
-                                }
-                                break;
-                            case 8:
-                                $rot = @imagerotate($im, 90, 0);
-                                if ($rot) {
-                                    $im = $rot;
-                                }
-                                break;
-                        }
-                    }
+                $orient = function_exists('ec_read_exif_orientation') ? ec_read_exif_orientation($image) : 1;
+                if ($orient >= 2 && $orient <= 8 && function_exists('ec_apply_exif_orientation')) {
+                    $im = ec_apply_exif_orientation($im, $orient);
                 }
                 $altesBild = $im;
                 $width     = imagesx($altesBild);
@@ -158,7 +143,7 @@ function pixelate($image, $thumb_path, $size = 200, $pixelate_x = 3, $pixelate_y
                 @imagepng($neuesBild, $thumb_path);
             }
 
-            @touch($thumb_path, time());
+            @touch($thumb_path, max(time(), EC_THUMB_EXIF_FIX_TS + 1));
             clearstatcache(true, $thumb_path);
             unset($neuesBild, $altesBild);
         }

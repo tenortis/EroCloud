@@ -134,15 +134,12 @@ function mcp_media_output_resized_image(
         $targetWidth = min(1024, $maxWidth);
     }
 
-    $hasExifRotation = false;
-    if (($mimeType === 'image/jpeg' || $mimeType === 'image/jpg') && function_exists('exif_read_data')) {
-        $exifCheck = @exif_read_data($filePath);
-        if (is_array($exifCheck) && in_array((int)($exifCheck['Orientation'] ?? 1), [3, 6, 8], true)) {
-            $hasExifRotation = true;
-        }
+    $exifOrient = 1;
+    if ($mimeType === 'image/jpeg' || $mimeType === 'image/jpg') {
+        $exifOrient = function_exists('ec_read_exif_orientation') ? \ec_read_exif_orientation($filePath) : 1;
     }
 
-    if ($targetWidth >= $srcWidth && !$hasExifRotation) {
+    if ($targetWidth >= $srcWidth && $exifOrient === 1) {
         while (ob_get_level() > 0) {
             @ob_end_clean();
         }
@@ -167,7 +164,7 @@ function mcp_media_output_resized_image(
             @mkdir($cacheDir, 0775, true);
         }
         if (is_dir($cacheDir)) {
-            $cacheFile = $cacheDir . '/' . $cachePrefix . '_' . md5($filePath . '|' . (int)@filemtime($filePath) . '|' . $newWidth) . '.bin';
+            $cacheFile = $cacheDir . '/' . $cachePrefix . '_v2_' . md5($filePath . '|' . (int)@filemtime($filePath) . '|' . $targetWidth . '|' . $exifOrient) . '.bin';
             if (is_file($cacheFile) && (int)@filesize($cacheFile) > 0) {
                 while (ob_get_level() > 0) {
                     @ob_end_clean();
@@ -185,33 +182,12 @@ function mcp_media_output_resized_image(
         $rawBytes = @file_get_contents($filePath);
         if (is_string($rawBytes) && $rawBytes !== '') {
             $srcImage = @imagecreatefromstring($rawBytes);
-            if ($srcImage instanceof \GdImage && function_exists('exif_read_data')) {
-                $exif = @exif_read_data($filePath);
-                if (is_array($exif) && !empty($exif['Orientation'])) {
-                    $orientation = (int)$exif['Orientation'];
-                    if ($orientation === 3) {
-                        $rot = @imagerotate($srcImage, 180, 0);
-                        if ($rot instanceof \GdImage) {
-                            $srcImage = $rot;
-                        }
-                    } elseif ($orientation === 6) {
-                        $rot = @imagerotate($srcImage, -90, 0);
-                        if ($rot instanceof \GdImage) {
-                            $srcImage = $rot;
-                            $srcWidth = imagesx($srcImage);
-                            $srcHeight = imagesy($srcImage);
-                            $newHeight = max(1, (int)round($newWidth * ($srcHeight / max(1, $srcWidth))));
-                        }
-                    } elseif ($orientation === 8) {
-                        $rot = @imagerotate($srcImage, 90, 0);
-                        if ($rot instanceof \GdImage) {
-                            $srcImage = $rot;
-                            $srcWidth = imagesx($srcImage);
-                            $srcHeight = imagesy($srcImage);
-                            $newHeight = max(1, (int)round($newWidth * ($srcHeight / max(1, $srcWidth))));
-                        }
-                    }
-                }
+            if ($srcImage instanceof \GdImage && $exifOrient >= 2 && $exifOrient <= 8 && function_exists('ec_apply_exif_orientation')) {
+                $srcImage  = \ec_apply_exif_orientation($srcImage, $exifOrient);
+                $srcWidth  = imagesx($srcImage);
+                $srcHeight = imagesy($srcImage);
+                $newWidth  = max(1, min($targetWidth, $srcWidth));
+                $newHeight = max(1, (int)round($newWidth * ($srcHeight / max(1, $srcWidth))));
             }
         }
     } elseif ($mimeType === 'image/png') {

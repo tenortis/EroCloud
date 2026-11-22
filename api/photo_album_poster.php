@@ -196,14 +196,11 @@ function to_thumb($bild, $size = 0) {
     }
 
     $exif_orient = 1;
-    if (($mime_type == 'image/jpeg' || $mime_type == 'image/jpg') && function_exists('exif_read_data')) {
-        $exif_check = @exif_read_data($bild);
-        if (is_array($exif_check) && !empty($exif_check['Orientation'])) {
-            $exif_orient = (int)$exif_check['Orientation'];
-        }
+    if ($mime_type == 'image/jpeg' || $mime_type == 'image/jpg') {
+        $exif_orient = function_exists('ec_read_exif_orientation') ? ec_read_exif_orientation($bild) : 1;
     }
 
-    if ($size >= $breite && !in_array($exif_orient, array(3, 6, 8), true)) {
+    if ($size >= $breite && $exif_orient === 1) {
         output_raw_file_and_exit($bild, $mime_type);
     }
 
@@ -217,7 +214,7 @@ function to_thumb($bild, $size = 0) {
     if (!is_dir($cacheDir)) {
         @mkdir($cacheDir, 0775, true);
     }
-    $cacheFile = $cacheDir . '/pa_' . md5($bild . '|' . (int)@filemtime($bild) . '|' . $neueBreite . '|' . $exif_orient) . '.bin';
+    $cacheFile = $cacheDir . '/pa_v2_' . md5($bild . '|' . (int)@filemtime($bild) . '|' . (int)$size . '|' . $exif_orient) . '.bin';
     if (is_file($cacheFile) && filesize($cacheFile) > 0) {
         if (!empty($GLOBALS['fastCacheFile']) && !is_file($GLOBALS['fastCacheFile'])) {
             @copy($cacheFile, $GLOBALS['fastCacheFile']);
@@ -230,23 +227,10 @@ function to_thumb($bild, $size = 0) {
         $image_data = @file_get_contents($bild);
         if ($image_data) {
             $altesBild = @imagecreatefromstring($image_data);
-            if ($altesBild && in_array($exif_orient, array(3, 6, 8), true)) {
-                switch ($exif_orient) {
-                    case 3:
-                        $rot = @imagerotate($altesBild, 180, 0);
-                        if ($rot) { $altesBild = $rot; }
-                        break;
-                    case 6:
-                        $rot = @imagerotate($altesBild, -90, 0);
-                        if ($rot) { $altesBild = $rot; }
-                        break;
-                    case 8:
-                        $rot = @imagerotate($altesBild, 90, 0);
-                        if ($rot) { $altesBild = $rot; }
-                        break;
-                }
-                $breite = imagesx($altesBild);
-                $hoehe  = imagesy($altesBild);
+            if ($altesBild && $exif_orient >= 2 && $exif_orient <= 8 && function_exists('ec_apply_exif_orientation')) {
+                $altesBild  = ec_apply_exif_orientation($altesBild, $exif_orient);
+                $breite     = imagesx($altesBild);
+                $hoehe      = imagesy($altesBild);
                 $neueBreite = max(1, min((int)$size, $breite));
                 $neueHoehe  = max(1, (int)round($neueBreite * ($hoehe / max(1, $breite))));
             }

@@ -560,34 +560,17 @@ if ($type === 'album_poster' || $type === 'album_photo') {
 
     if (($mime === 'image/jpeg' || $mime === 'image/jpg' || $mime === 'image/png') && function_exists('imagecreatetruecolor')) {
         $imgSize = @getimagesize($targetFile);
-        $exifOrientation = 1;
-        if (($mime === 'image/jpeg' || $mime === 'image/jpg') && function_exists('exif_read_data')) {
-            $exif = @exif_read_data($targetFile);
-            if (is_array($exif) && !empty($exif['Orientation'])) {
-                $exifOrientation = (int)$exif['Orientation'];
-            }
-        }
+        $exifOrientation = ($mime === 'image/jpeg' || $mime === 'image/jpg') && function_exists('ec_read_exif_orientation')
+            ? \ec_read_exif_orientation($targetFile)
+            : 1;
         $needsResize = ($reqWidth > 0 && $reqWidth <= 1024 && is_array($imgSize) && $imgSize[0] > $reqWidth && $imgSize[1] > 0);
-        $needsExifRotate = in_array($exifOrientation, [3, 6, 8], true);
+        $needsExifRotate = ($exifOrientation >= 2 && $exifOrientation <= 8);
 
         if (is_array($imgSize) && $imgSize[0] > 0 && $imgSize[1] > 0 && ($needsResize || $needsExifRotate)) {
             $srcImg = $mime === 'image/png' ? @imagecreatefrompng($targetFile) : @imagecreatefromjpeg($targetFile);
             if ($srcImg instanceof \GdImage) {
-                if ($exifOrientation === 3) {
-                    $rot = @imagerotate($srcImg, 180, 0);
-                    if ($rot instanceof \GdImage) {
-                        $srcImg = $rot;
-                    }
-                } elseif ($exifOrientation === 6) {
-                    $rot = @imagerotate($srcImg, -90, 0);
-                    if ($rot instanceof \GdImage) {
-                        $srcImg = $rot;
-                    }
-                } elseif ($exifOrientation === 8) {
-                    $rot = @imagerotate($srcImg, 90, 0);
-                    if ($rot instanceof \GdImage) {
-                        $srcImg = $rot;
-                    }
+                if ($needsExifRotate && function_exists('ec_apply_exif_orientation')) {
+                    $srcImg = \ec_apply_exif_orientation($srcImg, $exifOrientation);
                 }
 
                 $curW = imagesx($srcImg);

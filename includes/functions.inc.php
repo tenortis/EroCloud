@@ -466,6 +466,103 @@ function ec_invalidate_photo_album_api_cache($albumIdHash) {
     }
 }
 
+if (!function_exists('ec_read_exif_orientation')) {
+    /**
+     * Liest das EXIF-Orientation-Tag (1..8) einer JPEG-Datei fehlertolerant aus.
+     */
+    function ec_read_exif_orientation($filePath): int
+    {
+        $path = (string)$filePath;
+        if ($path === '' || !function_exists('exif_read_data') || !is_file($path)) {
+            return 1;
+        }
+        $exif = @exif_read_data($path);
+        if (is_array($exif) && !empty($exif['Orientation'])) {
+            $orient = (int)$exif['Orientation'];
+            if ($orient >= 2 && $orient <= 8) {
+                return $orient;
+            }
+        }
+        return 1;
+    }
+}
+
+if (!function_exists('ec_apply_exif_orientation')) {
+    /**
+     * Wendet alle EXIF-Orientierungen (2..8 inkl. Spiegelung bei Frontkamera-Selfies) auf ein GD-Bild an.
+     *
+     * @param \GdImage|resource $img
+     * @return \GdImage|resource
+     */
+    function ec_apply_exif_orientation($img, int $orientation)
+    {
+        if (!$img || $orientation < 2 || $orientation > 8) {
+            return $img;
+        }
+
+        switch ($orientation) {
+            case 2:
+                if (function_exists('imageflip')) {
+                    @imageflip($img, IMG_FLIP_HORIZONTAL);
+                }
+                break;
+            case 3:
+                if (function_exists('imagerotate')) {
+                    $rot = @imagerotate($img, 180, 0);
+                    if ($rot) {
+                        $img = $rot;
+                    }
+                }
+                break;
+            case 4:
+                if (function_exists('imageflip')) {
+                    @imageflip($img, IMG_FLIP_VERTICAL);
+                }
+                break;
+            case 5:
+                if (function_exists('imagerotate')) {
+                    $rot = @imagerotate($img, -90, 0);
+                    if ($rot) {
+                        $img = $rot;
+                    }
+                }
+                if (function_exists('imageflip')) {
+                    @imageflip($img, IMG_FLIP_HORIZONTAL);
+                }
+                break;
+            case 6:
+                if (function_exists('imagerotate')) {
+                    $rot = @imagerotate($img, -90, 0);
+                    if ($rot) {
+                        $img = $rot;
+                    }
+                }
+                break;
+            case 7:
+                if (function_exists('imagerotate')) {
+                    $rot = @imagerotate($img, 90, 0);
+                    if ($rot) {
+                        $img = $rot;
+                    }
+                }
+                if (function_exists('imageflip')) {
+                    @imageflip($img, IMG_FLIP_HORIZONTAL);
+                }
+                break;
+            case 8:
+                if (function_exists('imagerotate')) {
+                    $rot = @imagerotate($img, 90, 0);
+                    if ($rot) {
+                        $img = $rot;
+                    }
+                }
+                break;
+        }
+
+        return $img;
+    }
+}
+
 // MD5-Hash for changing Profile-Check
 function actor_checksum($actor_id) {
     include_once(SOURCEDIR.'/includes/klassen/actor.inc.php');
