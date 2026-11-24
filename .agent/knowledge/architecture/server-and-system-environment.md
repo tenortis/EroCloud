@@ -1,6 +1,6 @@
 ---
 name: server-and-system-environment
-description: Vollstaendige Dokumentation der Server-Infrastruktur (t199.nlserver.net), Betriebssystem, LiveConfig, installierte PHP-Versionen (8.0.30 & 8.4.27), Domains, Cronjobs und Error-Logging fuer EroCloud (web1).
+description: Vollstaendige Dokumentation der Server-Infrastruktur (t199.nlserver.net), Betriebssystem, LiveConfig, installierte PHP-Versionen (8.0.30 & 8.4.28), Domains, Cronjobs und Error-Logging fuer EroCloud (web1).
 usage: 'Wird automatisch herangezogen bei Fragen oder Arbeiten an Server-Konfiguration, PHP-Versionen, Cronjobs, Domains, Pfaden oder Error-Logging.'
 ---
 
@@ -25,7 +25,7 @@ usage: 'Wird automatisch herangezogen bei Fragen oder Arbeiten an Server-Konfigu
 | **Speicher-Mounts** | `/` (`375,66 GiB` Systemplatte) sowie `/var/www/web1/cloud_storage` (`5,20 TiB` Medienspeicher) |
 
 > **Wichtiger Infrastruktur-Hinweis (Warum Debian 11 statt Debian 12):**
-> Auf dem Server existiert neben **`web1` (EroCloud)** noch der Vertrag **`web2` (`amoredea.com`)**, der aktuell noch auf `PHP 7.3.33` (`php-7.3-opt`) läuft. Da Debian 12 (Bookworm) `OpenSSL 1.1` (`libssl1.1`) entfernt und nur noch `OpenSSL 3.0` mitbringt, wird `php-7.3-opt` unter Debian 12 nicht mehr unterstützt. Deshalb verbleibt das Host-System auf **Debian 11 (Bullseye)**, bis alle Verträge vollständig auf PHP 8.4+ umgestellt sind.
+> Auf dem Server existieren neben **`web1` (EroCloud)** noch die Verträge **`web2` (`amoredea.com`, `PHP 8.0.30`)** und **`web3` (`cdn.erocms.net`, noch `PHP 7.3.33` / `php-7.3-opt`)**. Da Debian 12 (Bookworm) `OpenSSL 1.1` (`libssl1.1`) entfernt und nur noch `OpenSSL 3.0` mitbringt, wird `php-7.3-opt` unter Debian 12 nicht mehr unterstützt. Deshalb verbleibt das Host-System auf **Debian 11 (Bullseye)**, bis alle Verträge vollständig auf PHP 8.4+ umgestellt sind.
 
 ---
 
@@ -36,9 +36,9 @@ Alle ungenutzten Zwischenversionen (`5.6`, `7.0`, `7.1`, `7.2`, `7.4`, `8.1`, `8
 
 | PHP-Version | Paketname | Installationspfad | CLI-Binary | Aktuelle Verwendung / Rolle |
 | :--- | :--- | :--- | :--- | :--- |
-| **PHP `8.4.27`** | `php-8.4-opt` (+ `imagick`) | `/opt/php-8.4/` | `/opt/php-8.4/bin/php` | **Aktiv für `acp.erocloud.net` (ACP v2.0) & `erocloud.net` (MCP v2.0)** sowie Ziel-Version für alle weiteren `web1`-Domains |
-| **PHP `8.0.30`** | `php-8.0-opt` (+ `imagick`) | `/opt/php-8.0/` | `/opt/php-8.0/bin/php` | **Aktuell produktiv für `api.erocloud.net` (Code bereits PHP-8.4/8.5-kompatibel & bereit für LiveConfig-Umstellung), `ads` & Cronjobs** |
-| **PHP `7.3.33`** | `php-7.3-opt` (+ `imagick`) | `/opt/php-7.3/` | `/opt/php-7.3/bin/php` | Nur noch für `web2` (`amoredea.com`) aktiv |
+| **PHP `8.4.28`** | `php-8.4-opt` (+ `imagick`) | `/opt/php-8.4/` | `/opt/php-8.4/bin/php` | **Aktiv für `acp.erocloud.net`, `erocloud.net`, `api.erocloud.net`, `wevsql.erocloud.net` sowie alle 8 Cronjobs von `web1`**; Ziel-Version für die verbleibenden `ads`-Domains |
+| **PHP `8.0.30`** | `php-8.0-opt` (+ `imagick`) | `/opt/php-8.0/` | `/opt/php-8.0/bin/php` | **Nur noch für `www1.erocloud.net` (`ads/`), `ad5.tv` (`ads/ad5.tv/`) sowie `web2` (`amoredea.com`) aktiv** |
+| **PHP `7.3.33`** | `php-7.3-opt` (+ `imagick`) | `/opt/php-7.3/` | `/opt/php-7.3/bin/php` | Nur noch für `web3` (`cdn.erocms.net`) aktiv |
 | **PHP `7.4.33`** | Debian Standard (`php-cgi`) | `/usr/bin/` | `/usr/bin/php` | Debian 11 System-Standard |
 
 ### 2.2 Lokale Entwicklungsumgebung (Windows XAMPP)
@@ -55,30 +55,28 @@ Das Projekt **EroCloud** liegt auf dem Live-Server im LiveConfig-Vertrag **`web1
 * **Cloud-Storage-Pfad:** `/var/www/web1/cloud_storage`
 
 ### 3.1 Domains in `web1`
-Die Domains von `web1` laufen über FastCGI/FPM (`acp.erocloud.net` und `erocloud.net` bereits produktiv auf **PHP `8.4.27`**, die übrigen Domains auf **PHP `8.0.30`** mit Migrationsziel **PHP `8.4.27`**):
+Die Domains von `web1` laufen über FastCGI/FPM (`acp.erocloud.net`, `erocloud.net`, `api.erocloud.net` und `wevsql.erocloud.net` produktiv auf **PHP `8.4.28`**, nur noch `www1.erocloud.net` und `ad5.tv` auf **PHP `8.0.30`** mit Migrationsziel **PHP `8.4.28`**):
 
 | Domain | Ziel-Verzeichnis (relativ zu `/var/www/web1/htdocs/`) | PHP-Version | Projektbereich |
 | :--- | :--- | :--- | :--- |
-| **`acp.erocloud.net`** | `acp/acp_neu/web/` | **PHP `8.4.27`** | Admin-Control-Panel (ACP v2.0 – `acp/acp_neu/app/` liegt physisch oberhalb des DocumentRoots; Legacy-Code verbleibt als Referenz in `acp/`) |
-| **`erocloud.net`** (inkl. `www.` / `*.erocloud.net`) | `mcp/mcp_neu/web/` | **PHP `8.4.27`** | Merchant-Control-Panel (MCP v2.0 – `mcp/mcp_neu/app/` liegt physisch oberhalb des DocumentRoots; Legacy-Code verbleibt als Archiv in `mcp/`) |
-| **`api.erocloud.net`** | `api/` | PHP `8.0.30` *(Code PHP 8.4/8.5-ready)* | Zentrale API-Schnittstelle (Videos, Fotoalben, Messenger, Tracking) |
+| **`acp.erocloud.net`** | `acp/acp_neu/web/` | **PHP `8.4.28`** | Admin-Control-Panel (ACP v2.0 – `acp/acp_neu/app/` liegt physisch oberhalb des DocumentRoots; Legacy-Code verbleibt als Referenz in `acp/`) |
+| **`erocloud.net`** (inkl. `www.` / `*.erocloud.net`) | `mcp/mcp_neu/web/` | **PHP `8.4.28`** | Merchant-Control-Panel (MCP v2.0 – `mcp/mcp_neu/app/` liegt physisch oberhalb des DocumentRoots; Legacy-Code verbleibt als Archiv in `mcp/`) |
+| **`api.erocloud.net`** | `api/` | **PHP `8.4.28`** *(Code PHP 8.4/8.5-ready)* | Zentrale API-Schnittstelle (Videos, Fotoalben, Messenger, Tracking) |
 | **`www1.erocloud.net`** | `ads/` | PHP `8.0.30` | Werbemittel- & Banner-Auslieferung |
 | **`ad5.tv`** (inkl. `www.ad5.tv`) | `ads/ad5.tv/` | PHP `8.0.30` | Ad-Tracking & Redirect-Endpunkt |
-| **`wevsql.erocloud.net`** | *(LiveConfig-Anwendung)* | – | phpMyAdmin |
+| **`wevsql.erocloud.net`** | *(LiveConfig-Anwendung `phpmyadmin5`)* | **PHP `8.4.28`** | phpMyAdmin |
 
 ### 3.2 Konfigurierte Cronjobs in `web1`
-Alle Cronjobs unter `cronjobs/` sowie `mcp/messenger/cronjobs/crawl_erocms_chats.php` (und die von `convert_movie.php` genutzte Bibliothek `mcp/includes/getid3/` auf Version `1.9.21`) sind vollständig **PHP-`8.4`/`8.5`-kompatibel gehärtet** und bereit für die Umstellung von `/opt/php-8.0/bin/php` auf `/opt/php-8.4/bin/php`:
+Alle 8 aktiven Cronjobs von `web1` unter `cronjobs/` sowie `mcp/messenger/cronjobs/crawl_erocms_chats.php` (inkl. `mcp/includes/getid3/` `1.9.21`) sind vollständig **PHP-`8.4`/`8.5`-kompatibel gehärtet** und laufen produktiv über `/opt/php-8.4/bin/php` *(die veralteten Einträge `api/usertracking/cronjob.php` – letzter DB-Eintrag `2024-11-08` – und `import_conversions.php --date=2022-12-17` wurden in LiveConfig entfernt)*:
 
-1. `* * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/api/usertracking/cronjob.php > /dev/null 2>&1` *(veraltet – Cross-Domain-Tracking wird nicht mehr genutzt, letzter Eintrag in `user_tracking_website_access` vom `2024-11-08`; Cronjob kann in LiveConfig deaktiviert/gelöscht werden)*
-2. `*/5 * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/actor_reassign.php` *(Code PHP 8.4/8.5-ready)*
-3. `*/2 * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/ai_compliance_worker.php >/dev/null 2>&1` *(Code PHP 8.4/8.5-ready)*
-4. `*/5 * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/convert_movie.php > /dev/null 2>&1` *(Code PHP 8.4/8.5-ready inkl. getID3 `1.9.21`)*
-5. `8 * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/crawl_erocms_revenues.php --all--type=webcam--month` *(Code PHP 8.4/8.5-ready)*
-6. `45 * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/delete_movie.php` *(Code PHP 8.4/8.5-ready)*
-7. `18 * * 12 *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/import_conversions.php --date=2022-12-17` *(historischer Alt-Job aus 2022 – kann in LiveConfig gelöscht werden; Code PHP 8.4/8.5-ready)*
-8. `*/4 * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/import_conversions.php --date=today` *(Code PHP 8.4/8.5-ready)*
-9. `11 0 * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/import_conversions.php --date=today` *(Code PHP 8.4/8.5-ready)*
-10. `*/5 * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/mcp/messenger/cronjobs/crawl_erocms_chats.php` *(Code PHP 8.4/8.5-ready)*
+1. `*/5 * * * *` – `/opt/php-8.4/bin/php /var/www/web1/htdocs/cronjobs/actor_reassign.php`
+2. `*/2 * * * *` – `/opt/php-8.4/bin/php /var/www/web1/htdocs/cronjobs/ai_compliance_worker.php >/dev/null 2>&1`
+3. `*/5 * * * *` – `/opt/php-8.4/bin/php /var/www/web1/htdocs/cronjobs/convert_movie.php > /dev/null 2>&1`
+4. `8 * * * *` – `/opt/php-8.4/bin/php /var/www/web1/htdocs/cronjobs/crawl_erocms_revenues.php --all--type=webcam--month`
+5. `45 * * * *` – `/opt/php-8.4/bin/php /var/www/web1/htdocs/cronjobs/delete_movie.php`
+6. `*/4 * * * *` – `/opt/php-8.4/bin/php /var/www/web1/htdocs/cronjobs/import_conversions.php --date=today`
+7. `11 0 * * *` – `/opt/php-8.4/bin/php /var/www/web1/htdocs/cronjobs/import_conversions.php --date=yesterday`
+8. `*/5 * * * *` – `/opt/php-8.4/bin/php /var/www/web1/htdocs/mcp/messenger/cronjobs/crawl_erocms_chats.php`
 
 ---
 
@@ -99,9 +97,9 @@ Alle 4 Web-Bereiche (`acp`, `mcp`, `api`, `ads`) sowie alle CLI-Cronjobs schreib
 
 ---
 
-## 5. 🛠️ Verbindliche PHP 8.0 $\rightarrow$ PHP 8.4.27 Entwicklungsrichtlinien
+## 5. 🛠️ Verbindliche PHP 8.0 $\rightarrow$ PHP 8.4.28 Entwicklungsrichtlinien
 
-Da `acp.erocloud.net` und `erocloud.net` bereits produktiv auf **PHP `8.4.27`** laufen und die übrigen Bereiche (`api.erocloud.net`, `ads`, Cronjobs) noch auf **PHP `8.0.30`** mit Migrationsziel **PHP `8.4.27`** betrieben werden, gelten für jeden neuen oder geänderten Code zwingend folgende Regeln:
+Da `acp.erocloud.net`, `erocloud.net`, `api.erocloud.net` sowie alle 8 Cronjobs bereits produktiv auf **PHP `8.4.28`** laufen und nur noch `ads` (`www1.erocloud.net`, `ad5.tv`) auf **PHP `8.0.30`** mit Migrationsziel **PHP `8.4.28`** betrieben wird, gelten für jeden neuen oder geänderten Code zwingend folgende Regeln:
 
 1. **Strikte Typ-Casts bei `abs()`, `round()` und `number_format()`:**
    * In PHP 8+ wirft `abs("")` oder `abs("abc")` einen `Fatal Error: Uncaught TypeError`.
