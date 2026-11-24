@@ -16,7 +16,7 @@ if (!isset($_GET['album_id'])) {
     print_xml($api);
 }
 
-$album_id = preg_replace('/[^a-zA-Z0-9]/', '', $_GET['album_id']);
+$album_id = (string)preg_replace('/[^a-zA-Z0-9]/', '', is_string($_GET['album_id']) ? $_GET['album_id'] : '');
 
 $rs_photos = p4c_query("SELECT * FROM `photo_albums_photos` WHERE `album_id`='". p4c_escape_string($album_id)."' AND `rejected`='0' ORDER BY `id` DESC;",__FILE__,__LINE__);
 

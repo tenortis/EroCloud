@@ -5,8 +5,18 @@ if (!defined('SAFE_INC')) {
 }
 
 $temp_file = 'get_actors_online_status.tmp';
+$cached_api = null;
+if (is_file($temp_file) && (int)@filemtime($temp_file) >= time() - 10) {
+    $raw_temp = @file_get_contents($temp_file);
+    if (is_string($raw_temp) && $raw_temp !== '') {
+        $unserialized = @unserialize($raw_temp, ['allowed_classes' => false]);
+        if (is_array($unserialized)) {
+            $cached_api = $unserialized;
+        }
+    }
+}
 
-if (filemtime($temp_file) < time()-10) {
+if ($cached_api === null) {
 
     // Alle Profile abfragen
     $rs_actors = p4c_query("SELECT `actors`.`id`, `erocall_number_de_status`, `stream_id`, `streamserver_url`, `lastonline`, `messenger_takes_a_break`, `actor_cams`.`datetime` AS `last_cam_time` FROM `actors` LEFT JOIN `actor_cams` ON `actors`.`id`=`actor_cams`.`actor_id` WHERE
@@ -24,7 +34,7 @@ if (filemtime($temp_file) < time()-10) {
             $webcam_stream_id   = '';
             $webcam_stream_url  = '';
 
-            if ($actors_obj->last_cam_time >= date("Y-m-d H:i:s", strtotime("-60 seconds")) AND $actors_obj->stream_id !== NULL) {
+            if ($actors_obj->last_cam_time !== null && (string)$actors_obj->last_cam_time >= date("Y-m-d H:i:s", strtotime("-60 seconds")) && $actors_obj->stream_id !== null) {
                 $webcam_stream_id   = $actors_obj->stream_id;
                 $webcam_stream_url  = $actors_obj->streamserver_url;
             }
@@ -36,7 +46,7 @@ if (filemtime($temp_file) < time()-10) {
                 $rs_check_call = p4c_query("SELECT * FROM `erocall` WHERE `actor_id`='".abs((int)$actors_obj->id)."' ORDER BY `erocall`.`id` DESC LIMIT 1;",__FILE__,__LINE__);
                 if (p4c_num_rows($rs_check_call) == 1) {
                     $call_obj = p4c_fetch_object($rs_check_call);
-                    if ($call_obj->date_time >= date("Y-m-d H:i:s", strtotime("-60 minutes")) AND $call_obj->event == 'connect') {
+                    if ($call_obj && $call_obj->date_time !== null && (string)$call_obj->date_time >= date("Y-m-d H:i:s", strtotime("-60 minutes")) && $call_obj->event == 'connect') {
                         $phone_status = 'occupied';
                     }
                 }
@@ -54,9 +64,9 @@ if (filemtime($temp_file) < time()-10) {
         }
     }
     
-    file_put_contents($temp_file, serialize($api));
+    @file_put_contents($temp_file, serialize($api), LOCK_EX);
     
 } else {
-    $api = unserialize(file_get_contents($temp_file));
+    $api = $cached_api;
 }
 

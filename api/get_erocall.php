@@ -8,14 +8,13 @@ include_once(API_DIR."/common.inc.php");
 
 $apikey = 'EpuMVsVWL749RY2rfZ4aT2wFdvMGLxTw';
 
-if (isset($_GET['hash'])) {
+if (isset($_GET['hash']) && is_string($_GET['hash'])) {
     
-    implode('&', $_GET);
     $_hash = trim($_GET["hash"]);
     unset($_GET['hash']);
     
     $_query = $_GET;
-    //$_query = array_filter($_query, "strlen"); // leere Einträge Entfernen
+    //$_query = array_filter($_query, "strlen"); // leere EintrÃ¤ge Entfernen
     ksort($_query); // Alphabetische Sortierung
     $_query = http_build_query($_query);
     $_xhash = hash("sha512", "$_query&".$apikey);
@@ -28,23 +27,25 @@ if (isset($_GET['hash'])) {
         exit;
     }
   
-    $actor_id = abs((int)$_GET['erocloud_actor_id']);
-    $rufnummer = $_GET['rufnummer'];
-    $ddi = $_GET['ddi'];
-    $caller = $_GET['caller'];
-    $destination_number = $_GET['destination_number'];
-    $event = $_GET['event'];
-    $event_info = $_GET['event_info'];
-    $date_time = date("Y-m-d H:i:s", $_GET['date_time']);
-    $timestamp = abs((int)$_GET['timestamp']);
-    $tarif = floatval($_GET['tarif']);
-    $duration_out = abs((int)$_GET['duration']);
-    $payout = floatval($_GET['payout']);
-    $provision_mobil = abs((float)$_GET['provision_mobil']);
-    $provision_festnetz = abs((float)$_GET['provision_festnetz']);
+    $actor_id = abs((int)(is_scalar($_GET['erocloud_actor_id'] ?? null) ? $_GET['erocloud_actor_id'] : 0));
+    $rufnummer = is_scalar($_GET['rufnummer'] ?? null) ? (string)$_GET['rufnummer'] : '';
+    $ddi = is_scalar($_GET['ddi'] ?? null) ? (string)$_GET['ddi'] : '';
+    $caller = is_scalar($_GET['caller'] ?? null) ? (string)$_GET['caller'] : '';
+    $destination_number = is_scalar($_GET['destination_number'] ?? null) ? (string)$_GET['destination_number'] : '';
+    $event = is_scalar($_GET['event'] ?? null) ? (string)$_GET['event'] : '';
+    $event_info = is_scalar($_GET['event_info'] ?? null) ? (string)$_GET['event_info'] : '';
+    $date_time = date("Y-m-d H:i:s", is_scalar($_GET['date_time'] ?? null) ? (int)$_GET['date_time'] : 0);
+    $timestamp = abs((int)(is_scalar($_GET['timestamp'] ?? null) ? $_GET['timestamp'] : 0));
+    $tarif = floatval(is_scalar($_GET['tarif'] ?? null) ? $_GET['tarif'] : 0);
+    $duration_out = abs((int)(is_scalar($_GET['duration'] ?? null) ? $_GET['duration'] : 0));
+    $payout = floatval(is_scalar($_GET['payout'] ?? null) ? $_GET['payout'] : 0);
+    $provision_mobil = abs((float)(is_scalar($_GET['provision_mobil'] ?? null) ? $_GET['provision_mobil'] : 0));
+    $provision_festnetz = abs((float)(is_scalar($_GET['provision_festnetz'] ?? null) ? $_GET['provision_festnetz'] : 0));
     
-    $erocall_number_de = substr($rufnummer,5);
-    $erocall_number_de = substr($erocall_number_de,0,-strlen($ddi));
+    $erocall_number_de = substr($rufnummer, 5);
+    if ($ddi !== '') {
+        $erocall_number_de = substr($erocall_number_de, 0, -strlen($ddi));
+    }
     
     $rs_check_actor_exists = p4c_query("SELECT * FROM `actors` WHERE
         `id`='".abs((int)$actor_id)."' AND
@@ -78,8 +79,8 @@ if (isset($_GET['hash'])) {
         $destination_netz = 'mobil';
     }    
    
-    // Prüfen ob Rufnummer aus Ziffern besteht // Rufnummer kann auch sein: 0049123456789XXX
-    if (($event == 'connect' OR $event == 'hangup') AND ctype_digit(str_replace('x','', strtolower($caller)))) {
+    // PrÃ¼fen ob Rufnummer aus Ziffern besteht // Rufnummer kann auch sein: 0049123456789XXX
+    if (($event == 'connect' OR $event == 'hangup') AND ctype_digit(str_replace('x','', strtolower((string)$caller)))) {
         $rs_anrufe = p4c_query("SELECT * FROM `erocall` WHERE `rufnummer`='".p4c_escape_string($rufnummer)."' AND `date_time`='".p4c_escape_string($date_time)."' AND `timestamp`='".abs((int)$timestamp)."' AND `event`='".p4c_escape_string($event)."' LIMIT 1;",__FILE__,__LINE__);
         if (p4c_num_rows($rs_anrufe) == 0) {
             if(p4c_query("INSERT INTO `erocall` SET 

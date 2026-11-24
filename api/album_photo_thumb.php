@@ -216,12 +216,12 @@ function ec_load_scaled_source_for_thumb($image, $size, $context_info = array())
                 }
             }
         } catch (\Throwable $e) {
-            $album_info = !empty($context_info) ? "Album-ID: {$context_info['album_id']}, Photo-ID: {$context_info['photo_id']}, Pfad: {$image}" : "Pfad: {$image}";
+            $album_info = !empty($context_info) ? "Album-ID: " . ($context_info['album_id'] ?? '') . ", Photo-ID: " . ($context_info['photo_id'] ?? '') . ", Pfad: {$image}" : "Pfad: {$image}";
             error_log("[EroCloud Photo Error] Imagick-Fallback fehlgeschlagen ({$e->getMessage()})! {$album_info}");
         }
     }
 
-    $album_info = !empty($context_info) ? "Album-ID: {$context_info['album_id']}, Photo-ID: {$context_info['photo_id']}, Pfad: {$image}" : "Pfad: {$image}";
+    $album_info = !empty($context_info) ? "Album-ID: " . ($context_info['album_id'] ?? '') . ", Photo-ID: " . ($context_info['photo_id'] ?? '') . ", Pfad: {$image}" : "Pfad: {$image}";
     error_log("[EroCloud Photo Error] Bilddatei konnte weder per GD noch per Imagick dekodiert werden! {$album_info}");
     return null;
 }
@@ -304,7 +304,7 @@ function pixelate($image, $thumb_path, $size = 200, $pixelate_x = 3, $pixelate_y
     return false;
 }
 
-if (!isset($_GET['photo_id']) || empty($_GET['photo_id'])) {
+if (!isset($_GET['photo_id']) || !is_string($_GET['photo_id']) || empty($_GET['photo_id'])) {
     error_log('[EroCloud Photo Error] Aufruf ohne photo_id Parameter.');
     no_image();
     exit;
@@ -347,6 +347,10 @@ if (p4c_num_rows($rs_photo) == 0) {
 }
 
 $photo_obj   = p4c_fetch_object($rs_photo);
+if (!$photo_obj) {
+    no_image();
+    exit;
+}
 $album_id    = $photo_obj->album_id;
 $merchant_id = $photo_obj->merchant_id;
 $filename    = $photo_obj->filename;
@@ -362,18 +366,20 @@ $context_info = array(
     'filename'    => $filename
 );
 
-function getRequestHeaders()
-{
-    if (function_exists('apache_request_headers')) {
-        if ($headers = apache_request_headers()) {
-            return $headers;
+if (!function_exists('getRequestHeaders')) {
+    function getRequestHeaders()
+    {
+        if (function_exists('apache_request_headers')) {
+            if ($headers = apache_request_headers()) {
+                return $headers;
+            }
         }
+        $headers = array();
+        if (isset($_SERVER['HTTP_IF_MODIFIED_SINCE'])) {
+            $headers['If-Modified-Since'] = $_SERVER['HTTP_IF_MODIFIED_SINCE'];
+        }
+        return $headers;
     }
-    $headers = array();
-    if (isset($_SERVER['HTTP_IF_MODIFIED_SINCE'])) {
-        $headers['If-Modified-Since'] = $_SERVER['HTTP_IF_MODIFIED_SINCE'];
-    }
-    return $headers;
 }
 
 $headers = getRequestHeaders();

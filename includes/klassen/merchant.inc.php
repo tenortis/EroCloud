@@ -48,19 +48,19 @@ class Merchant {
             $rs_member = $this->mysql->query("SELECT ".$select." FROM `merchants` WHERE `id`='".abs((int)$this->merchant_id)."' LIMIT 1;", __FILE__, __LINE__);
         }
 
-        if ($this->mysql->num_rows($rs_member) > 0) {
+        if ($rs_member && $this->mysql->num_rows($rs_member) > 0) {
             $member_ary = $this->mysql->fetch_object($rs_member);
-            return $member_ary->$var;
+            return $member_ary ? $member_ary->$var : null;
         }
 		
     } 
     
     private function sql_get_country($var) {
-        if (trim($var) != '') {
+        if (trim((string)$var) != '') {
             $rs_countries = $this->mysql->query("SELECT * FROM `countries` WHERE `alpha2`='".p4c_escape_string($var)."' LIMIT 1;", __FILE__, __LINE__);
-            if ($this->mysql->num_rows($rs_countries) > 0) {
+            if ($rs_countries && $this->mysql->num_rows($rs_countries) > 0) {
                 $country_ary = $this->mysql->fetch_object($rs_countries);
-                return $country_ary->country;
+                return $country_ary ? $country_ary->country : null;
             }
         }
     } 
@@ -110,7 +110,7 @@ class Merchant {
     }
 
     public function name($decrypt=''){
-        return $this -> sql_get_merchant('firstname',$decrypt)." ".$this -> sql_get_merchant('surname',$decrypt);
+        return (string)$this -> sql_get_merchant('firstname',$decrypt)." ".(string)$this -> sql_get_merchant('surname',$decrypt);
     }
     
     public function firstname($decrypt=''){

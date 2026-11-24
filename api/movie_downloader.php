@@ -9,17 +9,19 @@ define('SAFE_INC', 1);
 include_once("../config.inc.php");
 include_once(API_DIR . "/common.inc.php");
 
-if (!isset($_GET['user_streaming_key'])) {
+$api = array();
+
+if (!isset($_GET['user_streaming_key']) || !is_string($_GET['user_streaming_key'])) {
     $api['error'] = 'key not exists';
     print_xml($api);
 }
 
-if (!isset($_GET['movie_id'])) {
+if (!isset($_GET['movie_id']) || !is_string($_GET['movie_id'])) {
     $api['error'] = 'movie_id not exists';
     print_xml($api);
 }
 
-if (!isset($_GET['access_token'])) {
+if (!isset($_GET['access_token']) || !is_string($_GET['access_token'])) {
     $api['error'] = 'access denid';
     print_xml($api);
 }
@@ -34,9 +36,13 @@ if (p4c_num_rows($rs_user_streaming_key) == 0) {
 }
 
 $access_obj = p4c_fetch_object($rs_user_streaming_key);
+if (!$access_obj) {
+    $api['error'] = 'access denid';
+    print_xml($api);
+}
 
 // Wenn das Accesstoken nicht korrekt oder abgelaufen ist
-if ($access_obj->access_token != $_GET['access_token'] || $access_obj->access_token_datetime < date("Y-m-d H:i:s")) {
+if ($access_obj->access_token != $_GET['access_token'] || (string)($access_obj->access_token_datetime ?? '') < date("Y-m-d H:i:s")) {
     $api['error'] = 'access denid';
     print_xml($api);
 }
@@ -50,17 +56,23 @@ if (p4c_num_rows($rs_movie) == 0) {
 }
 
 $movie_ary = p4c_fetch_object($rs_movie);
+if (!$movie_ary) {
+    $api['error'] = 'movie_id not exists';
+    print_xml($api);
+}
 
 $file = MOVIES_PATH . '/' . $movie_ary->storage_location . '/' . $movie_ary->merchant_id . '/' . $movie_ary->id . '/' . $movie_ary->filename;
 
-if (!file_exists($file)) {
+if (!is_file($file)) {
     $class_errorlog->log("Ein Film konnte nicht heruntergeladen werden!\n" . $file, __FILE__, __LINE__);
     echo 'Es ist ein Fehler aufgetreten. Bitte versuche es sp&auml;ter noch einmal.';
 } else {
-    $size = (int)filesize($file);
+    $size = (int)@filesize($file);
 
     if (isset($_GET['start']) && $_GET['start'] == 'download') {
-        session_write_close();
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            @session_write_close();
+        }
 
         header('Pragma: public');
         header('Expires: 0');

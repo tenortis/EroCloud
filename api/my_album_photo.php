@@ -26,17 +26,19 @@ function no_image()
     p4c_errorlog(error_get_last());
 }
 
-if (!isset($_GET['user_key'])) {
+$api = array();
+
+if (!isset($_GET['user_key']) || !is_string($_GET['user_key'])) {
     $api['error'] = 'user_key not exists';
     print_xml($api);
 }
 
-if (!isset($_GET['photo_id'])) {
+if (!isset($_GET['photo_id']) || !is_string($_GET['photo_id'])) {
     no_image();
     exit;
 }
 
-if (!isset($_GET['access_token'])) {
+if (!isset($_GET['access_token']) || !is_string($_GET['access_token'])) {
     $api['error'] = 'access denid 1';
     print_xml($api);
 }
@@ -51,9 +53,13 @@ if (p4c_num_rows($rs_user_key) == 0) {
 }
 
 $access_obj = p4c_fetch_object($rs_user_key);
+if (!$access_obj) {
+    $api['error'] = 'access denid 2';
+    print_xml($api);
+}
 
 // Wenn das Accesstoken nicht korrekt oder abgelaufen ist
-if ($access_obj->access_token != $_GET['access_token'] || $access_obj->access_token_datetime < date("Y-m-d H:i:s")) {
+if ($access_obj->access_token != $_GET['access_token'] || (string)($access_obj->access_token_datetime ?? '') < date("Y-m-d H:i:s")) {
     $api['error'] = 'access denid 3';
     print_xml($api);
 }
@@ -75,11 +81,16 @@ if (p4c_num_rows($rs_photo) == 0) {
 }
 
 $photo_obj = p4c_fetch_object($rs_photo);
+if (!$photo_obj) {
+    no_image();
+    exit;
+}
 
 $file_dir  = PHOTO_ALBUMS_PATH . '/' . $photo_obj->storage_location . '/' . $photo_obj->merchant_id . '/' . $photo_obj->id . '/images/';
 $file_name = $photo_obj->filename;
 $file_path = $file_dir . $file_name;
 
+if (!function_exists('getRequestHeaders')) {
 function getRequestHeaders()
 {
     if (function_exists("apache_request_headers")) {
@@ -93,6 +104,7 @@ function getRequestHeaders()
     }
     return $headers;
 }
+}
 
 $headers = getRequestHeaders();
 
@@ -103,7 +115,7 @@ if (!is_file($file_path)) {
     no_image();
     exit;
 } else {
-    $mime_content_type = mime_content_type($file_path);
+    $mime_content_type = @mime_content_type($file_path) ?: 'image/jpeg';
 
     header("Pragma: cache");
     header('Cache-control: max-age=' . (60 * 60 * 24 * 360) . ', public');

@@ -286,7 +286,7 @@ function aic_check_environment() {
             @curl_setopt($ch, CURLOPT_TIMEOUT, 1);
             $resp = @curl_exec($ch);
             $code = (int)@curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            @curl_close($ch);
+            unset($ch);
             if ($code === 200 && $resp !== false) {
                 $env['llm_ready'] = true;
                 $env['llm_model_name'] = 'llama.cpp Server (127.0.0.1:8080)';
@@ -300,7 +300,7 @@ function aic_check_environment() {
                 @curl_setopt($ch2, CURLOPT_TIMEOUT, 1);
                 $resp2 = @curl_exec($ch2);
                 $code2 = (int)@curl_getinfo($ch2, CURLINFO_HTTP_CODE);
-                @curl_close($ch2);
+                unset($ch2);
                 if ($code2 === 200 && $resp2 !== false) {
                     $env['llm_ready'] = true;
                     $env['llm_endpoint'] = 'http://127.0.0.1:11434/api/chat';
@@ -856,7 +856,7 @@ function aic_analyze_texts($movie_data, $segments = array(), $spoken_transcript 
             @curl_setopt($ch, CURLOPT_TIMEOUT, 60);
             $raw_llm = @curl_exec($ch);
             $http_code = (int)@curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            @curl_close($ch);
+            unset($ch);
 
             if ($http_code === 200 && $raw_llm) {
                 $resp_obj = @json_decode($raw_llm, true);

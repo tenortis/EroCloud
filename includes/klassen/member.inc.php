@@ -34,9 +34,9 @@ class Member {
         }
 
         $rs_member = p4c_query("SELECT ".$select." FROM `members` WHERE ".$sql_id." LIMIT 1;", __FILE__, __LINE__);
-        if (p4c_num_rows($rs_member) > 0) {
+        if ($rs_member && p4c_num_rows($rs_member) > 0) {
             $member_ary = p4c_fetch_object($rs_member);
-            return $member_ary->$var;
+            return $member_ary ? $member_ary->$var : null;
         }
     }
     

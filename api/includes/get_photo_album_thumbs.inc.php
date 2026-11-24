@@ -16,7 +16,7 @@ if (!isset($_GET['album_id'])) {
     print_xml($api);
 }
 
-$album_id = preg_replace('/[^a-zA-Z0-9]/', '', (string)$_GET['album_id']);
+$album_id = (string)preg_replace('/[^a-zA-Z0-9]/', '', is_string($_GET['album_id']) ? $_GET['album_id'] : '');
 
 // Chronologische Sortierung (ORDER BY id ASC) analog MCP & ACP, damit Bild #1..#N überall exakt übereinstimmt
 $rs_photos = p4c_query("SELECT * FROM `photo_albums_photos` WHERE `album_id`='" . p4c_escape_string($album_id) . "' AND `rejected`='0' ORDER BY `id` ASC;", __FILE__, __LINE__);
@@ -30,18 +30,19 @@ if ($count_photos == 0) {
     $is_bought = '';
 
     // Prüfen ob der user_key angegeben wurde
-    if (isset($_GET['user_key'])) {
+    if (isset($_GET['user_key']) && is_string($_GET['user_key']) && trim($_GET['user_key']) !== '') {
         // Prüfen ob URL für Streaming oder Download generiert werden soll
         if (isset($_GET['buy_as']) && ($_GET['buy_as'] == 'streaming' || $_GET['buy_as'] == 'download')) {
-            $user_key = (string)$_GET['user_key'];
+            $user_key = $_GET['user_key'];
 
             // Prüfen ob der user_key existiert
             $rs_user_key = p4c_query("SELECT * FROM `photo_albums_access` WHERE `user_key` = '" . p4c_escape_string($user_key) . "' LIMIT 1;", __FILE__, __LINE__);
             if ($rs_user_key && p4c_num_rows($rs_user_key) != 0) {
                 $access_obj   = p4c_fetch_object($rs_user_key);
-                $access_token = (string)$access_obj->access_token;
-
-                $is_bought = API_URL . '/MyAlbumPhoto/' . $user_key . '/' . $access_token . '/';
+                if ($access_obj) {
+                    $access_token = (string)$access_obj->access_token;
+                    $is_bought = API_URL . '/MyAlbumPhoto/' . $user_key . '/' . $access_token . '/';
+                }
             }
         }
     }

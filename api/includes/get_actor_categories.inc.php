@@ -9,8 +9,8 @@ if (!defined('SAFE_INC')) {
 // Alle Darsteller-Kategorien abfragen
 $rs_actor_categories = p4c_query("SELECT * FROM `actor_categories` ORDER BY `category_group` ASC;",__FILE__,__LINE__);
 while($cat_obj = p4c_fetch_object($rs_actor_categories)) {
-    $group = $cat_obj->category_group;
-    $name = $cat_obj->name_id;
+    $group = (string)($cat_obj->category_group ?? '');
+    $name = (string)($cat_obj->name_id ?? '');
 
     $api['category'][$group][$name]['id']             = $cat_obj->name_id;
     $api['category'][$group][$name]['group']          = $cat_obj->category_group;

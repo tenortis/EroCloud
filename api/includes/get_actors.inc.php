@@ -6,10 +6,10 @@ if (!defined('SAFE_INC')) {
 
 $sql = '';
 // ++++++++++++++++++++++++++++++++++++++++++++++
-$get_category_master = trim((string)($_GET['category_master'] ?? ''));
+$get_category_master = trim(is_scalar($_GET['category_master'] ?? null) ? (string)$_GET['category_master'] : '');
 
 if (!empty($get_category_master)) {
-    $get_category_master = preg_replace ( '/[^a-z]/i', '', $get_category_master);
+    $get_category_master = (string)preg_replace ( '/[^a-z]/i', '', $get_category_master);
     
     if ($get_category_master == 'porn' OR $get_category_master == 'fetish') {
         $sql .= "MATCH (`actor_categories`) AGAINST ('".p4c_escape_string($get_category_master)."')";
@@ -18,17 +18,17 @@ if (!empty($get_category_master)) {
 }
 
 // age ++++++++++++++++++++++++++++++++++++++++++++++
-$get_category_age = trim((string)($_GET['age'] ?? ''));
+$get_category_age = trim(is_scalar($_GET['age'] ?? null) ? (string)$_GET['age'] : '');
 
 if (!empty($get_category_age)) {
-    $get_category_age = preg_replace ( '/[^\|A-Za-z0-9-_]/i', '', $get_category_age);
+    $get_category_age = (string)preg_replace ( '/[^\|A-Za-z0-9-_]/i', '', $get_category_age);
     $category_age_ary = explode('|', $get_category_age);
 }
 
 if (isset($category_age_ary)) {
    
-    // Nur wenn weniger als alle 4 Alterskategorien ausgewählt wurden, nutze die Suche 
-    // Wenn alle 4 Ausgewählt sind, ignorriere die Suche -> somit wird alles gesucht
+    // Nur wenn weniger als alle 4 Alterskategorien ausgewÃ¤hlt wurden, nutze die Suche 
+    // Wenn alle 4 AusgewÃ¤hlt sind, ignorriere die Suche -> somit wird alles gesucht
     
     if (count($category_age_ary) < 4) {
     
@@ -47,17 +47,17 @@ if (isset($category_age_ary)) {
 }
 
 // body ++++++++++++++++++++++++++++++++++++++++++++++
-$get_category_body = trim((string)($_GET['body'] ?? ''));
+$get_category_body = trim(is_scalar($_GET['body'] ?? null) ? (string)$_GET['body'] : '');
 
 if (!empty($get_category_body)) {
-    $get_category_body = preg_replace ( '/[^\|A-Za-z0-9-_]/i', '', $get_category_body);
+    $get_category_body = (string)preg_replace ( '/[^\|A-Za-z0-9-_]/i', '', $get_category_body);
     $category_body_ary = explode('|', $get_category_body);
 }
 
 if (isset($category_body_ary)) {
    
-    // Nur wenn weniger als alle 4 Körpereigenschaften ausgewählt wurden, nutze die Suche 
-    // Wenn alle 4 Ausgewählt sind, ignorriere die Suche -> somit wird alles gesucht
+    // Nur wenn weniger als alle 4 KÃ¶rpereigenschaften ausgewÃ¤hlt wurden, nutze die Suche 
+    // Wenn alle 4 AusgewÃ¤hlt sind, ignorriere die Suche -> somit wird alles gesucht
     
     if (count($category_body_ary) < 4) {
 
@@ -76,10 +76,10 @@ if (isset($category_body_ary)) {
 }
 
 // gender ++++++++++++++++++++++++++++++++++++++++++++++
-$get_category_gender = trim((string)($_GET['gender'] ?? ''));
+$get_category_gender = trim(is_scalar($_GET['gender'] ?? null) ? (string)$_GET['gender'] : '');
 
 if (!empty($get_category_gender)) {
-    $get_category_gender = preg_replace ( '/[^\|A-Za-z0-9-_]/i', '', $get_category_gender);
+    $get_category_gender = (string)preg_replace ( '/[^\|A-Za-z0-9-_]/i', '', $get_category_gender);
     $category_gender_ary = explode('|', $get_category_gender);
 }
 
@@ -120,10 +120,10 @@ if (isset($category_gender_ary)) {
 }
 
 // hair color ++++++++++++++++++++++++++++++++++++++++++++++
-$get_category_hair_color = trim((string)($_GET['hair_color'] ?? ''));
+$get_category_hair_color = trim(is_scalar($_GET['hair_color'] ?? null) ? (string)$_GET['hair_color'] : '');
 
 if (!empty($get_category_hair_color)) {
-    $get_category_hair_color = preg_replace ( '/[^\|A-Za-z0-9-_]/i', '', $get_category_hair_color);
+    $get_category_hair_color = (string)preg_replace ( '/[^\|A-Za-z0-9-_]/i', '', $get_category_hair_color);
     $category_hair_color_ary = explode('|', $get_category_hair_color);
 }
 
@@ -143,10 +143,10 @@ if (isset($category_hair_color_ary)) {
 }
 
 // skin color ++++++++++++++++++++++++++++++++++++++++++++++
-$get_category_skin_color = trim((string)($_GET['skin_color'] ?? ''));
+$get_category_skin_color = trim(is_scalar($_GET['skin_color'] ?? null) ? (string)$_GET['skin_color'] : '');
 
 if (!empty($get_category_skin_color)) {
-    $get_category_skin_color = preg_replace ( '/[^\|A-Za-z0-9-_]/i', '', $get_category_skin_color);
+    $get_category_skin_color = (string)preg_replace ( '/[^\|A-Za-z0-9-_]/i', '', $get_category_skin_color);
     $category_skin_color_ary = explode('|', $get_category_skin_color);
 }
 
@@ -166,10 +166,10 @@ if (isset($category_skin_color_ary)) {
 }
 
 // weight ++++++++++++++++++++++++++++++++++++++++++++++
-$get_category_weight = trim((string)($_GET['weight'] ?? ''));
+$get_category_weight = trim(is_scalar($_GET['weight'] ?? null) ? (string)$_GET['weight'] : '');
 
 if (!empty($get_category_weight)) {
-    $get_category_weight = preg_replace ( '/[^\|A-Za-z0-9-_]/i', '', $get_category_weight);
+    $get_category_weight = (string)preg_replace ( '/[^\|A-Za-z0-9-_]/i', '', $get_category_weight);
     $category_weight_ary = explode('|', $get_category_weight);
 }
 

@@ -94,11 +94,11 @@ function ec_p4c_internal_extract_api_key(array $jsonBody): string
         return trim((string)$m[1]);
     }
 
-    if (!empty($jsonBody['api_key'])) {
+    if (!empty($jsonBody['api_key']) && is_scalar($jsonBody['api_key'])) {
         return trim((string)$jsonBody['api_key']);
     }
 
-    if (!empty($_POST['api_key'])) {
+    if (!empty($_POST['api_key']) && is_scalar($_POST['api_key'])) {
         return trim((string)$_POST['api_key']);
     }
 
@@ -167,11 +167,11 @@ if ($expectedKey === '' || $providedKey === '' || !hash_equals($expectedKey, $pr
 // 3. ACTION-ROUTER (Read-Only)
 // =========================================================================
 $action = 'moderation_summary';
-if (!empty($jsonBody['action'])) {
+if (!empty($jsonBody['action']) && is_scalar($jsonBody['action'])) {
     $action = trim((string)$jsonBody['action']);
-} elseif (!empty($_POST['action'])) {
+} elseif (!empty($_POST['action']) && is_scalar($_POST['action'])) {
     $action = trim((string)$_POST['action']);
-} elseif (!empty($_GET['action'])) {
+} elseif (!empty($_GET['action']) && is_scalar($_GET['action'])) {
     $action = trim((string)$_GET['action']);
 }
 
@@ -195,7 +195,10 @@ if ($action === 'moderation_summary') {
         __LINE__
     );
     if ($rsMoviesCnt && p4c_num_rows($rsMoviesCnt) > 0) {
-        $countMoviesChecking = (int)p4c_fetch_object($rsMoviesCnt)->cnt;
+        $cntRow = p4c_fetch_object($rsMoviesCnt);
+        if ($cntRow) {
+            $countMoviesChecking = (int)$cntRow->cnt;
+        }
     }
 
     // Optional: Filme, die gerade noch konvertieren
@@ -206,7 +209,10 @@ if ($action === 'moderation_summary') {
         __LINE__
     );
     if ($rsMoviesConv && p4c_num_rows($rsMoviesConv) > 0) {
-        $countMoviesConverting = (int)p4c_fetch_object($rsMoviesConv)->cnt;
+        $convRow = p4c_fetch_object($rsMoviesConv);
+        if ($convRow) {
+            $countMoviesConverting = (int)$convRow->cnt;
+        }
     }
 
     // Vorschau der neuesten bis zu 5 ungeprueften Filme
@@ -246,7 +252,10 @@ if ($action === 'moderation_summary') {
         __LINE__
     );
     if ($rsAlbumsCnt && p4c_num_rows($rsAlbumsCnt) > 0) {
-        $countPhotoAlbumsChecking = (int)p4c_fetch_object($rsAlbumsCnt)->cnt;
+        $albCntRow = p4c_fetch_object($rsAlbumsCnt);
+        if ($albCntRow) {
+            $countPhotoAlbumsChecking = (int)$albCntRow->cnt;
+        }
     }
 
     // Vorschau der neuesten bis zu 5 ungeprueften Fotoalben
@@ -293,7 +302,10 @@ if ($action === 'moderation_summary') {
             __LINE__
         );
         if ($rsCoCnt && p4c_num_rows($rsCoCnt) > 0) {
-            $countCoActorsChecking = (int)p4c_fetch_object($rsCoCnt)->cnt;
+            $coCntRow = p4c_fetch_object($rsCoCnt);
+            if ($coCntRow) {
+                $countCoActorsChecking = (int)$coCntRow->cnt;
+            }
         }
 
         if ($countCoActorsChecking > 0) {

@@ -1,22 +1,24 @@
 <?php
 
-define('SAFE_INC', 1);
+if (!defined('SAFE_INC')) {
+    define('SAFE_INC', 1);
+}
 
 include_once("../config.inc.php");
 
 $fast_album_param = '';
-if (!empty($_GET['album_id'])) {
+if (!empty($_GET['album_id']) && is_scalar($_GET['album_id'])) {
     $fast_album_param = trim((string)$_GET['album_id']);
-} elseif (!empty($_GET['file_id'])) {
+} elseif (!empty($_GET['file_id']) && is_scalar($_GET['file_id'])) {
     $fast_album_param = trim((string)$_GET['file_id']);
-} elseif (!empty($_GET['id'])) {
+} elseif (!empty($_GET['id']) && is_scalar($_GET['id'])) {
     $fast_album_param = trim((string)$_GET['id']);
 }
-$fast_fsk = (isset($_GET['fsk']) && abs((int)$_GET['fsk']) == 18) ? '18' : '16';
-$fast_w   = isset($_GET['w']) && !empty($_GET['w']) ? abs((int)$_GET['w']) : 0;
+$fast_fsk = (isset($_GET['fsk']) && is_scalar($_GET['fsk']) && abs((int)$_GET['fsk']) == 18) ? '18' : '16';
+$fast_w   = (isset($_GET['w']) && is_scalar($_GET['w']) && !empty($_GET['w'])) ? abs((int)$_GET['w']) : 0;
 if ($fast_w > 1280) { $fast_w = 1280; }
 if ($fast_w > 0 && $fast_w < 50) { $fast_w = 50; }
-$fast_cs  = isset($_GET['cs']) ? trim((string)$_GET['cs']) : '';
+$fast_cs  = (isset($_GET['cs']) && is_scalar($_GET['cs'])) ? trim((string)$_GET['cs']) : '';
 
 $fastCacheDir  = ((defined('TEMP_DIR') && is_dir(TEMP_DIR)) ? rtrim((string)TEMP_DIR, '/\\') : sys_get_temp_dir()) . '/ec_poster_cache';
 $fastCacheFile = ($fast_album_param !== '' && $fast_cs !== '')
@@ -50,6 +52,7 @@ include_once(API_DIR."/common.inc.php");
 
 header('Access-Control-Allow-Origin: *');
 
+if (!function_exists('send_fallback_and_exit')) {
 function send_fallback_and_exit() {
     $fallback = SOURCEDIR . '/mcp/images/movie_poster_nopic.jpg';
     if (!is_file($fallback)) {
@@ -66,7 +69,9 @@ function send_fallback_and_exit() {
     }
     exit;
 }
+}
 
+if (!function_exists('output_raw_file_and_exit')) {
 function output_raw_file_and_exit($bild, $mime_type) {
     while (ob_get_level() > 0) { @ob_end_clean(); }
     header('Content-type: '.$mime_type);
@@ -74,14 +79,15 @@ function output_raw_file_and_exit($bild, $mime_type) {
     readfile($bild);
     exit;
 }
+}
 
 $album_param = '';
-if (isset($_GET['album_id']) && !empty($_GET['album_id'])) {
-    $album_param = trim($_GET['album_id']);
-} elseif (isset($_GET['file_id']) && !empty($_GET['file_id'])) {
-    $album_param = trim($_GET['file_id']);
-} elseif (isset($_GET['id']) && !empty($_GET['id'])) {
-    $album_param = trim($_GET['id']);
+if (isset($_GET['album_id']) && is_scalar($_GET['album_id']) && !empty($_GET['album_id'])) {
+    $album_param = trim((string)$_GET['album_id']);
+} elseif (isset($_GET['file_id']) && is_scalar($_GET['file_id']) && !empty($_GET['file_id'])) {
+    $album_param = trim((string)$_GET['file_id']);
+} elseif (isset($_GET['id']) && is_scalar($_GET['id']) && !empty($_GET['id'])) {
+    $album_param = trim((string)$_GET['id']);
 }
 
 if (empty($album_param)) {
@@ -107,6 +113,9 @@ if (p4c_num_rows($rs_album) == 0) {
 }
 
 $album_ary = p4c_fetch_object($rs_album);
+if (!$album_ary) {
+    send_fallback_and_exit();
+}
 $album_folder = PHOTO_ALBUMS_PATH.'/'.$album_ary->storage_location.'/'.$album_ary->merchant_id.'/'.$album_ary->id.'/';
 
 $filename = false;
@@ -126,12 +135,14 @@ if (!$filename) {
 
 // 3. Check first photo in album from photo_albums_photos database table
 if (!$filename) {
-    $rs_first_photo = p4c_query("SELECT `filename` FROM `photo_albums_photos` WHERE `album_id`='".$escaped_id."' OR `album_id`='".$album_ary->id."' ORDER BY `id` ASC LIMIT 1;",__FILE__,__LINE__);
+    $rs_first_photo = p4c_query("SELECT `filename` FROM `photo_albums_photos` WHERE `album_id`='".$escaped_id."' OR `album_id`='".abs((int)$album_ary->id)."' ORDER BY `id` ASC LIMIT 1;",__FILE__,__LINE__);
     if (p4c_num_rows($rs_first_photo) > 0) {
         $photo_obj = p4c_fetch_object($rs_first_photo);
-        $candidate = $album_folder . 'images/' . $photo_obj->filename;
-        if (file_exists($candidate)) {
-            $filename = $candidate;
+        if ($photo_obj && !empty($photo_obj->filename)) {
+            $candidate = $album_folder . 'images/' . $photo_obj->filename;
+            if (is_file($candidate)) {
+                $filename = $candidate;
+            }
         }
     }
 }
@@ -158,6 +169,7 @@ if (!$filename || !is_file($filename)) {
 }
 @p4c_close(DB_HOST);
 
+if (!function_exists('getRequestHeaders')) {
 function getRequestHeaders() {
     if (function_exists("apache_request_headers")) {
         if($headers = apache_request_headers()) {
@@ -170,7 +182,9 @@ function getRequestHeaders() {
     }
     return $headers;
 }
+}
 
+if (!function_exists('to_thumb')) {
 function to_thumb($bild, $size = 0) {
     if (!is_file($bild) || filesize($bild) == 0) {
         send_fallback_and_exit();
@@ -246,6 +260,10 @@ function to_thumb($bild, $size = 0) {
     }
 
     $neuesBild = imagecreatetruecolor($neueBreite, $neueHoehe);
+    if (!$neuesBild) {
+        unset($altesBild);
+        output_raw_file_and_exit($bild, $mime_type);
+    }
     if ($mime_type == 'image/png' || $mime_type == 'image/gif') {
         imagealphablending($neuesBild, false);
         imagesavealpha($neuesBild, true);
@@ -277,13 +295,14 @@ function to_thumb($bild, $size = 0) {
     unset($neuesBild, $altesBild);
     exit;
 }
+}
 
 $headers = getRequestHeaders();
 
 if (!is_file($filename) || filesize($filename) == 0) {
     send_fallback_and_exit();
 } else {
-    $mime_content_type = mime_content_type($filename);
+    $mime_content_type = @mime_content_type($filename) ?: 'image/jpeg';
     
     header("Pragma: cache");
     header('Cache-control: max-age=31536000, public');
@@ -297,12 +316,15 @@ if (!is_file($filename) || filesize($filename) == 0) {
     
     if ($width > 1280) {$width = 1280;}
     if ($width < 50) {$width = 50;}
-   
-    if (isset($headers['If-Modified-Since']) && (strtotime($headers['If-Modified-Since']) == filemtime($filename))) {
-        header('Last-Modified: '.gmdate('D, d M Y H:i:s', filemtime($filename)).' GMT', true, 304);
+
+    $mtime = (int)@filemtime($filename);
+    if ($mtime <= 0) { $mtime = time(); }
+    $imsTs = isset($headers['If-Modified-Since']) ? strtotime((string)$headers['If-Modified-Since']) : false;
+    if ($imsTs !== false && $imsTs === $mtime) {
+        header('Last-Modified: '.gmdate('D, d M Y H:i:s', $mtime).' GMT', true, 304);
         exit;
     } else {
-        header('Last-Modified: '.gmdate('D, d M Y H:i:s', filemtime($filename)).' GMT', true, 200);
+        header('Last-Modified: '.gmdate('D, d M Y H:i:s', $mtime).' GMT', true, 200);
         header('Content-transfer-encoding: binary');
         to_thumb($filename, $width);
     }

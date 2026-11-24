@@ -10,7 +10,7 @@ include_once("../config.inc.php");
 include_once(API_DIR."/common.inc.php");
 @session_write_close();
 
-$file_id = isset($_GET['id']) ? (string)$_GET['id'] : '';
+$file_id = (isset($_GET['id']) && is_scalar($_GET['id'])) ? (string)$_GET['id'] : '';
 
 if (strpos($file_id, '_16.') !== false) {
     $fsk = 16;
@@ -25,9 +25,11 @@ if ($file_id !== '') {
     $rs_picture = p4c_query("SELECT `id`, `merchant_id` FROM `actors` WHERE `profile_image_fsk".abs((int)$fsk)."`='".p4c_escape_string($file_id)."' LIMIT 1;",__FILE__,__LINE__);
     if ($rs_picture && p4c_num_rows($rs_picture) == 1) {
         $actor_obj = p4c_fetch_object($rs_picture);
-        $candidate = PROFILE_IMAGE_PATH.'/'.MERCHANT_DEFAULT_DIR.'/'.$actor_obj->merchant_id.'/'.$actor_obj->id.'/'.$file_id;
-        if (is_file($candidate)) {
-            $filename = $candidate;
+        if ($actor_obj) {
+            $candidate = PROFILE_IMAGE_PATH.'/'.MERCHANT_DEFAULT_DIR.'/'.$actor_obj->merchant_id.'/'.$actor_obj->id.'/'.$file_id;
+            if (is_file($candidate)) {
+                $filename = $candidate;
+            }
         }
     }
 }
@@ -59,6 +61,12 @@ function to_thumb($bild, $size = 0) {
     $breite = $file[0];
     $hoehe = $file[1];
 
+    if ($breite <= 0 || $hoehe <= 0) {
+        header("Content-Length: " . filesize($bild));
+        readfile($bild);
+        return;
+    }
+
     if (($breite > 800 && $size > 800) || $size == 0) {
         $size = 800;
     }
@@ -70,8 +78,8 @@ function to_thumb($bild, $size = 0) {
     }
 
     $prop = $hoehe / $breite;
-    $neueBreite = (int)$size;
-    $neueHoehe = (int)round($size * $prop);
+    $neueBreite = max(1, (int)$size);
+    $neueHoehe = max(1, (int)round($neueBreite * $prop));
 
     $cacheBase = (defined('TEMP_DIR') && is_dir(TEMP_DIR)) ? rtrim((string)TEMP_DIR, '/\\') : sys_get_temp_dir();
     $cacheDir  = $cacheBase . '/ec_poster_cache';
@@ -93,6 +101,12 @@ function to_thumb($bild, $size = 0) {
             return;
         }
         $neuesBild = imagecreatetruecolor($neueBreite, $neueHoehe);
+        if (!$neuesBild) {
+            unset($altesBild);
+            header("Content-Length: " . filesize($bild));
+            readfile($bild);
+            return;
+        }
         imagecopyresampled($neuesBild, $altesBild, 0, 0, 0, 0, $neueBreite, $neueHoehe, $breite, $hoehe);
 
         ob_start();
@@ -112,6 +126,12 @@ function to_thumb($bild, $size = 0) {
             return;
         }
         $neuesBild = imagecreatetruecolor($neueBreite, $neueHoehe);
+        if (!$neuesBild) {
+            unset($altesBild);
+            header("Content-Length: " . filesize($bild));
+            readfile($bild);
+            return;
+        }
         imagealphablending($neuesBild, false);
         imagesavealpha($neuesBild, true);
         imagecopyresampled($neuesBild, $altesBild, 0, 0, 0, 0, $neueBreite, $neueHoehe, $breite, $hoehe);
@@ -143,16 +163,21 @@ if (!is_file($filename) || filesize($filename) == 0) {
     header('Expires: '.gmdate(DATE_RFC1123, time()+60*60*24*365));
     header('Content-type: image/jpeg');
 
-    if (isset($headers['If-Modified-Since']) && (strtotime($headers['If-Modified-Since']) == filemtime($filename))) {
-        header('Last-Modified: '.gmdate('D, d M Y H:i:s', filemtime($filename)).' GMT', true, 304);
+    $mtime = (int)@filemtime($filename);
+    if ($mtime <= 0) { $mtime = time(); }
+    $imsTs = isset($headers['If-Modified-Since']) ? strtotime((string)$headers['If-Modified-Since']) : false;
+    if ($imsTs !== false && $imsTs === $mtime) {
+        header('Last-Modified: '.gmdate('D, d M Y H:i:s', $mtime).' GMT', true, 304);
     } else {
-        header('Last-Modified: '.gmdate('D, d M Y H:i:s', filemtime($filename)).' GMT', true, 200);
+        header('Last-Modified: '.gmdate('D, d M Y H:i:s', $mtime).' GMT', true, 200);
         header('Content-transfer-encoding: binary');
-        header('Content-length: '.filesize($filename));
-        readfile($filename);
+        if (is_file($filename)) {
+            header('Content-length: '.filesize($filename));
+            readfile($filename);
+        }
     }
 } else {
-    $mime_content_type = mime_content_type($filename);
+    $mime_content_type = @mime_content_type($filename) ?: 'image/jpeg';
 
     header("Pragma: cache");
     header('Cache-control: max-age='.(60*60*24*360).', public');
@@ -167,10 +192,13 @@ if (!is_file($filename) || filesize($filename) == 0) {
     if ($width > 900) { $width = 900; }
     if ($width < 50) { $width = 50; }
 
-    if (isset($headers['If-Modified-Since']) && (strtotime($headers['If-Modified-Since']) == filemtime($filename))) {
-        header('Last-Modified: '.gmdate('D, d M Y H:i:s', filemtime($filename)).' GMT', true, 304);
+    $mtime = (int)@filemtime($filename);
+    if ($mtime <= 0) { $mtime = time(); }
+    $imsTs = isset($headers['If-Modified-Since']) ? strtotime((string)$headers['If-Modified-Since']) : false;
+    if ($imsTs !== false && $imsTs === $mtime) {
+        header('Last-Modified: '.gmdate('D, d M Y H:i:s', $mtime).' GMT', true, 304);
     } else {
-        header('Last-Modified: '.gmdate('D, d M Y H:i:s', filemtime($filename)).' GMT', true, 200);
+        header('Last-Modified: '.gmdate('D, d M Y H:i:s', $mtime).' GMT', true, 200);
         header('Content-transfer-encoding: binary');
         to_thumb($filename, $width);
     }

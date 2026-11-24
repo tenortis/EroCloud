@@ -14,7 +14,7 @@ include_once("../../config.inc.php");
 include_once(API_DIR."/common.inc.php");
 
 ################################################
-### Prüfen ob Zugriff auf Script erlaubt ist ###
+### PrÃ¼fen ob Zugriff auf Script erlaubt ist ###
 ################################################
 
 // echo generate_domain_id('lady-julina.com');
@@ -29,7 +29,7 @@ function generate_domain_id( $input, $length = 8 ){
     return "US-".substr( $hash_urlsafe, 0, $length );
 }
 
-if (!isset($_GET['id'])) {
+if (!isset($_GET['id']) || !is_string($_GET['id'])) {
     exit;
 }
 
@@ -49,13 +49,13 @@ if (!isset($_SERVER['HTTP_REFERER'])) {
     exit;
 }
 
-$domain = parse_url($_SERVER['HTTP_REFERER']);
+$domain = parse_url((string)$_SERVER['HTTP_REFERER']);
 
-if (!isset($domain['host']) OR generate_domain_id($domain['host']) != $site_id) {
+if (!is_array($domain) || !isset($domain['host']) OR generate_domain_id($domain['host']) != $site_id) {
     exit;
 }
 
-### ENDE - Prüfen ob Zugriff auf Script erlaubt ist ###
+### ENDE - PrÃ¼fen ob Zugriff auf Script erlaubt ist ###
 
 
 // erster Aufruf dieser Datei
@@ -65,7 +65,7 @@ if (!isset($domain['host']) OR generate_domain_id($domain['host']) != $site_id) 
 if (!isset($_GET['guuid'])) {
     
     $ref='';
-    if (isset($_GET['ref'])) {
+    if (isset($_GET['ref']) && is_string($_GET['ref'])) {
         $ref = $_GET['ref'];
     }
     /*
@@ -75,16 +75,17 @@ if (!isset($_GET['guuid'])) {
     }
     */
 
+    $param = array();
     if (isset($_SERVER['HTTP_USER_AGENT'])) {
-        $param = array(
-            'useragent' => $_SERVER['HTTP_USER_AGENT']
-        );
+        $param['useragent'] = $_SERVER['HTTP_USER_AGENT'];
     }
     
-    if (isset($_GET['param']) AND trim($_GET['param']) != '') {
+    if (isset($_GET['param']) AND is_string($_GET['param']) AND trim($_GET['param']) != '') {
         $param_json = base64_decode($_GET['param']);
-        $param_get_ary = json_decode($param_json, true);        
-        $param = array_merge($param, $param_get_ary);
+        $param_get_ary = json_decode((string)$param_json, true);        
+        if (is_array($param_get_ary)) {
+            $param = array_merge($param, $param_get_ary);
+        }
     }
     
     $param = base64_encode(json_encode($param));
@@ -92,9 +93,9 @@ if (!isset($_GET['guuid'])) {
     function uniqidReal($lenght = 15) {
         // uniqid gives 13 chars, but you could adjust it to your needs.
         if (function_exists("random_bytes")) {
-            $bytes = random_bytes(ceil($lenght / 2));
+            $bytes = random_bytes((int)ceil($lenght / 2));
         } elseif (function_exists("openssl_random_pseudo_bytes")) {
-            $bytes = openssl_random_pseudo_bytes(ceil($lenght / 2));
+            $bytes = openssl_random_pseudo_bytes((int)ceil($lenght / 2));
         } else {
             throw new Exception("no cryptographically secure random function available");
         }
@@ -152,7 +153,7 @@ if (!isset($_GET['guuid'])) {
 ###############################################
 ### uuid und Referer in Datenbank speichern ###
 ###############################################
-if (isset($_GET['guuid'])) {
+if (isset($_GET['guuid']) && is_string($_GET['guuid'])) {
 
     $guuid = $_GET['guuid'];
     
@@ -167,6 +168,7 @@ if (isset($_GET['guuid'])) {
     $username = '';
     $last_shop = '';
     $useragent = '';
+    $user_id = 0;
     
     // Wenn User noch nicht geloggt, jetzt loggen
     if (p4c_num_rows($rs_check_user_exists) == 0) {
@@ -179,12 +181,14 @@ if (isset($_GET['guuid'])) {
         $user_id = p4c_insert_id();
     } else {
         $user_obj = p4c_fetch_object($rs_check_user_exists);
-        $user_id = $user_obj->id;
+        if ($user_obj) {
+            $user_id = $user_obj->id;
 
-        $email = $user_obj->email;
-        $username = $user_obj->username;
-        $last_shop = $user_obj->last_shop;
-        $useragent = $user_obj->useragent;
+            $email = (string)($user_obj->email ?? '');
+            $username = (string)($user_obj->username ?? '');
+            $last_shop = (string)($user_obj->last_shop ?? '');
+            $useragent = (string)($user_obj->useragent ?? '');
+        }
         
         p4c_query("UPDATE `user_tracking_users` SET
             `update_time` = '".date("Y-m-d H:i:s")."'
@@ -194,29 +198,29 @@ if (isset($_GET['guuid'])) {
     }
 
     
-    if (isset($_GET['param']) AND trim($_GET['param']) != '') {
+    if (isset($_GET['param']) AND is_string($_GET['param']) AND trim($_GET['param']) != '') {
 
         $param_json = base64_decode($_GET['param']);
-        $param_ary = json_decode($param_json, true);
+        $param_ary = json_decode((string)$param_json, true);
 
         #print_r($param_ary);
         #$class_errorlog->log($guuid.' - '.print_r($param_ary, true),__FILE__,__LINE__);
 
           
         if (is_array($param_ary) AND isset($param_ary['email']) AND $param_ary['email'] != '') {
-            $email = filter_var($param_ary['email'], FILTER_SANITIZE_EMAIL);
+            $email = (string)filter_var((string)$param_ary['email'], FILTER_SANITIZE_EMAIL);
         }
 
         if (is_array($param_ary) AND isset($param_ary['username']) AND $param_ary['username'] != '') {
-            $username = strip_tags($param_ary['username']);
+            $username = strip_tags((string)$param_ary['username']);
         }
 
         if (is_array($param_ary) AND isset($param_ary['last_shop']) AND $param_ary['last_shop'] != '') {
-            $last_shop = $param_ary['last_shop'];
+            $last_shop = (string)$param_ary['last_shop'];
         }
 
         if (is_array($param_ary) AND isset($param_ary['useragent']) AND $param_ary['useragent'] != '') {
-            $useragent = $param_ary['useragent'];
+            $useragent = (string)$param_ary['useragent'];
         }
         
         p4c_query("UPDATE `user_tracking_users` SET
@@ -232,7 +236,7 @@ if (isset($_GET['guuid'])) {
         
    
     
-    if (isset($_GET['referer'])) {
+    if (isset($_GET['referer']) && is_string($_GET['referer'])) {
         // Seitenaufruf loggen
         $ref = urldecode($_GET['referer']);
 

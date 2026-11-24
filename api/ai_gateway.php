@@ -91,11 +91,11 @@ function ec_ai_gateway_extract_api_key(array $jsonBody): string
         return trim((string)$m[1]);
     }
 
-    if (!empty($jsonBody['api_key'])) {
+    if (!empty($jsonBody['api_key']) && is_scalar($jsonBody['api_key'])) {
         return trim((string)$jsonBody['api_key']);
     }
 
-    if (!empty($_POST['api_key'])) {
+    if (!empty($_POST['api_key']) && is_scalar($_POST['api_key'])) {
         return trim((string)$_POST['api_key']);
     }
 
@@ -948,7 +948,7 @@ if (PHP_SAPI === 'cli' && !empty($argv) && is_array($argv)) {
         if (strpos((string)$cliArg, '--run-job=') === 0) {
             p4c_close(DB_HOST);
             @set_time_limit(600);
-            $cliJobId = preg_replace('/[^a-zA-Z0-9_]/', '', substr((string)$cliArg, 10));
+            $cliJobId = (string)preg_replace('/[^a-zA-Z0-9_]/', '', substr((string)$cliArg, 10));
             $jobsDir  = ec_ai_gateway_get_jobs_dir();
             $reqFile  = $jobsDir . '/' . $cliJobId . '_req.json';
             $stateFile = $jobsDir . '/' . $cliJobId . '.json';
@@ -991,11 +991,11 @@ if ($expectedKey === '' || $providedKey === '' || !hash_equals($expectedKey, $pr
 }
 
 $action = '';
-if (!empty($jsonBody['action'])) {
+if (!empty($jsonBody['action']) && is_scalar($jsonBody['action'])) {
     $action = strtolower(trim((string)$jsonBody['action']));
-} elseif (!empty($_POST['action'])) {
+} elseif (!empty($_POST['action']) && is_scalar($_POST['action'])) {
     $action = strtolower(trim((string)$_POST['action']));
-} elseif (!empty($_GET['action'])) {
+} elseif (!empty($_GET['action']) && is_scalar($_GET['action'])) {
     $action = strtolower(trim((string)$_GET['action']));
 } else {
     $action = 'health';
@@ -1028,8 +1028,12 @@ if ($action === 'health' || $action === 'status' || $action === 'models') {
 if ($action === 'check_job' || $action === 'run_job') {
     p4c_close(DB_HOST);
 
-    $rawJobId  = isset($jsonBody['job_id']) ? (string)$jsonBody['job_id'] : (isset($_POST['job_id']) ? (string)$_POST['job_id'] : (isset($_GET['job_id']) ? (string)$_GET['job_id'] : ''));
-    $jobId     = preg_replace('/[^a-zA-Z0-9_-]/', '', $rawJobId);
+    $rawJobId  = (isset($jsonBody['job_id']) && is_scalar($jsonBody['job_id']))
+        ? (string)$jsonBody['job_id']
+        : ((isset($_POST['job_id']) && is_scalar($_POST['job_id']))
+            ? (string)$_POST['job_id']
+            : ((isset($_GET['job_id']) && is_scalar($_GET['job_id'])) ? (string)$_GET['job_id'] : ''));
+    $jobId     = (string)preg_replace('/[^a-zA-Z0-9_-]/', '', $rawJobId);
     $jobsDir   = ec_ai_gateway_get_jobs_dir();
     $stateFile = $jobsDir . '/' . $jobId . '.json';
     $reqFile   = $jobsDir . '/' . $jobId . '_req.json';
@@ -1192,7 +1196,7 @@ if ($action === 'chat' || $action === 'start_job') {
 
     $workload      = $serverState['workload'];
     $throttleState = (string)$workload['throttle_state'];
-    $busyPolicy    = isset($jsonBody['busy_policy']) ? strtolower(trim((string)$jsonBody['busy_policy'])) : 'throttle';
+    $busyPolicy    = (isset($jsonBody['busy_policy']) && is_scalar($jsonBody['busy_policy'])) ? strtolower(trim((string)$jsonBody['busy_policy'])) : 'throttle';
 
     // Schutzsperre bei ROT (Ueberlastung) oder wenn GELB + Policy 'pause'
     if ($throttleState === 'red') {
@@ -1230,9 +1234,9 @@ if ($action === 'chat' || $action === 'start_job') {
     $threadsBusy   = max(2, min(16, $requestedBusyThreads));
     $threadsToUse  = ($throttleState === 'yellow') ? $threadsBusy : $threadsNormal;
 
-    $modelName    = !empty($jsonBody['model']) ? trim((string)$jsonBody['model']) : (string)$gwCfg['default_model'];
-    $systemPrompt = isset($jsonBody['system_prompt']) ? (string)$jsonBody['system_prompt'] : '';
-    $userPrompt   = isset($jsonBody['user_prompt']) ? (string)$jsonBody['user_prompt'] : '';
+    $modelName    = (!empty($jsonBody['model']) && is_scalar($jsonBody['model'])) ? trim((string)$jsonBody['model']) : (string)$gwCfg['default_model'];
+    $systemPrompt = (isset($jsonBody['system_prompt']) && is_scalar($jsonBody['system_prompt'])) ? (string)$jsonBody['system_prompt'] : '';
+    $userPrompt   = (isset($jsonBody['user_prompt']) && is_scalar($jsonBody['user_prompt'])) ? (string)$jsonBody['user_prompt'] : '';
     $numCtx       = isset($jsonBody['num_ctx']) ? max(1024, min(32768, (int)$jsonBody['num_ctx'])) : 8192;
     $numPredict   = isset($jsonBody['num_predict']) ? max(120, min(4096, (int)$jsonBody['num_predict'])) : 1000;
     $timeoutSec   = isset($jsonBody['timeout_seconds']) ? max(30, min(360, (int)$jsonBody['timeout_seconds'])) : 260;
@@ -1307,6 +1311,10 @@ if ($action === 'chat' || $action === 'start_job') {
             $phpBin = 'php';
             if (defined('PHP_BINARY') && PHP_BINARY !== '' && stripos(PHP_BINARY, 'fpm') === false && stripos(PHP_BINARY, 'cgi') === false && stripos(PHP_BINARY, 'httpd') === false) {
                 $phpBin = PHP_BINARY;
+            } elseif (@is_executable('/opt/php-8.4/bin/php')) {
+                $phpBin = '/opt/php-8.4/bin/php';
+            } elseif (@is_executable('/opt/php-8.0/bin/php')) {
+                $phpBin = '/opt/php-8.0/bin/php';
             }
             $cmd = 'nohup ' . escapeshellarg($phpBin) . ' ' . escapeshellarg(__FILE__) . ' --run-job=' . escapeshellarg($jobId) . ' >/dev/null 2>&1 &';
             @exec($cmd);

@@ -13,9 +13,9 @@ $no_pic = is_file(MCP_DIR . '/mcp_neu/web/assets/img/movie_poster_nopic.jpg')
 
 // Bild aus EroCMS gesendet
 if (isset($_GET['type']) && $_GET['type'] === 'erocms') {
-    $rawUrl = isset($_GET['url']) ? (string)$_GET['url'] : '';
-    $rawActorId = isset($_GET['actor_id']) ? (string)$_GET['actor_id'] : '';
-    $rawFilename = isset($_GET['filename']) ? (string)$_GET['filename'] : '';
+    $rawUrl = (isset($_GET['url']) && is_string($_GET['url'])) ? $_GET['url'] : '';
+    $rawActorId = (isset($_GET['actor_id']) && is_scalar($_GET['actor_id'])) ? (string)$_GET['actor_id'] : '';
+    $rawFilename = (isset($_GET['filename']) && is_string($_GET['filename'])) ? $_GET['filename'] : '';
     $img_url = 'https://' . $rawUrl . '/' . $rawActorId . '/' . $rawFilename;
 
     if (!filter_var($img_url, FILTER_VALIDATE_URL)) {
@@ -41,10 +41,14 @@ if (isset($_GET['type']) && $_GET['type'] === 'erocms') {
 
     if (isset($_GET['load'])) {
         $img_url = str_replace('thumb_', '', $img_url);
+        $safeDlName = (string)preg_replace('/[^a-zA-Z0-9._-]/', '', basename($img_url));
+        if ($safeDlName === '') {
+            $safeDlName = 'image.jpg';
+        }
 
         header('Content-Description: File Transfer');
         header('Content-Type: application/octet-stream');
-        header('Content-Disposition: attachment; filename=' . basename($img_url));
+        header('Content-Disposition: attachment; filename=' . $safeDlName);
         header('Content-Transfer-Encoding: binary');
         header('Expires: 0');
         header('Cache-Control: must-revalidate');
@@ -54,14 +58,14 @@ if (isset($_GET['type']) && $_GET['type'] === 'erocms') {
             @ob_clean();
         }
         flush();
-        readfile($img_url);
+        @readfile($img_url);
         exit;
     }
 } else {
     // Bild aus EroCloud gesendet
-    $actor_id = isset($_GET['actor_id']) ? abs((int)$_GET['actor_id']) : 0;
-    $merchant_id = isset($_GET['merchant_id']) ? abs((int)$_GET['merchant_id']) : 0;
-    $file_name = isset($_GET['filename']) ? (string)preg_replace('/[^a-z0-9._-]/i', '', (string)$_GET['filename']) : '';
+    $actor_id = (isset($_GET['actor_id']) && is_scalar($_GET['actor_id'])) ? abs((int)$_GET['actor_id']) : 0;
+    $merchant_id = (isset($_GET['merchant_id']) && is_scalar($_GET['merchant_id'])) ? abs((int)$_GET['merchant_id']) : 0;
+    $file_name = (isset($_GET['filename']) && is_string($_GET['filename'])) ? (string)preg_replace('/[^a-z0-9._-]/i', '', $_GET['filename']) : '';
 
     $file_path = PROFILE_IMAGE_PATH . '/' . MERCHANT_DEFAULT_DIR . '/' . $merchant_id . '/messenger/' . $actor_id . '/' . $file_name;
     if (!is_file($file_path)) {
@@ -81,7 +85,9 @@ if (isset($_GET['type']) && $_GET['type'] === 'erocms') {
             @ob_clean();
         }
         flush();
-        readfile($file_path);
+        if (is_file($file_path)) {
+            readfile($file_path);
+        }
         exit;
     }
 

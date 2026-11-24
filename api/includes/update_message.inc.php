@@ -11,7 +11,7 @@ if (!defined('SAFE_INC')) {
 $get_gelesen = abs((int)filter_input(INPUT_GET, 'gelesen', FILTER_SANITIZE_NUMBER_INT));
 if ($get_gelesen > 2) {$get_gelesen = 1;}
 
-$get_von = filter_input(INPUT_GET, 'von', FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_HIGH);
+$get_von = (isset($_GET['von']) && is_string($_GET['von'])) ? $_GET['von'] : '';
 if ($get_von !== 'actor' AND $get_von !== 'member') {
     $api['error'] = "'von' not allowed";
     $class_errorlog->log($api['error']."\n".print_r(filter_input_array(INPUT_GET), true),__FILE__,__LINE__);

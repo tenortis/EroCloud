@@ -3,7 +3,7 @@
 if (!defined('SAFE_INC'))
     die ("Hacking attempt...");
 
-// Das hier war nur zum testen un kann gelöscht werden
+// Das hier war nur zum testen un kann gelÃ¶scht werden
 // SELECT remote_member_id, erocms_chat_id, COUNT(*) c FROM `actor_member_info` GROUP BY erocms_chat_id, domain HAVING c > 1 ORDER BY `c` DESC
 
 
@@ -27,28 +27,29 @@ $check_parameters = [
 ];
 
 foreach($check_parameters as $value) {
-    if (!isset($_GET[$value]) OR trim($_GET[$value]) === '') {
+    if (!isset($_GET[$value]) OR !is_scalar($_GET[$value]) OR trim((string)$_GET[$value]) === '') {
         $api['error'] = '$_GET["'.$value.'"] empty';
-        $class_errorlog->log($api['error']."\n".print_r(filter_input(INPUT_GET), true),__FILE__,__LINE__);
+        $class_errorlog->log($api['error']."\n".print_r(filter_input_array(INPUT_GET), true),__FILE__,__LINE__);
         print_xml($api);
     }
 }
 
-$von = trim($_GET['von']);
+$von = trim((string)$_GET['von']);
 if ($von !== 'actor' AND $von !== 'member') {
-    $class_errorlog->log($api['error']."\n".print_r(filter_input(INPUT_GET), true),__FILE__,__LINE__);
     $api['error'] = "'von' false";
+    $class_errorlog->log($api['error']."\n".print_r(filter_input_array(INPUT_GET), true),__FILE__,__LINE__);
     print_xml($api);
 }
 
-$erocms_an_id   = abs((int)$_GET['an_id']);
+$erocms_an_id   = abs((int)(is_scalar($_GET['an_id'] ?? null) ? $_GET['an_id'] : 0));
 $beantwortet    = abs((int)$_GET['beantwortet']);
-$datetime       = date("Y-m-d H:i:s", strtotime($_GET['datetime']));
-$domain         = strip_tags($_GET['domain']);
+$dt_ts          = strtotime((string)$_GET['datetime']);
+$datetime       = ($dt_ts !== false) ? date("Y-m-d H:i:s", $dt_ts) : date("Y-m-d H:i:s");
+$domain         = strip_tags((string)$_GET['domain']);
 $gelesen        = abs((int)$_GET['gelesen']);
 $geloescht      = abs((int)$_GET['geloescht']);
 $is_mobile      = abs((int)$_GET['is_mobile']);
-$message        = $_GET['nachricht'];
+$message        = (string)$_GET['nachricht'];
 $p4c_shop_id    = abs((int)$_GET['p4c_shop_id']);
 $message_price  = abs((int)$_GET['preis_coins']);
 $actor_commision= abs((float)$_GET['actor_commision']);
@@ -68,7 +69,7 @@ if (p4c_num_rows($rs_actor_member_info) == 0) {
     $erocms_chat_id = $erocms_an_id.'_'.$erocms_von_id;
     $remote_member_id = $p4c_shop_id.'_'.$erocms_von_id;
     
-    // Prüfen ob Amateur schon syncronisiert wurde
+    // PrÃ¼fen ob Amateur schon syncronisiert wurde
     $rs_check_sync = p4c_query("SELECT * FROM `messenger_sync` WHERE
         `remote_actor_id`   = '".abs((int)$erocms_an_id)."' AND 
         `p4c_shop_id`       = '".abs((int)$p4c_shop_id)."'
@@ -130,7 +131,13 @@ if (p4c_num_rows($rs_actor_member_info) == 0) {
 }
     
 $member_info_obj = p4c_fetch_object($rs_actor_member_info);
+if (!$member_info_obj) {
+    $api['error'] = 'member_info not found';
+    print_xml($api);
+}
 
+$von_id = 0;
+$an_id = 0;
 if ($von === 'actor') {
     $von_id = $member_info_obj->actor_id;
     $an_id = $member_info_obj->member_id;
@@ -143,20 +150,20 @@ include_once(SOURCEDIR.'/includes/klassen/ChatMessage.inc.php');
 
 $mess = new ChatMessage;
 
-$mess->chat_id      = p4c_escape_string($member_info_obj->chat_id);
+$mess->chat_id      = (string)$member_info_obj->chat_id;
 $mess->p4c_shop_id  = abs((int)$member_info_obj->p4c_shop_id);
 $mess->merchant_id  = abs((int)$member_info_obj->merchant_id);
 $mess->erocms_von_id= abs((int)$erocms_von_id);
 $mess->erocms_an_id = abs((int)$erocms_an_id);
-$mess->domain       = p4c_escape_string($domain);
-$mess->von          = p4c_escape_string($von);
+$mess->domain       = (string)$domain;
+$mess->von          = (string)$von;
 $mess->von_id       = abs((int)$von_id);
 $mess->an_id        = abs((int)$an_id);
 $mess->message_price= abs((float)$message_price);
 $mess->actor_commision = abs((float)$actor_commision);
 $mess->actor_commision_percent = abs((float)$actor_commision_percent);
 $mess->message      = $message;
-$mess->datetime     = p4c_escape_string($datetime);
+$mess->datetime     = (string)$datetime;
 $mess->is_mobile    = abs((int)$is_mobile);
 $mess->systemnachricht= abs((int)$systemnachricht);
 $mess->gelesen      = abs((int)$gelesen);

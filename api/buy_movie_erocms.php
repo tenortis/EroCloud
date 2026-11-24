@@ -1,8 +1,8 @@
 <?php
 
 /**
- * Für EroCMS: 
- * Zugang für Kunde auf Video anlegen
+ * FÃ¼r EroCMS: 
+ * Zugang fÃ¼r Kunde auf Video anlegen
  */
 
 #http://cloud2.erocms.net/api/buy_movie_erocms.php?user_streaming_key=4b508f23ecd4a2025f81f6cf89a57cd20c42d6d12da67fa94d3779d5b27aaeedb7471f9dd21830c96de32dfdbddabda33cfaf07bd75a748f88eb4e5e607616b6&movie_id=b1ab14c317def94c8f480cc65560b15a&user_id=1&shop_id=50135&buy_timestamp=1514414821
@@ -11,6 +11,8 @@ define('SAFE_INC', 1);
 
 include_once("../config.inc.php");
 include_once(API_DIR."/common.inc.php");
+
+$api = array();
 
 if (!isset($_SERVER['REMOTE_ADDR'])) {
     $api['error'] = 'access denid - no remote address';
@@ -22,64 +24,64 @@ if (check_ip_whitelist($_SERVER['REMOTE_ADDR']) === false) {
     print_xml($api);
 }
 
-// Prüfen ob der user_streaming_key angegeben wurde
-if (!isset($_GET['user_streaming_key'])) {
+// PrÃ¼fen ob der user_streaming_key angegeben wurde
+if (!isset($_GET['user_streaming_key']) || !is_scalar($_GET['user_streaming_key'])) {
     $api['error'] = 'no user_streaming_key received';
     print_xml($api);
 }
 
-// Prüfen ob der movie_id existiert
-if (!isset($_GET['movie_id'])) {
+// PrÃ¼fen ob der movie_id existiert
+if (!isset($_GET['movie_id']) || !is_scalar($_GET['movie_id'])) {
     $api['error'] = 'no movie_id received';
     print_xml($api);
 }
 
-// Prüfen ob der user_id existiert
-if (!isset($_GET['user_id'])) {
+// PrÃ¼fen ob der user_id existiert
+if (!isset($_GET['user_id']) || !is_scalar($_GET['user_id'])) {
     $api['error'] = 'no user_id received';
     print_xml($api);
 }
 
-// Prüfen ob der shop_id existiert
-if (!isset($_GET['shop_id'])) {
+// PrÃ¼fen ob der shop_id existiert
+if (!isset($_GET['shop_id']) || !is_scalar($_GET['shop_id'])) {
     $api['error'] = 'no shop_id received';
     print_xml($api);
 }
 
-// Prüfen ob der Film für Streaming oder Download gekauft werden soll
-if (!isset($_GET['buy_as']) OR ($_GET['buy_as'] != 'streaming' AND $_GET['buy_as'] != 'download')) {
+// PrÃ¼fen ob der Film fÃ¼r Streaming oder Download gekauft werden soll
+if (!isset($_GET['buy_as']) OR !is_scalar($_GET['buy_as']) OR ($_GET['buy_as'] != 'streaming' AND $_GET['buy_as'] != 'download')) {
     $api['error'] = 'no buy_as received';
     print_xml($api);
 }
 
-$input['user_streaming_key']= $_GET['user_streaming_key'];
-$input['movie_id']          = $_GET['movie_id'];
+$input['user_streaming_key']= (string)$_GET['user_streaming_key'];
+$input['movie_id']          = (string)$_GET['movie_id'];
 $input['user_id']           = abs((int)$_GET['user_id']);
 $input['shop_id']           = abs((int)$_GET['shop_id']);
-$input['buy_as']            = $_GET['buy_as'];
-$input['movie_price']       = abs((float)$_GET['movie_price']);
-$input['actor_commision']   = abs((float)$_GET['actor_commision']);
-$input['actor_commision_percent'] = abs((float)$_GET['actor_commision_percent']);
+$input['buy_as']            = (string)$_GET['buy_as'];
+$input['movie_price']       = abs((float)(is_scalar($_GET['movie_price'] ?? null) ? $_GET['movie_price'] : 0));
+$input['actor_commision']   = abs((float)(is_scalar($_GET['actor_commision'] ?? null) ? $_GET['actor_commision'] : 0));
+$input['actor_commision_percent'] = abs((float)(is_scalar($_GET['actor_commision_percent'] ?? null) ? $_GET['actor_commision_percent'] : 0));
 
 // Der Streaming-Key erstellt sich wie folgt:
 $user_streaming_key = generate_user_streaming_key($input);
 
 #echo $user_streaming_key;
 
-// Prüfen ob der user_streaming_key korrekt erstellt wurde
+// PrÃ¼fen ob der user_streaming_key korrekt erstellt wurde
 if ($input['user_streaming_key'] != $user_streaming_key) {
     $api['error'] = 'user_streaming_key created incorrectly';
     print_xml($api);
 }
 
-// Prüfen ob die movie_id existiert
+// PrÃ¼fen ob die movie_id existiert
 $rs_movie_online = p4c_query("SELECT `file_id` FROM `movies_online` WHERE `file_id`='". p4c_escape_string($input['movie_id'])."' LIMIT 1;",__FILE__,__LINE__);
 if (p4c_num_rows($rs_movie_online) == 0) {
     $api['error'] = 'movie_id not exists';
     print_xml($api);
 }
 
-// Prüfen ob der user_streaming_key in der DB existiert, wenn nicht anlegen
+// PrÃ¼fen ob der user_streaming_key in der DB existiert, wenn nicht anlegen
 $rs_user_streaming_key = p4c_query("SELECT * FROM `movies_access` WHERE
         `movie_id`              = '". p4c_escape_string($input['movie_id'])."' AND
         `user_id`               = '". p4c_escape_string($input['user_id'])."' AND
@@ -110,12 +112,12 @@ $api['user_id']     = $input['user_id'];
 $api['shop_id']     = $input['shop_id'];
 $api['buy_as']      = $input['buy_as'];
 
-print_xml($api);
-
 // Garbage Collection
 p4c_close(DB_HOST);
 	
 // PHP Fehlermeldung loggen
 p4c_errorlog(error_get_last());
+
+print_xml($api);
 
 ?>

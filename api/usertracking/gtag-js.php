@@ -14,7 +14,7 @@ include_once("../../config.inc.php");
 include_once(API_DIR."/common.inc.php");
 
 ################################################
-### Prüfen ob Zugriff auf Script erlaubt ist ###
+### PrÃ¼fen ob Zugriff auf Script erlaubt ist ###
 ################################################
 
 // echo generate_domain_id('lady-julina.com');
@@ -29,7 +29,7 @@ function generate_domain_id( $input, $length = 8 ){
     return "US-".substr( $hash_urlsafe, 0, $length );
 }
 
-if (!isset($_GET['id'])) {
+if (!isset($_GET['id']) || !is_string($_GET['id'])) {
     exit;
 }
 
@@ -49,16 +49,16 @@ if (!isset($_SERVER['HTTP_REFERER'])) {
     exit;
 }
 
-$domain = parse_url($_SERVER['HTTP_REFERER']);
+$domain = parse_url((string)$_SERVER['HTTP_REFERER']);
 
-if (!isset($domain['host']) OR generate_domain_id($domain['host']) != $site_id) {
+if (!is_array($domain) || !isset($domain['host']) OR generate_domain_id($domain['host']) != $site_id) {
     exit;
 }
 
-### ENDE - Prüfen ob Zugriff auf Script erlaubt ist ###
+### ENDE - PrÃ¼fen ob Zugriff auf Script erlaubt ist ###
 
 $param='';
-if (isset($_GET['param']) AND trim($_GET['param']) != '') {
+if (isset($_GET['param']) AND is_string($_GET['param']) AND trim($_GET['param']) != '') {
     $param=$_GET['param'];
 }
 

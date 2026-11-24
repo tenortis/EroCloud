@@ -36,7 +36,7 @@ if(isset($_GET['actor']) AND $_GET['actor'] == 'me') {
     */
 } else if(isset($_GET['actor_id'])) {
         
-    $actor_id  = abs((int)$_GET['actor_id']);
+    $actor_id  = is_scalar($_GET['actor_id']) ? abs((int)$_GET['actor_id']) : 0;
     $reqDomain = preg_replace('/^www\./', '', strtolower(rtrim(trim((string)($domain ?? '')), '/')));
 
     /*
@@ -85,11 +85,12 @@ if(isset($_GET['actor']) AND $_GET['actor'] == 'me') {
         } else {
             $raw_movies = array();
             while ($movie_obj = p4c_fetch_object($rs_movies_online)) {
+                $online_ts = strtotime((string)$movie_obj->online_at);
                 $raw_movies[] = array(
                     'movie_id'     => (string)$movie_obj->file_id,
                     'actor_id'     => (string)$movie_obj->actor_id,
                     'checksum'     => (string)$movie_obj->checksum,
-                    'online_since' => date("c", strtotime((string)$movie_obj->online_at)),
+                    'online_since' => date("c", $online_ts !== false ? $online_ts : 0),
                     'raw_status'   => (string)$movie_obj->status,
                     'domain'       => (string)$movie_obj->visible_for_website,
                 );
@@ -120,6 +121,9 @@ if(isset($_GET['actor']) AND $_GET['actor'] == 'me') {
         $api['movies'] = array();
 
         foreach ($movies_list as $m_item) {
+            if (!is_array($m_item)) {
+                continue;
+            }
             $vis_website = trim((string)($m_item['domain'] ?? ''));
             $vis_norm    = preg_replace('/^www\./', '', strtolower(rtrim($vis_website, '/')));
             $raw_status  = (string)($m_item['raw_status'] ?? ($m_item['status'] ?? 'active'));
@@ -131,10 +135,10 @@ if(isset($_GET['actor']) AND $_GET['actor'] == 'me') {
             }
 
             $api['movies'][] = array(
-                'movie_id'     => $m_item['movie_id'],
-                'actor_id'     => $m_item['actor_id'],
-                'checksum'     => $m_item['checksum'],
-                'online_since' => $m_item['online_since'],
+                'movie_id'     => $m_item['movie_id'] ?? '',
+                'actor_id'     => $m_item['actor_id'] ?? '',
+                'checksum'     => $m_item['checksum'] ?? '',
+                'online_since' => $m_item['online_since'] ?? '',
                 'status'       => $eff_status,
                 'domain'       => $vis_website,
             );

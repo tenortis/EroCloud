@@ -66,14 +66,23 @@ class p4c_mysqli {
     }
     
     public function fetch_object($result) {
+        if (!$result || !is_object($result)) {
+            return null;
+        }
         return $result->fetch_object();
     }
 
     public function fetch_array($result) {
+        if (!$result || !is_object($result)) {
+            return null;
+        }
         return $result->fetch_array();
     }
     
     public function fetch_row ($result) {
+        if (!$result || !is_object($result)) {
+            return null;
+        }
         return $result->fetch_row();
     }
 
@@ -83,6 +92,7 @@ class p4c_mysqli {
             return $result->num_rows;
         } else {
             $this->error_log->log('MYSQL-ERROR: '.$this->connect->error, $file, $line);
+            return 0;
         }
     }
     

@@ -4,7 +4,7 @@ define('SAFE_INC', 1);
 
 include_once("../config.inc.php");
 
-if (!isset($_GET['file_id']) || empty($_GET['file_id'])) {
+if (!isset($_GET['file_id']) || !is_scalar($_GET['file_id']) || empty($_GET['file_id'])) {
     header('HTTP/1.1 404 Not Found');
     echo 'movie id not exists';
     exit;
@@ -12,19 +12,19 @@ if (!isset($_GET['file_id']) || empty($_GET['file_id'])) {
 
 $file_id = trim((string)$_GET['file_id']);
 $fsk = '16';
-if (isset($_GET['fsk'])) {
+if (isset($_GET['fsk']) && is_scalar($_GET['fsk'])) {
     $fsk_val = abs((int)$_GET['fsk']);
     if ($fsk_val == 16 || $fsk_val == 18) {
         $fsk = (string)$fsk_val;
     }
 }
 $req_width = 0;
-if (isset($_GET['w']) && !empty($_GET['w'])) {
+if (isset($_GET['w']) && is_scalar($_GET['w']) && !empty($_GET['w'])) {
     $req_width = abs((int)$_GET['w']);
 }
 if ($req_width > 900) { $req_width = 900; }
 if ($req_width > 0 && $req_width < 50) { $req_width = 50; }
-$req_cs = isset($_GET['cs']) ? trim((string)$_GET['cs']) : '';
+$req_cs = (isset($_GET['cs']) && is_scalar($_GET['cs'])) ? trim((string)$_GET['cs']) : '';
 
 // Zero-DB / Zero-Session Fast-Path: Wenn das skalierte Poster bereits im Disk-Cache liegt,
 // direkt ohne Session-Start und ohne MySQL-Verbindung in ~1ms ausliefern!
@@ -76,13 +76,13 @@ function output_raw_file_and_exit($bild, $mime_type) {
     exit;
 }
 
-if (!isset($_GET['file_id']) || empty($_GET['file_id'])) {
+if (!isset($_GET['file_id']) || !is_scalar($_GET['file_id']) || empty($_GET['file_id'])) {
     header('HTTP/1.1 404 Not Found');
     echo 'movie id not exists';
     exit;
 }
 
-$file_id = $_GET['file_id'];
+$file_id = trim((string)$_GET['file_id']);
 
 $fsk = '16';
 if (isset($_GET['fsk'])) {
@@ -104,6 +104,11 @@ if (p4c_num_rows($rs_movie) == 0) {
 
 $movie_ary = p4c_fetch_object($rs_movie);
 @p4c_close(DB_HOST);
+if (!$movie_ary) {
+    header('HTTP/1.1 404 Not Found');
+    echo 'movie id not exists';
+    exit;
+}
 
 $selected_thumb = !empty($movie_ary->$fsk_field) ? $movie_ary->$fsk_field : '1';
 $base_path = MOVIES_PATH.'/'.$movie_ary->storage_location.'/'.$movie_ary->merchant_id.'/'.$movie_ary->id.'/thumb_'.$movie_ary->id.'_'.$movie_ary->file_id.'_';
@@ -129,6 +134,7 @@ if (!$found_file) {
     }
 }
 
+if (!function_exists('getRequestHeaders')) {
 function getRequestHeaders() {
     if (function_exists("apache_request_headers")) {
         if($headers = apache_request_headers()) {
@@ -140,6 +146,7 @@ function getRequestHeaders() {
         $headers['If-Modified-Since'] = $_SERVER['HTTP_IF_MODIFIED_SINCE'];
     }
     return $headers;
+}
 }
 
 function to_thumb($bild, $size = 0) {
@@ -171,8 +178,8 @@ function to_thumb($bild, $size = 0) {
     }
 
     $prop = $hoehe / $breite;
-    $neueBreite = (int)$size;
-    $neueHoehe = (int)round($size * $prop);
+    $neueBreite = max(1, (int)$size);
+    $neueHoehe = max(1, (int)round($neueBreite * $prop));
 
     $cacheBase = (defined('TEMP_DIR') && is_dir(TEMP_DIR)) ? rtrim((string)TEMP_DIR, '/\\') : sys_get_temp_dir();
     $cacheDir  = $cacheBase . '/ec_poster_cache';
@@ -197,15 +204,22 @@ function to_thumb($bild, $size = 0) {
                 if (!empty($exif['Orientation'])) {
                     switch ($exif['Orientation']) {
                         case 3:
-                            $altesBild = @imagerotate($altesBild, 180, 0);
+                            $rot = @imagerotate($altesBild, 180, 0);
+                            if ($rot) { $altesBild = $rot; }
                             break;
                         case 6:
-                            $altesBild = @imagerotate($altesBild, -90, 0);
+                            $rot = @imagerotate($altesBild, -90, 0);
+                            if ($rot) { $altesBild = $rot; }
                             break;
                         case 8:
-                            $altesBild = @imagerotate($altesBild, 90, 0);
+                            $rot = @imagerotate($altesBild, 90, 0);
+                            if ($rot) { $altesBild = $rot; }
                             break;
                     }
+                    $breite     = imagesx($altesBild);
+                    $hoehe      = imagesy($altesBild);
+                    $neueBreite = max(1, min((int)$size, $breite));
+                    $neueHoehe  = max(1, (int)round($neueBreite * ($hoehe / max(1, $breite))));
                 }
             }
         }
@@ -220,6 +234,10 @@ function to_thumb($bild, $size = 0) {
     }
 
     $neuesBild = imagecreatetruecolor($neueBreite, $neueHoehe);
+    if (!$neuesBild) {
+        unset($altesBild);
+        output_raw_file_and_exit($bild, $mime_type);
+    }
     if ($mime_type == 'image/png' || $mime_type == 'image/gif') {
         imagealphablending($neuesBild, false);
         imagesavealpha($neuesBild, true);
@@ -257,7 +275,7 @@ $headers = getRequestHeaders();
 if (!$found_file || !is_file($filename) || filesize($filename) == 0) {
     send_fallback_and_exit();
 } else {
-    $mime_content_type = mime_content_type($filename);
+    $mime_content_type = @mime_content_type($filename) ?: 'image/jpeg';
     
     header("Pragma: cache");
     header('Cache-control: max-age=31536000, public');
@@ -270,13 +288,16 @@ if (!$found_file || !is_file($filename) || filesize($filename) == 0) {
     }
     
     if ($width > 900) {$width = 900;}
-    if ($width < 50) {$width = 50;}
-   
-    if (isset($headers['If-Modified-Since']) && (strtotime($headers['If-Modified-Since']) == filemtime($filename))) {
-        header('Last-Modified: '.gmdate('D, d M Y H:i:s', filemtime($filename)).' GMT', true, 304);
+    if ($width > 0 && $width < 50) {$width = 50;}
+
+    $mtime = (int)@filemtime($filename);
+    if ($mtime <= 0) { $mtime = time(); }
+    $imsTs = isset($headers['If-Modified-Since']) ? strtotime((string)$headers['If-Modified-Since']) : false;
+    if ($imsTs !== false && $imsTs === $mtime) {
+        header('Last-Modified: '.gmdate('D, d M Y H:i:s', $mtime).' GMT', true, 304);
         exit;
     } else {
-        header('Last-Modified: '.gmdate('D, d M Y H:i:s', filemtime($filename)).' GMT', true, 200);
+        header('Last-Modified: '.gmdate('D, d M Y H:i:s', $mtime).' GMT', true, 200);
         header('Content-transfer-encoding: binary');
         to_thumb($filename, $width);
     }

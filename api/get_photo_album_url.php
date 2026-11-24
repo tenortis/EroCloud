@@ -9,51 +9,57 @@ define('SAFE_INC', 1);
 include_once("../config.inc.php");
 include_once(API_DIR."/common.inc.php");
 
-// Prüfen ob der user_key angegeben wurde
-if (!isset($_GET['user_key'])) {
+$api = array();
+
+// PrÃ¼fen ob der user_key angegeben wurde
+if (!isset($_GET['user_key']) || !is_string($_GET['user_key'])) {
     $api['error'] = 'no user_key received';
     print_xml($api);
 }
 
-// Prüfen ob der album_id existiert
-if (!isset($_GET['album_id'])) {
+// PrÃ¼fen ob der album_id existiert
+if (!isset($_GET['album_id']) || !is_string($_GET['album_id'])) {
     $api['error'] = 'no movie_id received';
     print_xml($api);
 }
 
-// Prüfen URL für Streaming oder Download generiert werden soll
-if (!isset($_GET['buy_as']) OR ($_GET['buy_as'] != 'streaming' AND $_GET['buy_as'] != 'download')) {
+// PrÃ¼fen URL fÃ¼r Streaming oder Download generiert werden soll
+if (!isset($_GET['buy_as']) OR !is_string($_GET['buy_as']) OR ($_GET['buy_as'] != 'streaming' AND $_GET['buy_as'] != 'download')) {
     $api['error'] = 'no buy_as received';
     print_xml($api);
 }
 
 $user_key = $_GET['user_key'];
 
-// Prüfen ob der user_streaming_key existiert
+// PrÃ¼fen ob der user_streaming_key existiert
 $rs_user_key = p4c_query("SELECT * FROM `photo_albums_access` WHERE `user_key` = '". p4c_escape_string($user_key)."' LIMIT 1;",__FILE__,__LINE__);
 if (p4c_num_rows($rs_user_key) == 0) {
     $api['error'] = 'access denid';
     print_xml($api);
 }
 
-$album_id = p4c_escape_string($_GET['album_id']);
+$album_id = (string)$_GET['album_id'];
 
-$rs_album = p4c_query("SELECT * FROM `photo_albums` WHERE `album_id`='".$album_id."' LIMIT 1;",__FILE__,__LINE__);
+$rs_album = p4c_query("SELECT * FROM `photo_albums` WHERE `album_id`='".p4c_escape_string($album_id)."' LIMIT 1;",__FILE__,__LINE__);
 if (p4c_num_rows($rs_album) == 0) {
     $api['error'] = 'album_id not exists';
-    print_xml($api);;   
+    print_xml($api);   
 }
 
-// Das Token ist nur 30 Minuten gültig. Danach kann das Album von diesem Kunden nicht mehr direkt per URL aufgerufen werden
+// Das Token ist nur 30 Minuten gÃ¼ltig. Danach kann das Album von diesem Kunden nicht mehr direkt per URL aufgerufen werden
 $album_access_obj = p4c_fetch_object($rs_user_key);
+if (!$album_access_obj) {
+    $api['error'] = 'access denid';
+    print_xml($api);
+}
 $access_token = $album_access_obj->access_token;
 
-// Wenn acces_token älter als 30 Minuten, dann aktualisieren
-if ($album_access_obj->access_token_datetime < date("Y-m-d H:i:s")) {
+// Wenn acces_token Ã¤lter als 30 Minuten, dann aktualisieren
+if ((string)($album_access_obj->access_token_datetime ?? '') < date("Y-m-d H:i:s")) {
     $access_token = randomString(10);
     
     p4c_query("UPDATE `photo_albums_access` SET 
-        `access_token` = '".$access_token."',
+        `access_token` = '".p4c_escape_string($access_token)."',
         `access_token_datetime` = '".date("Y-m-d H:i:s", strtotime("+30 minutes"))."'
     WHERE `user_key` = '". p4c_escape_string($user_key)."' LIMIT 1;",__FILE__,__LINE__);
 }
@@ -78,12 +84,12 @@ if ($_GET['buy_as'] == 'download') {
     }
 }
 
-print_xml($api);
-
 // Garbage Collection
 p4c_close(DB_HOST);
 	
 // PHP Fehlermeldung loggen
 p4c_errorlog(error_get_last());
+
+print_xml($api);
 
 ?>

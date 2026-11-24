@@ -24,37 +24,37 @@ $mess->send();
 
 class ChatMessage {
 
-    var $chat_id        = '';
-    var $p4c_shop_id    = 0;
-    var $merchant_id    = 0;
-    var $erocms_von_id  = 0;
-    var $erocms_an_id   = 0;
-    var $von            = 'actor'; // actor / member / system
-    var $von_id         = 0;
-    var $an_id          = 0;
-    var $message_price  = 0;
-    var $message        = 'DUMMY';
-    var $actor_commision = 0;
-    var $actor_commision_percent = 0;
-    var $datetime       = 0;
-    var $is_mobile      = 0;
-    var $systemnachricht= 0;
-    var $gelesen        = 0;
-    var $beantwortet    = 0;
-    var $geloescht      = 0;
-    var $domain         = '';
-    var $send_to        = '';
-    var $mysql;
-    var $class_errorlog;
-    var $preis          = 0;
+    public $chat_id        = '';
+    public $p4c_shop_id    = 0;
+    public $merchant_id    = 0;
+    public $erocms_von_id  = 0;
+    public $erocms_an_id   = 0;
+    public $von            = 'actor'; // actor / member / system
+    public $von_id         = 0;
+    public $an_id          = 0;
+    public $message_price  = 0;
+    public $message        = 'DUMMY';
+    public $actor_commision = 0;
+    public $actor_commision_percent = 0;
+    public $datetime       = 0;
+    public $is_mobile      = 0;
+    public $systemnachricht= 0;
+    public $gelesen        = 0;
+    public $beantwortet    = 0;
+    public $geloescht      = 0;
+    public $domain         = '';
+    public $send_to        = '';
+    public $mysql;
+    public $class_errorlog;
+    public $preis          = 0;
     
-    function __construct() {
+    public function __construct() {
         global $mysql, $class_errorlog;
         $this->mysql = $mysql;
         $this->class_errorlog = $class_errorlog;
     }
  
-    function send() {
+    public function send() {
         global $class_errorlog;
 
     	if ($this->systemnachricht == 1) {$this->preis = 0;}
@@ -67,57 +67,67 @@ class ChatMessage {
         if ($this->von === 'actor' AND $this->systemnachricht == 0) {
             $points_for = '';
 
-            $rs_get_last_member_message = p4c_query("SELECT * FROM `chat_messages` WHERE `chat_id`='".p4c_escape_string($this->chat_id)."' ORDER BY `id` DESC LIMIT 1;");
+            $rs_get_last_member_message = p4c_query("SELECT * FROM `chat_messages` WHERE `chat_id`='".p4c_escape_string($this->chat_id)."' ORDER BY `id` DESC LIMIT 1;", __FILE__, __LINE__);
 
-            // Punkte für neuen User anschreiben
-            if (p4c_num_rows($rs_get_last_member_message) == 0) {
+            // Punkte fÃ¼r neuen User anschreiben
+            if ($rs_get_last_member_message && p4c_num_rows($rs_get_last_member_message) == 0) {
                 $points_for = 'contat_new_user';
 
-            // Punkte für Antworten auf eine Nachricht
-            } else {
+            // Punkte fÃ¼r Antworten auf eine Nachricht
+            } elseif ($rs_get_last_member_message) {
                 
                 $last_mess_obj = p4c_fetch_object($rs_get_last_member_message);
                 
                 #$class_errorlog->log('Punkte: '.$points_for,__FILE__,__LINE__);
 
                 // Wenn die letzte Nachricht vom User ist
-                if ($last_mess_obj->von == 'member') {
-                
-                    // Wenn Antwort unter 8 Stunden
-                    if (strtotime($last_mess_obj->datetime) > strtotime("-8 hours")) {
-                        $points_for = 'till8hours';
+                if ($last_mess_obj && $last_mess_obj->von == 'member') {
+                    $lastTs = strtotime((string)($last_mess_obj->datetime ?? ''));
+                    if ($lastTs !== false) {
+                        // Wenn Antwort unter 8 Stunden
+                        if ($lastTs > strtotime("-8 hours")) {
+                            $points_for = 'till8hours';
 
-                    // Wenn Antwort unter 16 Stunden
-                    } else if (strtotime($last_mess_obj->datetime) > strtotime("-16 hours")) {
-                        $points_for = 'till16hours';
+                        // Wenn Antwort unter 16 Stunden
+                        } else if ($lastTs > strtotime("-16 hours")) {
+                            $points_for = 'till16hours';
 
-                    // Wenn Antwort unter 24 Stunden
-                    } else if (strtotime($last_mess_obj->datetime) > strtotime("-24 hours")) {
-                        $points_for = 'till24hours';
+                        // Wenn Antwort unter 24 Stunden
+                        } else if ($lastTs > strtotime("-24 hours")) {
+                            $points_for = 'till24hours';
+                        }
                     }
                 }
             }
 
             if ($points_for != '') {
-                $points_cls = new PointsSystem;
-                $points_cls->group = 'messenger';
-                $points_cls->points_for = $points_for;
-                $points_cls->actor_id = $this->von_id;
-                $points_cls->date = date("Y-m-d");
+                if (!class_exists('PointsSystem') && defined('SOURCEDIR') && is_file(SOURCEDIR . '/includes/klassen/PointsSystem.inc.php')) {
+                    include_once(SOURCEDIR . '/includes/klassen/PointsSystem.inc.php');
+                }
+                if (class_exists('PointsSystem')) {
+                    $points_cls = new PointsSystem();
+                    $points_cls->group = 'messenger';
+                    $points_cls->points_for = $points_for;
+                    $points_cls->actor_id = $this->von_id;
+                    $points_cls->date = date("Y-m-d");
 
-                if ($points_cls->get_points() != false) {
                     $points = $points_cls->get_points();
-                    $points_cls->set_points($points);
-                };
+                    if ($points !== false) {
+                        $points_cls->set_points($points);
+                    }
+                }
             }
 
         }
         
-        $message = trim($this->message);
-    	#$this->message = str_replace("¤", "&euro;", $this->message);
+        $message = trim((string)$this->message);
+    	#$this->message = str_replace("Â¤", "&euro;", $this->message);
    	
-    	// Für korrekte Kodierung von Sonderzeichen wie EURO-Zeichen, Ü, Ä
-    	p4c_query('SET NAMES "utf8"');
+    	// FÃ¼r korrekte Kodierung von Sonderzeichen wie EURO-Zeichen, Ãœ, Ã„
+    	p4c_query("SET NAMES 'utf8mb4';", __FILE__, __LINE__);
+
+        $dtTs = strtotime((string)$this->datetime);
+        $dtFormatted = ($dtTs !== false) ? date("Y-m-d H:i:s", $dtTs) : date("Y-m-d H:i:s");
         
         if (p4c_query('INSERT INTO `chat_messages` SET 
             `chat_id`       = "'.p4c_escape_string($this->chat_id).'",
@@ -132,7 +142,7 @@ class ChatMessage {
             `actor_commision`           = "'.abs((float)$this->actor_commision).'",
             `actor_commision_percent`   = "'.abs((float)$this->actor_commision_percent).'",
             `message`       = "'.p4c_escape_string($message).'",
-            `datetime`      = "'.date("Y-m-d H:i:s", strtotime($this->datetime)).'",
+            `datetime`      = "'.$dtFormatted.'",
             `is_mobile`     = "'.abs((int)$this->is_mobile).'",
             `systemnachricht` = "'.abs((int)$this->systemnachricht).'",
             `gelesen`       = "'.abs((int)$this->gelesen).'",
@@ -154,7 +164,7 @@ class ChatMessage {
                 `actor_commision`           = "'.abs((float)$this->actor_commision).'",
                 `actor_commision_percent`   = "'.abs((float)$this->actor_commision_percent).'",
                 `message`       = "'.p4c_escape_string($message).'",
-                `datetime`      = "'.date("Y-m-d H:i:s", strtotime($this->datetime)).'",
+                `datetime`      = "'.$dtFormatted.'",
                 `is_mobile`     = "'.abs((int)$this->is_mobile).'",
                 `systemnachricht` = "'.abs((int)$this->systemnachricht).'",
                 `gelesen`       = "'.abs((int)$this->gelesen).'",
@@ -181,21 +191,23 @@ class ChatMessage {
         $merchant = new Merchant($this->mysql,$this->von_id);
 
         $search = array('http://', 'https://', 'www.');
-        $domain = str_replace($search, '', $this->domain);
+        $domain = str_replace($search, '', (string)$this->domain);
         
         $rs_messenger_sync = p4c_query("SELECT AES_DECRYPT(`apikey`, '".AES_KEY."') FROM `messenger_sync` WHERE `actor_id`='".abs((int)$p4c_actor_id)."' AND `p4c_shop_id`='".abs((int)$p4c_shop_id)."' LIMIT 1;",__FILE__,__LINE__);
 
         $param = array(
-            "api_key"   => p4c_result($rs_messenger_sync, 0),
+            "api_key"   => (string)p4c_result($rs_messenger_sync, 0),
             "von"       => $this->von,
             "von_id"    => $this->erocms_von_id,
             "an_id"     => $this->erocms_an_id,
             "message"   => $this->message
         );
 
-        $param = array_filter($param, "strlen"); // leere Einträge Entfernen
+        $param = array_filter($param, static function ($v) {
+            return $v !== null && $v !== false && strlen((string)$v) > 0;
+        }); // leere EintrÃ¤ge Entfernen
         ksort($param); // Alphabetische Sortierung
-        $query = http_build_query($param, '&amp;');
+        $query = http_build_query($param);
         
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, 'https://'.$domain.'/erocloud_api/get_new_message.php?'.$query);
@@ -213,7 +225,7 @@ class ChatMessage {
             } else {
                 $class_errorlog->log($data."\n".'https://'.$domain.'/erocloud_api/get_new_message.php?'.$query,__FILE__,__LINE__);
             }
-            curl_close($ch);
-        }        
+        }
+        unset($ch);        
     }
 }

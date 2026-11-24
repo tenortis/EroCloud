@@ -14,7 +14,7 @@ include_once("../../config.inc.php");
 include_once(API_DIR."/common.inc.php");
 
 ################################################
-### Prüfen ob Zugriff auf Script erlaubt ist ###
+### PrÃ¼fen ob Zugriff auf Script erlaubt ist ###
 ################################################
 
 // echo generate_domain_id('lady-julina.com');
@@ -29,7 +29,7 @@ function generate_domain_id( $input, $length = 8 ){
     return "US-".substr( $hash_urlsafe, 0, $length );
 }
 
-if (!isset($_GET['id'])) {
+if (!isset($_GET['id']) || !is_string($_GET['id'])) {
     exit;
 }
 
@@ -48,13 +48,13 @@ if (!isset($_SERVER['HTTP_REFERER'])) {
     exit;
 }
 
-$domain = parse_url($_SERVER['HTTP_REFERER']);
+$domain = parse_url((string)$_SERVER['HTTP_REFERER']);
 
-if (!isset($domain['host']) OR generate_domain_id($domain['host']) != $site_id) {
+if (!is_array($domain) || !isset($domain['host']) OR generate_domain_id($domain['host']) != $site_id) {
     exit;
 }
 
-### ENDE - Prüfen ob Zugriff auf Script erlaubt ist ###
+### ENDE - PrÃ¼fen ob Zugriff auf Script erlaubt ist ###
 
 
 // erster Aufruf dieser Datei
@@ -65,17 +65,17 @@ if (!isset($_GET['guuid'])) {
     
     $site_id = generate_domain_id('api.erocloud.net');
     
-    $ref='';
-    if (isset($_GET['param'])) {
+    $param = '';
+    if (isset($_GET['param']) && is_string($_GET['param'])) {
         $param = $_GET['param'];
     }
 
     function uniqidReal($lenght = 15) {
         // uniqid gives 13 chars, but you could adjust it to your needs.
         if (function_exists("random_bytes")) {
-            $bytes = random_bytes(ceil($lenght / 2));
+            $bytes = random_bytes((int)ceil($lenght / 2));
         } elseif (function_exists("openssl_random_pseudo_bytes")) {
-            $bytes = openssl_random_pseudo_bytes(ceil($lenght / 2));
+            $bytes = openssl_random_pseudo_bytes((int)ceil($lenght / 2));
         } else {
             throw new Exception("no cryptographically secure random function available");
         }
@@ -132,7 +132,7 @@ if (!isset($_GET['guuid'])) {
 ###############################################
 ### uuid und Referer in Datenbank speichern ###
 ###############################################
-if (isset($_GET['guuid'])) {
+if (isset($_GET['guuid']) && is_string($_GET['guuid'])) {
 
     $guuid = $_GET['guuid'];
     
@@ -147,12 +147,14 @@ if (isset($_GET['guuid'])) {
     if (p4c_num_rows($rs_check_user_exists) > 0) {
 
         $user_obj = p4c_fetch_object($rs_check_user_exists);
-        $user_id = $user_obj->id;
+        if ($user_obj) {
+            $user_id = $user_obj->id;
+        }
         
-        if (isset($_GET['param']) AND trim($_GET['param']) != '') {
+        if (isset($_GET['param']) AND is_string($_GET['param']) AND trim($_GET['param']) != '') {
 
             $param_json = base64_decode($_GET['param']);
-            $param_ary = json_decode($param_json, true);
+            $param_ary = json_decode((string)$param_json, true);
 
             #print_r($param_ary);
             
@@ -160,13 +162,13 @@ if (isset($_GET['guuid'])) {
                 exit;
             }
 
-            $email = filter_var($param_ary['email'], FILTER_SANITIZE_EMAIL);
-            $username = strip_tags($param_ary['username']);
+            $email = (string)filter_var((string)$param_ary['email'], FILTER_SANITIZE_EMAIL);
+            $username = strip_tags((string)$param_ary['username']);
             
             p4c_query("UPDATE `user_tracking_users` SET
                 `email`='". p4c_escape_string($email)."',
                 `username`='". p4c_escape_string($username)."',
-                `last_shop`='". p4c_escape_string($param_ary['last_shop'])."',
+                `last_shop`='". p4c_escape_string((string)$param_ary['last_shop'])."',
                 `update_email` = '".date("Y-m-d H:i:s")."'
             WHERE 
                 `guuid` = '". p4c_escape_string($guuid)."'

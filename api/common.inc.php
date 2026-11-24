@@ -10,7 +10,7 @@ include_once(SOURCEDIR."/includes/functions.inc.php");
 ##############################################
 if (empty($no_session) && session_status() !== PHP_SESSION_ACTIVE && !headers_sent()) {
     session_save_path(TEMP_DIR.'/');
-    ini_set('session.gc_probability', 1);
+    ini_set('session.gc_probability', '1');
     if (!isset($_SESSION)) {
         p4c_session_start(!empty($session_write_close));
     }
@@ -41,8 +41,8 @@ include_once(SOURCEDIR.'/includes/klassen/sendSMTPmail.inc.php');
  * Schutz vor Hacks
  **/
 
-if (isset($_GET['referer'])) {
-    $_SERVER['HTTP_REFERER'] = $_GET['referer'];
+if (isset($_GET['referer']) && is_scalar($_GET['referer'])) {
+    $_SERVER['HTTP_REFERER'] = (string)$_GET['referer'];
 }
 
 // Cookie manipulation verhindern 

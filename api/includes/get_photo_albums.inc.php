@@ -12,7 +12,7 @@ header('Content-Type: text/html; charset=utf-8');
 // Wenn eine Darsteller angegeben wurde
  if(isset($_GET['actor_id'])) {
     
-    $actor_id = abs((int)$_GET['actor_id']);        
+    $actor_id = is_scalar($_GET['actor_id']) ? abs((int)$_GET['actor_id']) : 0;        
     // Alle Filme vom Amateur holen
     $rs_albums_online = p4c_query("SELECT `checksum`, `album_id`, `actor_id`, `online_at`, `status` FROM `photo_albums_online` WHERE `actor_id`='".abs((int)$actor_id)."';",__FILE__,__LINE__);
     $number_of_albums = p4c_num_rows($rs_albums_online);
@@ -23,11 +23,12 @@ header('Content-Type: text/html; charset=utf-8');
         $api['number_of_albums'] = $number_of_albums;
         $api['albums'] = array();
         while($album_obj = p4c_fetch_object($rs_albums_online)) {
+            $online_ts = strtotime((string)$album_obj->online_at);
             $api['albums'][] = array(
                 'album_id'      => $album_obj->album_id,
                 'actor_id'      => $album_obj->actor_id,
                 'checksum'      => $album_obj->checksum,
-                'online_since'  => date("c", strtotime($album_obj->online_at)),
+                'online_since'  => date("c", $online_ts !== false ? $online_ts : 0),
                 'status'        => $album_obj->status
             );
         }

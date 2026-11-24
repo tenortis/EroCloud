@@ -27,9 +27,9 @@ class Actor {
         }
 
         $rs_actor = p4c_query("SELECT ".$select." FROM `actors` WHERE `id`='".abs((int)$this->actor_id)."' LIMIT 1;", __FILE__, __LINE__);
-        if (p4c_num_rows($rs_actor) > 0) {
+        if ($rs_actor && p4c_num_rows($rs_actor) > 0) {
             $actor_ary = p4c_fetch_object($rs_actor);
-            return $actor_ary->$var;
+            return $actor_ary ? $actor_ary->$var : null;
         }
     }
     

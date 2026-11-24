@@ -15,7 +15,7 @@ if(!isset($_GET['movie_id'])) {
     print_xml($api);
 }
 
-$movie_id = preg_replace('/[^a-zA-Z0-9]/', '', $_GET['movie_id']);
+$movie_id = (string)preg_replace('/[^a-zA-Z0-9]/', '', is_string($_GET['movie_id']) ? $_GET['movie_id'] : '');
 
 
 /*
@@ -28,7 +28,7 @@ $temp_file = API_DIR.'/temp/get_movie/'.$movie_id.'.tmp';
 
 // Änderungszeitpunkt der temporären Datei
 if (is_file($temp_file)) {
-    $temp_file_time = @filemtime($temp_file);
+    $temp_file_time = (int)@filemtime($temp_file);
 } else {
     $temp_file_time = 0;
 }
@@ -65,6 +65,10 @@ if ($cached_api === null) {
         print_xml($api);
     } else {
         $movie_obj = p4c_fetch_object($rs_movie);
+        if (!$movie_obj) {
+            $api['error'] = 'movie not exists';
+            print_xml($api);
+        }
 
         $m = new MovieOnline($mysql, $movie_obj->id);
 
@@ -87,7 +91,8 @@ if ($cached_api === null) {
         $api['meta_title']          = $m->field('meta_title');
         $api['meta_description']    = $m->field('meta_description');
         $api['seo_url']             = $m->field('seo_url');
-        $api['online_since']        = date("c", strtotime((string)$m->field('online_at')));
+        $online_ts                  = strtotime((string)$m->field('online_at'));
+        $api['online_since']        = date("c", $online_ts !== false ? $online_ts : 0);
         $api['amount_second']       = $m->field('amount_second');
         $api['amount_webmaster']    = $m->field('amount_webmaster');
         $api['as_download']         = $m->field('as_download');
@@ -120,7 +125,7 @@ if (!isset($api['error'])) {
     if ($norm_vis === 'public') {
         $api['status'] = $raw_status;
     } elseif ($norm_vis !== '' && $norm_req === $norm_vis) {
-        $api['domain'] = $domain;
+        $api['domain'] = (string)($domain ?? '');
         $api['status'] = $raw_status;
     } else {
         $api['status'] = 'deleted';

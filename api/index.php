@@ -5,39 +5,40 @@ define('SAFE_INC', 1);
 include_once("../config.inc.php");
 include_once(API_DIR."/common.inc.php");
 
+$api = array();
 $api['version'] = '1.0';
 
 // Wenn keine API-Key angegeben wurde
-if(!isset($_GET['api_key'])) {
+if (!isset($_GET['api_key']) || !is_string($_GET['api_key'])) {
     $api['error'] = 'api_key not exists';
     print_xml($api);
 }
 
 // Wenn keine API angegeben wurde
-if(!isset($_GET['api_name'])) {
+if (!isset($_GET['api_name']) || !is_string($_GET['api_name'])) {
     $api['error'] = 'api_name not exists';
     print_xml($api);
 }
 
 // API-Key wurde angegeben
-$api['api_key'] = strip_tags($_GET['api_key']);
+$api['api_key'] = strip_tags((string)$_GET['api_key']);
 $api_key = $api['api_key'];
 
 // Wenn keine Domain angegeben wurde
-if(!isset($_GET['domain'])) {
+if (!isset($_GET['domain']) || !is_string($_GET['domain'])) {
     $api['error'] = 'domain not exists';
     print_xml($api);
 }
 
-$domain          = strip_tags($_GET['domain']);
+$domain          = strip_tags((string)$_GET['domain']);
 $p4c_shop_id     = abs((int)filter_input(INPUT_GET, 'p4c_shop_id', FILTER_SANITIZE_NUMBER_INT));
 $remote_actor_id = abs((int)filter_input(INPUT_GET, 'sender_id', FILTER_SANITIZE_NUMBER_INT));
 
-// Domainname säubern
+// Domainname sÃ¤ubern
 $domain = str_replace(array("http://", "https://"), "", $domain);
 
 /*
- *  Prüfen ob der API-Key existiert.
+ *  PrÃ¼fen ob der API-Key existiert.
  *  Wenn ja, speichere die Information in der Session.
  *  Grund: Damit nicht bei jedem Aufruf die DB angesprochen werden muss.
  */
@@ -95,7 +96,11 @@ if($_GET['api_name'] == 'get_movies') {
 // (Gekaufte) Fotos zum Fotoalbum mit der ID X laden
 } else if($_GET['api_name'] == 'get_my_photo_album') {
     check_api_key_exists($api_key);
-    include_once(API_DIR.'/includes/get_my_photo_album.inc.php');
+    if (is_file(API_DIR.'/includes/get_my_photo_album.inc.php')) {
+        include_once(API_DIR.'/includes/get_my_photo_album.inc.php');
+    } else {
+        $api['error'] = 'endpoint disabled';
+    }
     
 // Amateur-online-Status
 } else if($_GET['api_name'] == 'get_actors_online_status') {
@@ -152,12 +157,12 @@ if($_GET['api_name'] == 'get_movies') {
 #print_r($api);
 #echo '</pre>';
 
-print_xml($api);
-
 // Garbage Collection
 p4c_close(DB_HOST);
 	
 // PHP Fehlermeldung loggen
 p4c_errorlog(error_get_last());
+
+print_xml($api);
 
 ?>

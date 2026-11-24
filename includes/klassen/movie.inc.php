@@ -21,21 +21,21 @@ class Movie {
         if (is_logged_in('mcp') === true OR is_logged_in('acp') === true) {
             
             // Wenn movie_id = file_id ist
-            if (strlen($this->movie_id) == 32) {
+            if (strlen((string)$this->movie_id) == 32) {
                 $from = "`file_id`='". p4c_escape_string($this->movie_id)."'";
             } else {
                 $from = "`id`='".abs((int)$this->movie_id)."'";
             }
             
             if (is_logged_in('mcp') === true) {
-                $rs_movies = $this->mysql->query("SELECT `".p4c_escape_string($var)."` FROM `movies` WHERE ".$from." AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
+                $rs_movies = $this->mysql->query("SELECT `".p4c_escape_string($var)."` FROM `movies` WHERE ".$from." AND `merchant_id`='".abs((int)($_SESSION['merchant_id'] ?? 0))."' LIMIT 1;", __FILE__, __LINE__);
             } else if (is_logged_in('acp') === true) {
                 $rs_movies = $this->mysql->query("SELECT `".p4c_escape_string($var)."` FROM `movies` WHERE ".$from." LIMIT 1;", __FILE__, __LINE__);
             }
             
-            if ($this->mysql->num_rows($rs_movies) > 0) {
+            if (isset($rs_movies) && $rs_movies && $this->mysql->num_rows($rs_movies) > 0) {
                 $movie_ary = $this->mysql->fetch_object($rs_movies);
-                return $movie_ary->$var;
+                return $movie_ary ? $movie_ary->$var : null;
             }
         }
     } 

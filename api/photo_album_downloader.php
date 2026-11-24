@@ -9,17 +9,19 @@ define('SAFE_INC', 1);
 include_once("../config.inc.php");
 include_once(API_DIR . "/common.inc.php");
 
-if (!isset($_GET['user_key'])) {
+$api = array();
+
+if (!isset($_GET['user_key']) || !is_string($_GET['user_key'])) {
     $api['error'] = 'user_key not exists';
     print_xml($api);
 }
 
-if (!isset($_GET['album_id'])) {
+if (!isset($_GET['album_id']) || !is_string($_GET['album_id'])) {
     $api['error'] = 'album_id not exists';
     print_xml($api);
 }
 
-if (!isset($_GET['access_token'])) {
+if (!isset($_GET['access_token']) || !is_string($_GET['access_token'])) {
     $api['error'] = 'access denid 1';
     print_xml($api);
 }
@@ -34,27 +36,39 @@ if (p4c_num_rows($rs_user_key) == 0) {
 }
 
 $access_obj = p4c_fetch_object($rs_user_key);
+if (!$access_obj) {
+    $api['error'] = 'access denid 2';
+    print_xml($api);
+}
 
 // Wenn das Accesstoken nicht korrekt oder abgelaufen ist
-if ($access_obj->access_token != $_GET['access_token'] || $access_obj->access_token_datetime < date("Y-m-d H:i:s")) {
+if ($access_obj->access_token != $_GET['access_token'] || (string)($access_obj->access_token_datetime ?? '') < date("Y-m-d H:i:s")) {
     $api['error'] = 'access denid 3';
     print_xml($api);
 }
 
-$album_id = p4c_escape_string((string)$_GET['album_id']);
+$album_id_raw = (string)$_GET['album_id'];
 
-$rs_album = p4c_query("SELECT * FROM `photo_albums` WHERE `album_id`='" . $album_id . "' LIMIT 1;", __FILE__, __LINE__);
+$rs_album = p4c_query("SELECT * FROM `photo_albums` WHERE `album_id`='" . p4c_escape_string($album_id_raw) . "' LIMIT 1;", __FILE__, __LINE__);
 if (p4c_num_rows($rs_album) == 0) {
     $api['error'] = 'album_id not exists';
     print_xml($api);
 }
 
 $album_ary = p4c_fetch_object($rs_album);
+if (!$album_ary) {
+    $api['error'] = 'album_id not exists';
+    print_xml($api);
+}
 $albumTitleRaw = (string)($album_ary->title ?? ($album_ary->name ?? 'Fotoalbum'));
 
-$rs_photos = p4c_query("SELECT * FROM `photo_albums_photos` WHERE `album_id`='" . p4c_escape_string($album_id) . "' AND `rejected`='0';", __FILE__, __LINE__);
+$rs_photos = p4c_query("SELECT * FROM `photo_albums_photos` WHERE `album_id`='" . p4c_escape_string($album_id_raw) . "' AND `rejected`='0';", __FILE__, __LINE__);
 
 $album_dir = PROFILE_IMAGE_PATH . '/' . $album_ary->storage_location . '/' . $album_ary->merchant_id . '/' . $album_ary->id;
+if (!class_exists('ZipArchive') || !is_dir($album_dir)) {
+    $api['error'] = 'cannot open zipfile';
+    print_xml($api);
+}
 $zip_file = $album_dir . '/album.zip';
 
 if (is_file($zip_file)) {
@@ -63,7 +77,7 @@ if (is_file($zip_file)) {
 
 $zip = new ZipArchive();
 
-if ($zip->open($zip_file, ZipArchive::CREATE) !== true) {
+if ($zip->open($zip_file, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
     $api['error'] = 'cannot open zipfile';
     print_xml($api);
 }
@@ -75,12 +89,17 @@ while ($photo_ary = p4c_fetch_object($rs_photos)) {
         $zip->addFile($photoPath, (string)$photo_ary->filename);
     }
 }
-$zip->close();
+if ($zip->close() !== true || !is_file($zip_file)) {
+    $api['error'] = 'cannot create zipfile';
+    print_xml($api);
+}
 
-$size = is_file($zip_file) ? (int)filesize($zip_file) : 0;
+$size = (int)@filesize($zip_file);
 
 if (isset($_GET['start']) && $_GET['start'] == 'download') {
-    session_write_close();
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        @session_write_close();
+    }
 
     header('Pragma: public');
     header('Expires: 0');
@@ -95,7 +114,7 @@ if (isset($_GET['start']) && $_GET['start'] == 'download') {
 
     $bis = 1024 * 1024;
     $count = (int)ceil($size / max(1, $bis));
-    $handle = fopen($zip_file, "rb");
+    $handle = is_file($zip_file) ? @fopen($zip_file, "rb") : false;
     if ($handle !== false) {
         for ($i = 0; $i <= $count; $i++) {
             $ftell = ftell($handle) + $bis;

@@ -16,7 +16,7 @@ if(!isset($_GET['album_id'])) {
 }
 
 
-$album_id = preg_replace('/[^a-zA-Z0-9]/', '', $_GET['album_id']);
+$album_id = (string)preg_replace('/[^a-zA-Z0-9]/', '', is_string($_GET['album_id']) ? $_GET['album_id'] : '');
 
 /*
  * Pfad zur temporären Datei
@@ -28,7 +28,7 @@ $temp_file = API_DIR.'/temp/get_photo_album/'.$album_id.'.tmp';
 
 // Änderungszeitpunkt der temporären Datei
 if (is_file($temp_file)) {
-    $temp_file_time = @filemtime($temp_file);
+    $temp_file_time = (int)@filemtime($temp_file);
 } else {
     $temp_file_time = 0;
 }
@@ -58,6 +58,10 @@ if ($cached_api === null) {
     } else {
 
         $album_obj = p4c_fetch_object($rs_album);
+        if (!$album_obj) {
+            $api['error'] = 'album not exists';
+            print_xml($api);
+        }
 
         $a = new PhotoAlbumOnline($mysql,$album_obj->id);
 
@@ -76,7 +80,8 @@ if ($cached_api === null) {
         $api['meta_title']      = $a->field('meta_title');
         $api['meta_description']= $a->field('meta_description');
         $api['seo_url']         = $a->field('seo_url');
-        $api['online_since']    = date("c", strtotime($a->field('online_at')));
+        $online_ts              = strtotime((string)$a->field('online_at'));
+        $api['online_since']    = date("c", $online_ts !== false ? $online_ts : 0);
         $api['amount_webmaster']= $a->field('amount_webmaster');
         $api['amount_download'] = $a->field('amount_download');
         $api['categories']      = $a->field('category_slave');

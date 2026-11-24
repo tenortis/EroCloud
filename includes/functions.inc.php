@@ -104,7 +104,7 @@ function saltPassword($password, $salt)	{
 }
 
 function hash_password($new_password) {
-    $new_password  = trim(htmlspecialchars(strip_tags($new_password),ENT_QUOTES, 'ISO-8859-1'));
+    $new_password  = trim(htmlspecialchars(strip_tags((string)$new_password),ENT_QUOTES, 'ISO-8859-1'));
     $salt           = mt_rand();
     $saltedHash	   = saltPassword($new_password, $salt);
     return $saltedHash.':'.$salt;
@@ -174,16 +174,21 @@ function p4c_result($string, $row, $field=0) {
 // Zufallscode $len = länge zb. 5 
 function make_seed(){ 
     list($usec , $sec) = explode (' ', microtime()); 
-    return (float) $sec + ((float) $usec * 100000); 
+    return (int)round((float)$sec + ((float)$usec * 100000)); 
 }
 function randomString($len) { 
-    srand(make_seed());  
-
     //Der String $possible enthält alle Zeichen, die verwendet werden sollen 
     $possible="ABCDEFGHJKLMNPRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"; 
+    $maxIdx = strlen($possible) - 1;
+    $targetLen = max(0, (int)$len);
     $str=""; 
-    while(strlen($str)<$len) { 
-        $str.=substr($possible,(rand()%(strlen($possible))),1); 
+    while(strlen($str) < $targetLen) { 
+        try {
+            $idx = random_int(0, $maxIdx);
+        } catch (\Throwable $e) {
+            $idx = mt_rand(0, $maxIdx);
+        }
+        $str .= substr($possible, $idx, 1); 
     } 
     return($str); 
 }
@@ -216,22 +221,24 @@ function p4c_errorlog($error) {
 function getUserIP() {
     foreach (array('HTTP_CLIENT_IP', 'HTTP_X_FORWARDED_FOR', 'HTTP_X_FORWARDED', 'HTTP_X_CLUSTER_CLIENT_IP', 'HTTP_FORWARDED_FOR', 'HTTP_FORWARDED', 'REMOTE_ADDR') as $key) {
         if (array_key_exists($key, $_SERVER) === true) {
-            foreach (explode(',', $_SERVER[$key]) as $ip) {
+            foreach (explode(',', (string)$_SERVER[$key]) as $ip) {
+                $ip = trim($ip);
                 if (filter_var($ip, FILTER_VALIDATE_IP) !== false) {
                     return $ip;
                 }
             }
         }
     }
+    return '';
 }
 
 function getBrowserFingerprint() {
-    $client_ip = getUserIP();
-    $useragent = @$_SERVER['HTTP_USER_AGENT'];
-    $accept   = @$_SERVER['HTTP_ACCEPT'];
-    if (isset($_SERVER['HTTP_ACCEPT_CHARSET'])) {$charset = $_SERVER['HTTP_ACCEPT_CHARSET'];} else {$charset='';}
-    $encoding = @$_SERVER['HTTP_ACCEPT_ENCODING'];
-    $language = @$_SERVER['HTTP_ACCEPT_LANGUAGE'];
+    $client_ip = (string)getUserIP();
+    $useragent = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
+    $accept   = (string)($_SERVER['HTTP_ACCEPT'] ?? '');
+    if (isset($_SERVER['HTTP_ACCEPT_CHARSET'])) {$charset = (string)$_SERVER['HTTP_ACCEPT_CHARSET'];} else {$charset='';}
+    $encoding = (string)($_SERVER['HTTP_ACCEPT_ENCODING'] ?? '');
+    $language = (string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '');
     $data = '';
     $data .= $client_ip;
     $data .= $useragent;
@@ -290,6 +297,7 @@ function utf8decodeArray($array) {
 
 
 function seo_url($string) {
+    $string = (string)($string ?? '');
     if (empty($string)) {
         return '';
     }
@@ -309,10 +317,10 @@ function seo_url($string) {
     $string = str_replace(array(' ', '_'), '-', $string);
 
     // Alle verbleibenden Sonderzeichen entfernen
-    $string = preg_replace('/[^a-zA-Z0-9\-]/', '', $string);
+    $string = (string)preg_replace('/[^a-zA-Z0-9\-]/', '', $string);
 
     // Mehrere aufeinanderfolgende Bindestriche auf einen reduzieren
-    $string = preg_replace('/-+/', '-', $string);
+    $string = (string)preg_replace('/-+/', '-', $string);
 
     // Bindestriche am Anfang und Ende entfernen
     $string = trim($string, '-');
@@ -630,13 +638,15 @@ function print_xml($api) {
 function generate_user_streaming_key($array) {
     /** IN DIESER FUNKTION NICHTS ÄNDERN !!! **/
     $param = array(
-        "movie_id"      => $array['movie_id'],
-        "user_id"       => $array['user_id'],
-        "shop_id"       => $array['shop_id'],
-        "buy_as"        => $array['buy_as']
+        "movie_id"      => $array['movie_id'] ?? '',
+        "user_id"       => $array['user_id'] ?? '',
+        "shop_id"       => $array['shop_id'] ?? '',
+        "buy_as"        => $array['buy_as'] ?? ''
     );
 
-    $param  = array_filter($param, "strlen"); // leere Eintraege Entfernen
+    $param  = array_filter($param, static function ($v) {
+        return $v !== null && $v !== false && strlen((string)$v) > 0;
+    }); // leere Eintraege Entfernen
     ksort($param);
     $param  = http_build_query($param);
     
@@ -646,13 +656,15 @@ function generate_user_streaming_key($array) {
 function generate_user_album_key($array) {
     /** IN DIESER FUNKTION NICHTS ÄNDERN !!! **/
     $param = array(
-        "album_id"      => $array['album_id'],
-        "user_id"       => $array['user_id'],
-        "shop_id"       => $array['shop_id'],
-        "buy_as"        => $array['buy_as']
+        "album_id"      => $array['album_id'] ?? '',
+        "user_id"       => $array['user_id'] ?? '',
+        "shop_id"       => $array['shop_id'] ?? '',
+        "buy_as"        => $array['buy_as'] ?? ''
     );
 
-    $param  = array_filter($param, "strlen"); // leere Eintraege Entfernen
+    $param  = array_filter($param, static function ($v) {
+        return $v !== null && $v !== false && strlen((string)$v) > 0;
+    }); // leere Eintraege Entfernen
     ksort($param);
     $param  = http_build_query($param);
     
@@ -711,6 +723,9 @@ function convertBytes($size, $sourceUnit = 'B', $targetUnit = 'MB') {
          'ZB' => 8,
          'YB' => 9
     );
+    if (!isset($units[$sourceUnit], $units[$targetUnit])) {
+        return '0 B';
+    }
  
     if( $units[$sourceUnit] <= $units[$targetUnit] ) {
         for( $i = $units[$sourceUnit]; $size >= 1024; $i++ ) {
@@ -729,7 +744,9 @@ function convertBytes($size, $sourceUnit = 'B', $targetUnit = 'MB') {
             }
         }
     }
-    return number_format(round($size, 2),2,',','').' '. array_keys($units)[$i];
+    $unitKeys = array_keys($units);
+    $i = max(0, min($i, count($unitKeys) - 1));
+    return number_format(round($size, 2),2,',','').' '. $unitKeys[$i];
     
     #echo convertBytes( 1234567890 ); // 1.15 GB
     #echo convertBytes( 1.149780945852399, 'GB', 'B' ); // 1234567890 B
@@ -744,13 +761,13 @@ function p4c_curl($url) {
     curl_setopt($ch, CURLOPT_REFERER, URL);
     curl_setopt($ch, CURLOPT_USERAGENT, PROJECTNAME." - ".COMPANYNAME." - ".URL);
     $data = curl_exec($ch);
+    unset($ch);
     return $data;
-    curl_close($ch);
 }
 
 
 function validate_url($url) {
-    $url = trim($url);
+    $url = trim((string)$url);
    
     $urlregex = "/^(https?|ftp)\:\/\/([a-z0-9+!*(),;?&=\$_.-]+(\:[a-z0-9+!*(),;?&=\$_.-]+)?@)?[a-z0-9+\$_-]+(\.[a-z0-9+\$_-]+)*(\:[0-9]{2,5})?(\/([a-z0-9+\$_-]\.?)+)*\/?(\?[a-z+&\$_.-][a-z0-9;:@\/&%=+\$_.-]*)?(#[a-z_.-][a-z0-9+\$_.-]*)?\$/i";
     if (preg_match($urlregex, (string)$url)) {
@@ -784,40 +801,77 @@ function utf8_to_latin1swedishci($string = '') {
 
     // https://www.utf8-chartable.de/unicode-utf8-table.pl?start=8192&number=128&utf8=string-literal
     // https://www.toptal.com/designers/htmlarrows/punctuation/
-    
-    if (trim((string)$string) != '') {
+    $string = (string)($string ?? '');
+
+    if (trim($string) != '') {
         # \xE2\x80\x8B
-        $string = mb_ereg_replace("\xe2\x80\x80", "", $string);
-        $string = mb_ereg_replace("\xe2\x80\x82", "", $string);
-        $string = mb_ereg_replace("\xe2\x80\x83", "", $string);
-        $string = mb_ereg_replace("\xe2\x80\x84", "", $string);
-        $string = mb_ereg_replace("\xe2\x80\x85", "", $string);
-        $string = mb_ereg_replace("\xe2\x80\x86", "", $string);
-        $string = mb_ereg_replace("\xe2\x80\x87", "", $string);
-        $string = mb_ereg_replace("\xe2\x80\x88", "", $string);
-        $string = mb_ereg_replace("\xe2\x80\x89", "", $string);
-        $string = mb_ereg_replace("\xe2\x80\x8a", "", $string);
-        $string = mb_ereg_replace("\xe2\x80\x8b", "", $string);
-        $string = mb_ereg_replace("\xe2\x80\x8c", "", $string);
-        $string = mb_ereg_replace("\xe2\x80\x8d", "", $string);
-        $string = mb_ereg_replace("\xe2\x80\x8e", "", $string);
-        $string = mb_ereg_replace("\xe2\x80\x8f", "", $string);
- 
-        $string = mb_ereg_replace("\xe2\x80\x90", "&#8208;", $string);
-        $string = mb_ereg_replace("\xe2\x80\x91", "&#8209;", $string);
-        $string = mb_ereg_replace("\xe2\x80\x92", "&#8210;", $string);
-        $string = mb_ereg_replace("\xe2\x80\x93", "&#8211;", $string);
-        $string = mb_ereg_replace("\xe2\x80\x94", "&#8212;", $string);
-        $string = mb_ereg_replace("\xe2\x80\x95", "&#8213;", $string);
-        $string = mb_ereg_replace("\xe2\x80\x96", "&#8214;", $string);
-        $string = mb_ereg_replace("\xe2\x80\x97", "&#8215;", $string);
-        $string = mb_ereg_replace("\xe2\x80\x98", "&#8216;", $string);
-        $string = mb_ereg_replace("\xe2\x80\x99", "&#8217;", $string);
-        $string = mb_ereg_replace("\xe2\x80\x9a", "&#8218;", $string);
-        $string = mb_ereg_replace("\xe2\x80\x9b", "&#8219;", $string);
-        $string = mb_ereg_replace("\xe2\x80\x9c", "&#8220;", $string);
-        $string = mb_ereg_replace("\xe2\x80\x9d", "&#8221;", $string);
-        $string = mb_ereg_replace("\xe2\x80\x9e", "&#8222;", $string);
+        $string = str_replace(
+            array(
+                "\xe2\x80\x80",
+                "\xe2\x80\x82",
+                "\xe2\x80\x83",
+                "\xe2\x80\x84",
+                "\xe2\x80\x85",
+                "\xe2\x80\x86",
+                "\xe2\x80\x87",
+                "\xe2\x80\x88",
+                "\xe2\x80\x89",
+                "\xe2\x80\x8a",
+                "\xe2\x80\x8b",
+                "\xe2\x80\x8c",
+                "\xe2\x80\x8d",
+                "\xe2\x80\x8e",
+                "\xe2\x80\x8f",
+                "\xe2\x80\x90",
+                "\xe2\x80\x91",
+                "\xe2\x80\x92",
+                "\xe2\x80\x93",
+                "\xe2\x80\x94",
+                "\xe2\x80\x95",
+                "\xe2\x80\x96",
+                "\xe2\x80\x97",
+                "\xe2\x80\x98",
+                "\xe2\x80\x99",
+                "\xe2\x80\x9a",
+                "\xe2\x80\x9b",
+                "\xe2\x80\x9c",
+                "\xe2\x80\x9d",
+                "\xe2\x80\x9e",
+            ),
+            array(
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "&#8208;",
+                "&#8209;",
+                "&#8210;",
+                "&#8211;",
+                "&#8212;",
+                "&#8213;",
+                "&#8214;",
+                "&#8215;",
+                "&#8216;",
+                "&#8217;",
+                "&#8218;",
+                "&#8219;",
+                "&#8220;",
+                "&#8221;",
+                "&#8222;",
+            ),
+            $string
+        );
     }
     return $string;
 }

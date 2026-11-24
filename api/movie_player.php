@@ -21,17 +21,19 @@ include_once("../config.inc.php");
 include_once(API_DIR . "/common.inc.php");
 include_once(SOURCEDIR . '/includes/klassen/VideoStream.inc.php');
 
-if (!isset($_GET['user_streaming_key']) || $_GET['user_streaming_key'] === '') {
+$api = array();
+
+if (!isset($_GET['user_streaming_key']) || !is_string($_GET['user_streaming_key']) || $_GET['user_streaming_key'] === '') {
     $api['error'] = 'key not exists';
     print_xml($api);
 }
 
-if (!isset($_GET['movie_id']) || $_GET['movie_id'] === '') {
+if (!isset($_GET['movie_id']) || !is_string($_GET['movie_id']) || $_GET['movie_id'] === '') {
     $api['error'] = 'movie_id not exists';
     print_xml($api);
 }
 
-if (!isset($_GET['access_token']) || $_GET['access_token'] === '') {
+if (!isset($_GET['access_token']) || !is_string($_GET['access_token']) || $_GET['access_token'] === '') {
     $api['error'] = 'access denid';
     print_xml($api);
 }
@@ -80,6 +82,13 @@ if (p4c_num_rows($rs_user_streaming_key) == 0) {
 }
 
 $access_obj = p4c_fetch_object($rs_user_streaming_key);
+if (!$access_obj) {
+    if (function_exists('session_status') && session_status() === PHP_SESSION_ACTIVE) {
+        @session_write_close();
+    }
+    $api['error'] = 'access denid';
+    print_xml($api);
+}
 
 // Wenn das Accesstoken nicht zum hinterlegten Token passt (Toleranz für lang geöffnete iOS-Safari-Tabs / BFCache,
 // solange user_streaming_key + movie_id + access_token exakt mit dem gekauften Datensatz übereinstimmen).
@@ -95,7 +104,7 @@ if (!$tokenMatchesRecord || !$movieMatchesRecord) {
 
 // Access-Token-Laufzeit gedrosselt verlängern (maximal 1x pro Stunde statt bei jedem einzelnen Range-Chunk,
 // damit parallele Range-Requests beim Spulen auf Browser/iOS/Smart-TV keine DB-Row-Locks erzeugen).
-if ($access_obj->access_token_datetime < date("Y-m-d H:i:s", strtotime("+5 hours"))) {
+if ((string)($access_obj->access_token_datetime ?? '') < date("Y-m-d H:i:s", strtotime("+5 hours"))) {
     p4c_query("UPDATE `movies_access` SET
         `access_token_datetime`='" . date("Y-m-d H:i:s", strtotime("+6 hours")) . "'
     WHERE `user_streaming_key`='" . p4c_escape_string($user_streaming_key) . "' LIMIT 1;", __FILE__, __LINE__);
@@ -113,6 +122,13 @@ if (p4c_num_rows($rs_movie) == 0) {
 }
 
 $movie_ary = p4c_fetch_object($rs_movie);
+if (!$movie_ary) {
+    if (function_exists('session_status') && session_status() === PHP_SESSION_ACTIVE) {
+        @session_write_close();
+    }
+    $api['error'] = 'movie_id not exists';
+    print_xml($api);
+}
 
 $file = MOVIES_PATH . '/' . $movie_ary->storage_location . '/' . $movie_ary->merchant_id . '/' . $movie_ary->id . '/' . $movie_ary->filename;
 

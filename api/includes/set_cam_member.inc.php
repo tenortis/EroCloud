@@ -95,7 +95,7 @@ $rs_actor_cam_members = p4c_query("SELECT * FROM `members_seeing_actor_cam` WHER
 
 $cam_watching   = 0;
 
-if ($cam_user_auto_on === 1) {
+if ((int)$cam_user_auto_on === 1) {
     $cam_watching = 1;
 }
 

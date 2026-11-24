@@ -2,7 +2,7 @@
 
 
 /*
- * Diese Datei gibt die guuid anhand der E-Mail-Adresse zurück
+ * Diese Datei gibt die guuid anhand der E-Mail-Adresse zurÃ¼ck
  * 
  */
 
@@ -10,13 +10,16 @@ header('Access-Control-Allow-Origin: *');
 
 define('SAFE_INC', 1);
 
+$no_session = true;
+$_SESSION = array();
+
 include_once("../../config.inc.php");
 include_once("common.inc.php");
 
 $json_ary = array();
 
 
-$email = filter_input(INPUT_GET, 'email', FILTER_SANITIZE_EMAIL);
+$email = (string)(filter_input(INPUT_GET, 'email', FILTER_SANITIZE_EMAIL) ?? '');
 
 if (!filter_input(INPUT_GET, 'email', FILTER_VALIDATE_EMAIL)) {
     $json_ary['error'] = 'not found';

@@ -9,21 +9,23 @@ define('SAFE_INC', 1);
 include_once("../config.inc.php");
 include_once(API_DIR."/common.inc.php");
 
+$api = array();
+
 // Prüfen ob der user_streaming_key angegeben wurde
-if (!isset($_GET['user_streaming_key'])) {
+if (!isset($_GET['user_streaming_key']) || !is_string($_GET['user_streaming_key'])) {
     $api['error'] = 'no user_streaming_key received';
     print_xml($api);
 }
 
 // Prüfen ob der movie_id existiert
-if (!isset($_GET['movie_id'])) {
+if (!isset($_GET['movie_id']) || !is_string($_GET['movie_id'])) {
     $api['error'] = 'no movie_id received';
     print_xml($api);
 }
 
 
 // Prüfen URL für Streaming oder Download generiert werden soll
-if (!isset($_GET['buy_as']) OR ($_GET['buy_as'] != 'streaming' AND $_GET['buy_as'] != 'download')) {
+if (!isset($_GET['buy_as']) OR !is_string($_GET['buy_as']) OR ($_GET['buy_as'] != 'streaming' AND $_GET['buy_as'] != 'download')) {
     $api['error'] = 'no buy_as received';
     print_xml($api);
 }
@@ -37,21 +39,29 @@ if (p4c_num_rows($rs_user_streaming_key) == 0) {
     print_xml($api);
 }
 $access_obj = p4c_fetch_object($rs_user_streaming_key);
+if (!$access_obj) {
+    $api['error'] = 'access denid';
+    print_xml($api);
+}
 
-$movie_id = p4c_escape_string($_GET['movie_id']);
+$movie_id = (string)$_GET['movie_id'];
 
-$rs_movie = p4c_query("SELECT * FROM `movies` WHERE `file_id`='".$movie_id."' LIMIT 1;",__FILE__,__LINE__);
+$rs_movie = p4c_query("SELECT * FROM `movies` WHERE `file_id`='".p4c_escape_string($movie_id)."' LIMIT 1;",__FILE__,__LINE__);
 if (p4c_num_rows($rs_movie) == 0) {
     $api['error'] = 'movie_id not exists';
     print_xml($api);
 }
 
 $movie_obj = p4c_fetch_object($rs_movie);
-$resolution = explode('x', (string)$movie_obj->resolution);
+if (!$movie_obj) {
+    $api['error'] = 'movie_id not exists';
+    print_xml($api);
+}
+$resolution = explode('x', (string)($movie_obj->resolution ?? ''));
 
 // Bestehendes gültiges Access-Token wiederverwenden (damit ein bereits aktiver TV-/AirPlay-/Chromecast-Stream
 // bei einem erneuten Seitenaufruf nicht abgebrochen wird) und Gültigkeit auf 6 Stunden verlängern.
-if (isset($access_obj->access_token) && $access_obj->access_token !== '' && isset($access_obj->access_token_datetime) && $access_obj->access_token_datetime > date("Y-m-d H:i:s")) {
+if (isset($access_obj->access_token) && $access_obj->access_token !== '' && isset($access_obj->access_token_datetime) && (string)$access_obj->access_token_datetime > date("Y-m-d H:i:s")) {
     $access_token = $access_obj->access_token;
 } else {
     $access_token = randomString(10);
@@ -74,12 +84,12 @@ if ($_GET['buy_as'] == 'download') {
 
 }
 
-print_xml($api);
-
 // Garbage Collection
 p4c_close(DB_HOST);
 	
 // PHP Fehlermeldung loggen
 p4c_errorlog(error_get_last());
+
+print_xml($api);
 
 ?>

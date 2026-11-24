@@ -21,14 +21,14 @@ class PhotoAlbum {
         
         if (is_logged_in('mcp') === true OR is_logged_in('acp') === true) {
             if (is_logged_in('mcp') === true) {
-                $rs_albums = $this->mysql->query("SELECT `".p4c_escape_string($var)."` FROM `photo_albums` WHERE `id`='".abs((int)$this->album_id)."' AND `merchant_id`='".abs((int)$_SESSION['merchant_id'])."' LIMIT 1;", __FILE__, __LINE__);
+                $rs_albums = $this->mysql->query("SELECT `".p4c_escape_string($var)."` FROM `photo_albums` WHERE `id`='".abs((int)$this->album_id)."' AND `merchant_id`='".abs((int)($_SESSION['merchant_id'] ?? 0))."' LIMIT 1;", __FILE__, __LINE__);
             } else if (is_logged_in('acp') === true) {
                 $rs_albums = $this->mysql->query("SELECT `".p4c_escape_string($var)."` FROM `photo_albums` WHERE `id`='".abs((int)$this->album_id)."' LIMIT 1;", __FILE__, __LINE__);
             }
             
-            if ($this->mysql->num_rows($rs_albums) > 0) {
+            if (isset($rs_albums) && $rs_albums && $this->mysql->num_rows($rs_albums) > 0) {
                 $album_ary = $this->mysql->fetch_object($rs_albums);
-                return $album_ary->$var;
+                return $album_ary ? $album_ary->$var : null;
             }
         }
     } 

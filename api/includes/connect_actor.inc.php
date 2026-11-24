@@ -33,8 +33,12 @@ if(p4c_num_rows($rs_actor) == '0') {
 } else {
     
     $actor_obj = p4c_fetch_object($rs_actor);
+    if (!$actor_obj) {
+        $api['error'] = 'actor not exists';
+        print_xml($api);
+    }
                    
-    // Prüfen ob Darsteller schon syncronisiert wurde / mit Cloud verbunden ist
+    // PrÃ¼fen ob Darsteller schon syncronisiert wurde / mit Cloud verbunden ist
     $rs_check_sync = p4c_query("SELECT * FROM `messenger_sync` WHERE
         `merchant_id`   = '".abs((int)$actor_obj->merchant_id)."' AND
         `actor_id`      = '".abs((int)$get_erocloud_actor_id)."' AND
@@ -64,9 +68,9 @@ if(p4c_num_rows($rs_actor) == '0') {
         LIMIT 1;",__FILE__,__LINE__);
         
         /**
-         *  Prüfe ob der es Bereits Verbindungen zw. dem Darsteller und Kunden der Seite gab
-         *  Wenn die übergeben "remote_actor_id" nicht mit der hinterlegten in der Datenbank übersinstimmt,
-         *  hat sich diese vermutlich auf der Webseite geändert und muss in der Datenbank aktualisiert werden.
+         *  PrÃ¼fe ob der es Bereits Verbindungen zw. dem Darsteller und Kunden der Seite gab
+         *  Wenn die Ã¼bergeben "remote_actor_id" nicht mit der hinterlegten in der Datenbank Ã¼bersinstimmt,
+         *  hat sich diese vermutlich auf der Webseite geÃ¤ndert und muss in der Datenbank aktualisiert werden.
          */
         
         $rs_check_actor_member_info = p4c_query("SELECT * FROM `actor_member_info` WHERE
@@ -79,7 +83,7 @@ if(p4c_num_rows($rs_actor) == '0') {
            
             while ($actor_member_obj = p4c_fetch_object($rs_check_actor_member_info)) {
                 $class_errorlog->log("",__FILE__,__LINE__);
-                $explode = explode('_',$actor_member_obj->erocms_chat_id);
+                $explode = explode('_', (string)($actor_member_obj->erocms_chat_id ?? ''));
                 
                 if (count($explode) == 2) {
                     $erocms_chat_id = $get_remote_actor_id.'_'.$explode[1];
