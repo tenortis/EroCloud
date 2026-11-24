@@ -2,12 +2,15 @@
 
 define('SAFE_INC', 1);
 
+$no_session = true;
+$_SESSION = array();
+
 include_once("../../config.inc.php");
 include_once(API_DIR."/common.inc.php");
 
-if (isset($_GET['set_webmaster_id'])) {
+if (isset($_GET['set_webmaster_id']) && is_scalar($_GET['set_webmaster_id'])) {
     
-    $username = trim(strip_tags($_GET['set_webmaster_id']));
+    $username = trim(strip_tags((string)$_GET['set_webmaster_id']));
 
     function check_username($username) {
         if (!empty($username)) {
@@ -26,7 +29,7 @@ if (isset($_GET['set_webmaster_id'])) {
     $check_username = check_username($username);
     
     if ($check_username !== false) {
-        header('Location: '.Pay4Coins_MCP_URL.'/Partner-werden?wmid='.$check_username);    
+        header('Location: '.Pay4Coins_MCP_URL.'/Partner-werden?wmid='.urlencode((string)$check_username));    
     } else {
         echo 'Der Partnerlink scheint nicht korrekt zu sein.';
     }
@@ -34,6 +37,8 @@ if (isset($_GET['set_webmaster_id'])) {
     
     
 }
+
+p4c_close(DB_HOST);
 
 // PHP Fehlermeldung loggen
 p4c_errorlog(error_get_last());

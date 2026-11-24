@@ -37,7 +37,7 @@ Alle ungenutzten Zwischenversionen (`5.6`, `7.0`, `7.1`, `7.2`, `7.4`, `8.1`, `8
 | PHP-Version | Paketname | Installationspfad | CLI-Binary | Aktuelle Verwendung / Rolle |
 | :--- | :--- | :--- | :--- | :--- |
 | **PHP `8.4.28`** | `php-8.4-opt` (+ `imagick`) | `/opt/php-8.4/` | `/opt/php-8.4/bin/php` | **Aktiv für `acp.erocloud.net`, `erocloud.net`, `api.erocloud.net`, `wevsql.erocloud.net` sowie alle 8 Cronjobs von `web1`**; Ziel-Version für die verbleibenden `ads`-Domains |
-| **PHP `8.0.30`** | `php-8.0-opt` (+ `imagick`) | `/opt/php-8.0/` | `/opt/php-8.0/bin/php` | **Nur noch für `www1.erocloud.net` (`ads/`), `ad5.tv` (`ads/ad5.tv/`) sowie `web2` (`amoredea.com`) aktiv** |
+| **PHP `8.0.30`** | `php-8.0-opt` (+ `imagick`) | `/opt/php-8.0/` | `/opt/php-8.0/bin/php` | **Nur noch für `www1.erocloud.net` (`ads/`), `ad5.tv` (`ads/ad5.tv/`, beide Code PHP-8.4/8.5-ready) sowie `web2` (`amoredea.com`) aktiv** |
 | **PHP `7.3.33`** | `php-7.3-opt` (+ `imagick`) | `/opt/php-7.3/` | `/opt/php-7.3/bin/php` | Nur noch für `web3` (`cdn.erocms.net`) aktiv |
 | **PHP `7.4.33`** | Debian Standard (`php-cgi`) | `/usr/bin/` | `/usr/bin/php` | Debian 11 System-Standard |
 
@@ -62,8 +62,8 @@ Die Domains von `web1` laufen über FastCGI/FPM (`acp.erocloud.net`, `erocloud.n
 | **`acp.erocloud.net`** | `acp/acp_neu/web/` | **PHP `8.4.28`** | Admin-Control-Panel (ACP v2.0 – `acp/acp_neu/app/` liegt physisch oberhalb des DocumentRoots; Legacy-Code verbleibt als Referenz in `acp/`) |
 | **`erocloud.net`** (inkl. `www.` / `*.erocloud.net`) | `mcp/mcp_neu/web/` | **PHP `8.4.28`** | Merchant-Control-Panel (MCP v2.0 – `mcp/mcp_neu/app/` liegt physisch oberhalb des DocumentRoots; Legacy-Code verbleibt als Archiv in `mcp/`) |
 | **`api.erocloud.net`** | `api/` | **PHP `8.4.28`** *(Code PHP 8.4/8.5-ready)* | Zentrale API-Schnittstelle (Videos, Fotoalben, Messenger, Tracking) |
-| **`www1.erocloud.net`** | `ads/` | PHP `8.0.30` | Werbemittel- & Banner-Auslieferung |
-| **`ad5.tv`** (inkl. `www.ad5.tv`) | `ads/ad5.tv/` | PHP `8.0.30` | Ad-Tracking & Redirect-Endpunkt |
+| **`www1.erocloud.net`** | `ads/` | PHP `8.0.30` *(Code PHP 8.4/8.5-ready)* | Werbemittel- & Banner-Auslieferung |
+| **`ad5.tv`** (inkl. `www.ad5.tv`) | `ads/ad5.tv/` | PHP `8.0.30` *(Code PHP 8.4/8.5-ready)* | Ad-Tracking & Redirect-Endpunkt |
 | **`wevsql.erocloud.net`** | *(LiveConfig-Anwendung `phpmyadmin5`)* | **PHP `8.4.28`** | phpMyAdmin |
 
 ### 3.2 Konfigurierte Cronjobs in `web1`

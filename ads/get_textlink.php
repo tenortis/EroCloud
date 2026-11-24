@@ -8,35 +8,43 @@ include_once(API_DIR."/common.inc.php");
 // Mit CID  => /l/[site_id]/[wmid]/[cid]
 // Ohne CID => /l/[site_id]/[wmid]
 
-if (isset($_GET['site_id']) AND isset($_GET['wmid'])) {
+if (isset($_GET['site_id']) && is_scalar($_GET['site_id']) && isset($_GET['wmid']) && is_scalar($_GET['wmid'])) {
         
-    $pid        = trim(preg_replace ( '/[^a-z0-9.-]/i', '', $_GET['wmid']));
+    $pid        = trim((string)preg_replace('/[^a-z0-9.-]/i', '', (string)$_GET['wmid']));
     $site_id    = abs((int)$_GET['site_id']);
     
-    $rs_site = p4c_query("SELECT * FROM `sites` WHERE `id`='".p4c_escape_string($site_id)."' LIMIT 1;",__FILE__,__LINE__);
+    $rs_site = p4c_query("SELECT * FROM `sites` WHERE `id`='".abs((int)$site_id)."' LIMIT 1;",__FILE__,__LINE__);
     
-    // Prüfen ob Seite existiert - wenn nicht, zu EroCloud leten
+    // PrÃ¼fen ob Seite existiert - wenn nicht, zu EroCloud leiten
     if (p4c_num_rows($rs_site) == 0) {
         header('Location: '.URL);
+        p4c_close(DB_HOST);
         exit;
     }
     
     $site_obj = p4c_fetch_object($rs_site);
+    if (!$site_obj) {
+        header('Location: '.URL);
+        p4c_close(DB_HOST);
+        exit;
+    }
 
-    $home_url = 'https://'.$site_obj->domain;
+    $home_url = 'https://'.(string)$site_obj->domain;
     
     $rs_wmid = p4c_query("SELECT * FROM `merchants` WHERE `partner_id`='".p4c_escape_string($pid)."' LIMIT 1;",__FILE__,__LINE__);
     
-    // Prüfen ob Webmaster existiert - wenn nicht, User direkt zur Zielseite leiten     
+    // PrÃ¼fen ob Webmaster existiert - wenn nicht, User direkt zur Zielseite leiten     
     if (p4c_num_rows($rs_wmid) == 0) {
         header('Location: '.$home_url);
+        p4c_close(DB_HOST);
         exit;
     }
 
     // Weiterleitung OHNE cid
     $juschu = 0;
     if ($juschu == '1') {
-        $url = 'http://ad5.tv/h/'.url_shorter($home_url.'/index.php?site=1&wmid='.$pid, $ref);
+        #$url = 'http://ad5.tv/h/'.url_shorter($home_url.'/index.php?site=1&wmid='.$pid, $ref);
+        $url = $home_url.'/?wmid='.$pid;
     } else {
         $url = $home_url.'/?wmid='.$pid;
     }
@@ -47,8 +55,8 @@ if (isset($_GET['site_id']) AND isset($_GET['wmid'])) {
      **/
     $cid = '';
 
-    if (isset($_GET['cid'])) {
-        $cid = trim(preg_replace ( '/[^a-z0-9.-]/i', '', $_GET['cid']));
+    if (isset($_GET['cid']) && is_scalar($_GET['cid'])) {
+        $cid = trim((string)preg_replace('/[^a-z0-9.-]/i', '', (string)$_GET['cid']));
 
         // Wenn die Campagne existiert
         $rs_campaign_exists = p4c_query("SELECT * FROM `ads_campaigns` WHERE `campaign_id`='".p4c_escape_string($cid)."' AND `p4c_partner_id`='".p4c_escape_string($pid)."' LIMIT 1;",__FILE__,__LINE__);
@@ -58,12 +66,12 @@ if (isset($_GET['site_id']) AND isset($_GET['wmid'])) {
         }
     }
 
-    if (isset($_SERVER["HTTP_REFERER"]) AND !empty($_SERVER["HTTP_REFERER"])) {
+    if (isset($_SERVER["HTTP_REFERER"]) && is_string($_SERVER["HTTP_REFERER"]) && trim($_SERVER["HTTP_REFERER"]) !== '') {
         $ref = $_SERVER["HTTP_REFERER"];
 
         $parse_url = parse_url($ref);
-        if (isset($parse_url['host']) AND !empty($parse_url['host'])) {
-            $host = $parse_url['host'];
+        if (is_array($parse_url) && !empty($parse_url['host'])) {
+            $host = (string)$parse_url['host'];
             $host = str_replace('www.', '', $host);
         } else {
             $host = $ref;
@@ -88,7 +96,7 @@ if (isset($_GET['site_id']) AND isset($_GET['wmid'])) {
         PRIMARY KEY (`id`),
         KEY `session` (`session`),
         KEY `timestamp` (`timestamp`)
-    ) ENGINE=MyISAM AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;",__FILE__,__LINE__);
+    ) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;",__FILE__,__LINE__);
 
     // Wenn Klick noch nicht existiert, logge ihn  
     $rs_check = p4c_query("SELECT `timestamp` FROM `ads_clicks_".date('Ym')."` WHERE `p4c_partner_id`='".p4c_escape_string($pid)."' AND `site_id`='".abs((int)$site_id)."' AND `referer`='". p4c_escape_string($ref)."' AND `session`='".p4c_escape_string(session_id())."' LIMIT 1",__FILE__,__LINE__);
@@ -103,12 +111,14 @@ if (isset($_GET['site_id']) AND isset($_GET['wmid'])) {
             `referer`           = '".p4c_escape_string($ref)."'
         ",__FILE__,__LINE__);
 
-        p4c_query("UPDATE `ads_campaigns` SET `count_clicks`=count_clicks+1 WHERE `campaign_id`='".p4c_escape_string($cid)."' AND `p4c_partner_id`='".p4c_escape_string($pid)."' LIMIT 1;",__FILE__,__LINE__);
+        if (!empty($cid)) {
+            p4c_query("UPDATE `ads_campaigns` SET `count_clicks`=count_clicks+1 WHERE `campaign_id`='".p4c_escape_string($cid)."' AND `p4c_partner_id`='".p4c_escape_string($pid)."' LIMIT 1;",__FILE__,__LINE__);
+        }
 
     // Wenn Klick existiert aber aelter als 5 Stunden logge ihn als neuen klick
     } else {
         $check_obj = p4c_fetch_object($rs_check);
-        if ($check_obj->timestamp < date("Y-m-d H:i:s", strtotime("-24 hours"))) {
+        if ($check_obj && (string)$check_obj->timestamp < date("Y-m-d H:i:s", strtotime("-24 hours"))) {
             p4c_query("INSERT INTO `ads_clicks_".(int)date('Ym')."` SET
                 `p4c_partner_id`    = '".p4c_escape_string($pid)."',
                 `campaign_id`       = '".p4c_escape_string($cid)."',
@@ -135,8 +145,13 @@ if (isset($_GET['site_id']) AND isset($_GET['wmid'])) {
 
     
     header('Location: '.$url);
+    p4c_close(DB_HOST);
+    p4c_errorlog(error_get_last());
+    exit;
     
     
 } else {
+    p4c_close(DB_HOST);
+    p4c_errorlog(error_get_last());
     die ('<h2>404 Fehler</h2>');    
 }
