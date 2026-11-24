@@ -103,8 +103,7 @@ function to_thumb($bild, $size = 0) {
         }
         header("Content-Length: " . strlen((string)$binaryData));
         echo $binaryData;
-        imagedestroy($neuesBild);
-        imagedestroy($altesBild);
+        unset($neuesBild, $altesBild);
     } elseif ($mime_type == 'image/png') {
         $altesBild = @ImageCreateFromPNG($bild);
         if (!$altesBild) {
@@ -125,8 +124,7 @@ function to_thumb($bild, $size = 0) {
         }
         header("Content-Length: " . strlen((string)$binaryData));
         echo $binaryData;
-        imagedestroy($neuesBild);
-        imagedestroy($altesBild);
+        unset($neuesBild, $altesBild);
     } else {
         header("Content-Length: " . filesize($bild));
         readfile($bild);

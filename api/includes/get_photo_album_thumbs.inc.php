@@ -18,7 +18,8 @@ if (!isset($_GET['album_id'])) {
 
 $album_id = preg_replace('/[^a-zA-Z0-9]/', '', (string)$_GET['album_id']);
 
-$rs_photos = p4c_query("SELECT * FROM `photo_albums_photos` WHERE `album_id`='" . p4c_escape_string($album_id) . "' AND `rejected`='0' ORDER BY `id` DESC;", __FILE__, __LINE__);
+// Chronologische Sortierung (ORDER BY id ASC) analog MCP & ACP, damit Bild #1..#N überall exakt übereinstimmt
+$rs_photos = p4c_query("SELECT * FROM `photo_albums_photos` WHERE `album_id`='" . p4c_escape_string($album_id) . "' AND `rejected`='0' ORDER BY `id` ASC;", __FILE__, __LINE__);
 
 $count_photos = p4c_num_rows($rs_photos);
 
@@ -59,6 +60,8 @@ if ($count_photos == 0) {
         }
     }
 
+    $thumbEpoch = defined('EC_THUMB_EXIF_FIX_TS') ? (int)EC_THUMB_EXIF_FIX_TS : 1795520600;
+
     $api['number_of_photos'] = $count_photos;
     $api['album_id']         = $album_id;
     $api['photos']           = array();
@@ -71,10 +74,12 @@ if ($count_photos == 0) {
             $thumbPath  = $images_dir . 'thumb_' . $fname;
             $origMtime  = is_file($origPath) ? (int)@filemtime($origPath) : 0;
             $thumbMtime = is_file($thumbPath) ? (int)@filemtime($thumbPath) : 0;
-            $mtime      = max($origMtime, $thumbMtime);
+            $mtime      = max($origMtime, $thumbMtime, $thumbEpoch);
             if ($mtime > 0) {
                 $verSuffix = '?v=' . $mtime;
             }
+        } else {
+            $verSuffix = '?v=' . $thumbEpoch;
         }
 
         $api['photos'][] = array(

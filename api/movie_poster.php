@@ -248,8 +248,7 @@ function to_thumb($bild, $size = 0) {
     header('Content-length: '.strlen((string)$binaryData));
     echo $binaryData;
 
-    imagedestroy($neuesBild);
-    imagedestroy($altesBild);
+    unset($neuesBild, $altesBild);
     exit;
 }
 

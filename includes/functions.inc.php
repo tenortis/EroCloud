@@ -466,6 +466,10 @@ function ec_invalidate_photo_album_api_cache($albumIdHash) {
     }
 }
 
+if (!defined('EC_THUMB_EXIF_FIX_TS')) {
+    define('EC_THUMB_EXIF_FIX_TS', 1795520600);
+}
+
 if (!function_exists('ec_read_exif_orientation')) {
     /**
      * Liest das EXIF-Orientation-Tag (1..8) einer JPEG-Datei fehlertolerant aus.

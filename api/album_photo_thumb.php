@@ -2,40 +2,102 @@
 
 define('SAFE_INC', 1);
 
+if (ob_get_level() === 0) {
+    ob_start();
+}
+@ini_set('memory_limit', '512M');
+
 include_once("../config.inc.php");
 include_once(API_DIR . "/common.inc.php");
 @session_write_close();
 
+if (!defined('EC_THUMB_EXIF_FIX_TS')) {
+    define('EC_THUMB_EXIF_FIX_TS', 1795520600);
+}
+
 function no_image()
 {
-    $filename = MCP_DIR . '/images/movie_poster_nopic.jpg';
-    if (is_file($filename)) {
-        header('Content-type: image/jpeg');
-        header('Content-transfer-encoding: binary');
-        header('Content-length: ' . filesize($filename));
-        readfile($filename);
+    while (ob_get_level() > 0) {
+        @ob_end_clean();
+    }
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    header('Pragma: no-cache');
+
+    $candidates = array(
+        MCP_DIR . '/mcp_neu/web/assets/img/movie_poster_nopic.jpg',
+        MCP_DIR . '/images/movie_poster_nopic.jpg',
+        SOURCEDIR . '/acp/images/movie_poster_nopic.jpg',
+    );
+    foreach ($candidates as $filename) {
+        if (is_file($filename)) {
+            header('Content-type: image/jpeg');
+            header('Content-transfer-encoding: binary');
+            header('Content-length: ' . filesize($filename));
+            readfile($filename);
+            break;
+        }
     }
 
     p4c_close(DB_HOST);
     p4c_errorlog(error_get_last());
 }
 
-if (!defined('EC_THUMB_EXIF_FIX_TS')) {
-    // Alle vor diesem Zeitpunkt (2026-11-22) generierten Thumbs mit EXIF Orientation > 1 werden einmalig frisch erzeugt
-    define('EC_THUMB_EXIF_FIX_TS', 1795362100);
+/**
+ * Prüft per schnellem 7x7-Stichproben-Raster, ob ein bestehendes kleines Vorschaubild
+ * beschädigt oder komplett schwarz ist (z. B. aus fehlgeschlagenen Alt-Konvertierungen).
+ */
+function ec_thumb_is_solid_black($thumb_path)
+{
+    $raw = @file_get_contents($thumb_path);
+    if ($raw === false || $raw === '') {
+        return true;
+    }
+    $im = @imagecreatefromstring($raw);
+    unset($raw);
+    if (!$im) {
+        return true;
+    }
+
+    $w = imagesx($im);
+    $h = imagesy($im);
+    if ($w <= 0 || $h <= 0) {
+        unset($im);
+        return true;
+    }
+
+    for ($gy = 1; $gy <= 7; $gy++) {
+        $py = min($h - 1, max(0, (int)round(($h - 1) * ($gy / 8.0))));
+        for ($gx = 1; $gx <= 7; $gx++) {
+            $px  = min($w - 1, max(0, (int)round(($w - 1) * ($gx / 8.0))));
+            $rgb = imagecolorsforindex($im, imagecolorat($im, $px, $py));
+            if (($rgb['red'] ?? 0) >= 6 || ($rgb['green'] ?? 0) >= 6 || ($rgb['blue'] ?? 0) >= 6) {
+                unset($im);
+                return false;
+            }
+        }
+    }
+
+    unset($im);
+    return true;
 }
 
 /**
  * Prüft, ob das verpixelte Vorschaubild (thumb_{filename}) neu generiert werden muss:
  *  1. Datei fehlt oder ist zu klein/beschädigt (<= 3100 Bytes)
  *  2. Das Originalbild wurde nach der Erstellung des Thumbnails geändert/gedreht (filemtime)
- *  3. Altbestand-Selbstheilung für alle EXIF-Orientierungen (2..8 inkl. 180°, 1:1-Quadrat & Frontkamera-Spiegelung):
- *     - Jedes vor EC_THUMB_EXIF_FIX_TS erzeugte Thumbnail mit EXIF Orientation > 1 wird einmalig neu generiert.
- *     - Bei 90°/270°-Drehungen (5/6/7/8) greift zusätzlich dauerhaft die Hoch-/Querformat-Prüfung.
+ *  3. Altbestand-Selbstheilung vor EC_THUMB_EXIF_FIX_TS:
+ *     - JPEGs mit EXIF Orientation > 1 (2..8 inkl. 180°, 1:1-Quadrat & Frontkamera-Spiegelung)
+ *     - Komplett schwarze Alt-Thumbnails (< 20 KB, z. B. 9:16-Hochformat > 3100 Bytes bei Orientation = 1)
+ *  4. Dauerhafte 90°/270°-Seitenverhältnis-Prüfung (Orientation 5/6/7/8)
  */
 function ec_album_thumb_needs_regeneration($image, $thumb_path, $ext)
 {
-    if (!is_file($thumb_path) || (int)@filesize($thumb_path) <= 3100) {
+    if (!is_file($thumb_path)) {
+        return true;
+    }
+
+    $thumbBytes = (int)@filesize($thumb_path);
+    if ($thumbBytes <= 3100) {
         return true;
     }
 
@@ -45,24 +107,27 @@ function ec_album_thumb_needs_regeneration($image, $thumb_path, $ext)
         return true;
     }
 
-    if ($ext === 'jpg' || $ext === 'jpeg') {
-        $orient = function_exists('ec_read_exif_orientation') ? ec_read_exif_orientation($image) : 1;
-        if ($orient >= 2 && $orient <= 8) {
-            if ($thumbMtime < EC_THUMB_EXIF_FIX_TS) {
-                return true;
-            }
-            if (in_array($orient, array(5, 6, 7, 8), true)) {
-                $origSize  = @getimagesize($image);
-                $thumbSize = @getimagesize($thumb_path);
-                if (is_array($origSize) && is_array($thumbSize) && $origSize[0] > 0 && $origSize[1] > 0 && $thumbSize[0] > 0 && $thumbSize[1] > 0) {
-                    // Nach 90°/270°-EXIF-Drehung muss Hoch-/Querformat gegenüber den rohen Sensor-Pixeln getauscht sein
-                    $origIsLandscape  = ($origSize[0] > $origSize[1]);
-                    $origIsPortrait   = ($origSize[1] > $origSize[0]);
-                    $thumbIsLandscape = ($thumbSize[0] > $thumbSize[1]);
-                    $thumbIsPortrait  = ($thumbSize[1] > $thumbSize[0]);
-                    if (($origIsLandscape && $thumbIsLandscape) || ($origIsPortrait && $thumbIsPortrait)) {
-                        return true;
-                    }
+    if ($thumbMtime < EC_THUMB_EXIF_FIX_TS && $thumbBytes < 20480) {
+        if (ec_thumb_is_solid_black($thumb_path)) {
+            return true;
+        }
+    }
+
+    $orient = function_exists('ec_read_exif_orientation') ? ec_read_exif_orientation($image) : 1;
+    if ($orient >= 2 && $orient <= 8) {
+        if ($thumbMtime < EC_THUMB_EXIF_FIX_TS) {
+            return true;
+        }
+        if (in_array($orient, array(5, 6, 7, 8), true)) {
+            $origSize  = @getimagesize($image);
+            $thumbSize = @getimagesize($thumb_path);
+            if (is_array($origSize) && is_array($thumbSize) && $origSize[0] > 0 && $origSize[1] > 0 && $thumbSize[0] > 0 && $thumbSize[1] > 0) {
+                $origIsLandscape  = ($origSize[0] > $origSize[1]);
+                $origIsPortrait   = ($origSize[1] > $origSize[0]);
+                $thumbIsLandscape = ($thumbSize[0] > $thumbSize[1]);
+                $thumbIsPortrait  = ($thumbSize[1] > $thumbSize[0]);
+                if (($origIsLandscape && $thumbIsLandscape) || ($origIsPortrait && $thumbIsPortrait)) {
+                    return true;
                 }
             }
         }
@@ -71,104 +136,171 @@ function ec_album_thumb_needs_regeneration($image, $thumb_path, $ext)
     return false;
 }
 
+/**
+ * Lädt das Quellbild speicherschonend, skaliert es zuerst auf Zielgröße (~200px) herunter
+ * und wendet erst danach die EXIF-Drehung an (halbiert den RAM-Bedarf bei 48-50-MP-Fotos).
+ * Unterstützt zusätzlich WebP/Transparenz sowie Imagick-Fallback (z. B. für HEIC/AVIF/CMYK).
+ */
+function ec_load_scaled_source_for_thumb($image, $size, $context_info = array())
+{
+    $targetSize = max(50, (int)$size);
+    $orient     = function_exists('ec_read_exif_orientation') ? ec_read_exif_orientation($image) : 1;
+
+    $image_data = @file_get_contents($image);
+    if ($image_data !== false && $image_data !== '') {
+        $im = @imagecreatefromstring($image_data);
+        unset($image_data);
+
+        if ($im) {
+            $rawW = imagesx($im);
+            $rawH = imagesy($im);
+            if ($rawW > 0 && $rawH > 0) {
+                // Bei 90°/270°-EXIF-Drehung (5/6/7/8) tauschen Breite und Höhe nach dem Drehen
+                if (in_array($orient, array(5, 6, 7, 8), true)) {
+                    $preH = $targetSize;
+                    $preW = max(1, (int)round($targetSize * ($rawW / max(1, $rawH))));
+                } else {
+                    $preW = $targetSize;
+                    $preH = max(1, (int)round($targetSize * ($rawH / max(1, $rawW))));
+                }
+
+                $scaled = imagecreatetruecolor($preW, $preH);
+                if ($scaled) {
+                    // Heller Hintergrund verhindert schwarze Flächen bei PNG/WebP mit Alpha-Transparenz
+                    $white = imagecolorallocate($scaled, 255, 255, 255);
+                    imagefilledrectangle($scaled, 0, 0, $preW - 1, $preH - 1, $white);
+                    imagealphablending($scaled, true);
+                    imagecopyresampled($scaled, $im, 0, 0, 0, 0, $preW, $preH, $rawW, $rawH);
+                    // Volles Originalbild sofort aus dem RAM freigeben, bevor gedreht wird!
+                    unset($im);
+
+                    if ($orient >= 2 && $orient <= 8 && function_exists('ec_apply_exif_orientation')) {
+                        $scaled = ec_apply_exif_orientation($scaled, $orient);
+                    }
+                    return $scaled;
+                }
+            }
+            unset($im);
+        }
+    }
+
+    // Fallback über Imagick (z. B. falls Smartphone-HEIC/AVIF/CMYK als .jpg hochgeladen wurde)
+    if (class_exists('Imagick')) {
+        try {
+            $imagick = new \Imagick();
+            $imagick->readImage($image);
+            if ($imagick->getNumberImages() > 1) {
+                $imagick->setIteratorIndex(0);
+            }
+            if (method_exists($imagick, 'autoOrient')) {
+                $imagick->autoOrient();
+            } elseif (method_exists($imagick, 'autoOrientImage')) {
+                $imagick->autoOrientImage();
+            }
+            $imagick->setImageBackgroundColor('white');
+            if (defined('Imagick::ALPHACHANNEL_REMOVE')) {
+                $imagick->setImageAlphaChannel(\Imagick::ALPHACHANNEL_REMOVE);
+            }
+            $imagick->thumbnailImage($targetSize, 0);
+            $imagick->setImageFormat('jpeg');
+            $imagick->setImageCompressionQuality(95);
+            $blob = $imagick->getImageBlob();
+            $imagick->clear();
+            unset($imagick);
+
+            if (is_string($blob) && $blob !== '') {
+                $imFromBlob = @imagecreatefromstring($blob);
+                unset($blob);
+                if ($imFromBlob) {
+                    return $imFromBlob;
+                }
+            }
+        } catch (\Throwable $e) {
+            $album_info = !empty($context_info) ? "Album-ID: {$context_info['album_id']}, Photo-ID: {$context_info['photo_id']}, Pfad: {$image}" : "Pfad: {$image}";
+            error_log("[EroCloud Photo Error] Imagick-Fallback fehlgeschlagen ({$e->getMessage()})! {$album_info}");
+        }
+    }
+
+    $album_info = !empty($context_info) ? "Album-ID: {$context_info['album_id']}, Photo-ID: {$context_info['photo_id']}, Pfad: {$image}" : "Pfad: {$image}";
+    error_log("[EroCloud Photo Error] Bilddatei konnte weder per GD noch per Imagick dekodiert werden! {$album_info}");
+    return null;
+}
+
 function pixelate($image, $thumb_path, $size = 200, $pixelate_x = 3, $pixelate_y = 3, $context_info = array())
 {
     $ext = strtolower(pathinfo($image, PATHINFO_EXTENSION));
 
-    if ($ext === 'jpg' || $ext === 'jpeg' || $ext === 'png') {
-        if (ec_album_thumb_needs_regeneration($image, $thumb_path, $ext)) {
-            $image_data = @file_get_contents($image);
-            if ($image_data === false || empty($image_data)) {
-                $album_info = !empty($context_info) ? "Album-ID: {$context_info['album_id']}, Photo-ID: {$context_info['photo_id']}, Pfad: {$image}" : "Pfad: {$image}";
-                error_log("[EroCloud Photo Error] Konnte Bilddaten nicht lesen! {$album_info}");
-                return false;
-            }
+    if (ec_album_thumb_needs_regeneration($image, $thumb_path, $ext)) {
+        $neuesBild = ec_load_scaled_source_for_thumb($image, $size, $context_info);
+        if (!$neuesBild) {
+            return false;
+        }
 
-            $im = @imagecreatefromstring($image_data);
-            if (!$im) {
-                $album_info = !empty($context_info) ? "Album-ID: {$context_info['album_id']}, Photo-ID: {$context_info['photo_id']}, Pfad: {$image}" : "Pfad: {$image}";
-                error_log("[EroCloud Photo Error] GD imagecreatefromstring fehlgeschlagen (Bild beschädigt)! {$album_info}");
-                return false;
-            }
+        $imgW = imagesx($neuesBild);
+        $imgH = imagesy($neuesBild);
+        if ($imgW <= 0 || $imgH <= 0) {
+            unset($neuesBild);
+            return false;
+        }
 
-            $altesBild = null;
-            $width     = 0;
-            $height    = 0;
-            if ($ext === 'jpg' || $ext === 'jpeg') {
-                $orient = function_exists('ec_read_exif_orientation') ? ec_read_exif_orientation($image) : 1;
-                if ($orient >= 2 && $orient <= 8 && function_exists('ec_apply_exif_orientation')) {
-                    $im = ec_apply_exif_orientation($im, $orient);
-                }
-                $altesBild = $im;
-                $width     = imagesx($altesBild);
-                $height    = imagesy($altesBild);
-            } elseif ($ext === 'png') {
-                $width     = imagesx($im);
-                $height    = imagesy($im);
-                $altesBild = imagecreatetruecolor($width, $height);
-                imagecopy($altesBild, $im, 0, 0, 0, 0, $width, $height);
-                unset($im);
-            }
-
-            if (!$altesBild || $width <= 0 || $height <= 0) {
-                $album_info = !empty($context_info) ? "Album-ID: {$context_info['album_id']}, Photo-ID: {$context_info['photo_id']}, Pfad: {$image}" : "Pfad: {$image}";
-                error_log("[EroCloud Photo Error] Ungültige Bildabmessungen! {$album_info}");
-                return false;
-            }
-
-            $prop        = $height / $width;
-            $neueBreite  = (int)$size;
-            $neueHoehe   = max(1, (int)round($size * $prop));
-            $neuesBild   = imagecreatetruecolor($neueBreite, $neueHoehe);
-
-            imagecopyresampled($neuesBild, $altesBild, 0, 0, 0, 0, $neueBreite, $neueHoehe, $width, $height);
-
-            $imgW = imagesx($neuesBild);
-            $imgH = imagesy($neuesBild);
-
-            // Pixelate-Loop mit Abmessungs-Prüfung zur Vermeidung von imagecolorat Out-of-Bounds
-            for ($y = 0; $y < $imgH; $y += $pixelate_y + 1) {
-                for ($x = 0; $x < $imgW; $x += $pixelate_x + 1) {
-                    if ($x < $imgW && $y < $imgH) {
-                        $rgb   = imagecolorsforindex($neuesBild, imagecolorat($neuesBild, $x, $y));
-                        $color = imagecolorclosest($neuesBild, $rgb['red'], $rgb['green'], $rgb['blue']);
-                        imagefilledrectangle($neuesBild, $x, $y, min($x + $pixelate_x, $imgW - 1), min($y + $pixelate_y, $imgH - 1), $color);
-                    }
+        // Pixelate-Loop mit Abmessungs-Prüfung zur Vermeidung von imagecolorat Out-of-Bounds
+        for ($y = 0; $y < $imgH; $y += $pixelate_y + 1) {
+            for ($x = 0; $x < $imgW; $x += $pixelate_x + 1) {
+                if ($x < $imgW && $y < $imgH) {
+                    $rgb   = imagecolorsforindex($neuesBild, imagecolorat($neuesBild, $x, $y));
+                    $color = imagecolorclosest($neuesBild, $rgb['red'], $rgb['green'], $rgb['blue']);
+                    imagefilledrectangle($neuesBild, $x, $y, min($x + $pixelate_x, $imgW - 1), min($y + $pixelate_y, $imgH - 1), $color);
                 }
             }
+        }
 
-            if ($ext === 'jpg' || $ext === 'jpeg') {
-                @imagejpeg($neuesBild, $thumb_path, 95);
-            } elseif ($ext === 'png') {
-                @imagepng($neuesBild, $thumb_path);
+        $tmpThumb = $thumb_path . '.tmp_' . mt_rand(1000, 9999);
+        $saved    = ($ext === 'png')
+            ? @imagepng($neuesBild, $tmpThumb, 8)
+            : @imagejpeg($neuesBild, $tmpThumb, 95);
+        unset($neuesBild);
+
+        if ($saved && is_file($tmpThumb) && (int)@filesize($tmpThumb) > 0) {
+            if (!@rename($tmpThumb, $thumb_path)) {
+                if (@copy($tmpThumb, $thumb_path)) {
+                    @unlink($tmpThumb);
+                } else {
+                    @unlink($tmpThumb);
+                    return false;
+                }
             }
-
+            @chmod($thumb_path, 0777);
             @touch($thumb_path, max(time(), EC_THUMB_EXIF_FIX_TS + 1));
             clearstatcache(true, $thumb_path);
-            unset($neuesBild, $altesBild);
-        }
-
-        if (is_file($thumb_path)) {
-            $mime_content_type = mime_content_type($thumb_path);
-            header('Content-type: ' . $mime_content_type);
-            header('Content-Length: ' . filesize($thumb_path));
-
-            if ($ext === 'jpg' || $ext === 'jpeg') {
-                readfile($thumb_path);
-            } elseif ($ext === 'png') {
-                $fp = fopen($thumb_path, 'rb');
-                if ($fp) {
-                    header('Content-Type: image/png');
-                    header('Content-Length: ' . filesize($thumb_path));
-                    fpassthru($fp);
-                    fclose($fp);
-                } else {
-                    readfile($thumb_path);
-                }
+        } else {
+            if (is_file($tmpThumb)) {
+                @unlink($tmpThumb);
             }
-            return true;
+            return false;
         }
     }
+
+    if (is_file($thumb_path) && (int)@filesize($thumb_path) > 0) {
+        $thumbMime = function_exists('mime_content_type') ? (string)@mime_content_type($thumb_path) : '';
+        if ($thumbMime === '' || strpos($thumbMime, 'image/') !== 0) {
+            $thumbMime = ($ext === 'png') ? 'image/png' : 'image/jpeg';
+        }
+        $newMtime = max((int)@filemtime($image), (int)@filemtime($thumb_path));
+
+        while (ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+        header('Pragma: cache');
+        header('Cache-control: max-age=' . (60 * 60 * 24 * 360) . ', public');
+        header('Expires: ' . gmdate(DATE_RFC1123, time() + 60 * 60 * 24 * 365));
+        header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $newMtime) . ' GMT', true, 200);
+        header('Content-type: ' . $thumbMime);
+        header('Content-Length: ' . filesize($thumb_path));
+        header('Content-transfer-encoding: binary');
+        readfile($thumb_path);
+        return true;
+    }
+
     return false;
 }
 
@@ -255,15 +387,8 @@ if (!is_file($file_path)) {
     no_image();
     exit;
 } else {
-    $extCheck  = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
+    $extCheck   = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
     $needsRegen = ec_album_thumb_needs_regeneration($file_path, $thumb_path, $extCheck);
-
-    $mime_content_type = mime_content_type($file_path);
-
-    header('Pragma: cache');
-    header('Cache-control: max-age=' . (60 * 60 * 24 * 360) . ', public');
-    header('Expires: ' . gmdate(DATE_RFC1123, time() + 60 * 60 * 24 * 365));
-    header('Content-type: ' . $mime_content_type);
 
     $width = 200;
     if (isset($_GET['w']) && !empty($_GET['w'])) {
@@ -279,17 +404,17 @@ if (!is_file($file_path)) {
     $effectiveMtime = max((int)@filemtime($file_path), is_file($thumb_path) ? (int)@filemtime($thumb_path) : 0);
 
     if (!$needsRegen && isset($headers['If-Modified-Since']) && (strtotime((string)$headers['If-Modified-Since']) === $effectiveMtime)) {
+        while (ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+        header('Pragma: cache');
+        header('Cache-control: max-age=' . (60 * 60 * 24 * 360) . ', public');
+        header('Expires: ' . gmdate(DATE_RFC1123, time() + 60 * 60 * 24 * 365));
         header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $effectiveMtime) . ' GMT', true, 304);
     } else {
-        header('Content-transfer-encoding: binary');
         $success = pixelate($file_path, $thumb_path, $width, 3, 3, $context_info);
         if (!$success) {
             no_image();
-        } else {
-            $newMtime = max((int)@filemtime($file_path), is_file($thumb_path) ? (int)@filemtime($thumb_path) : time());
-            if (!headers_sent()) {
-                header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $newMtime) . ' GMT', true, 200);
-            }
         }
     }
 }
