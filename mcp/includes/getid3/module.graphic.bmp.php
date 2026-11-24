@@ -1,11 +1,11 @@
 <?php
+
 /////////////////////////////////////////////////////////////////
 /// getID3() by James Heinrich <info@getid3.org>               //
-//  available at http://getid3.sourceforge.net                 //
-//            or http://www.getid3.org                         //
-//          also https://github.com/JamesHeinrich/getID3       //
-/////////////////////////////////////////////////////////////////
-// See readme.txt for more details                             //
+//  available at https://github.com/JamesHeinrich/getID3       //
+//            or https://www.getid3.org                        //
+//            or http://getid3.sourceforge.net                 //
+//  see readme.txt for more details                            //
 /////////////////////////////////////////////////////////////////
 //                                                             //
 // module.graphic.bmp.php                                      //
@@ -14,12 +14,29 @@
 //                                                            ///
 /////////////////////////////////////////////////////////////////
 
+if (!defined('GETID3_INCLUDEPATH')) { // prevent path-exposing attacks that access modules directly on public webservers
+	exit;
+}
 
 class getid3_bmp extends getid3_handler
 {
+	/**
+	 * return BMP palette
+	 *
+	 * @var bool
+	 */
 	public $ExtractPalette = false;
+
+	/**
+	 * return image data
+	 *
+	 * @var bool
+	 */
 	public $ExtractData    = false;
 
+	/**
+	 * @return bool
+	 */
 	public function Analyze() {
 		$info = &$this->getid3->info;
 
@@ -492,6 +509,7 @@ class getid3_bmp extends getid3_handler
 					switch ($thisfile_bmp_header_raw['bits_per_pixel']) {
 						case 4:
 							$pixelcounter = 0;
+							$paletteindexes = array();
 							while ($pixeldataoffset < strlen($BMPpixelData)) {
 								$firstbyte  = getid3_lib::LittleEndian2Int(substr($BMPpixelData, $pixeldataoffset++, 1));
 								$secondbyte = getid3_lib::LittleEndian2Int(substr($BMPpixelData, $pixeldataoffset++, 1));
@@ -527,7 +545,6 @@ class getid3_bmp extends getid3_handler
 											// of color indexes that follow. Subsequent bytes contain color indexes in their
 											// high- and low-order 4 bits, one color index for each pixel. In absolute mode,
 											// each run must be aligned on a word boundary.
-											unset($paletteindexes);
 											$paletteindexes = array();
 											for ($i = 0; $i < ceil($secondbyte / 2); $i++) {
 												$paletteindexbyte = getid3_lib::LittleEndian2Int(substr($BMPpixelData, $pixeldataoffset++, 1));
@@ -626,7 +643,11 @@ class getid3_bmp extends getid3_handler
 		return true;
 	}
 
-
+	/**
+	 * @param array $BMPinfo
+	 *
+	 * @return bool
+	 */
 	public function PlotBMP(&$BMPinfo) {
 		$starttime = time();
 		if (!isset($BMPinfo['bmp']['data']) || !is_array($BMPinfo['bmp']['data'])) {
@@ -651,18 +672,23 @@ class getid3_bmp extends getid3_handler
 			}
 			if (headers_sent()) {
 				echo 'plotted '.($BMPinfo['resolution_x'] * $BMPinfo['resolution_y']).' pixels in '.(time() - $starttime).' seconds<BR>';
-				imagedestroy($im);
+				unset($im);
 				exit;
 			} else {
 				header('Content-type: image/png');
 				imagepng($im);
-				imagedestroy($im);
+				unset($im);
 				return true;
 			}
 		}
 		return false;
 	}
 
+	/**
+	 * @param int $compressionid
+	 *
+	 * @return string
+	 */
 	public function BMPcompressionWindowsLookup($compressionid) {
 		static $BMPcompressionWindowsLookup = array(
 			0 => 'BI_RGB',
@@ -675,6 +701,11 @@ class getid3_bmp extends getid3_handler
 		return (isset($BMPcompressionWindowsLookup[$compressionid]) ? $BMPcompressionWindowsLookup[$compressionid] : 'invalid');
 	}
 
+	/**
+	 * @param int $compressionid
+	 *
+	 * @return string
+	 */
 	public function BMPcompressionOS2Lookup($compressionid) {
 		static $BMPcompressionOS2Lookup = array(
 			0 => 'BI_RGB',

@@ -67,18 +67,18 @@ Die Domains von `web1` laufen über FastCGI/FPM (`acp.erocloud.net` und `eroclou
 | **`wevsql.erocloud.net`** | *(LiveConfig-Anwendung)* | – | phpMyAdmin |
 
 ### 3.2 Konfigurierte Cronjobs in `web1`
-Alle 10 Cronjobs von `web1` werden über das PHP-8.0-CLI (`/opt/php-8.0/bin/php`, nach Abschluss der 8.4-Migration `/opt/php-8.4/bin/php`) ausgeführt:
+Alle Cronjobs unter `cronjobs/` sowie `mcp/messenger/cronjobs/crawl_erocms_chats.php` (und die von `convert_movie.php` genutzte Bibliothek `mcp/includes/getid3/` auf Version `1.9.21`) sind vollständig **PHP-`8.4`/`8.5`-kompatibel gehärtet** und bereit für die Umstellung von `/opt/php-8.0/bin/php` auf `/opt/php-8.4/bin/php`:
 
-1. `* * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/api/usertracking/cronjob.php > /dev/null 2>&1`
-2. `*/5 * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/actor_reassign.php`
-3. `*/2 * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/ai_compliance_worker.php >/dev/null 2>&1`
-4. `*/5 * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/convert_movie.php > /dev/null 2>&1`
-5. `8 * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/crawl_erocms_revenues.php --all--type=webcam--month`
-6. `45 * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/delete_movie.php`
-7. `18 * * 12 *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/import_conversions.php --date=2022-12-17`
-8. `*/4 * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/import_conversions.php --date=today`
-9. `11 0 * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/import_conversions.php --date=today`
-10. `*/5 * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/mcp/messenger/cronjobs/crawl_erocms_chats.php`
+1. `* * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/api/usertracking/cronjob.php > /dev/null 2>&1` *(veraltet – Cross-Domain-Tracking wird nicht mehr genutzt, letzter Eintrag in `user_tracking_website_access` vom `2024-11-08`; Cronjob kann in LiveConfig deaktiviert/gelöscht werden)*
+2. `*/5 * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/actor_reassign.php` *(Code PHP 8.4/8.5-ready)*
+3. `*/2 * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/ai_compliance_worker.php >/dev/null 2>&1` *(Code PHP 8.4/8.5-ready)*
+4. `*/5 * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/convert_movie.php > /dev/null 2>&1` *(Code PHP 8.4/8.5-ready inkl. getID3 `1.9.21`)*
+5. `8 * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/crawl_erocms_revenues.php --all--type=webcam--month` *(Code PHP 8.4/8.5-ready)*
+6. `45 * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/delete_movie.php` *(Code PHP 8.4/8.5-ready)*
+7. `18 * * 12 *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/import_conversions.php --date=2022-12-17` *(historischer Alt-Job aus 2022 – kann in LiveConfig gelöscht werden; Code PHP 8.4/8.5-ready)*
+8. `*/4 * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/import_conversions.php --date=today` *(Code PHP 8.4/8.5-ready)*
+9. `11 0 * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/cronjobs/import_conversions.php --date=today` *(Code PHP 8.4/8.5-ready)*
+10. `*/5 * * * *` – `/opt/php-8.0/bin/php /var/www/web1/htdocs/mcp/messenger/cronjobs/crawl_erocms_chats.php` *(Code PHP 8.4/8.5-ready)*
 
 ---
 

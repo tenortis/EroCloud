@@ -67,45 +67,47 @@ $get_cam_visible_for_actor = abs((int)filter_input(INPUT_GET, 'user_cam_visible_
 $get_user_cam_streamserver_url = filter_input(INPUT_GET, 'user_cam_streamserver_url', FILTER_VALIDATE_URL);
 if (!is_string($get_user_cam_streamserver_url)) {$get_user_cam_streamserver_url = '';}
 
-$rs_member = p4c_query("SELECT * FROM `members` WHERE `remote_member_id` = '". p4c_escape_string($get_remote_member_id)."' LIMIT 1;",__FILE__,__LINE__);
-
 $member_id = '';
 
-// Wenn kunde noch nicht existiert
-if (p4c_num_rows($rs_member) == 0) {
-    
-    if (p4c_query("INSERT INTO `members` SET 
-        `remote_member_id`  = '".p4c_escape_string($get_remote_member_id)."',
-        `p4c_shop_id`       = '".p4c_escape_string($get_p4c_shop_id)."',
-        `username`          = '".p4c_escape_string($get_username)."',
-        `amount_coins`      = '".abs((int)$get_amount_coins)."',
-        `email`             = '".p4c_escape_string($get_email)."',
-        `birthday`          = '".p4c_escape_string($get_birthday)."',
-        `lastonline`        = '".p4c_escape_string($get_lastonline)."',
-        `online_device`     = '".p4c_escape_string($get_online_device)."',
-        `locked`            = '".abs((int)$get_locked)."',
-        `avatar_url`        = '".p4c_escape_string($get_avatar_url)."';",__FILE__,__LINE__)
-    ) {
-        $member_id = p4c_insert_id();
-    }
-    
-// Aktualisieren    
-} else {
+$esc_remote_member_id = p4c_escape_string($get_remote_member_id);
+$esc_username         = p4c_escape_string($get_username);
+$esc_email            = p4c_escape_string($get_email);
+$esc_birthday         = p4c_escape_string($get_birthday);
+$esc_lastonline       = p4c_escape_string($get_lastonline);
+$esc_online_device    = p4c_escape_string($get_online_device);
+$esc_avatar_url       = p4c_escape_string($get_avatar_url);
 
-    if (p4c_query("UPDATE `members` SET 
-        `amount_coins`  = '".abs((int)$get_amount_coins)."',
-        `username`      = '".p4c_escape_string($get_username)."',
-        `email`         = '".p4c_escape_string($get_email)."',
-        `birthday`      = '".p4c_escape_string($get_birthday)."',
-        `lastonline`    = '".p4c_escape_string($get_lastonline)."',
-        `online_device` = '".p4c_escape_string($get_online_device)."',
-        `locked`        = '".abs((int)$get_locked)."',
-        `avatar_url`    = '".p4c_escape_string($get_avatar_url)."'
-        WHERE `remote_member_id`='". p4c_escape_string($get_remote_member_id)."' AND  `p4c_shop_id`='".abs((int)$get_p4c_shop_id)."' LIMIT 1;",__FILE__,__LINE__)
-    ) {
-        $member_obj = p4c_fetch_object($rs_member);
-        if ($member_obj) {
-            $member_id = $member_obj->id;
+// Atomares Upsert verhindert Race-Condition-Duplicate-Keys bei parallelen EroCMS-Requests
+if (p4c_query("INSERT INTO `members` SET 
+    `remote_member_id`  = '".$esc_remote_member_id."',
+    `p4c_shop_id`       = '".abs((int)$get_p4c_shop_id)."',
+    `username`          = '".$esc_username."',
+    `amount_coins`      = '".abs((int)$get_amount_coins)."',
+    `email`             = '".$esc_email."',
+    `birthday`          = '".$esc_birthday."',
+    `lastonline`        = '".$esc_lastonline."',
+    `online_device`     = '".$esc_online_device."',
+    `locked`            = '".abs((int)$get_locked)."',
+    `avatar_url`        = '".$esc_avatar_url."'
+    ON DUPLICATE KEY UPDATE
+    `id`                = LAST_INSERT_ID(`id`),
+    `amount_coins`      = '".abs((int)$get_amount_coins)."',
+    `username`          = '".$esc_username."',
+    `email`             = '".$esc_email."',
+    `birthday`          = '".$esc_birthday."',
+    `lastonline`        = '".$esc_lastonline."',
+    `online_device`     = '".$esc_online_device."',
+    `locked`            = '".abs((int)$get_locked)."',
+    `avatar_url`        = '".$esc_avatar_url."';",__FILE__,__LINE__)
+) {
+    $insert_id = p4c_insert_id();
+    if (!empty($insert_id)) {
+        $member_id = $insert_id;
+    } else {
+        $rs_member_lookup = p4c_query("SELECT `id` FROM `members` WHERE `remote_member_id` = '".$esc_remote_member_id."' LIMIT 1;",__FILE__,__LINE__);
+        $member_obj_lookup = $rs_member_lookup ? p4c_fetch_object($rs_member_lookup) : false;
+        if ($member_obj_lookup) {
+            $member_id = $member_obj_lookup->id;
         }
     }
 }

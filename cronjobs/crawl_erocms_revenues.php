@@ -38,7 +38,7 @@ if ((isset($_GET['actor_id']) OR isset($_GET['merchant_id']) OR isset($_GET['all
             $remote_actor_id = $site_obj->remote_actor_id;
             $domain = $site_obj->domain;
 
-            // PrÃ¼fen ob Website aktiv ist. Wenn nicht, mache mit nÃ¤chster website weiter
+            // Prüfen ob Website aktiv ist. Wenn nicht, mache mit nächster website weiter
             $rs_sites = p4c_query("SELECT * FROM `sites` WHERE `domain`='". p4c_escape_string($domain)."' AND `status`='1';",__FILE__,__LINE__);
             if (p4c_num_rows($rs_sites) == 0) {
                 continue;
@@ -54,12 +54,15 @@ if ((isset($_GET['actor_id']) OR isset($_GET['merchant_id']) OR isset($_GET['all
                 $param = array_merge($param, array('month'=>date("Y-m")));
             
             } else if (isset($_GET['date'])) {
-                $param = array_merge($param, array('date'=> date("Y-m-d", strtotime($_GET['date']))));
+                $date_ts = strtotime((string)$_GET['date']);
+                $param = array_merge($param, array('date'=> ($date_ts !== false) ? date("Y-m-d", $date_ts) : date("Y-m-d")));
             };
 
-            $param = array_filter($param, "strlen"); // leere EintrÃ¤ge Entfernen
+            $param = array_filter($param, static function ($v) {
+                return $v !== null && $v !== false && strlen((string)$v) > 0;
+            }); // leere Einträge Entfernen
             ksort($param); // Alphabetische Sortierung
-            $query = http_build_query($param, '&amp;');
+            $query = http_build_query($param, '', '&');
 
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, 'https://'.$domain.'/erocloud_api/send_erocms_revenue.php?'.$query);
@@ -71,21 +74,25 @@ if ((isset($_GET['actor_id']) OR isset($_GET['merchant_id']) OR isset($_GET['all
             curl_setopt($ch, CURLOPT_REFERER, URL);
             curl_setopt($ch, CURLOPT_USERAGENT, PROJECTNAME." - ".COMPANYNAME." - ".URL);
             $data = curl_exec($ch);
-            curl_close($ch);
+            unset($ch);
 
             if($data != false) {
                 
                 $revenue_obj = json_decode($data);
                 
-                if (isset($revenue_obj->domain) AND $revenue_obj->domain == $domain) {
+                if (is_object($revenue_obj) && isset($revenue_obj->domain) AND $revenue_obj->domain == $domain && isset($revenue_obj->date) && (is_array($revenue_obj->date) || is_object($revenue_obj->date))) {
                 
                     foreach($revenue_obj->date as $date => $amount) {
                         
                         $amount = abs((float)$amount);
                         
-                        $date = date("Y-m-d", strtotime($date));
+                        $dateTs = strtotime((string)$date);
+                        if ($dateTs === false) {
+                            continue;
+                        }
+                        $date = date("Y-m-d", $dateTs);
 
-                        if ($date != '1970-01') {                  
+                        if ($date !== '1970-01-01') {                  
 
                             if ($amount > 0) {
 

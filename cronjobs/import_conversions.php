@@ -70,7 +70,7 @@ function getConversionsData($url, $site_obj) {
         #$class_errorlog->log($file_get_contents,__FILE__,__LINE__);
         $error = curl_error($ch);
         $errno = curl_errno($ch);
-        curl_close($ch);	
+        unset($ch);
         
         mail(TECHSUPPORT_EMAIL, 'EroADS - Conversion-Error', "Bitte Domain prüfen!
 Folgende URL ist zum angegebenen Zeitpunkt nicht erreichbar gewesen.
@@ -89,7 +89,7 @@ Curl errno: ".$errno."
         
         #$class_errorlog->log($file_get_contents,__FILE__,__LINE__);
 
-        curl_close($ch);
+        unset($ch);
         
         // Prüfen ob Logs als XML gesendet werden    
         preg_match_all('/<log>(.*)<\/log>/smU',$file_get_contents, $xml_logs);
@@ -121,17 +121,9 @@ Curl errno: ".$errno."
                 if (count($array) > 5) {
                     #$class_errorlog->log(print_r($array, true),__FILE__,__LINE__);
                     
-                    $checksum = sha1(json_encode($array));
+                    $checksum = sha1((string)json_encode($array));
                     
-                    // Aus array variablen machen
-                    foreach ($array as $key => $value) {
-                        $$key = $value;
-                    }
-                    
-                    $wm_id = trim(preg_replace ( '/[^a-z0-9.-]/i', '', $wm_id));
-                    $timestamp = date("Y-m-d H:i:s", strtotime($timestamp));
-                    
-                    if(!isset($member_id)) {
+                    if(!isset($array->member_id)) {
                         mail(TECHSUPPORT_EMAIL, 'EroADS - Conversion Error', "Bitte Domain prüfen!
 Es wurden keine Daten gefunden. Eventuell existiert die Domain nicht mehr.
 Domain: ".$site_obj->domain."
@@ -145,6 +137,17 @@ Zeile: ".__LINE__, 'From: EroADS-Bot <no-replay@erocloud.net>');
                         p4c_errorlog(error_get_last());
                         exit;
                     }
+
+                    $member_id = (string)$array->member_id;
+                    $wm_id = isset($array->wm_id) ? trim((string)preg_replace('/[^a-z0-9.-]/i', '', (string)$array->wm_id)) : '';
+                    $timestamp_raw = isset($array->timestamp) ? (string)$array->timestamp : '';
+                    $timestamp_ts = ($timestamp_raw !== '') ? strtotime($timestamp_raw) : false;
+                    $timestamp = ($timestamp_ts !== false) ? date("Y-m-d H:i:s", $timestamp_ts) : date("Y-m-d H:i:s", 0);
+                    $username = isset($array->username) ? (string)$array->username : '';
+                    $user_hash = isset($array->user_hash) ? (string)$array->user_hash : '';
+                    $campaign_id = isset($array->campaign_id) ? (string)$array->campaign_id : '';
+                    $sign_form = isset($array->sign_form) ? abs((int)$array->sign_form) : 0;
+                    $is_registered = isset($array->is_registered) ? abs((int)$array->is_registered) : 0;
                     
                     if (!empty($member_id) OR $member_id != '0') {
                         p4c_query("UPDATE `ads_conversions` SET
@@ -160,16 +163,16 @@ Zeile: ".__LINE__, 'From: EroADS-Bot <no-replay@erocloud.net>');
                     
                     
                     $rs_check_exists = p4c_query("SELECT * FROM `ads_conversions` WHERE
-                        `cheksum`   = '".$checksum."' AND
+                        `cheksum`   = '".p4c_escape_string($checksum)."' AND
                         `date_time` = '".$timestamp."'
                     LIMIT 1;",__FILE__,__LINE__);
                     
                     if (p4c_num_rows($rs_check_exists) == 0) {
                     
-                        if (!isset($first_payment)) {$first_payment = 0;}
-                        if (!isset($follow_payment)) {$follow_payment = 0;}
-                        if (!isset($gutschrift_payment)) {$gutschrift_payment = 0;}
-                        if (!isset($storno_payment)) {$storno_payment = 0;}
+                        $first_payment = isset($array->first_payment) ? (string)$array->first_payment : '0';
+                        $follow_payment = isset($array->follow_payment) ? (string)$array->follow_payment : '0';
+                        $gutschrift_payment = isset($array->gutschrift_payment) ? (string)$array->gutschrift_payment : '0';
+                        $storno_payment = isset($array->storno_payment) ? (string)$array->storno_payment : '0';
 
                         p4c_query("INSERT INTO `ads_conversions` SET
                             `cheksum`       = '".p4c_escape_string($checksum)."',
@@ -208,7 +211,7 @@ Zeile: ".__LINE__, 'From: EroADS-Bot <no-replay@erocloud.net>');
 
                 if (!isset($xml_logs[1]) OR empty($xml_logs[1])) {
                     // HTML-Tags entfernen und auf max. 250 Zeichen kürzen, um das Logfile nicht zu überfluten
-                    $clean_error = trim(preg_replace('/\s+/', ' ', strip_tags($file_get_contents)));
+                    $clean_error = trim((string)preg_replace('/\s+/', ' ', strip_tags((string)$file_get_contents)));
                     if (strlen($clean_error) > 250) {
                         $clean_error = substr($clean_error, 0, 247) . '...';
                     }
@@ -229,17 +232,21 @@ Zeile: ".__LINE__, 'From: EroADS-Bot <no-replay@erocloud.net>');
 // Oder: /usr/bin/php /var/www/web1/htdocs/cronjobs/import_conversions.php --date=2022-05-23
 
 $date = date('Y-m-d');
-if (isset($_GET['date'])) {
-    if ($_GET['date'] == 'today') {
+if (isset($_GET['date']) && is_scalar($_GET['date'])) {
+    $date_param = (string)$_GET['date'];
+    if ($date_param === 'today') {
         $date = date('Y-m-d');
         
-    } else if ($_GET['date'] == 'yesterday') {
+    } else if ($date_param === 'yesterday') {
         $date = date('Y-m-d', strtotime("-1 days"));
         
     } else {
-        $date_ary  = explode('-', $_GET['date']);
-        if (checkdate($date_ary[1], $date_ary[2], $date_ary[0]) AND strlen($_GET['date']) == 10 AND count($date_ary) == 3) {
-            $date = date("Y-m-d", strtotime($_GET['date']));
+        $date_ary  = explode('-', $date_param);
+        if (strlen($date_param) === 10 && count($date_ary) === 3 && checkdate((int)$date_ary[1], (int)$date_ary[2], (int)$date_ary[0])) {
+            $parsed_ts = strtotime($date_param);
+            if ($parsed_ts !== false) {
+                $date = date("Y-m-d", $parsed_ts);
+            }
         }
     }
 }
@@ -261,7 +268,7 @@ if (isset($date)) {
     ORDER BY `sites`.`import_conversions_updatetime` ASC LIMIT 20;",__FILE__,__LINE__);
     
     while($site_obj = p4c_fetch_object($rs_sites)) {
-        $url = $site_obj->eroads_url.'?apikey='.$site_obj->apikey.'&date='.$date;
+        $url = (string)$site_obj->eroads_url . '?apikey=' . (string)($site_obj->apikey ?? '') . '&date=' . $date;
         #$class_errorlog->log($site_obj->eroads_url.'?apikey='.$site_obj->apikey.'&date='.$date,__FILE__,__LINE__);
         getConversionsData($url, $site_obj);
     }

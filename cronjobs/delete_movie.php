@@ -19,7 +19,11 @@ function deleteFolder($folderPath) {
     if (!is_dir($folderPath)) {
         return true; // Falls das Verzeichnis nicht mehr existiert
     }
-    $files = array_diff(scandir($folderPath), array('.', '..'));
+    $entries = scandir($folderPath);
+    if ($entries === false) {
+        return false;
+    }
+    $files = array_diff($entries, array('.', '..'));
     foreach ($files as $file) {
         $filePath = $folderPath . DIRECTORY_SEPARATOR . $file;
         if (is_dir($filePath)) {

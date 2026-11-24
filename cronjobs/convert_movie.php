@@ -54,7 +54,7 @@ if (isset($db_settings_ary['videothek_ffmpeg_on_off']) AND $db_settings_ary['vid
 
                 // Wenn Datei existiert
                 if (file_exists($org_file)) {
-                    $base_filename = pathinfo($movie_ary->filename, PATHINFO_FILENAME);
+                    $base_filename = pathinfo((string)$movie_ary->filename, PATHINFO_FILENAME);
                     $file_name_neu = strtolower($base_filename) . '.mp4';
                 
                     p4c_query("UPDATE `movies` SET `convert_status`='1', `convert_starttime`='".date("Y-m-d H:i:s")."' WHERE `id`='".abs((int)$movie_ary->id)."' LIMIT 1;", __FILE__, __LINE__);
@@ -74,12 +74,12 @@ if (isset($db_settings_ary['videothek_ffmpeg_on_off']) AND $db_settings_ary['vid
                     $getID3 = new getID3;
                     $pre_fileinfo = @$getID3->analyze($org_file);
                     if (isset($pre_fileinfo['video']['resolution_x']) && isset($pre_fileinfo['video']['resolution_y'])) {
-                        $pre_width  = (int)round($pre_fileinfo['video']['resolution_x']);
-                        $pre_height = (int)round($pre_fileinfo['video']['resolution_y']);
+                        $pre_width  = (int)round((float)$pre_fileinfo['video']['resolution_x']);
+                        $pre_height = (int)round((float)$pre_fileinfo['video']['resolution_y']);
                     }
 
                     if ($pre_width <= 0 || $pre_height <= 0) {
-                        $explode_resolution = explode("x", $movie_ary->resolution);
+                        $explode_resolution = explode("x", (string)($movie_ary->resolution ?? ''));
                         if (isset($explode_resolution[0]) && isset($explode_resolution[1])) {
                             $pre_width  = (int)$explode_resolution[0];
                             $pre_height = (int)$explode_resolution[1];
@@ -167,20 +167,20 @@ if (isset($db_settings_ary['videothek_ffmpeg_on_off']) AND $db_settings_ary['vid
                                 $getID3_post = new getID3;
                                 $post_fileinfo = @$getID3_post->analyze($final_mp4_file);
 
-                                $post_width  = (isset($post_fileinfo['video']['resolution_x']) && round($post_fileinfo['video']['resolution_x']) > 0)
-                                    ? (int)round($post_fileinfo['video']['resolution_x'])
+                                $post_width  = (isset($post_fileinfo['video']['resolution_x']) && round((float)$post_fileinfo['video']['resolution_x']) > 0)
+                                    ? (int)round((float)$post_fileinfo['video']['resolution_x'])
                                     : $pre_width;
-                                $post_height = (isset($post_fileinfo['video']['resolution_y']) && round($post_fileinfo['video']['resolution_y']) > 0)
-                                    ? (int)round($post_fileinfo['video']['resolution_y'])
+                                $post_height = (isset($post_fileinfo['video']['resolution_y']) && round((float)$post_fileinfo['video']['resolution_y']) > 0)
+                                    ? (int)round((float)$post_fileinfo['video']['resolution_y'])
                                     : $pre_height;
                                 $post_resolution = $post_width . 'x' . $post_height;
 
-                                $post_playtime_sec = (isset($post_fileinfo['playtime_seconds']) && round($post_fileinfo['playtime_seconds']) > 0)
-                                    ? (int)round($post_fileinfo['playtime_seconds'])
+                                $post_playtime_sec = (isset($post_fileinfo['playtime_seconds']) && round((float)$post_fileinfo['playtime_seconds']) > 0)
+                                    ? (int)round((float)$post_fileinfo['playtime_seconds'])
                                     : (int)$movie_ary->playtime_seconds;
                                 $post_playtime_str = (isset($post_fileinfo['playtime_string']) && $post_fileinfo['playtime_string'] !== '')
-                                    ? $post_fileinfo['playtime_string']
-                                    : $movie_ary->playtime_string;
+                                    ? (string)$post_fileinfo['playtime_string']
+                                    : (string)($movie_ary->playtime_string ?? '');
 
                                 // Falls die Spieldauer beim Upload wegen fehlender Metadaten 0 war, Filmpreis (amount_own) nachberechnen
                                 $amount_own_sql = '';

@@ -9,20 +9,21 @@ include_once(MCP_DIR."/common.inc.php");
 
 /**
  * Ablauf:
- * 1. Datenbankeinträge neu zuordnen
+ * 1. DatenbankeintrÃ¤ge neu zuordnen
  * 2. Wenn DB-Zuordnung erledigt, dann Dateien (Filme, Fotos usw. neu zuorden/ kopieren) 
  */
 
 function delete_directory($dirname) {
     global $class_errorlog;
     
+    $dir_handle = false;
     if(is_dir($dirname)) {
         $dir_handle = opendir($dirname);
     }
     
     //Falls Verzeichnis nicht geoeffnet werden kann, mit Fehlermeldung terminieren
-    if(isset($dir_handle)) {
-        while($file=readdir($dir_handle)) {
+    if($dir_handle !== false) {
+        while(($file=readdir($dir_handle)) !== false) {
             if($file!="." && $file!="..")  {
                 //Datei loeschen 
                 if(!is_dir($dirname."/".$file)) {
@@ -67,13 +68,13 @@ function data_mapping($id=0) {
         
         // Dateien kopieren
         
-        // erstelle Speicher für Filme
+        // erstelle Speicher fÃ¼r Filme
         $new_movie_path = MOVIES_PATH.'/'.MOVIES_DEFAULT_DIR.'/'.$new_merchant_id;
         if (!file_exists($new_movie_path)) {
             mkdir($new_movie_path, 0777, true);
         }
         
-        // erstelle Speicher für Fotoalben
+        // erstelle Speicher fÃ¼r Fotoalben
         $new_photo_album_path = PHOTO_ALBUMS_PATH.'/'.PHOTO_ALBUMS_DEFAULT_DIR.'/'.$new_merchant_id;
         if (!file_exists($new_photo_album_path)) {
             mkdir($new_photo_album_path, 0777, true);
@@ -90,10 +91,10 @@ function data_mapping($id=0) {
                     // Dateien kopieren
                     copyDir($old_path, $new_path);   
                     
-                    // Prüfen ob Dateien erfolgreich kopiert wurden
+                    // PrÃ¼fen ob Dateien erfolgreich kopiert wurden
                     if (file_exists($new_path.'/'.$reassing_file_obj->filename)) {
 
-                        // Dateien bei alten Merchant löschen
+                        // Dateien bei alten Merchant lÃ¶schen
                         if (delete_directory($old_path) === true) {
 
                             // Dateien in DB neuem Merchant zuordnen
@@ -110,7 +111,7 @@ function data_mapping($id=0) {
                     // Dateien kopieren    
                     copyDir($old_path, $new_path);
 
-                    // Dateien bei alten Merchant löschen
+                    // Dateien bei alten Merchant lÃ¶schen
                     if (delete_directory($old_path) === true) {
 
                         // Dateien in DB neuem Merchant zuordnen
@@ -129,11 +130,13 @@ function data_mapping($id=0) {
         $new_img_path = PROFILE_IMAGE_PATH.'/'.MERCHANT_DEFAULT_DIR.'/'.$new_merchant_id.'/'.$actor_id;
         $old_img_path = PROFILE_IMAGE_PATH.'/'.MERCHANT_DEFAULT_DIR.'/'.$old_merchant_id.'/'.$actor_id;
 
-        // Verzeichniss für Profilbilder erstellen
-        mkdir($new_img_path, 0777, true);
+        // Verzeichniss fÃ¼r Profilbilder erstellen
+        if (!file_exists($new_img_path)) {
+            mkdir($new_img_path, 0777, true);
+        }
         // Profilbilder von alten zu neuen Merchant kopieren
         copyDir($old_img_path, $new_img_path);
-        // Profilbilder bei alten Merchant löschen
+        // Profilbilder bei alten Merchant lÃ¶schen
         delete_directory($old_img_path);
 
         
@@ -142,7 +145,7 @@ function data_mapping($id=0) {
 }
 
 
-// Datenbankeinträge neu zuordnen
+// DatenbankeintrÃ¤ge neu zuordnen
 $rs_check_actor_reassign = p4c_query("SELECT * FROM `actor_reassign` WHERE `data_mapping_completed`='0000-00-00 00:00:00' ORDER BY `actor_reassign`.`id` ASC LIMIT 1;",__FILE__,__LINE__);
 if (p4c_num_rows($rs_check_actor_reassign) == 1) {
 
@@ -172,7 +175,7 @@ if (p4c_num_rows($rs_check_actor_reassign) == 1) {
         p4c_query("UPDATE `group_actors` SET `group_id`='".abs((int)$group_id)."' WHERE `merchant_id`='".abs((int)$old_merchant_id)."' AND `actor_id`='".abs((int)$actor_id)."';",__FILE__,__LINE__);
     }    
     
-    // zu kopierende Filme tämporär in DB speichern speichern
+    // zu kopierende Filme tÃ¤mporÃ¤r in DB speichern speichern
     $rs_movies = p4c_query("SELECT * FROM `movies` WHERE `merchant_id`='".abs((int)$old_merchant_id)."' AND `actor_id`='".abs((int)$actor_id)."';",__FILE__,__LINE__);
     if (p4c_num_rows($rs_movies) > 0) {
         while($movie_obj = p4c_fetch_object($rs_movies)) {
@@ -190,7 +193,7 @@ if (p4c_num_rows($rs_check_actor_reassign) == 1) {
         }
     }
     
-    // zu kopierende Fotoalben tämporär in DB speichern speichern
+    // zu kopierende Fotoalben tÃ¤mporÃ¤r in DB speichern speichern
     $rs_photo_albums = p4c_query("SELECT * FROM `photo_albums` WHERE `merchant_id`='".abs((int)$old_merchant_id)."' AND `actor_id`='".abs((int)$actor_id)."';",__FILE__,__LINE__);
     if (p4c_num_rows($rs_photo_albums) > 0) {
         while($album_obj = p4c_fetch_object($rs_photo_albums)) {
