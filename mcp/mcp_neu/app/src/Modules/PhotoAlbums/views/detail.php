@@ -339,7 +339,7 @@ $priceCentsOptions = range(0, 5000, 100);
       <div class="kkc-card-header">
         <div>
           <h6 class="mb-0 fw-bold"><i class="bi bi-grid-3x3-gap me-2 text-primary"></i>Fotos im Album (<span id="album-photos-grid-count"><?= $numPhotos ?></span>)</h6>
-          <div class="small text-muted">Klicke bei einem Foto auf <strong>FSK16</strong> oder <strong>FSK18</strong>, um es direkt im Cover-Studio als Cover-Vorlage zu öffnen</div>
+          <div class="small text-muted">Klicke bei einem Foto auf <strong>FSK16</strong> oder <strong>FSK18</strong>, um es direkt im Cover-Studio als Cover-Vorlage zu öffnen. Über die Dreh-Buttons kannst du Fotos jederzeit – auch bei bereits aktiven Online-Alben – direkt und ohne erneute Prüfung drehen.</div>
         </div>
         <label class="btn btn-sm btn-kkc-primary mb-0">
           <i class="bi bi-plus-lg me-1"></i> Weitere Fotos hinzufügen

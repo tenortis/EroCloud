@@ -683,6 +683,7 @@ final class PhotoAlbumsCheckingController
             Response::error('Dein Sicherheitstoken ist abgelaufen. Bitte lade die Seite neu.', 403);
             return;
         }
+        @ini_set('memory_limit', '512M');
 
         $photoId   = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)$this->request->post('photo_id', ''));
         $direction = trim((string)$this->request->post('direction', ''));
@@ -720,11 +721,15 @@ final class PhotoAlbumsCheckingController
         $albumsBasePath = defined('PHOTO_ALBUMS_PATH') ? (string)PHOTO_ALBUMS_PATH : (dirname(__DIR__, 5) . '/priv');
         $imagesDir      = rtrim($albumsBasePath, '/\\') . '/' . trim($storageDir, '/\\') . '/' . $merchantId . '/' . $albumDbId . '/images';
         $filePath       = $imagesDir . '/' . $safeFilename;
+        $thumbCacheFile = $imagesDir . '/thumb_' . $safeFilename;
 
         if ($safeFilename === '' || !is_file($filePath) || (int)@filesize($filePath) === 0) {
             Response::error('Die Bilddatei konnte auf dem Server nicht gefunden werden.', 404);
             return;
         }
+
+        $prevMtime      = (int)@filemtime($filePath);
+        $prevThumbMtime = is_file($thumbCacheFile) ? (int)@filemtime($thumbCacheFile) : 0;
 
         if (!function_exists('imagerotate') || !function_exists('imagecreatetruecolor')) {
             Response::error('Die GD-Bildbearbeitung ist auf diesem Server aktuell nicht verfügbar.', 500);
@@ -743,6 +748,7 @@ final class PhotoAlbumsCheckingController
             $rawBytes = @file_get_contents($filePath);
             if (is_string($rawBytes) && $rawBytes !== '') {
                 $srcImg = @imagecreatefromstring($rawBytes);
+                unset($rawBytes);
                 // Vorhandene EXIF-Ausrichtung (2..8 inkl. Spiegelung) zuerst normalisieren, damit die 90°-Drehung exakt der sichtbaren Darstellung entspricht
                 if ($srcImg instanceof \GdImage && function_exists('ec_read_exif_orientation') && function_exists('ec_apply_exif_orientation')) {
                     $orient = \ec_read_exif_orientation($filePath);
@@ -803,14 +809,14 @@ final class PhotoAlbumsCheckingController
             }
         }
 
-        $nowTs = time();
-        $now   = date('Y-m-d H:i:s', $nowTs);
+        $thumbEpoch = defined('EC_THUMB_EXIF_FIX_TS') ? (int)EC_THUMB_EXIF_FIX_TS : 1795520600;
+        $nowTs      = max(time(), $prevMtime + 1, $prevThumbMtime + 1, $thumbEpoch + 1);
+        $now        = date('Y-m-d H:i:s', time());
         @chmod($filePath, 0777);
         @touch($filePath, $nowTs);
         clearstatcache(true, $filePath);
 
         // Verpixeltes API-Vorschaubild (thumb_{filename}) löschen, damit es beim nächsten Portal-Aufruf frisch generiert wird
-        $thumbCacheFile = $imagesDir . '/thumb_' . $safeFilename;
         if (is_file($thumbCacheFile)) {
             @unlink($thumbCacheFile);
         }
@@ -830,17 +836,19 @@ final class PhotoAlbumsCheckingController
         );
 
         $rsOnline = p4c_query(
-            "SELECT `id` FROM `photo_albums_online` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "' LIMIT 1;",
+            "SELECT `id`, `checksum` FROM `photo_albums_online` WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "' LIMIT 1;",
             __FILE__,
             __LINE__
         );
         if ($rsOnline && p4c_num_rows($rsOnline) > 0) {
+            $onlineObj         = p4c_fetch_object($rsOnline);
+            $newOnlineChecksum = md5((string)($onlineObj->checksum ?? $row->checksum ?? '') . '|rot|' . $nowTs);
             p4c_query(
                 "UPDATE `photo_albums_online`
-                 SET `checksum` = '" . p4c_escape_string($newChecksum) . "',
+                 SET `checksum` = '" . p4c_escape_string($newOnlineChecksum) . "',
                      `last_updated_by` = '" . $employeeId . "',
                      `last_updated_datetime` = '" . $now . "'
-                 WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "'
+                 WHERE `id` = '" . abs((int)$onlineObj->id) . "'
                  LIMIT 1;",
                 __FILE__,
                 __LINE__

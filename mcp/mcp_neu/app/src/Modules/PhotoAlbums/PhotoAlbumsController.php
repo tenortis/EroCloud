@@ -938,10 +938,9 @@ final class PhotoAlbumsController
      */
     public function rotatePhoto(): void
     {
-        global $mysql;
-
         $this->requireValidCsrf();
         $merchantId = $this->requireMerchantId();
+        @ini_set('memory_limit', '512M');
 
         $albumDbId   = abs((int)$this->request->post('album_id', 0));
         $photoFileId = trim((string)$this->request->post('file_id', ''));
@@ -977,10 +976,14 @@ final class PhotoAlbumsController
         $imagesDir      = rtrim($albumsBasePath, '/\\') . '/' . $storageDir . '/' . $merchantId . '/' . $albumDbId . '/images';
         $safeFilename   = basename((string)$pObj->filename);
         $filePath       = $imagesDir . '/' . $safeFilename;
+        $thumbCacheFile = $imagesDir . '/thumb_' . $safeFilename;
 
         if ($safeFilename === '' || !is_file($filePath) || (int)@filesize($filePath) === 0) {
             Response::error('Die Bilddatei konnte auf dem Server nicht gefunden werden.', 404);
         }
+
+        $prevMtime      = (int)@filemtime($filePath);
+        $prevThumbMtime = is_file($thumbCacheFile) ? (int)@filemtime($thumbCacheFile) : 0;
 
         if (!function_exists('imagerotate') || !function_exists('imagecreatetruecolor')) {
             Response::error('Die Bildbearbeitung ist auf diesem Server aktuell nicht verfügbar.', 500);
@@ -997,6 +1000,7 @@ final class PhotoAlbumsController
             $rawBytes = @file_get_contents($filePath);
             if (is_string($rawBytes) && $rawBytes !== '') {
                 $srcImg = @imagecreatefromstring($rawBytes);
+                unset($rawBytes);
                 // Vorhandene EXIF-Ausrichtung (2..8 inkl. Spiegelung) zuerst normalisieren, damit die 90°-Drehung exakt der sichtbaren Darstellung entspricht
                 if ($srcImg instanceof \GdImage && function_exists('ec_read_exif_orientation') && function_exists('ec_apply_exif_orientation')) {
                     $orient = \ec_read_exif_orientation($filePath);
@@ -1053,38 +1057,72 @@ final class PhotoAlbumsController
             }
         }
 
-        $nowTs = time();
+        $thumbEpoch = defined('EC_THUMB_EXIF_FIX_TS') ? (int)EC_THUMB_EXIF_FIX_TS : 1795520600;
+        $nowTs      = max(time(), $prevMtime + 1, $prevThumbMtime + 1, $thumbEpoch + 1);
+        $nowSql     = date('Y-m-d H:i:s', time());
         @chmod($filePath, 0777);
         @touch($filePath, $nowTs);
         clearstatcache(true, $filePath);
 
         // Verpixeltes API-Vorschaubild (thumb_{filename}) löschen, damit es in der neuen Ausrichtung neu generiert wird
-        $thumbCacheFile = $imagesDir . '/thumb_' . $safeFilename;
         if (is_file($thumbCacheFile)) {
             @unlink($thumbCacheFile);
         }
-        if (function_exists('ec_invalidate_photo_album_api_cache')) {
-            \ec_invalidate_photo_album_api_cache($albumIdHash);
-        }
 
-        $totalPhotos = $this->recalculatePhotoCount($albumDbId, $albumIdHash, $merchantId, $mysql);
+        // Reine Foto-Rotation löst bewusst KEINE erneute ACP-Prüfung aus; Checksumme direkt in photo_albums & photo_albums_online nachziehen
+        $newAlbumChecksum = md5((string)($aObj->checksum ?? '') . '|rot|' . $nowTs);
+        p4c_query(
+            "UPDATE `photo_albums`
+             SET `checksum` = '" . p4c_escape_string($newAlbumChecksum) . "',
+                 `last_updated_datetime` = '" . $nowSql . "'
+             WHERE `id` = '" . $albumDbId . "'
+               AND `merchant_id` = '" . $merchantId . "'
+             LIMIT 1;",
+            __FILE__,
+            __LINE__
+        );
 
-        if ((int)$aObj->released !== 0 || (string)$aObj->album_checked !== '0000-00-00 00:00:00') {
-            $hasFsk16 = trim((string)$aObj->preview_image_fsk16) !== '';
-            $hasFsk18 = trim((string)$aObj->preview_image_fsk18) !== '';
-            $nextRel  = ($hasFsk16 && $hasFsk18 && $totalPhotos >= 4) ? '1' : '0';
+        $isAlbumOnline = false;
+        $rsOnline = p4c_query(
+            "SELECT `id`, `checksum`
+             FROM `photo_albums_online`
+             WHERE `album_id` = '" . p4c_escape_string($albumIdHash) . "'
+               AND `merchant_id` = '" . $merchantId . "'
+             LIMIT 1;",
+            __FILE__,
+            __LINE__
+        );
+        if ($rsOnline && p4c_num_rows($rsOnline) > 0) {
+            $isAlbumOnline     = true;
+            $onlineObj         = p4c_fetch_object($rsOnline);
+            $newOnlineChecksum = md5((string)($onlineObj->checksum ?? $aObj->checksum ?? '') . '|rot|' . $nowTs);
             p4c_query(
-                "UPDATE `photo_albums` SET `album_checked` = '0000-00-00 00:00:00', `released` = '" . $nextRel . "', `last_updated_datetime` = '" . date('Y-m-d H:i:s', $nowTs) . "' WHERE `id` = '" . $albumDbId . "' AND `merchant_id` = '" . $merchantId . "';",
+                "UPDATE `photo_albums_online`
+                 SET `checksum` = '" . p4c_escape_string($newOnlineChecksum) . "',
+                     `last_updated_datetime` = '" . $nowSql . "'
+                 WHERE `id` = '" . abs((int)$onlineObj->id) . "'
+                 LIMIT 1;",
                 __FILE__,
                 __LINE__
             );
         }
 
-        $mcpUrl = defined('MCP_URL') ? MCP_URL : 'https://erocloud.net';
+        if (function_exists('ec_invalidate_photo_album_api_cache')) {
+            \ec_invalidate_photo_album_api_cache($albumIdHash);
+        }
+
+        if (function_exists('log_action')) {
+            log_action('Foto ' . $photoFileId . ' in Foto-Album #' . $albumDbId . ' im MCP um 90° nach ' . ($direction === 'left' ? 'links' : 'rechts') . ' gedreht (ohne erneute Prüfung)');
+        }
+
+        $mcpUrl      = defined('MCP_URL') ? MCP_URL : 'https://erocloud.net';
+        $directionDe = ($direction === 'left') ? 'links' : 'rechts';
 
         Response::json([
             'status'     => 'ok',
-            'message'    => $direction === 'left' ? 'Das Foto wurde um 90° nach links gedreht.' : 'Das Foto wurde um 90° nach rechts gedreht.',
+            'message'    => $isAlbumOnline
+                ? 'Das Foto wurde um 90° nach ' . $directionDe . ' gedreht und sofort ohne erneute Prüfung übernommen.'
+                : 'Das Foto wurde um 90° nach ' . $directionDe . ' gedreht.',
             'file_id'    => $photoFileId,
             'thumb_url'  => $mcpUrl . '/AlbumPhoto/' . rawurlencode($photoFileId) . '?w=200&v=' . $nowTs,
             'zoom_url'   => $mcpUrl . '/AlbumPhoto/' . rawurlencode($photoFileId) . '?w=900&v=' . $nowTs,

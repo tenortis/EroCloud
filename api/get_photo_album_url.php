@@ -41,10 +41,11 @@ if (p4c_num_rows($rs_user_key) == 0) {
 $album_id = (string)$_GET['album_id'];
 
 $rs_album = p4c_query("SELECT * FROM `photo_albums` WHERE `album_id`='".p4c_escape_string($album_id)."' LIMIT 1;",__FILE__,__LINE__);
-if (p4c_num_rows($rs_album) == 0) {
+if (!$rs_album || p4c_num_rows($rs_album) == 0) {
     $api['error'] = 'album_id not exists';
     print_xml($api);   
 }
+$alb_meta = p4c_fetch_object($rs_album);
 
 // Das Token ist nur 30 Minuten gültig. Danach kann das Album von diesem Kunden nicht mehr direkt per URL aufgerufen werden
 $album_access_obj = p4c_fetch_object($rs_user_key);
@@ -66,6 +67,18 @@ if ((string)($album_access_obj->access_token_datetime ?? '') < date("Y-m-d H:i:s
 
 if ($_GET['buy_as'] == 'download') {
     $api['album_url'] = API_URL.'/PhotoAlbumDownloader/'.$user_key.'/'.$album_id.'/'.$access_token;
+
+    $images_dir = '';
+    if ($alb_meta) {
+        $st_loc = trim((string)($alb_meta->storage_location ?? ''));
+        if ($st_loc === '') {
+            $st_loc = defined('PHOTO_ALBUMS_DEFAULT_DIR') ? (string)PHOTO_ALBUMS_DEFAULT_DIR : 'photo_albums';
+        }
+        if (defined('PHOTO_ALBUMS_PATH')) {
+            $images_dir = rtrim((string)PHOTO_ALBUMS_PATH, '/\\') . '/' . trim($st_loc, '/\\') . '/' . abs((int)$alb_meta->merchant_id) . '/' . abs((int)$alb_meta->id) . '/images/';
+        }
+    }
+    $thumbEpoch = defined('EC_THUMB_EXIF_FIX_TS') ? (int)EC_THUMB_EXIF_FIX_TS : 1795520600;
     
     $rs_photos = p4c_query("SELECT * FROM `photo_albums_photos` WHERE `album_id`='". p4c_escape_string($album_id)."' AND `rejected`='0' ORDER BY `id` DESC;",__FILE__,__LINE__);
     $count_photos = p4c_num_rows($rs_photos);
@@ -75,10 +88,25 @@ if ($_GET['buy_as'] == 'download') {
         $api['album_id'] = $album_id;
         $api['photos'] = array();
         while($album_obj = p4c_fetch_object($rs_photos)) {
+            $fname     = basename((string)$album_obj->filename);
+            $verSuffix = '';
+            if ($images_dir !== '' && $fname !== '') {
+                $origPath   = $images_dir . $fname;
+                $thumbPath  = $images_dir . 'thumb_' . $fname;
+                $origMtime  = is_file($origPath) ? (int)@filemtime($origPath) : 0;
+                $thumbMtime = is_file($thumbPath) ? (int)@filemtime($thumbPath) : 0;
+                $mtime      = max($origMtime, $thumbMtime, $thumbEpoch);
+                if ($mtime > 0) {
+                    $verSuffix = '?v=' . $mtime;
+                }
+            } else {
+                $verSuffix = '?v=' . $thumbEpoch;
+            }
+
             $api['photos'][] = array(
                 'file_id'       => $album_obj->file_id,
                 'file_name'     => $album_obj->filename,
-                'photo_url'     => API_URL.'/MyAlbumPhoto/'.$user_key.'/'.$access_token.'/'.$album_obj->file_id
+                'photo_url'     => API_URL.'/MyAlbumPhoto/'.$user_key.'/'.$access_token.'/'.$album_obj->file_id.$verSuffix
             );
         }
     }
