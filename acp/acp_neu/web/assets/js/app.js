@@ -6176,6 +6176,9 @@ const App = {
       const fd = new FormData();
       fd.append('_csrf', App.csrfToken);
 
+      const controller = new AbortController();
+      const timeoutId  = setTimeout(() => controller.abort(), 45000);
+
       try {
         const res = await fetch(`${App.basePath}/api.php?route=sites/sync-p4c`, {
           method: 'POST',
@@ -6183,12 +6186,23 @@ const App = {
             'X-Requested-With': 'XMLHttpRequest',
             'X-CSRF-Token': App.csrfToken
           },
-          body: fd
+          body: fd,
+          signal: controller.signal
         });
-        const data = await res.json();
 
-        if (!res.ok || data.status !== 'ok') {
-          App.toast(data.message || 'Synchronisation mit Pay4Coins fehlgeschlagen.', 'danger');
+        const rawText = await res.text();
+        let data = null;
+        try {
+          data = rawText ? JSON.parse(rawText) : null;
+        } catch (_) {
+          data = null;
+        }
+
+        if (!res.ok || !data || data.status !== 'ok') {
+          const errMsg = (data && data.message)
+            ? data.message
+            : `Synchronisation mit Pay4Coins fehlgeschlagen (HTTP ${res.status}).`;
+          App.toast(errMsg, 'danger');
           if (btnEl) {
             btnEl.disabled = false;
             btnEl.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Mit Pay4Coins synchronisieren';
@@ -6200,11 +6214,16 @@ const App = {
         App.toast(data.message || 'Webseiten erfolgreich mit Pay4Coins synchronisiert.', 'success');
         App.handleRoute();
       } catch (err) {
-        App.toast('Netzwerkfehler bei Pay4Coins-Synchronisation: ' + err.message, 'danger');
+        const msg = err && err.name === 'AbortError'
+          ? 'Die Synchronisation mit Pay4Coins hat das Zeitlimit (45s) überschritten. Bitte prüfe das EroCloud- und Pay4Coins-Errorlog (htdocs/log/.errorlog).'
+          : ('Netzwerkfehler bei Pay4Coins-Synchronisation: ' + (err && err.message ? err.message : err));
+        App.toast(msg, 'danger');
         if (btnEl) {
           btnEl.disabled = false;
           btnEl.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Mit Pay4Coins synchronisieren';
         }
+      } finally {
+        clearTimeout(timeoutId);
       }
     }
   },

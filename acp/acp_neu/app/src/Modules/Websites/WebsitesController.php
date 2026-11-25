@@ -13,7 +13,7 @@ use App\Core\Response;
 use App\Core\View;
 
 /**
-ἓ * EroCloud ACP (v2.0) – Modul: Webseiten (#/sites & #/site?id=...)
+ * EroCloud ACP (v2.0) – Modul: Webseiten (#/sites & #/site?id=...)
  *
  * Ersetzt:
  *  - acp/includes/sites.php + acp/includes/ajax/sites.php
@@ -656,6 +656,14 @@ final class WebsitesController
         if (!Csrf::validate($this->request->csrfToken())) {
             Response::error('Ungültiges Sicherheits-Token (CSRF). Bitte lade die Seite neu.', 403);
             return;
+        }
+
+        // PHP-Session-Lock sofort freigeben, damit F5 und parallele ACP-Tabs während des Syncs niemals blockieren
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(60);
         }
 
         require_once SOURCEDIR . '/includes/p4c_sites_sync.inc.php';
