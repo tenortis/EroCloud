@@ -60,7 +60,7 @@ Der Creator (Partner/Merchant) lädt ein Video im produktiven **Merchant Control
     * Vollständige Dokumentation: siehe `@co-actor-verification-and-model-release.md`.
 * **Schritt 2 (Datei-Upload)**:
   * **Validierung**: Erlaubte Formate sind `avi`, `flv`, `m4v`, `mkv`, `mov`, `mp4`, `mpg`, `wmv`. Maximale Größe beträgt 2,0 bis 4,0 GB.
-  * **Analyse (getID3)**: Die PHP-Bibliothek `getID3` (`mcp/includes/getid3/`, Version `1.9.21`, PHP 8.4/8.5-kompatibel gehärtet) analysiert die temporäre Datei bezüglich Abspieldauer (`playtime_seconds`) und Auflösung (mindestens 640x480).
+  * **Analyse (getID3)**: Die PHP-Bibliothek `getID3` (`mcp/includes/getid3/`, Version `1.9.28`, nativ PHP-8.4/8.5-kompatibel und ohne ungenutzte `extension.cache.*`-Dateien) analysiert die temporäre Datei bezüglich Abspieldauer (`playtime_seconds`) und Auflösung (mindestens 640x480).
   * **Berechnung des Preises**: Der Gesamtpreis des Videos (`amount_own`) wird auf Basis der Dauer in Sekunden und des Sekundenpreises berechnet (`round(playtime_seconds * amount_second)`).
   * **Speicherung**: Die Datei wird als `[movie_id]_[file_id].[extension]` in den Händler-Ordner verschoben.
   * **Datenbank-Status**: Setzt `convert_status = '0'` (bereit für Konvertierung).

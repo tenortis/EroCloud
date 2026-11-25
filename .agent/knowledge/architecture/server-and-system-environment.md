@@ -67,7 +67,7 @@ Die Domains von `web1` laufen über FastCGI/FPM (`acp.erocloud.net`, `erocloud.n
 | **`wevsql.erocloud.net`** | *(LiveConfig-Anwendung `phpmyadmin5`)* | **PHP `8.4.28`** | phpMyAdmin |
 
 ### 3.2 Konfigurierte Cronjobs in `web1`
-Alle 8 aktiven Cronjobs von `web1` unter `cronjobs/` sowie `mcp/messenger/cronjobs/crawl_erocms_chats.php` (inkl. `mcp/includes/getid3/` `1.9.21`) sind vollständig **PHP-`8.4`/`8.5`-kompatibel gehärtet** und laufen produktiv über `/opt/php-8.4/bin/php` *(die veralteten Einträge `api/usertracking/cronjob.php` – letzter DB-Eintrag `2024-11-08` – und `import_conversions.php --date=2022-12-17` wurden in LiveConfig entfernt)*:
+Alle 8 aktiven Cronjobs von `web1` unter `cronjobs/` sowie `mcp/messenger/cronjobs/crawl_erocms_chats.php` (inkl. `mcp/includes/getid3/` `1.9.28`) sind vollständig **PHP-`8.4`/`8.5`-kompatibel** und laufen produktiv über `/opt/php-8.4/bin/php` *(die veralteten Einträge `api/usertracking/cronjob.php` – letzter DB-Eintrag `2024-11-08` – und `import_conversions.php --date=2022-12-17` wurden in LiveConfig entfernt)*:
 
 1. `*/5 * * * *` – `/opt/php-8.4/bin/php /var/www/web1/htdocs/cronjobs/actor_reassign.php`
 2. `*/2 * * * *` – `/opt/php-8.4/bin/php /var/www/web1/htdocs/cronjobs/ai_compliance_worker.php >/dev/null 2>&1`

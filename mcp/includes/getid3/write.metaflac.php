@@ -71,7 +71,7 @@ class getid3_write_metaflac
 					$picture_typeid = (!empty($picturedetails['picturetypeid']) ? $this->ID3v2toFLACpictureTypes($picturedetails['picturetypeid']) : 3); // default to "3:Cover (front)"
 					$picture_mimetype = (!empty($picturedetails['mime']) ? $picturedetails['mime'] : ''); // should be auto-detected
 					$picture_width_height_depth = '';
-					$this->pictures[] = $picture_typeid.'|'.$picture_mimetype.'|'.preg_replace('#[^\x20-\x7B\x7D-\x7F]#', '', $picturedetails['description']).'|'.$picture_width_height_depth.'|'.$temppicturefilename;
+					$this->pictures[] = $picture_typeid.'|'.$picture_mimetype.'|'.preg_replace('#[^\x20-\x7B\x7D-\x7F]#', '', (string) $picturedetails['description']).'|'.$picture_width_height_depth.'|'.$temppicturefilename;
 				} else {
 					$this->errors[] = 'failed to open temporary tags file, tags not written - fopen("'.$temppicturefilename.'", "wb")';
 					return false;
@@ -101,7 +101,7 @@ class getid3_write_metaflac
 		if (GETID3_OS_ISWINDOWS) {
 
 			if (file_exists(GETID3_HELPERAPPSDIR.'metaflac.exe')) {
-				//$commandline = '"'.GETID3_HELPERAPPSDIR.'metaflac.exe" --no-utf8-convert --remove-all-tags --import-tags-from="'.$tempcommentsfilename.'" "'.str_replace('/', '\\', $this->filename).'"';
+				//$commandline = '"'.GETID3_HELPERAPPSDIR.'metaflac.exe" --no-utf8-convert --remove-all-tags --import-tags-from='.escapeshellarg($tempcommentsfilename).' '.escapeshellarg(str_replace('/', DIRECTORY_SEPARATOR, $this->filename)).'"';
 				//  metaflac works fine if you copy-paste the above commandline into a command prompt,
 				//  but refuses to work with `backtick` if there are "doublequotes" present around BOTH
 				//  the metaflac pathname and the target filename. For whatever reason...??
@@ -121,9 +121,14 @@ class getid3_write_metaflac
 				$metaflacError = shell_exec($commandline);
 
 				if (empty($metaflacError)) {
-					clearstatcache(true, $this->filename);
-					if ($timestampbeforewriting == filemtime($this->filename)) {
-						$metaflacError = 'File modification timestamp has not changed - it looks like the tags were not written';
+					if (abs(time() - $timestampbeforewriting) < 5) {
+						// https://github.com/JamesHeinrich/getID3/issues/474
+						// probably working on a temporary (or otherwise newly-created) file so hack-check file-modification-date will always fail
+					} else {
+						clearstatcache(true, $this->filename);
+						if ($timestampbeforewriting == filemtime($this->filename)) {
+							$metaflacError = 'File modification timestamp has not changed - it looks like the tags were not written';
+						}
 					}
 				}
 			} else {
@@ -176,7 +181,7 @@ class getid3_write_metaflac
 				clearstatcache(true, $this->filename);
 				$timestampbeforewriting = filemtime($this->filename);
 
-				$commandline = GETID3_HELPERAPPSDIR.'metaflac.exe --remove-all-tags "'.$this->filename.'" 2>&1';
+				$commandline = GETID3_HELPERAPPSDIR.'metaflac.exe --remove-all-tags '.escapeshellarg($this->filename).'" 2>&1';
 				$metaflacError = shell_exec($commandline);
 
 				if (empty($metaflacError)) {
@@ -192,7 +197,7 @@ class getid3_write_metaflac
 		} else {
 
 			// It's simpler on *nix
-			$commandline = 'metaflac --remove-all-tags "'.$this->filename.'" 2>&1';
+			$commandline = 'metaflac --remove-all-tags '.escapeshellarg($this->filename).'" 2>&1';
 			$metaflacError = shell_exec($commandline);
 
 		}
