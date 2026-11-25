@@ -252,220 +252,106 @@ foreach ($rejectionReasons as $rrCheck) {
 </div>
 <?php endif; ?>
 
+<!-- ==========================================================================
+     SICHTUNGS-BÜHNE (LINKS: ALBUM-COVERBILDER | RECHTS: MITWIRKENDE & GESICHTSABGLEICH)
+     ========================================================================== -->
+<div class="row g-4 mb-4 ec-review-stage">
+  <div class="col-xl-7">
+    <!-- 1. FSK16 & FSK18 Coverbilder & Technik-Infos -->
+    <div class="card-kkc h-100 mb-0">
+      <div class="card-kkc-header flex-wrap gap-2">
+        <div class="card-title">
+          <i class="bi bi-image-fill ec-text-primary"></i>
+          <span>Album-Coverbilder (FSK16 &amp; FSK18)</span>
+        </div>
+        <span class="badge-kkc badge-kkc-neutral">
+          <?= (int)$album['number_of_photos'] ?> Fotos im Album
+        </span>
+      </div>
+      <div class="card-kkc-body">
+        <div class="row g-3 mb-3">
+          <!-- FSK16 Cover -->
+          <div class="col-sm-6">
+            <div class="p-2 rounded border h-100" style="background: var(--kkc-surface-hover);">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="badge bg-info text-dark fw-bold">FSK16 Cover (Jugendschutz)</span>
+                <?php if (!empty($album['has_fsk16'])): ?>
+                  <span class="badge-kkc badge-kkc-success"><i class="bi bi-check-lg"></i> Vorhanden</span>
+                <?php else: ?>
+                  <span class="badge-kkc badge-kkc-danger">Fehlt</span>
+                <?php endif; ?>
+              </div>
+              <div class="position-relative rounded overflow-hidden bg-dark" style="aspect-ratio: 4/3; cursor: pointer;"
+                   onclick="App.openImagePreviewModal('media.php?type=album_poster&album_id=<?= View::e($albumIdHash) ?>&fsk=16', 'FSK16 Cover – Fotoalbum #<?= $albumDbId ?>')">
+                <img src="media.php?type=album_poster&amp;album_id=<?= View::e($albumIdHash) ?>&amp;fsk=16&amp;w=480"
+                     alt="FSK16 Cover" class="w-100 h-100" style="object-fit: cover;">
+                <button type="button" class="btn btn-sm btn-dark position-absolute bottom-0 end-0 m-2 opacity-75">
+                  <i class="bi bi-arrows-fullscreen me-1"></i> Großansicht
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- FSK18 Cover -->
+          <div class="col-sm-6">
+            <div class="p-2 rounded border h-100" style="background: var(--kkc-surface-hover);">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="badge bg-danger text-white fw-bold">FSK18 Cover (ab 18 J.)</span>
+                <?php if (!empty($album['has_fsk18'])): ?>
+                  <span class="badge-kkc badge-kkc-success"><i class="bi bi-check-lg"></i> Vorhanden</span>
+                <?php else: ?>
+                  <span class="badge-kkc badge-kkc-danger">Fehlt</span>
+                <?php endif; ?>
+              </div>
+              <div class="position-relative rounded overflow-hidden bg-dark" style="aspect-ratio: 4/3; cursor: pointer;"
+                   onclick="App.openImagePreviewModal('media.php?type=album_poster&album_id=<?= View::e($albumIdHash) ?>&fsk=18', 'FSK18 Cover – Fotoalbum #<?= $albumDbId ?>')">
+                <img src="media.php?type=album_poster&amp;album_id=<?= View::e($albumIdHash) ?>&amp;fsk=18&amp;w=480"
+                     alt="FSK18 Cover" class="w-100 h-100" style="object-fit: cover;">
+                <button type="button" class="btn btn-sm btn-dark position-absolute bottom-0 end-0 m-2 opacity-75">
+                  <i class="bi bi-arrows-fullscreen me-1"></i> Großansicht
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-2 pt-2 border-top small text-muted" style="border-color: var(--kkc-border) !important;">
+          <div class="col-sm-6">
+            <div><strong>Merchant:</strong> <a href="#/merchant?id=<?= $merchantId ?>" class="ec-text-primary text-decoration-none"><?= View::e((string)$album['merchant_username']) ?> (MID #<?= $merchantId ?>)</a></div>
+            <div><strong>Partner-ID:</strong> #<?= (int)$album['merchant_partner_id'] ?></div>
+          </div>
+          <div class="col-sm-6">
+            <div><strong>Storage:</strong> <span class="font-monospace"><?= View::e((string)$album['storage_location']) ?></span></div>
+            <div><strong>Angelegt am:</strong> <?= View::e((string)$album['create_datetime']) ?></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-5 position-relative">
+    <!-- 2. Mitwirkende Personen & Gesichtsabgleich / 18+ ID-Shot-Prüfung -->
+    <?= View::render('Shared', 'co_actors_panel', [
+        'performersData'   => $performersData,
+        'contentType'      => 'album',
+        'contentId'        => $albumDbId,
+        'merchantId'       => $merchantId,
+        'panelId'          => 'pac-performers-card',
+        'readOnly'         => false,
+        'matchStageHeight' => true,
+        'pendingDocsHint'  => 'Noch kein ID-Shot hochgeladen: Übergangsphase aktiv – du kannst das Fotoalbum unten trotzdem ganz normal prüfen und veröffentlichen.',
+    ]) ?>
+  </div>
+</div>
+
 <form id="pac-approve-form" onsubmit="App.submitPhotoAlbumApprove(event)">
   <input type="hidden" name="album_id" value="<?= $albumDbId ?>">
 
   <div class="row g-4">
     <!-- ======================================================================
-         LINKE SPALTE: COVERBILDER, 18+ MITWIRKENDE & FOTOS IM ALBUM
+         LINKE SPALTE: FOTOS IM ALBUM
          ====================================================================== -->
     <div class="col-xl-6">
-
-      <!-- 1. FSK16 & FSK18 Coverbilder & Technik-Infos -->
-      <div class="card-kkc mb-4">
-        <div class="card-kkc-header flex-wrap gap-2">
-          <div class="card-title">
-            <i class="bi bi-image-fill ec-text-primary"></i>
-            <span>Album-Coverbilder (FSK16 &amp; FSK18)</span>
-          </div>
-          <span class="badge-kkc badge-kkc-neutral">
-            <?= (int)$album['number_of_photos'] ?> Fotos im Album
-          </span>
-        </div>
-        <div class="card-kkc-body">
-          <div class="row g-3 mb-3">
-            <!-- FSK16 Cover -->
-            <div class="col-sm-6">
-              <div class="p-2 rounded border h-100" style="background: var(--kkc-surface-hover);">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <span class="badge bg-info text-dark fw-bold">FSK16 Cover (Jugendschutz)</span>
-                  <?php if (!empty($album['has_fsk16'])): ?>
-                    <span class="badge-kkc badge-kkc-success"><i class="bi bi-check-lg"></i> Vorhanden</span>
-                  <?php else: ?>
-                    <span class="badge-kkc badge-kkc-danger">Fehlt</span>
-                  <?php endif; ?>
-                </div>
-                <div class="position-relative rounded overflow-hidden bg-dark" style="aspect-ratio: 4/3; cursor: pointer;"
-                     onclick="App.openImagePreviewModal('media.php?type=album_poster&album_id=<?= View::e($albumIdHash) ?>&fsk=16', 'FSK16 Cover – Fotoalbum #<?= $albumDbId ?>')">
-                  <img src="media.php?type=album_poster&amp;album_id=<?= View::e($albumIdHash) ?>&amp;fsk=16&amp;w=480"
-                       alt="FSK16 Cover" class="w-100 h-100" style="object-fit: cover;">
-                  <button type="button" class="btn btn-sm btn-dark position-absolute bottom-0 end-0 m-2 opacity-75">
-                    <i class="bi bi-arrows-fullscreen me-1"></i> Großansicht
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- FSK18 Cover -->
-            <div class="col-sm-6">
-              <div class="p-2 rounded border h-100" style="background: var(--kkc-surface-hover);">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <span class="badge bg-danger text-white fw-bold">FSK18 Cover (ab 18 J.)</span>
-                  <?php if (!empty($album['has_fsk18'])): ?>
-                    <span class="badge-kkc badge-kkc-success"><i class="bi bi-check-lg"></i> Vorhanden</span>
-                  <?php else: ?>
-                    <span class="badge-kkc badge-kkc-danger">Fehlt</span>
-                  <?php endif; ?>
-                </div>
-                <div class="position-relative rounded overflow-hidden bg-dark" style="aspect-ratio: 4/3; cursor: pointer;"
-                     onclick="App.openImagePreviewModal('media.php?type=album_poster&album_id=<?= View::e($albumIdHash) ?>&fsk=18', 'FSK18 Cover – Fotoalbum #<?= $albumDbId ?>')">
-                  <img src="media.php?type=album_poster&amp;album_id=<?= View::e($albumIdHash) ?>&amp;fsk=18&amp;w=480"
-                       alt="FSK18 Cover" class="w-100 h-100" style="object-fit: cover;">
-                  <button type="button" class="btn btn-sm btn-dark position-absolute bottom-0 end-0 m-2 opacity-75">
-                    <i class="bi bi-arrows-fullscreen me-1"></i> Großansicht
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="row g-2 pt-2 border-top small text-muted" style="border-color: var(--kkc-border) !important;">
-            <div class="col-sm-6">
-              <div><strong>Merchant:</strong> <a href="#/merchant?id=<?= $merchantId ?>" class="ec-text-primary text-decoration-none"><?= View::e((string)$album['merchant_username']) ?> (MID #<?= $merchantId ?>)</a></div>
-              <div><strong>Partner-ID:</strong> #<?= (int)$album['merchant_partner_id'] ?></div>
-            </div>
-            <div class="col-sm-6">
-              <div><strong>Storage:</strong> <span class="font-monospace"><?= View::e((string)$album['storage_location']) ?></span></div>
-              <div><strong>Angelegt am:</strong> <?= View::e((string)$album['create_datetime']) ?></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 2. Mitwirkende Personen & 18+ ID-Shot-Prüfung (CoActorManager) -->
-      <?php
-        $perfMode    = (string)($performersData['performer_mode'] ?? 'solo_owner');
-        $perfPersons = is_array($performersData['persons'] ?? null) ? $performersData['persons'] : [];
-      ?>
-      <div class="card-kkc mb-4" id="pac-performers-card">
-        <div class="card-kkc-header flex-wrap gap-2">
-          <div class="card-title">
-            <i class="bi bi-person-badge-fill ec-text-primary"></i>
-            <span>Mitwirkende Personen &amp; ID-Shot-Prüfung (18+ / Model Release)</span>
-          </div>
-          <?php if ($perfMode === 'solo_owner'): ?>
-            <span class="badge-kkc badge-kkc-info">
-              Solo: Nur Account-Inhaber (<?= View::e((string)$performersData['merchant_full_name']) ?>)
-            </span>
-          <?php else: ?>
-            <span class="badge-kkc badge-kkc-warning">
-              Mehrere Personen (<?= count($perfPersons) ?> gemeldet)
-            </span>
-          <?php endif; ?>
-        </div>
-        <div class="card-kkc-body">
-          <?php if (empty($perfPersons)): ?>
-            <div class="alert alert-danger mb-0 py-2 small">
-              <i class="bi bi-exclamation-triangle-fill me-1"></i> Keine mitwirkenden Personen für dieses Fotoalbum hinterlegt.
-            </div>
-          <?php else: ?>
-            <div class="d-flex flex-column gap-3">
-              <?php foreach ($perfPersons as $p):
-                  $pId       = (int)$p['id'];
-                  $isOwner   = !empty($p['is_owner']);
-                  $pStatus   = (string)($p['checked_status'] ?? 'pending_qr');
-                  $isReady   = !empty($p['is_ready_for_use']);
-                  $hasDocs   = !empty($p['has_uploaded_docs']) || !empty($p['has_id_shot']) || !empty($p['face_ref_url']) || !empty($p['id_front_url']);
-                  $isAiReady = !empty($p['ai_face_ready']);
-
-                  $pBadgeCls = 'badge-kkc-warning';
-                  if ($pStatus === 'verified') {
-                      $pBadgeCls = 'badge-kkc-success';
-                  } elseif ($pStatus === 'rejected') {
-                      $pBadgeCls = 'badge-kkc-danger';
-                  } elseif ($pStatus === 'under_review') {
-                      $pBadgeCls = 'badge-kkc-info';
-                  }
-              ?>
-              <div class="p-3 rounded border" style="background: var(--kkc-surface-hover); border-color: var(--kkc-border) !important;">
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                  <div class="d-flex flex-wrap align-items-center gap-2">
-                    <span class="badge <?= $isOwner ? 'bg-primary' : 'bg-secondary' ?>">
-                      <?= $isOwner ? 'ICH (ACCOUNT-INHABER)' : 'DREHPARTNER' ?>
-                    </span>
-                    <strong class="text-body"><?= View::e((string)($p['display_label'] ?? '')) ?></strong>
-                    <?php if ($isAiReady): ?>
-                      <span class="badge-kkc badge-kkc-info"><i class="bi bi-qr-code-scan me-1"></i>Live-QR (KI-Ready)</span>
-                    <?php elseif (($p['verification_method'] ?? '') === 'manual_legacy'): ?>
-                      <span class="badge-kkc badge-kkc-neutral"><i class="bi bi-folder2-open me-1"></i>Alt-Dokumente</span>
-                    <?php endif; ?>
-                  </div>
-                  <span class="badge-kkc <?= $pBadgeCls ?>" id="pac-coactor-status-<?= $pId ?>">
-                    <?= View::e((string)($p['status_label'] ?? $pStatus)) ?>
-                  </span>
-                </div>
-
-                <div class="small text-muted mb-2">
-                  <?php if (!empty($p['birth_date_de'])): ?>
-                    Geb.: <strong><?= View::e((string)$p['birth_date_de']) ?></strong><?= $p['age'] !== null ? ' (' . (int)$p['age'] . ' J.)' : '' ?> &bull;
-                  <?php endif; ?>
-                  <?php if (!empty($p['id_doc_number'])): ?>
-                    Ausweis-Nr.: <strong><?= View::e((string)$p['id_doc_number']) ?></strong> &bull;
-                  <?php endif; ?>
-                  <?php if (!empty($p['city'])): ?>
-                    Ort: <?= View::e((string)$p['city']) ?>
-                  <?php endif; ?>
-                </div>
-
-                <?php if ($hasDocs): ?>
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-                  <?php if (!empty($p['face_ref_url'])): ?>
-                  <a href="<?= View::e((string)$p['face_ref_url']) ?>" target="_blank" rel="noopener"
-                     class="text-decoration-none border rounded p-1 bg-body text-center">
-                    <img src="<?= View::e((string)$p['face_ref_url']) ?>" alt="KI-Selfie"
-                         style="width: 72px; height: 52px; object-fit: cover; display: block;" class="rounded">
-                    <span class="d-block text-muted" style="font-size: 0.68rem;">1. KI-Selfie</span>
-                  </a>
-                  <?php endif; ?>
-
-                  <?php if (!empty($p['id_shot_url'])): ?>
-                  <a href="<?= View::e((string)$p['id_shot_url']) ?>" target="_blank" rel="noopener"
-                     class="text-decoration-none border rounded p-1 bg-body text-center">
-                    <img src="<?= View::e((string)$p['id_shot_url']) ?>" alt="ID-Shot"
-                         style="width: 72px; height: 52px; object-fit: cover; display: block;" class="rounded">
-                    <span class="d-block text-muted" style="font-size: 0.68rem;">2. ID-Shot</span>
-                  </a>
-                  <?php endif; ?>
-
-                  <?php if (!empty($p['id_front_url'])): ?>
-                  <a href="<?= View::e((string)$p['id_front_url']) ?>" target="_blank" rel="noopener"
-                     class="text-decoration-none border rounded p-1 bg-body text-center">
-                    <img src="<?= View::e((string)$p['id_front_url']) ?>" alt="Ausweis"
-                         style="width: 72px; height: 52px; object-fit: cover; display: block;" class="rounded">
-                    <span class="d-block text-muted" style="font-size: 0.68rem;">3. Ausweis</span>
-                  </a>
-                  <?php endif; ?>
-
-                  <?php if ($isReady && !empty($p['certificate_url'])): ?>
-                  <a href="<?= View::e((string)$p['certificate_url']) ?>" target="_blank" rel="noopener"
-                     class="btn btn-sm btn-outline-kkc">
-                    <i class="bi bi-file-earmark-pdf-fill text-danger me-1"></i> Unterschriebene Freigabe / PDF
-                  </a>
-                  <?php endif; ?>
-                </div>
-
-                <div class="d-flex flex-wrap align-items-center gap-2 pt-2 border-top" style="border-color: var(--kkc-border) !important;">
-                  <button type="button" class="btn btn-sm btn-success py-1 px-2"
-                          onclick="App.reviewAlbumCoActor(<?= $albumDbId ?>, <?= $merchantId ?>, <?= $pId ?>, 'verify')">
-                    <i class="bi bi-check-lg me-1"></i> ID-Shot &amp; Person bestätigen
-                  </button>
-                  <button type="button" class="btn btn-sm btn-outline-danger py-1 px-2"
-                          onclick="App.reviewAlbumCoActor(<?= $albumDbId ?>, <?= $merchantId ?>, <?= $pId ?>, 'reject')">
-                    <i class="bi bi-x-lg me-1"></i> ID-Shot ablehnen
-                  </button>
-                </div>
-                <?php else: ?>
-                <div class="alert alert-secondary py-2 px-3 mb-0 small d-flex align-items-center gap-2">
-                  <i class="bi bi-info-circle-fill ec-text-primary flex-shrink-0"></i>
-                  <span><strong>Noch kein ID-Shot hochgeladen:</strong> Übergangsphase aktiv – du kannst das Fotoalbum unten trotzdem ganz normal prüfen und veröffentlichen.</span>
-                </div>
-                <?php endif; ?>
-              </div>
-              <?php endforeach; ?>
-            </div>
-          <?php endif; ?>
-        </div>
-      </div>
 
       <!-- 3. Alle Einzelfotos im Album prüfen & ggf. einzelne Fotos ablehnen -->
       <div class="card-kkc mb-4">

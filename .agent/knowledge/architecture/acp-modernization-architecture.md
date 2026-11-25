@@ -109,12 +109,15 @@ acp/acp_neu/ (später: acp/)
 
 ## 4. 🎬 Module „Filme prüfen“ & „Fotoalben prüfen“
 
+* **Side-by-Side Sichtungs-Bühne & Gesichtsabgleich (`App\Modules\Shared\views\co_actors_panel.php`):**
+  * Alle Film- und Fotoalbum-Detailseiten (`MoviesChecking`, `MoviesOnline` Edit/Draft, `PhotoAlbumsChecking`, `PhotoAlbumsOnline` Edit) platzieren den Video-Player bzw. die FSK16/FSK18-Coverbilder links (`col-xl-7`) direkt neben dem höhengekoppelten Mitwirkenden- & Gesichtsabgleich-Panel rechts (`col-xl-5`, `.ec-review-stage` / `.ec-stage-side-match`).
+  * Bei bereits freigegebenen Personen (`verified`) verschwinden die offenen Prüf-Buttons zugunsten großer, klickbarer Frontal-Selfies (`face_ref_url`) für den sofortigen Gesichtsabgleich; Nachweise und Widerruf-Aktionen liegen eingeklappt im Detail-Drawer. Nach jeder AJAX-Prüfaktion wird das Panel über `panel_html` sofort live neu gerendert.
 * **`App\Modules\MoviesChecking` (`#/movies-checking` & `#/movie-checking?id=...`):**
   * Prüf-Warteschlange inkl. KPI-Kacheln, Echtzeit-Filterung (BRAM-Status, 18+ ID-Check, Hauptkategorie), FSK16/FSK18-Vorschau und automatischer BRAM-Erstberechnung.
-  * 3-Tab-Prüfcockpit mit HTML5-Videoplayer (inkl. WebVTT-Untertiteln, Schnell-Spul- & Speed-Steuerung), `getID3`-Metadaten-Modal, 1-Klick-Prüfung für mitwirkende Personen (`CoActorManager`), FSK16/FSK18-Szenenbild-Wähler (`1..12`), Live-Streamingpreis-Rechner, SEO-Generator, Kategorie-Suche mit Texterkennungs-Hervorhebung, Freigabe (`POST ?route=movies-checking/approve` inkl. `movies_online`-Sync & `PointsSystem`) und Ablehnung (`POST ?route=movies-checking/reject` inkl. Historie).
+  * 3-Tab-Prüfcockpit mit Side-by-Side Sichtungs-Bühne (HTML5-Videoplayer inkl. WebVTT-Untertiteln, Schnell-Spul- & Speed-Steuerung links neben dem 18+ Gesichtsabgleich rechts), `getID3`-Metadaten-Modal, 1-Klick-Prüfung für mitwirkende Personen (`CoActorManager`), FSK16/FSK18-Szenenbild-Wähler (`1..12`), Live-Streamingpreis-Rechner, SEO-Generator, Kategorie-Suche (volle Breite) mit Texterkennungs-Hervorhebung, Freigabe (`POST ?route=movies-checking/approve` inkl. `movies_online`-Sync & `PointsSystem`) und Ablehnung (`POST ?route=movies-checking/reject` inkl. Historie).
 * **`App\Modules\PhotoAlbumsChecking` (`#/photo-albums-checking` & `#/photo-album-checking?id=...`):**
   * Fotoalben-Warteschlange mit KPI-Kacheln, Echtzeit-Filterung, FSK16/FSK18-Cover-Lightbox, BRAM-Textanalyse und 18+ ID-Shot-Status.
-  * Einzelprüfung mit FSK16/FSK18-Cover-Großansicht, 1-Klick-Verifizierung für mitwirkende Personen (`CoActorManager`), interaktivem Einzelfoto-Grid (inkl. 1-Klick-Ablehnung einzelner Fotos per AJAX `photo-albums-checking/toggle-photo` & durchblätterbarer Galerie-Lightbox), Duplikat-Titel-Erkennung, Kategorie-Hervorhebung (aus Text & Darsteller-Profil), Freigabe (`photo-albums-checking/approve` inkl. `photo_albums_online`-Sync & `PointsSystem`) und Ablehnung (`photo-albums-checking/reject` inkl. Historie).
+  * Einzelprüfung mit Side-by-Side Sichtungs-Bühne (FSK16/FSK18-Cover-Großansicht links neben 18+ Gesichtsabgleich rechts), 1-Klick-Verifizierung für mitwirkende Personen (`CoActorManager`), interaktivem Einzelfoto-Grid (inkl. 1-Klick-Ablehnung einzelner Fotos per AJAX `photo-albums-checking/toggle-photo` & durchblätterbarer Galerie-Lightbox), Duplikat-Titel-Erkennung, Kategorie-Hervorhebung (aus Text & Darsteller-Profil), Freigabe (`photo-albums-checking/approve` inkl. `photo_albums_online`-Sync & `PointsSystem`) und Ablehnung (`photo-albums-checking/reject` inkl. Historie).
 
 ---
 

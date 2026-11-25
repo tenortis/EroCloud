@@ -262,6 +262,97 @@ foreach ($rejectionReasons as $rrCheck) {
       <?php endif; ?>
     <?php endif; ?>
 
+    <!-- ======================================================================
+         SICHTUNGS-BÜHNE (LINKS: VIDEOPLAYER | RECHTS: MITWIRKENDE & GESICHTSABGLEICH)
+         ====================================================================== -->
+    <div class="row g-4 mb-4 ec-review-stage">
+      <div class="col-xl-7">
+        <!-- 1. Video-Player & Schnellsteuerung -->
+        <div class="card-kkc h-100 mb-0">
+          <div class="card-kkc-header">
+            <div class="card-title">
+              <i class="bi bi-play-circle-fill ec-text-primary"></i>
+              <span>Video-Vorschau &amp; Sichtung</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge-kkc badge-kkc-neutral font-monospace"><?= View::e((string)$movie['resolution']) ?></span>
+              <span class="badge-kkc badge-kkc-neutral font-monospace"><?= View::e((string)$movie['playtime_formatted']) ?></span>
+              <button type="button" class="btn btn-sm btn-outline-kkc py-0 px-2" onclick="App.openMovieFileMetaModal(<?= $movieId ?>)">
+                <i class="bi bi-code-square me-1"></i> getID3 Infos
+              </button>
+            </div>
+          </div>
+          <div class="card-kkc-body p-3">
+            <div class="rounded overflow-hidden bg-black mb-2 position-relative ec-stage-video-wrap">
+              <video id="mc-video-player" class="w-100 d-block" controls preload="metadata"
+                     poster="media.php?type=poster&amp;file_id=<?= View::e($fileId) ?>&amp;fsk=18">
+                <source src="media.php?type=video&amp;file_id=<?= View::e($fileId) ?>" type="video/mp4">
+                <?php if (!empty($aiData['has_vtt'])): ?>
+                <track label="Transkript (<?= View::e($detLang ?: 'DE') ?>)" kind="subtitles"
+                       srclang="<?= View::e(strtolower($detLang ?: 'de')) ?>"
+                       src="media.php?type=vtt&amp;movie_id=<?= $movieId ?>" default>
+                <?php endif; ?>
+                Dein Browser unterstützt kein HTML5-Video.
+              </video>
+            </div>
+
+            <!-- Schnell-Steuerung für effizientes Prüfen (Spulen & Geschwindigkeit) -->
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-1">
+              <div class="btn-group btn-group-sm" role="group" aria-label="Zeitsprung">
+                <button type="button" class="btn btn-outline-kkc" onclick="App.skipMoviePlayer(-10)" title="10 Sekunden zurück">
+                  <i class="bi bi-skip-backward"></i> -10s
+                </button>
+                <button type="button" class="btn btn-outline-kkc" onclick="App.skipMoviePlayer(10)" title="10 Sekunden vor">
+                  +10s <i class="bi bi-skip-forward"></i>
+                </button>
+                <button type="button" class="btn btn-outline-kkc" onclick="App.skipMoviePlayer(30)" title="30 Sekunden vor">
+                  +30s
+                </button>
+                <button type="button" class="btn btn-outline-kkc" onclick="App.skipMoviePlayer(60)" title="60 Sekunden vor">
+                  +60s
+                </button>
+              </div>
+
+              <div class="d-flex align-items-center gap-1">
+                <span class="small text-muted me-1">Speed:</span>
+                <div class="btn-group btn-group-sm" role="group" aria-label="Abspielgeschwindigkeit">
+                  <button type="button" class="btn btn-outline-kkc mc-speed-btn active" onclick="App.setMoviePlayerSpeed(1, this)">1x</button>
+                  <button type="button" class="btn btn-outline-kkc mc-speed-btn" onclick="App.setMoviePlayerSpeed(1.5, this)">1.5x</button>
+                  <button type="button" class="btn btn-outline-kkc mc-speed-btn" onclick="App.setMoviePlayerSpeed(2, this)">2x</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Kompakte Datei- & Merchant-Infos -->
+            <div class="row g-2 mt-2 pt-2 border-top small text-muted" style="border-color: var(--kkc-border) !important;">
+              <div class="col-sm-6">
+                <div><strong>Merchant:</strong> <a href="#/merchant?id=<?= $merchantId ?>" class="ec-text-primary text-decoration-none"><?= View::e((string)$movie['merchant_username']) ?> (MID #<?= $merchantId ?>)</a></div>
+                <div><strong>Dateiname:</strong> <span class="font-monospace"><?= View::e((string)$movie['filename']) ?></span></div>
+              </div>
+              <div class="col-sm-6">
+                <div><strong>Storage:</strong> <span class="font-monospace"><?= View::e((string)$movie['storage_location']) ?></span></div>
+                <div><strong>Eingereicht:</strong> <?= View::e((string)$movie['create_datetime']) ?></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-5 position-relative">
+        <!-- 2. Mitwirkende Personen & Gesichtsabgleich / 18+ ID-Shot-Prüfung -->
+        <?= View::render('Shared', 'co_actors_panel', [
+            'performersData'   => $performersData,
+            'contentType'      => 'movie',
+            'contentId'        => $movieId,
+            'merchantId'       => $merchantId,
+            'panelId'          => 'mc-performers-card',
+            'readOnly'         => false,
+            'matchStageHeight' => true,
+            'pendingDocsHint'  => 'Noch kein ID-Shot hochgeladen: Übergangsphase aktiv – du kannst den Film unten trotzdem ganz normal prüfen und veröffentlichen.',
+        ]) ?>
+      </div>
+    </div>
+
     <form id="mc-approve-form" onsubmit="App.submitMovieApprove(event)">
       <input type="hidden" name="movie_id" value="<?= $movieId ?>">
       <input type="hidden" name="fsk16" id="mc-input-fsk16" value="<?= (int)$movie['preview_image_fsk16'] ?>">
@@ -269,216 +360,9 @@ foreach ($rejectionReasons as $rrCheck) {
 
       <div class="row g-4">
         <!-- ==================================================================
-             LINKE SPALTE: VIDEOPLAYER, TECHNIK, 18+ MITWIRKENDE & VORSCHAUBILDER
+             LINKE SPALTE: SZENEN-VORSCHAUBILDER (FSK16 & FSK18)
              ================================================================== -->
         <div class="col-xl-6">
-
-          <!-- 1. Video-Player & Schnellsteuerung -->
-          <div class="card-kkc mb-4">
-            <div class="card-kkc-header">
-              <div class="card-title">
-                <i class="bi bi-play-circle-fill ec-text-primary"></i>
-                <span>Video-Vorschau &amp; Sichtung</span>
-              </div>
-              <div class="d-flex align-items-center gap-2">
-                <span class="badge-kkc badge-kkc-neutral font-monospace"><?= View::e((string)$movie['resolution']) ?></span>
-                <span class="badge-kkc badge-kkc-neutral font-monospace"><?= View::e((string)$movie['playtime_formatted']) ?></span>
-                <button type="button" class="btn btn-sm btn-outline-kkc py-0 px-2" onclick="App.openMovieFileMetaModal(<?= $movieId ?>)">
-                  <i class="bi bi-code-square me-1"></i> getID3 Infos
-                </button>
-              </div>
-            </div>
-            <div class="card-kkc-body p-3">
-              <div class="rounded overflow-hidden bg-black mb-2 position-relative">
-                <video id="mc-video-player" class="w-100 d-block" style="max-height: 400px;" controls preload="metadata"
-                       poster="media.php?type=poster&amp;file_id=<?= View::e($fileId) ?>&amp;fsk=18">
-                  <source src="media.php?type=video&amp;file_id=<?= View::e($fileId) ?>" type="video/mp4">
-                  <?php if (!empty($aiData['has_vtt'])): ?>
-                  <track label="Transkript (<?= View::e($detLang ?: 'DE') ?>)" kind="subtitles"
-                         srclang="<?= View::e(strtolower($detLang ?: 'de')) ?>"
-                         src="media.php?type=vtt&amp;movie_id=<?= $movieId ?>" default>
-                  <?php endif; ?>
-                  Dein Browser unterstützt kein HTML5-Video.
-                </video>
-              </div>
-
-              <!-- Schnell-Steuerung für effizientes Prüfen (Spulen & Geschwindigkeit) -->
-              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-1">
-                <div class="btn-group btn-group-sm" role="group" aria-label="Zeitsprung">
-                  <button type="button" class="btn btn-outline-kkc" onclick="App.skipMoviePlayer(-10)" title="10 Sekunden zurück">
-                    <i class="bi bi-skip-backward"></i> -10s
-                  </button>
-                  <button type="button" class="btn btn-outline-kkc" onclick="App.skipMoviePlayer(10)" title="10 Sekunden vor">
-                    +10s <i class="bi bi-skip-forward"></i>
-                  </button>
-                  <button type="button" class="btn btn-outline-kkc" onclick="App.skipMoviePlayer(30)" title="30 Sekunden vor">
-                    +30s
-                  </button>
-                  <button type="button" class="btn btn-outline-kkc" onclick="App.skipMoviePlayer(60)" title="60 Sekunden vor">
-                    +60s
-                  </button>
-                </div>
-
-                <div class="d-flex align-items-center gap-1">
-                  <span class="small text-muted me-1">Speed:</span>
-                  <div class="btn-group btn-group-sm" role="group" aria-label="Abspielgeschwindigkeit">
-                    <button type="button" class="btn btn-outline-kkc mc-speed-btn active" onclick="App.setMoviePlayerSpeed(1, this)">1x</button>
-                    <button type="button" class="btn btn-outline-kkc mc-speed-btn" onclick="App.setMoviePlayerSpeed(1.5, this)">1.5x</button>
-                    <button type="button" class="btn btn-outline-kkc mc-speed-btn" onclick="App.setMoviePlayerSpeed(2, this)">2x</button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Kompakte Datei- & Merchant-Infos -->
-              <div class="row g-2 mt-2 pt-2 border-top small text-muted" style="border-color: var(--kkc-border) !important;">
-                <div class="col-sm-6">
-                  <div><strong>Merchant:</strong> <a href="#/merchant?id=<?= $merchantId ?>" class="ec-text-primary text-decoration-none"><?= View::e((string)$movie['merchant_username']) ?> (MID #<?= $merchantId ?>)</a></div>
-                  <div><strong>Dateiname:</strong> <span class="font-monospace"><?= View::e((string)$movie['filename']) ?></span></div>
-                </div>
-                <div class="col-sm-6">
-                  <div><strong>Storage:</strong> <span class="font-monospace"><?= View::e((string)$movie['storage_location']) ?></span></div>
-                  <div><strong>Eingereicht:</strong> <?= View::e((string)$movie['create_datetime']) ?></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 2. Mitwirkende Personen & 18+ ID-Shot-Prüfung (CoActorManager) -->
-          <?php
-            $perfMode    = (string)($performersData['performer_mode'] ?? 'solo_owner');
-            $perfPersons = is_array($performersData['persons'] ?? null) ? $performersData['persons'] : [];
-          ?>
-          <div class="card-kkc mb-4" id="mc-performers-card">
-            <div class="card-kkc-header flex-wrap gap-2">
-              <div class="card-title">
-                <i class="bi bi-person-badge-fill ec-text-primary"></i>
-                <span>Mitwirkende Personen &amp; ID-Shot-Prüfung (18+ / Model Release)</span>
-              </div>
-              <?php if ($perfMode === 'solo_owner'): ?>
-                <span class="badge-kkc badge-kkc-info">
-                  Solo: Nur Account-Inhaber (<?= View::e((string)$performersData['merchant_full_name']) ?>)
-                </span>
-              <?php else: ?>
-                <span class="badge-kkc badge-kkc-warning">
-                  Mehrere Personen (<?= count($perfPersons) ?> gemeldet)
-                </span>
-              <?php endif; ?>
-            </div>
-            <div class="card-kkc-body">
-              <?php if (empty($perfPersons)): ?>
-                <div class="alert alert-danger mb-0 py-2 small">
-                  <i class="bi bi-exclamation-triangle-fill me-1"></i> Keine mitwirkenden Personen für diesen Film hinterlegt.
-                </div>
-              <?php else: ?>
-                <div class="d-flex flex-column gap-3">
-                  <?php foreach ($perfPersons as $p):
-                      $pId       = (int)$p['id'];
-                      $isOwner   = !empty($p['is_owner']);
-                      $pStatus   = (string)($p['checked_status'] ?? 'pending_qr');
-                      $isReady   = !empty($p['is_ready_for_use']);
-                      $hasDocs   = !empty($p['has_uploaded_docs']) || !empty($p['has_id_shot']) || !empty($p['face_ref_url']) || !empty($p['id_front_url']);
-                      $isAiReady = !empty($p['ai_face_ready']);
-
-                      $pBadgeCls = 'badge-kkc-warning';
-                      if ($pStatus === 'verified') {
-                          $pBadgeCls = 'badge-kkc-success';
-                      } elseif ($pStatus === 'rejected') {
-                          $pBadgeCls = 'badge-kkc-danger';
-                      } elseif ($pStatus === 'under_review') {
-                          $pBadgeCls = 'badge-kkc-info';
-                      }
-                  ?>
-                  <div class="p-3 rounded border" style="background: var(--kkc-surface-hover); border-color: var(--kkc-border) !important;" id="mc-coactor-box-<?= $pId ?>">
-                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                      <div class="d-flex flex-wrap align-items-center gap-2">
-                        <span class="badge <?= $isOwner ? 'bg-primary' : 'bg-secondary' ?>">
-                          <?= $isOwner ? 'ICH (ACCOUNT-INHABER)' : 'DREHPARTNER' ?>
-                        </span>
-                        <strong class="text-body"><?= View::e((string)($p['display_label'] ?? '')) ?></strong>
-                        <?php if ($isAiReady): ?>
-                          <span class="badge-kkc badge-kkc-info"><i class="bi bi-qr-code-scan me-1"></i>Live-QR (KI-Ready)</span>
-                        <?php elseif (($p['verification_method'] ?? '') === 'manual_legacy'): ?>
-                          <span class="badge-kkc badge-kkc-neutral"><i class="bi bi-folder2-open me-1"></i>Alt-Dokumente</span>
-                        <?php endif; ?>
-                      </div>
-                      <span class="badge-kkc <?= $pBadgeCls ?>" id="mc-coactor-status-<?= $pId ?>">
-                        <?= View::e((string)($p['status_label'] ?? $pStatus)) ?>
-                      </span>
-                    </div>
-
-                    <div class="small text-muted mb-2">
-                      <?php if (!empty($p['birth_date_de'])): ?>
-                        Geb.: <strong><?= View::e((string)$p['birth_date_de']) ?></strong><?= $p['age'] !== null ? ' (' . (int)$p['age'] . ' J.)' : '' ?> &bull;
-                      <?php endif; ?>
-                      <?php if (!empty($p['id_doc_number'])): ?>
-                        Ausweis-Nr.: <strong><?= View::e((string)$p['id_doc_number']) ?></strong> &bull;
-                      <?php endif; ?>
-                      <?php if (!empty($p['city'])): ?>
-                        Ort: <?= View::e((string)$p['city']) ?>
-                      <?php endif; ?>
-                    </div>
-
-                    <?php if ($hasDocs): ?>
-                    <!-- Dokument-Vorschaubilder & PDF-Zertifikat -->
-                    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-                      <?php if (!empty($p['face_ref_url'])): ?>
-                      <a href="<?= View::e((string)$p['face_ref_url']) ?>" target="_blank" rel="noopener"
-                         class="text-decoration-none border rounded p-1 bg-body text-center">
-                        <img src="<?= View::e((string)$p['face_ref_url']) ?>" alt="KI-Selfie"
-                             style="width: 72px; height: 52px; object-fit: cover; display: block;" class="rounded">
-                        <span class="d-block text-muted" style="font-size: 0.68rem;">1. KI-Selfie</span>
-                      </a>
-                      <?php endif; ?>
-
-                      <?php if (!empty($p['id_shot_url'])): ?>
-                      <a href="<?= View::e((string)$p['id_shot_url']) ?>" target="_blank" rel="noopener"
-                         class="text-decoration-none border rounded p-1 bg-body text-center">
-                        <img src="<?= View::e((string)$p['id_shot_url']) ?>" alt="ID-Shot"
-                             style="width: 72px; height: 52px; object-fit: cover; display: block;" class="rounded">
-                        <span class="d-block text-muted" style="font-size: 0.68rem;">2. ID-Shot</span>
-                      </a>
-                      <?php endif; ?>
-
-                      <?php if (!empty($p['id_front_url'])): ?>
-                      <a href="<?= View::e((string)$p['id_front_url']) ?>" target="_blank" rel="noopener"
-                         class="text-decoration-none border rounded p-1 bg-body text-center">
-                        <img src="<?= View::e((string)$p['id_front_url']) ?>" alt="Ausweis"
-                             style="width: 72px; height: 52px; object-fit: cover; display: block;" class="rounded">
-                        <span class="d-block text-muted" style="font-size: 0.68rem;">3. Ausweis</span>
-                      </a>
-                      <?php endif; ?>
-
-                      <?php if ($isReady && !empty($p['certificate_url'])): ?>
-                      <a href="<?= View::e((string)$p['certificate_url']) ?>" target="_blank" rel="noopener"
-                         class="btn btn-sm btn-outline-kkc">
-                        <i class="bi bi-file-earmark-pdf-fill text-danger me-1"></i> Unterschriebene Freigabe / PDF
-                      </a>
-                      <?php endif; ?>
-                    </div>
-
-                    <!-- 1-Klick Admin-Prüfbuttons per AJAX (nur wenn Dokumente vorliegen) -->
-                    <div class="d-flex flex-wrap align-items-center gap-2 pt-2 border-top" style="border-color: var(--kkc-border) !important;">
-                      <button type="button" class="btn btn-sm btn-success py-1 px-2"
-                              onclick="App.reviewMovieCoActor(<?= $movieId ?>, <?= $merchantId ?>, <?= $pId ?>, 'verify')">
-                        <i class="bi bi-check-lg me-1"></i> ID-Shot &amp; Person bestätigen
-                      </button>
-                      <button type="button" class="btn btn-sm btn-outline-danger py-1 px-2"
-                              onclick="App.reviewMovieCoActor(<?= $movieId ?>, <?= $merchantId ?>, <?= $pId ?>, 'reject')">
-                        <i class="bi bi-x-lg me-1"></i> ID-Shot ablehnen
-                      </button>
-                    </div>
-                    <?php else: ?>
-                    <div class="alert alert-secondary py-2 px-3 mb-0 small d-flex align-items-center gap-2">
-                      <i class="bi bi-info-circle-fill ec-text-primary flex-shrink-0"></i>
-                      <span><strong>Noch kein ID-Shot hochgeladen:</strong> Übergangsphase aktiv – du kannst den Film unten trotzdem ganz normal prüfen und veröffentlichen.</span>
-                    </div>
-                    <?php endif; ?>
-                  </div>
-                  <?php endforeach; ?>
-                </div>
-              <?php endif; ?>
-            </div>
-          </div>
 
           <!-- 3. Szenen-Vorschaubilder (FSK16 & FSK18 Auswahl 1..12) -->
           <div class="card-kkc mb-4">
@@ -825,104 +709,104 @@ foreach ($rejectionReasons as $rrCheck) {
             </div>
           </div>
 
-          <!-- 2. Kategorisierung (Hauptkategorie & Unterkategorien) -->
-          <div class="card-kkc mb-4">
-            <div class="card-kkc-header flex-wrap gap-2">
-              <div class="card-title">
-                <i class="bi bi-tags-fill ec-text-primary"></i>
-                <span>Kategorisierung &amp; Freigabe</span>
-              </div>
-              <span class="badge-kkc badge-kkc-info" id="mc-selected-cats-badge">
-                <?= count($movie['selected_slaves']) ?> Unterkategorien gewählt
-              </span>
-            </div>
-            <div class="card-kkc-body">
+        </div>
+      </div>
 
-              <!-- Hauptkategorie (Porno vs. Fetisch) -->
-              <div class="mb-3 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
-                <label class="form-label small fw-bold d-block mb-2">Hauptkategorie *</label>
-                <div class="d-flex gap-3">
-                  <label class="d-flex align-items-center gap-2 px-3 py-2 rounded border cursor-pointer" style="background: var(--kkc-surface-hover); cursor: pointer;">
-                    <input type="radio" name="category_master" value="porn" class="form-check-input mt-0"
-                           <?= $movie['category_master'] === 'porn' ? 'checked' : '' ?>>
-                    <span class="fw-bold">Porno</span>
-                  </label>
-                  <label class="d-flex align-items-center gap-2 px-3 py-2 rounded border cursor-pointer" style="background: var(--kkc-surface-hover); cursor: pointer;">
-                    <input type="radio" name="category_master" value="fetish" class="form-check-input mt-0"
-                           <?= $movie['category_master'] === 'fetish' ? 'checked' : '' ?>>
-                    <span class="fw-bold">Fetisch</span>
-                  </label>
-                </div>
-              </div>
+      <!-- 2. Kategorisierung & Freigabe (Volle Breite) -->
+      <div class="card-kkc mb-4">
+        <div class="card-kkc-header flex-wrap gap-2">
+          <div class="card-title">
+            <i class="bi bi-tags-fill ec-text-primary"></i>
+            <span>Kategorisierung &amp; Freigabe</span>
+          </div>
+          <span class="badge-kkc badge-kkc-info" id="mc-selected-cats-badge">
+            <?= count($movie['selected_slaves']) ?> Unterkategorien gewählt
+          </span>
+        </div>
+        <div class="card-kkc-body">
 
-              <!-- Schnellsuche für Unterkategorien -->
-              <div class="mb-3">
-                <div class="input-group input-group-sm">
-                  <span class="input-group-text bg-transparent"><i class="bi bi-search text-muted"></i></span>
-                  <input type="search" id="mc-cat-search-input" class="form-control"
-                         placeholder="Unterkategorie schnell suchen (z.B. Amateur, Blowjob, Outdoor...)"
-                         oninput="App.filterMovieCategories(this.value)">
-                </div>
-              </div>
-
-              <!-- Gruppierte Unterkategorien -->
-              <div class="d-flex flex-column gap-3" style="max-height: 440px; overflow-y: auto; padding-right: 4px;">
-                <?php foreach ($categoryGroupLabels as $cType => $grpMeta):
-                    $catItems = $categoriesByType[$cType] ?? [];
-                    if (empty($catItems)) {
-                        continue;
-                    }
-                ?>
-                <div class="mc-cat-group">
-                  <div class="small fw-bold text-uppercase text-muted mb-2 d-flex align-items-center gap-1">
-                    <i class="bi <?= $grpMeta['icon'] ?> ec-text-primary"></i>
-                    <span><?= View::e($grpMeta['label']) ?></span>
-                  </div>
-                  <div class="row g-1">
-                    <?php foreach ($catItems as $cat):
-                        $idName = (string)$cat['id_name'];
-                        $deName = (string)$cat['de'];
-                        $isSel  = !empty($cat['selected']);
-                        $inTxt  = !empty($cat['in_text']);
-                    ?>
-                    <div class="col-sm-6 col-md-4 mc-cat-item" data-cat-label="<?= View::e(strtolower($deName . ' ' . $idName)) ?>">
-                      <label class="d-flex align-items-center gap-2 p-1.5 rounded border small w-100 <?= $isSel ? 'border-primary bg-primary bg-opacity-10 fw-semibold' : ($inTxt ? 'border-warning bg-warning bg-opacity-10' : '') ?>"
-                             style="cursor: pointer; padding: 5px 8px;">
-                        <input type="checkbox" name="categories[]" value="<?= View::e($idName) ?>"
-                               class="form-check-input mt-0 mc-cat-checkbox"
-                               <?= $isSel ? 'checked' : '' ?>
-                               onchange="App.onMovieCategoryChange(this)">
-                        <span class="text-truncate" title="<?= View::e($deName) ?>"><?= View::e($deName) ?></span>
-                        <?php if ($inTxt && !$isSel): ?>
-                        <span class="ms-auto badge bg-warning text-dark" style="font-size: 0.6rem;" title="Begriff kommt im Titel oder Beschreibungstext vor">Text</span>
-                        <?php endif; ?>
-                      </label>
-                    </div>
-                    <?php endforeach; ?>
-                  </div>
-                </div>
-                <?php endforeach; ?>
-              </div>
-
-              <!-- HAUPT-SPEICHER- & FREIGABE-BUTTON -->
-              <div class="mt-4 pt-3 border-top d-flex flex-wrap align-items-center justify-content-between gap-2" style="border-color: var(--kkc-border) !important;">
-                <div class="form-check mb-0">
-                  <input class="form-check-input" type="checkbox" id="mc-auto-next-check" checked>
-                  <label class="form-check-label small text-muted" for="mc-auto-next-check">
-                    Nach Freigabe direkt nächsten offenen Film öffnen
-                  </label>
-                </div>
-                <button type="submit" id="mc-submit-approve-btn" class="btn btn-kkc px-4 py-2 fw-bold"
-                        <?= ($isOnlineAtTooFar && $movie['status'] === 'active') ? 'disabled' : '' ?>>
-                  <i class="bi bi-check2-circle me-1"></i> Film speichern &amp; freigeben
-                </button>
-                <div class="small text-danger fw-semibold mt-2 w-100 text-end <?= ($isOnlineAtTooFar && $movie['status'] === 'active') ? '' : 'd-none' ?>" id="mc-approve-blocked-hint">
-                  <i class="bi bi-lock-fill me-1"></i>Freigabe blockiert: Datum liegt &gt; 12 Monate in der Zukunft.
-                </div>
-              </div>
+          <!-- Hauptkategorie (Porno vs. Fetisch) -->
+          <div class="mb-3 pb-3 border-bottom" style="border-color: var(--kkc-border) !important;">
+            <label class="form-label small fw-bold d-block mb-2">Hauptkategorie *</label>
+            <div class="d-flex gap-3">
+              <label class="d-flex align-items-center gap-2 px-3 py-2 rounded border cursor-pointer" style="background: var(--kkc-surface-hover); cursor: pointer;">
+                <input type="radio" name="category_master" value="porn" class="form-check-input mt-0"
+                       <?= $movie['category_master'] === 'porn' ? 'checked' : '' ?>>
+                <span class="fw-bold">Porno</span>
+              </label>
+              <label class="d-flex align-items-center gap-2 px-3 py-2 rounded border cursor-pointer" style="background: var(--kkc-surface-hover); cursor: pointer;">
+                <input type="radio" name="category_master" value="fetish" class="form-check-input mt-0"
+                       <?= $movie['category_master'] === 'fetish' ? 'checked' : '' ?>>
+                <span class="fw-bold">Fetisch</span>
+              </label>
             </div>
           </div>
 
+          <!-- Schnellsuche für Unterkategorien -->
+          <div class="mb-3">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text bg-transparent"><i class="bi bi-search text-muted"></i></span>
+              <input type="search" id="mc-cat-search-input" class="form-control"
+                     placeholder="Unterkategorie schnell suchen (z.B. Amateur, Blowjob, Outdoor...)"
+                     oninput="App.filterMovieCategories(this.value)">
+            </div>
+          </div>
+
+          <!-- Gruppierte Unterkategorien -->
+          <div class="d-flex flex-column gap-3" style="max-height: 440px; overflow-y: auto; padding-right: 4px;">
+            <?php foreach ($categoryGroupLabels as $cType => $grpMeta):
+                $catItems = $categoriesByType[$cType] ?? [];
+                if (empty($catItems)) {
+                    continue;
+                }
+            ?>
+            <div class="mc-cat-group">
+              <div class="small fw-bold text-uppercase text-muted mb-2 d-flex align-items-center gap-1">
+                <i class="bi <?= $grpMeta['icon'] ?> ec-text-primary"></i>
+                <span><?= View::e($grpMeta['label']) ?></span>
+              </div>
+              <div class="row g-1">
+                <?php foreach ($catItems as $cat):
+                    $idName = (string)$cat['id_name'];
+                    $deName = (string)$cat['de'];
+                    $isSel  = !empty($cat['selected']);
+                    $inTxt  = !empty($cat['in_text']);
+                ?>
+                <div class="col-sm-6 col-md-4 col-lg-3 col-xl-2 mc-cat-item" data-cat-label="<?= View::e(strtolower($deName . ' ' . $idName)) ?>">
+                  <label class="d-flex align-items-center gap-2 p-1.5 rounded border small w-100 <?= $isSel ? 'border-primary bg-primary bg-opacity-10 fw-semibold' : ($inTxt ? 'border-warning bg-warning bg-opacity-10' : '') ?>"
+                         style="cursor: pointer; padding: 5px 8px;">
+                    <input type="checkbox" name="categories[]" value="<?= View::e($idName) ?>"
+                           class="form-check-input mt-0 mc-cat-checkbox"
+                           <?= $isSel ? 'checked' : '' ?>
+                           onchange="App.onMovieCategoryChange(this)">
+                    <span class="text-truncate" title="<?= View::e($deName) ?>"><?= View::e($deName) ?></span>
+                    <?php if ($inTxt && !$isSel): ?>
+                    <span class="ms-auto badge bg-warning text-dark" style="font-size: 0.6rem;" title="Begriff kommt im Titel oder Beschreibungstext vor">Text</span>
+                    <?php endif; ?>
+                  </label>
+                </div>
+                <?php endforeach; ?>
+              </div>
+            </div>
+            <?php endforeach; ?>
+          </div>
+
+          <!-- HAUPT-SPEICHER- & FREIGABE-BUTTON -->
+          <div class="mt-4 pt-3 border-top d-flex flex-wrap align-items-center justify-content-between gap-2" style="border-color: var(--kkc-border) !important;">
+            <div class="form-check mb-0">
+              <input class="form-check-input" type="checkbox" id="mc-auto-next-check" checked>
+              <label class="form-check-label small text-muted" for="mc-auto-next-check">
+                Nach Freigabe direkt nächsten offenen Film öffnen
+              </label>
+            </div>
+            <button type="submit" id="mc-submit-approve-btn" class="btn btn-kkc px-4 py-2 fw-bold"
+                    <?= ($isOnlineAtTooFar && $movie['status'] === 'active') ? 'disabled' : '' ?>>
+              <i class="bi bi-check2-circle me-1"></i> Film speichern &amp; freigeben
+            </button>
+            <div class="small text-danger fw-semibold mt-2 w-100 text-end <?= ($isOnlineAtTooFar && $movie['status'] === 'active') ? '' : 'd-none' ?>" id="mc-approve-blocked-hint">
+              <i class="bi bi-lock-fill me-1"></i>Freigabe blockiert: Datum liegt &gt; 12 Monate in der Zukunft.
+            </div>
+          </div>
         </div>
       </div>
     </form>

@@ -633,10 +633,16 @@ final class PhotoAlbumsOnlineController
                     'status_label'        => self::decodeText((string)($p['status_label'] ?? '')),
                     'is_ready_for_use'    => !empty($p['is_ready_for_use']),
                     'ai_face_ready'       => !empty($p['ai_face_ready']),
+                    'verification_method' => (string)($p['verification_method'] ?? ''),
+                    'rejection_reason'    => self::decodeText((string)($p['rejection_reason'] ?? '')),
                     'face_ref_url'        => (string)($p['face_ref_url'] ?? ''),
                     'id_shot_url'         => (string)($p['id_shot_url'] ?? ''),
                     'id_front_url'        => (string)($p['id_front_url'] ?? ''),
+                    'id_back_url'         => (string)($p['id_back_url'] ?? ''),
                     'certificate_url'     => (string)($p['certificate_url'] ?? ''),
+                    'has_uploaded_docs'   => !empty($p['has_uploaded_docs']),
+                    'has_id_shot'         => !empty($p['has_id_shot']),
+                    'checked_on'          => (string)($p['checked_on'] ?? ''),
                 ];
             }
         }

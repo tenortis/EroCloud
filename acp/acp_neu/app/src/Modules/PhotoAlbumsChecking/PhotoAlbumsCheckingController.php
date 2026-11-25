@@ -1580,12 +1580,16 @@ final class PhotoAlbumsCheckingController
             return;
         }
 
-        $employeeId = abs((int)($_SESSION['employee_id'] ?? 0));
-        $albumDbId  = abs((int)$this->request->post('album_id', 0));
-        $merchantId = abs((int)$this->request->post('merchant_id', 0));
-        $coActorId  = abs((int)$this->request->post('co_actor_id', 0));
-        $decision   = trim((string)$this->request->post('decision', ''));
-        $reason     = trim((string)$this->request->post('reason', ''));
+        $employeeId       = abs((int)($_SESSION['employee_id'] ?? 0));
+        $albumDbId        = abs((int)$this->request->post('album_id', 0));
+        $merchantId       = abs((int)$this->request->post('merchant_id', 0));
+        $coActorId        = abs((int)$this->request->post('co_actor_id', 0));
+        $decision         = trim((string)$this->request->post('decision', ''));
+        $reason           = trim((string)$this->request->post('reason', ''));
+        $panelIdRaw       = trim((string)$this->request->post('panel_id', 'pac-performers-card'));
+        $panelIdClean     = preg_replace('/[^a-zA-Z0-9_-]/', '', $panelIdRaw);
+        $panelId          = ($panelIdClean !== null && $panelIdClean !== '') ? $panelIdClean : 'pac-performers-card';
+        $matchStageHeight = trim((string)$this->request->post('match_stage_height', '1')) === '1';
 
         if ($coActorId <= 0 || $merchantId <= 0 || !in_array($decision, ['verify', 'reject', 'reset_review'], true)) {
             Response::error('Ungültige Parameter für die Drehpartner-Prüfung.', 400);
@@ -1600,9 +1604,23 @@ final class PhotoAlbumsCheckingController
 
         log_action("Drehpartner / ID-Shot #{$coActorId} (MID #{$merchantId}) bei Fotoalbum-Prüfung #{$albumDbId}: {$decision}.");
 
+        $performersData = $this->loadAlbumPerformersData($albumDbId, $merchantId);
+        $panelHtml = View::render('Shared', 'co_actors_panel', [
+            'performersData'   => $performersData,
+            'contentType'      => 'album',
+            'contentId'        => $albumDbId,
+            'merchantId'       => $merchantId,
+            'panelId'          => $panelId,
+            'readOnly'         => false,
+            'matchStageHeight' => $matchStageHeight,
+            'pendingDocsHint'  => 'Noch kein ID-Shot hochgeladen: Übergangsphase aktiv – du kannst das Fotoalbum unten trotzdem ganz normal prüfen und veröffentlichen.',
+        ]);
+
         Response::json([
-            'status'  => 'ok',
-            'message' => (string)($res['message'] ?? 'Status aktualisiert.'),
+            'status'          => 'ok',
+            'message'         => (string)($res['message'] ?? 'Status aktualisiert.'),
+            'performers_data' => $performersData,
+            'panel_html'      => $panelHtml,
         ]);
     }
 

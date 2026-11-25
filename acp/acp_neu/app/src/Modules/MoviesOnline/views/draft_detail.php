@@ -199,14 +199,13 @@ $categoryGroupLabels = [
         </div>
       </div>
 
-      <div class="row g-4">
-        <!-- ================================================================
-             LINKE SPALTE: VIDEOPLAYER, 18+ MITWIRKENDE & VORSCHAUBILDER
-             ================================================================ -->
-        <div class="col-xl-6">
-
+      <!-- ====================================================================
+           SICHTUNGS-BÜHNE (LINKS: VIDEOPLAYER | RECHTS: MITWIRKENDE & GESICHTSABGLEICH)
+           ==================================================================== -->
+      <div class="row g-4 mb-4 ec-review-stage">
+        <div class="col-xl-7">
           <!-- 1. Video-Player & Schnellsteuerung -->
-          <div class="card-kkc mb-4">
+          <div class="card-kkc h-100 mb-0">
             <div class="card-kkc-header">
               <div class="card-title">
                 <i class="bi bi-play-circle-fill ec-text-primary"></i>
@@ -222,8 +221,8 @@ $categoryGroupLabels = [
             </div>
             <div class="card-kkc-body p-3">
               <?php if ($cStat === 2): ?>
-                <div class="rounded overflow-hidden bg-black mb-2 position-relative">
-                  <video id="mc-video-player" class="w-100 d-block" style="max-height: 400px;" controls preload="metadata"
+                <div class="rounded overflow-hidden bg-black mb-2 position-relative ec-stage-video-wrap">
+                  <video id="mc-video-player" class="w-100 d-block" controls preload="metadata"
                          poster="media.php?type=poster&amp;file_id=<?= View::e($fileId) ?>&amp;fsk=18">
                     <source src="media.php?type=video&amp;file_id=<?= View::e($fileId) ?>" type="video/mp4">
                     <?php if (!empty($aiData['has_vtt'])): ?>
@@ -272,98 +271,28 @@ $categoryGroupLabels = [
               </div>
             </div>
           </div>
+        </div>
 
-          <!-- 2. Mitwirkende Personen & 18+ ID-Shot-Übersicht (Nur-Lesen) -->
-          <?php
-            $perfMode    = (string)($performersData['performer_mode'] ?? 'solo_owner');
-            $perfPersons = is_array($performersData['persons'] ?? null) ? $performersData['persons'] : [];
-          ?>
-          <div class="card-kkc mb-4">
-            <div class="card-kkc-header flex-wrap gap-2">
-              <div class="card-title">
-                <i class="bi bi-person-badge-fill ec-text-primary"></i>
-                <span>Mitwirkende Personen &amp; ID-Shot-Nachweise (18+ / Model Release)</span>
-              </div>
-              <?php if ($perfMode === 'solo_owner'): ?>
-                <span class="badge-kkc badge-kkc-info">Solo: Nur Account-Inhaber (<?= View::e((string)$performersData['merchant_full_name']) ?>)</span>
-              <?php else: ?>
-                <span class="badge-kkc badge-kkc-warning">Mehrere Personen (<?= count($perfPersons) ?> gemeldet)</span>
-              <?php endif; ?>
-            </div>
-            <div class="card-kkc-body">
-              <?php if (empty($perfPersons)): ?>
-                <div class="alert alert-secondary mb-0 py-2 small">
-                  Keine zusätzlichen Drehpartner für diesen Film hinterlegt.
-                </div>
-              <?php else: ?>
-                <div class="d-flex flex-column gap-3">
-                  <?php foreach ($perfPersons as $p):
-                      $pId     = (int)$p['id'];
-                      $isOwner = !empty($p['is_owner']);
-                      $pStatus = (string)($p['checked_status'] ?? 'pending_qr');
-                      $isReady = !empty($p['is_ready_for_use']);
-                      $hasDocs = !empty($p['has_uploaded_docs']) || !empty($p['has_id_shot']) || !empty($p['face_ref_url']) || !empty($p['id_front_url']);
+        <div class="col-xl-5 position-relative">
+          <!-- 2. Mitwirkende Personen & Gesichtsabgleich (Nur-Lesen) -->
+          <?= View::render('Shared', 'co_actors_panel', [
+              'performersData'   => $performersData,
+              'contentType'      => 'movie',
+              'contentId'        => $movieId,
+              'merchantId'       => $merchantId,
+              'panelId'          => 'md-performers-card',
+              'readOnly'         => true,
+              'matchStageHeight' => true,
+              'pendingDocsHint'  => 'Noch keine ID-Shot-Dokumente hochgeladen.',
+          ]) ?>
+        </div>
+      </div>
 
-                      $pBadgeCls = 'badge-kkc-warning';
-                      if ($pStatus === 'verified') {
-                          $pBadgeCls = 'badge-kkc-success';
-                      } elseif ($pStatus === 'rejected') {
-                          $pBadgeCls = 'badge-kkc-danger';
-                      } elseif ($pStatus === 'under_review') {
-                          $pBadgeCls = 'badge-kkc-info';
-                      }
-                  ?>
-                  <div class="p-3 rounded border" style="background: var(--kkc-surface-hover); border-color: var(--kkc-border) !important;">
-                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                      <div class="d-flex flex-wrap align-items-center gap-2">
-                        <span class="badge <?= $isOwner ? 'bg-primary' : 'bg-secondary' ?>">
-                          <?= $isOwner ? 'ICH (ACCOUNT-INHABER)' : 'DREHPARTNER' ?>
-                        </span>
-                        <strong class="text-body"><?= View::e((string)($p['display_label'] ?? '')) ?></strong>
-                      </div>
-                      <span class="badge-kkc <?= $pBadgeCls ?>">
-                        <?= View::e((string)($p['status_label'] ?? $pStatus)) ?>
-                      </span>
-                    </div>
-
-                    <?php if ($hasDocs): ?>
-                    <div class="d-flex flex-wrap align-items-center gap-2">
-                      <?php if (!empty($p['face_ref_url'])): ?>
-                      <a href="<?= View::e((string)$p['face_ref_url']) ?>" target="_blank" rel="noopener" class="text-decoration-none border rounded p-1 bg-body text-center">
-                        <img src="<?= View::e((string)$p['face_ref_url']) ?>" alt="KI-Selfie" style="width: 70px; height: 50px; object-fit: cover; display: block;" class="rounded">
-                        <span class="d-block text-muted" style="font-size: 0.65rem;">1. KI-Selfie</span>
-                      </a>
-                      <?php endif; ?>
-                      <?php if (!empty($p['id_shot_url'])): ?>
-                      <a href="<?= View::e((string)$p['id_shot_url']) ?>" target="_blank" rel="noopener" class="text-decoration-none border rounded p-1 bg-body text-center">
-                        <img src="<?= View::e((string)$p['id_shot_url']) ?>" alt="ID-Shot" style="width: 70px; height: 50px; object-fit: cover; display: block;" class="rounded">
-                        <span class="d-block text-muted" style="font-size: 0.65rem;">2. ID-Shot</span>
-                      </a>
-                      <?php endif; ?>
-                      <?php if (!empty($p['id_front_url'])): ?>
-                      <a href="<?= View::e((string)$p['id_front_url']) ?>" target="_blank" rel="noopener" class="text-decoration-none border rounded p-1 bg-body text-center">
-                        <img src="<?= View::e((string)$p['id_front_url']) ?>" alt="Ausweis" style="width: 70px; height: 50px; object-fit: cover; display: block;" class="rounded">
-                        <span class="d-block text-muted" style="font-size: 0.65rem;">3. Ausweis</span>
-                      </a>
-                      <?php endif; ?>
-                      <?php if ($isReady && !empty($p['certificate_url'])): ?>
-                      <a href="<?= View::e((string)$p['certificate_url']) ?>" target="_blank" rel="noopener" class="btn btn-sm btn-outline-kkc">
-                        <i class="bi bi-file-earmark-pdf-fill text-danger me-1"></i> PDF-Freigabe
-                      </a>
-                      <?php endif; ?>
-                    </div>
-                    <?php else: ?>
-                    <div class="alert alert-secondary py-2 px-3 mb-0 small d-flex align-items-center gap-2">
-                      <i class="bi bi-info-circle-fill ec-text-primary flex-shrink-0"></i>
-                      <span>Noch keine ID-Shot-Dokumente hochgeladen.</span>
-                    </div>
-                    <?php endif; ?>
-                  </div>
-                  <?php endforeach; ?>
-                </div>
-              <?php endif; ?>
-            </div>
-          </div>
+      <div class="row g-4">
+        <!-- ================================================================
+             LINKE SPALTE: VORSCHAUBILDER (NUR-LESEN)
+             ================================================================ -->
+        <div class="col-xl-6">
 
           <!-- 3. Szenen-Vorschaubilder (FSK16 & FSK18 Ansicht 1..12, Nur-Lesen) -->
           <div class="card-kkc mb-4">

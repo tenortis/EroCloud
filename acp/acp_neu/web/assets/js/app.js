@@ -909,7 +909,7 @@ const App = {
     return false;
   },
 
-  async reviewMovieCoActor(movieId, merchantId, coActorId, decision) {
+  async reviewMovieCoActor(movieId, merchantId, coActorId, decision, panelId = 'mc-performers-card') {
     let reason = '';
     if (decision === 'reject') {
       const r = await this.prompt({
@@ -923,7 +923,21 @@ const App = {
       });
       if (r === null) return;
       reason = r.trim();
+    } else if (decision === 'reset_review') {
+      const ok = await this.confirm({
+        title: 'Prüfstatus zurücksetzen',
+        message: 'Soll der Status dieser Person wieder auf „Eingereicht (In Prüfung)“ zurückgesetzt werden?',
+        variant: 'warning',
+        icon: 'bi-arrow-counterclockwise',
+        confirmText: 'Auf „In Prüfung“ setzen',
+        confirmIcon: 'bi-arrow-counterclockwise'
+      });
+      if (!ok) return;
     }
+
+    const resolvedPanelId = panelId || 'mc-performers-card';
+    const panelEl = document.getElementById(resolvedPanelId);
+    const matchStageHeight = panelEl?.dataset?.matchStageHeight ?? '1';
 
     const formData = new FormData();
     formData.append('_csrf', this.csrfToken);
@@ -932,6 +946,8 @@ const App = {
     formData.append('co_actor_id', String(coActorId));
     formData.append('decision', decision);
     formData.append('reason', reason);
+    formData.append('panel_id', resolvedPanelId);
+    formData.append('match_stage_height', String(matchStageHeight));
 
     try {
       const res = await fetch(`${this.basePath}/api.php?route=movies-checking/co-actor-action`, {
@@ -947,8 +963,16 @@ const App = {
       }
 
       this.resetLogoutCountdown();
-      this.toast(data.message || 'Drehpartner-Status aktualisiert.', decision === 'verify' ? 'success' : 'warning');
+      this.toast(
+        data.message || 'Drehpartner-Status aktualisiert.',
+        decision === 'verify' ? 'success' : (decision === 'reset_review' ? 'info' : 'warning')
+      );
       this.refreshSidebarCounts();
+
+      if (data.panel_html && panelEl) {
+        panelEl.outerHTML = data.panel_html;
+        return;
+      }
 
       const badge = document.getElementById(`mc-coactor-status-${coActorId}`);
       if (badge) {
@@ -958,6 +982,9 @@ const App = {
         } else if (decision === 'reject') {
           badge.className = 'badge-kkc badge-kkc-danger';
           badge.textContent = 'Abgelehnt – Korrektur nötig';
+        } else if (decision === 'reset_review') {
+          badge.className = 'badge-kkc badge-kkc-warning';
+          badge.textContent = 'Prüfung offen';
         }
       }
     } catch (err) {
@@ -1552,7 +1579,7 @@ const App = {
     return false;
   },
 
-  async reviewAlbumCoActor(albumDbId, merchantId, coActorId, decision) {
+  async reviewAlbumCoActor(albumDbId, merchantId, coActorId, decision, panelId = 'pac-performers-card') {
     let reason = '';
     if (decision === 'reject') {
       const r = await this.prompt({
@@ -1566,7 +1593,21 @@ const App = {
       });
       if (r === null) return;
       reason = r.trim();
+    } else if (decision === 'reset_review') {
+      const ok = await this.confirm({
+        title: 'Prüfstatus zurücksetzen',
+        message: 'Soll der Status dieser Person wieder auf „Eingereicht (In Prüfung)“ zurückgesetzt werden?',
+        variant: 'warning',
+        icon: 'bi-arrow-counterclockwise',
+        confirmText: 'Auf „In Prüfung“ setzen',
+        confirmIcon: 'bi-arrow-counterclockwise'
+      });
+      if (!ok) return;
     }
+
+    const resolvedPanelId = panelId || 'pac-performers-card';
+    const panelEl = document.getElementById(resolvedPanelId);
+    const matchStageHeight = panelEl?.dataset?.matchStageHeight ?? '1';
 
     const formData = new FormData();
     formData.append('_csrf', this.csrfToken);
@@ -1575,6 +1616,8 @@ const App = {
     formData.append('co_actor_id', String(coActorId));
     formData.append('decision', decision);
     formData.append('reason', reason);
+    formData.append('panel_id', resolvedPanelId);
+    formData.append('match_stage_height', String(matchStageHeight));
 
     try {
       const res = await fetch(`${this.basePath}/api.php?route=photo-albums-checking/co-actor-action`, {
@@ -1590,8 +1633,16 @@ const App = {
       }
 
       this.resetLogoutCountdown();
-      this.toast(data.message || 'Drehpartner-Status aktualisiert.', decision === 'verify' ? 'success' : 'warning');
+      this.toast(
+        data.message || 'Drehpartner-Status aktualisiert.',
+        decision === 'verify' ? 'success' : (decision === 'reset_review' ? 'info' : 'warning')
+      );
       this.refreshSidebarCounts();
+
+      if (data.panel_html && panelEl) {
+        panelEl.outerHTML = data.panel_html;
+        return;
+      }
 
       const badge = document.getElementById(`pac-coactor-status-${coActorId}`);
       if (badge) {
@@ -1601,6 +1652,9 @@ const App = {
         } else if (decision === 'reject') {
           badge.className = 'badge-kkc badge-kkc-danger';
           badge.textContent = 'Abgelehnt – Korrektur nötig';
+        } else if (decision === 'reset_review') {
+          badge.className = 'badge-kkc badge-kkc-warning';
+          badge.textContent = 'Prüfung offen';
         }
       }
     } catch (err) {

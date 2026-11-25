@@ -711,7 +711,11 @@ final class MoviesOnlineController
                     'face_ref_url'        => (string)($p['face_ref_url'] ?? ''),
                     'id_shot_url'         => (string)($p['id_shot_url'] ?? ''),
                     'id_front_url'        => (string)($p['id_front_url'] ?? ''),
+                    'id_back_url'         => (string)($p['id_back_url'] ?? ''),
                     'certificate_url'     => (string)($p['certificate_url'] ?? ''),
+                    'has_uploaded_docs'   => !empty($p['has_uploaded_docs']),
+                    'has_id_shot'         => !empty($p['has_id_shot']),
+                    'checked_on'          => (string)($p['checked_on'] ?? ''),
                 ];
             }
         }
@@ -1574,7 +1578,11 @@ final class MoviesOnlineController
                     'face_ref_url'        => (string)($p['face_ref_url'] ?? ''),
                     'id_shot_url'         => (string)($p['id_shot_url'] ?? ''),
                     'id_front_url'        => (string)($p['id_front_url'] ?? ''),
+                    'id_back_url'         => (string)($p['id_back_url'] ?? ''),
                     'certificate_url'     => (string)($p['certificate_url'] ?? ''),
+                    'has_uploaded_docs'   => !empty($p['has_uploaded_docs']),
+                    'has_id_shot'         => !empty($p['has_id_shot']),
+                    'checked_on'          => (string)($p['checked_on'] ?? ''),
                 ];
             }
         }
