@@ -508,20 +508,143 @@ const App = {
 
   checkPoppersCategoryConstraint() {
     const poppersCb = document.querySelector('.mc-cat-checkbox[value="poppers"]');
-    const pubOpt = document.getElementById('mc-visible-public-opt');
-    const warnEl = document.getElementById('mc-poppers-warning');
+    const kaviarCb  = document.querySelector('.mc-cat-checkbox[value="kaviar"]');
+    const nsCb      = document.querySelector('.mc-cat-checkbox[value="golden_showers"]');
+    const pubOpt    = document.getElementById('mc-visible-public-opt');
+    const warnEl    = document.getElementById('mc-poppers-warning');
+    const infoEl    = document.getElementById('mc-site-policy-info');
     const visSelect = document.getElementById('mc-visible-website');
-    if (!poppersCb || !pubOpt) return;
+    if (!visSelect && !poppersCb && !kaviarCb && !nsCb) return;
 
-    if (poppersCb.checked) {
-      pubOpt.disabled = true;
-      if (warnEl) warnEl.classList.remove('d-none');
-      if (visSelect && visSelect.value === 'public' && visSelect.options.length > 1) {
-        visSelect.selectedIndex = 1;
+    const hasPoppers    = !!(poppersCb && poppersCb.checked);
+    const hasKvNs       = !!((kaviarCb && kaviarCb.checked) || (nsCb && nsCb.checked));
+    const hasRestricted = hasPoppers || hasKvNs;
+
+    if (pubOpt) {
+      pubOpt.disabled = hasRestricted;
+    }
+
+    if (hasRestricted && visSelect && visSelect.value === 'public') {
+      for (let i = 0; i < visSelect.options.length; i++) {
+        const opt = visSelect.options[i];
+        if (opt.value === 'public') continue;
+        const okPop = !hasPoppers || opt.dataset.allowPoppers === '1';
+        const okKv  = !hasKvNs || opt.dataset.allowKvNs === '1';
+        if (okPop && okKv) {
+          visSelect.selectedIndex = i;
+          break;
+        }
       }
-    } else {
-      pubOpt.disabled = false;
-      if (warnEl) warnEl.classList.add('d-none');
+    }
+
+    const esc = (str) => String(str || '').replace(/[&<>"']/g, (ch) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[ch]));
+
+    const selectedOpt = (visSelect && visSelect.selectedIndex >= 0)
+      ? visSelect.options[visSelect.selectedIndex]
+      : null;
+
+    if (infoEl && selectedOpt) {
+      if (selectedOpt.value === 'public') {
+        infoEl.innerHTML = '<div class="d-flex flex-wrap gap-1 mt-1">'
+          + '<span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">Public: keine Poppers- / KV- / NS-Freigabe</span>'
+          + '</div>';
+      } else {
+        const synced       = selectedOpt.dataset.synced === '1';
+        const allowPoppers = selectedOpt.dataset.allowPoppers === '1';
+        const allowKvNs    = selectedOpt.dataset.allowKvNs === '1';
+        const hasCc        = selectedOpt.dataset.hasCc === '1';
+        const hasPsc       = selectedOpt.dataset.hasPsc === '1';
+        const p4cCats      = selectedOpt.dataset.p4cCats || '';
+        const conflicts    = selectedOpt.dataset.conflicts || '';
+
+        if (!synced) {
+          infoEl.innerHTML = '<div class="d-flex flex-wrap gap-1 mt-1">'
+            + '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">'
+            + '<i class="bi bi-exclamation-circle me-1"></i>Noch nicht mit Pay4Coins synchronisiert</span>'
+            + '</div>';
+        } else {
+          const badges = [];
+          badges.push(allowPoppers
+            ? '<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle"><i class="bi bi-check-circle me-1"></i>Poppers erlaubt</span>'
+            : '<span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">Poppers gesperrt</span>');
+          badges.push(allowKvNs
+            ? '<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle"><i class="bi bi-check-circle me-1"></i>KV/NS (Digital) erlaubt</span>'
+            : '<span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">KV/NS gesperrt</span>');
+          if (hasCc) {
+            badges.push('<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">Kreditkarte aktiv</span>');
+          }
+          if (hasPsc) {
+            badges.push('<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">Paysafecard aktiv</span>');
+          }
+
+          let html = '<div class="d-flex flex-wrap gap-1 mt-1">' + badges.join('') + '</div>';
+          if (p4cCats !== '') {
+            html += '<div class="text-muted small mt-1">Pay4Coins: ' + esc(p4cCats) + '</div>';
+          }
+          if (conflicts !== '') {
+            html += '<div class="text-danger small mt-1"><i class="bi bi-exclamation-octagon-fill me-1"></i>Konflikt: ' + esc(conflicts) + '</div>';
+          }
+          infoEl.innerHTML = html;
+        }
+      }
+    }
+
+    if (warnEl) {
+      const warnings = [];
+      if (selectedOpt) {
+        if (selectedOpt.value === 'public') {
+          if (hasPoppers) {
+            warnings.push('„Poppers“ darf nicht auf „public“ veröffentlicht werden.');
+          }
+          if (hasKvNs) {
+            warnings.push('„Kaviar (KV)“ und „Natursekt (NS)“ dürfen nicht auf „public“ veröffentlicht werden.');
+          }
+        } else {
+          const dom          = selectedOpt.value;
+          const synced       = selectedOpt.dataset.synced === '1';
+          const allowPoppers = selectedOpt.dataset.allowPoppers === '1';
+          const allowKvNs    = selectedOpt.dataset.allowKvNs === '1';
+          const hasP4cPop    = selectedOpt.dataset.hasP4cPoppers === '1';
+          const hasP4cKvNs   = selectedOpt.dataset.hasP4cKvNs === '1';
+          const hasCc        = selectedOpt.dataset.hasCc === '1';
+          const hasPsc       = selectedOpt.dataset.hasPsc === '1';
+
+          if (!synced) {
+            if (hasRestricted) {
+              warnings.push('Die Website „' + dom + '“ ist noch nicht mit Pay4Coins synchronisiert – Poppers sowie Kaviar (KV) / Natursekt (NS) können erst nach Synchronisation freigegeben werden.');
+            }
+          } else {
+            if (hasPoppers && !allowPoppers) {
+              const reasons = [];
+              if (!hasP4cPop) reasons.push('in Pay4Coins fehlt die Shop-Kategorie „Poppers“');
+              if (hasCc) reasons.push('Kreditkarte ist aktiv');
+              if (hasPsc) reasons.push('Paysafecard ist aktiv');
+              warnings.push('„Poppers“ ist auf „' + dom + '“ nicht zulässig' + (reasons.length ? ' (' + reasons.join(', ') + ')' : '') + '.');
+            }
+            if (hasKvNs && !allowKvNs) {
+              const reasons = [];
+              if (!hasP4cKvNs) reasons.push('in Pay4Coins fehlt die Shop-Kategorie „KV, NS (Digital)“');
+              if (hasCc) reasons.push('Kreditkarte ist aktiv');
+              warnings.push('„Kaviar (KV) / Natursekt (NS)“ ist auf „' + dom + '“ nicht zulässig' + (reasons.length ? ' (' + reasons.join(', ') + ')' : '') + '.');
+            }
+          }
+        }
+      }
+
+      if (warnings.length > 0) {
+        warnEl.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i>'
+          + warnings.map(esc).join('<br><i class="bi bi-exclamation-triangle-fill me-1"></i>');
+        warnEl.classList.remove('d-none');
+      } else {
+        warnEl.innerHTML = '';
+        warnEl.classList.add('d-none');
+      }
     }
   },
 
@@ -5976,6 +6099,7 @@ const App = {
     applyFilters(page = 1) {
       const q       = (document.getElementById('sites-filter-q')?.value || '').trim();
       const status  = document.getElementById('sites-filter-status')?.value || 'all';
+      const category = document.getElementById('sites-filter-category')?.value || 'all';
       const eroads  = document.getElementById('sites-filter-eroads')?.value || 'all';
       const shopSys = document.getElementById('sites-filter-shopsys')?.value || 'all';
       const banners = document.getElementById('sites-filter-banners')?.value || 'all';
@@ -5985,6 +6109,7 @@ const App = {
       const params = new URLSearchParams();
       if (page > 1) params.set('page', String(page));
       if (status !== 'all') params.set('status', status);
+      if (category !== 'all') params.set('category', category);
       if (eroads !== 'all') params.set('eroads', eroads);
       if (shopSys !== 'all') params.set('shop_system', shopSys);
       if (banners !== 'all') params.set('banners', banners);
@@ -6002,12 +6127,14 @@ const App = {
       return false;
     },
 
-    quickFilter(status, eroads, shopSys, banners) {
+    quickFilter(status, eroads, shopSys, banners, category = 'all') {
       const stEl  = document.getElementById('sites-filter-status');
+      const catEl = document.getElementById('sites-filter-category');
       const erEl  = document.getElementById('sites-filter-eroads');
       const sysEl = document.getElementById('sites-filter-shopsys');
       const banEl = document.getElementById('sites-filter-banners');
       if (stEl) stEl.value = status;
+      if (catEl) catEl.value = category;
       if (erEl) erEl.value = eroads;
       if (sysEl) sysEl.value = shopSys;
       if (banEl) banEl.value = banners;
@@ -6017,6 +6144,7 @@ const App = {
     resetFilters() {
       const qEl   = document.getElementById('sites-filter-q');
       const stEl  = document.getElementById('sites-filter-status');
+      const catEl = document.getElementById('sites-filter-category');
       const erEl  = document.getElementById('sites-filter-eroads');
       const sysEl = document.getElementById('sites-filter-shopsys');
       const banEl = document.getElementById('sites-filter-banners');
@@ -6025,6 +6153,7 @@ const App = {
 
       if (qEl) qEl.value = '';
       if (stEl) stEl.value = 'all';
+      if (catEl) catEl.value = 'all';
       if (erEl) erEl.value = 'all';
       if (sysEl) sysEl.value = 'all';
       if (banEl) banEl.value = 'all';

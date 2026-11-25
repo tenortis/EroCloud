@@ -361,18 +361,25 @@ class MoviesController
         $hasCustomFsk16 = $hasThumbOnDisk(11) || abs((int)$mObj->preview_image_fsk16) === 11;
         $hasCustomFsk18 = $hasThumbOnDisk(12) || abs((int)$mObj->preview_image_fsk18) === 12;
 
-        // Kategorien inkl. System-Auto-Erkennung laden
-        $categoryGroups = $this->loadCategoriesWithAutoDetection(
-            $actorId,
-            $title,
-            $desc,
-            (string)$mObj->category_slave
-        );
-
         // Aktive Darsteller & Partner-Websites laden
         $merchant = new \Merchant($mysql, $merchantId);
         $actors   = $this->loadActiveMerchantActors($merchantId, $actorId);
         $websites = $this->loadMerchantWebsites($merchant, (string)$mObj->visible_for_website);
+
+        $effectiveWebsite = (string)$mObj->visible_for_website;
+        if ($effectiveWebsite === '' && !empty($websites)) {
+            $effectiveWebsite = (string)$websites[0]['value'];
+        }
+
+        // Kategorien inkl. System-Auto-Erkennung & Website-Policy laden
+        $categoryGroups = $this->loadCategoriesWithAutoDetection(
+            $actorId,
+            $title,
+            $desc,
+            (string)$mObj->category_slave,
+            $websites,
+            $effectiveWebsite
+        );
 
         $nowCacheBust = time();
         $movieData = [
@@ -589,7 +596,9 @@ class MoviesController
             (int)$draft['actor_id'],
             (string)$draft['title'],
             (string)$draft['description'],
-            (string)$draft['category_slave']
+            (string)$draft['category_slave'],
+            $websites,
+            (string)$draft['visible_for_website']
         );
 
         // Darsteller- & Drehpartner-Daten für Schritt 1 des Film-Uploads laden
@@ -738,6 +747,16 @@ class MoviesController
         }
         if ($visibleWebsite === '') {
             $errors[] = 'Bitte wähle eine gültige Website für die Veröffentlichung aus.';
+        }
+
+        if (!empty($validSlaves) && $visibleWebsite !== '') {
+            require_once SOURCEDIR . '/includes/p4c_sites_sync.inc.php';
+            $catPolicyCheck = ec_movie_validate_categories_for_website(array_unique($validSlaves), $visibleWebsite, true);
+            if (empty($catPolicyCheck['valid'])) {
+                foreach ($catPolicyCheck['errors'] as $cErr) {
+                    $errors[] = $cErr;
+                }
+            }
         }
 
         // Prüfung auf doppelten Filmtitel
@@ -1400,6 +1419,36 @@ class MoviesController
         }
         $categorySlave = implode(',', array_unique($validSlaves));
 
+        $merchant       = new \Merchant($mysql, $merchantId);
+        $visibleWebsite = trim(strip_tags((string)$this->request->post('visible_for_website', (string)$mObj->visible_for_website)));
+        if ($visibleWebsite === 'public') {
+            if (!$this->isPublicUploadAllowed($merchant, $merchantId, (string)$mObj->visible_for_website)) {
+                $visibleWebsite = '';
+            }
+        } elseif ($visibleWebsite !== '') {
+            $rsSite = p4c_query("SELECT `id` FROM `sites`
+                WHERE `partner_id` = '" . p4c_escape_string((string)$merchant->partner_id()) . "'
+                  AND `domain` = '" . p4c_escape_string($visibleWebsite) . "'
+                  AND `status` = '1'
+                LIMIT 1;", __FILE__, __LINE__);
+            if (!$rsSite || p4c_num_rows($rsSite) === 0) {
+                $visibleWebsite = '';
+            }
+        }
+        if ($visibleWebsite === '') {
+            $visibleWebsite = (string)$mObj->visible_for_website;
+        }
+
+        if (!empty($validSlaves) && $visibleWebsite !== '') {
+            require_once SOURCEDIR . '/includes/p4c_sites_sync.inc.php';
+            $catPolicyCheck = ec_movie_validate_categories_for_website(array_unique($validSlaves), $visibleWebsite, true);
+            if (empty($catPolicyCheck['valid'])) {
+                foreach ($catPolicyCheck['errors'] as $cErr) {
+                    $errors[] = $cErr;
+                }
+            }
+        }
+
         // Darsteller- & Drehpartner-Prüfung (Pflicht vor dem Einreichen)
         \CoActorManager::ensureSchema();
         $performerMode  = trim((string)$this->request->post('performer_mode', (string)($mObj->performer_mode ?? 'solo_owner')));
@@ -1459,26 +1508,6 @@ class MoviesController
         $amountDownload = $isTrailer
             ? 0
             : max(0, min(150, abs((int)$this->request->post('amount_download', (int)$mObj->amount_download))));
-
-        $merchant       = new \Merchant($mysql, $merchantId);
-        $visibleWebsite = trim(strip_tags((string)$this->request->post('visible_for_website', (string)$mObj->visible_for_website)));
-        if ($visibleWebsite === 'public') {
-            if (!$this->isPublicUploadAllowed($merchant, $merchantId, (string)$mObj->visible_for_website)) {
-                $visibleWebsite = '';
-            }
-        } elseif ($visibleWebsite !== '') {
-            $rsSite = p4c_query("SELECT `id` FROM `sites`
-                WHERE `partner_id` = '" . p4c_escape_string((string)$merchant->partner_id()) . "'
-                  AND `domain` = '" . p4c_escape_string($visibleWebsite) . "'
-                  AND `status` = '1'
-                LIMIT 1;", __FILE__, __LINE__);
-            if (!$rsSite || p4c_num_rows($rsSite) === 0) {
-                $visibleWebsite = '';
-            }
-        }
-        if ($visibleWebsite === '') {
-            $visibleWebsite = (string)$mObj->visible_for_website;
-        }
 
         $amountOwn = $isTrailer ? 0 : (int)round((float)$mObj->playtime_seconds * (float)$amountSecond);
 
@@ -2033,10 +2062,61 @@ class MoviesController
     }
 
     /**
-     * Lädt alle Film-Kategorien gruppiert inkl. System-Auto-Erkennung (Gelb-Hervorhebung).
+     * Lädt alle Film-Kategorien gruppiert inkl. System-Auto-Erkennung (Gelb-Hervorhebung)
+     * und Filterung anhand der Pay4Coins-Website-Freigaben.
+     *
+     * @param array<int, array<string, mixed>> $websites
      */
-    private function loadCategoriesWithAutoDetection(int $actorId, string $title, string $description, string $savedSlavesCsv): array
-    {
+    private function loadCategoriesWithAutoDetection(
+        int $actorId,
+        string $title,
+        string $description,
+        string $savedSlavesCsv,
+        array $websites = [],
+        string $selectedWebsite = ''
+    ): array {
+        require_once SOURCEDIR . '/includes/p4c_sites_sync.inc.php';
+
+        $hiddenCategories = ec_movie_get_mcp_hidden_categories();
+        $restrictedRules  = ec_movie_get_restricted_category_rules();
+
+        $anyAllowsPolicy = [
+            'allow_poppers' => false,
+            'allow_kv_ns'   => false,
+        ];
+        $currentSiteAllowsPolicy = [
+            'allow_poppers' => false,
+            'allow_kv_ns'   => false,
+        ];
+        $matchedSelectedSite = false;
+
+        foreach ($websites as $ws) {
+            $wsVal = (string)($ws['value'] ?? '');
+            if (!empty($ws['allow_poppers'])) {
+                $anyAllowsPolicy['allow_poppers'] = true;
+            }
+            if (!empty($ws['allow_kv_ns'])) {
+                $anyAllowsPolicy['allow_kv_ns'] = true;
+            }
+            if ($wsVal !== '' && $selectedWebsite !== '' && strcasecmp($wsVal, $selectedWebsite) === 0) {
+                $matchedSelectedSite                     = true;
+                $currentSiteAllowsPolicy['allow_poppers'] = !empty($ws['allow_poppers']);
+                $currentSiteAllowsPolicy['allow_kv_ns']   = !empty($ws['allow_kv_ns']);
+            }
+        }
+
+        if (!$matchedSelectedSite && $selectedWebsite !== '' && strcasecmp($selectedWebsite, 'public') !== 0) {
+            $fallbackPolicy = ec_site_get_policy_by_domain($selectedWebsite);
+            $currentSiteAllowsPolicy['allow_poppers'] = !empty($fallbackPolicy['allow_poppers']);
+            $currentSiteAllowsPolicy['allow_kv_ns']   = !empty($fallbackPolicy['allow_kv_ns']);
+            if ($currentSiteAllowsPolicy['allow_poppers']) {
+                $anyAllowsPolicy['allow_poppers'] = true;
+            }
+            if ($currentSiteAllowsPolicy['allow_kv_ns']) {
+                $anyAllowsPolicy['allow_kv_ns'] = true;
+            }
+        }
+
         $savedSlaves = $savedSlavesCsv !== '' ? array_map('trim', explode(',', $savedSlavesCsv)) : [];
 
         $actorCategories = [];
@@ -2067,9 +2147,23 @@ class MoviesController
 
             if ($rsCats && p4c_num_rows($rsCats) > 0) {
                 while ($cObj = p4c_fetch_object($rsCats)) {
-                    $nameId   = (string)$cObj->name_id;
-                    $deVal    = self::decodeLegacyText((string)$cObj->de_name_value);
-                    $deText   = self::decodeLegacyText((string)($cObj->de_name_text ?? ''));
+                    $nameId = (string)$cObj->name_id;
+                    if (in_array($nameId, $hiddenCategories, true)) {
+                        continue;
+                    }
+
+                    $sitePolicyKey     = '';
+                    $allowedForCurrent = true;
+                    if (isset($restrictedRules[$nameId])) {
+                        $sitePolicyKey = (string)$restrictedRules[$nameId]['policy_key'];
+                        if (empty($anyAllowsPolicy[$sitePolicyKey])) {
+                            continue;
+                        }
+                        $allowedForCurrent = !empty($currentSiteAllowsPolicy[$sitePolicyKey]);
+                    }
+
+                    $deVal     = self::decodeLegacyText((string)$cObj->de_name_value);
+                    $deText    = self::decodeLegacyText((string)($cObj->de_name_text ?? ''));
                     $moreWords = self::decodeLegacyText((string)($cObj->more_search_words ?? ''));
 
                     $isSaved = in_array($nameId, $savedSlaves, true);
@@ -2096,16 +2190,23 @@ class MoviesController
                     }
 
                     $isChecked = ($isSaved || $isSystemDetected);
+                    if (!$allowedForCurrent) {
+                        $isSystemDetected = false;
+                        $isChecked        = false;
+                    }
+
                     if ($isChecked) {
                         $selectedCount++;
                     }
 
                     $items[] = [
-                        'name_id'            => $nameId,
-                        'label'              => $deVal,
-                        'hint'               => $deText,
-                        'is_checked'         => $isChecked,
-                        'is_system_detected' => $isSystemDetected,
+                        'name_id'                     => $nameId,
+                        'label'                       => $deVal,
+                        'hint'                        => $deText,
+                        'is_checked'                  => $isChecked,
+                        'is_system_detected'          => $isSystemDetected,
+                        'site_policy_key'             => $sitePolicyKey,
+                        'is_allowed_for_current_site' => $allowedForCurrent,
                     ];
                 }
             }
@@ -2146,21 +2247,27 @@ class MoviesController
     }
 
     /**
-     * Lädt alle freigeschalteten Websites des Partners inkl. Whitelist-Prüfung für 'public'.
+     * Lädt alle freigeschalteten Websites des Partners inkl. Whitelist-Prüfung für 'public'
+     * sowie Pay4Coins-Freigabe-Flags (`allow_poppers`, `allow_kv_ns`).
      */
     private function loadMerchantWebsites(\Merchant $merchant, string $currentValue = ''): array
     {
+        require_once SOURCEDIR . '/includes/p4c_sites_sync.inc.php';
+        ec_p4c_sites_ensure_schema();
+
         $merchantId = isset($_SESSION['merchant_id']) ? abs((int)$_SESSION['merchant_id']) : 0;
         $websites   = [];
 
         if ($this->isPublicUploadAllowed($merchant, $merchantId, $currentValue)) {
             $websites[] = [
-                'value' => 'public',
-                'label' => 'alle Partnerwebsites',
+                'value'         => 'public',
+                'label'         => 'alle Partnerwebsites',
+                'allow_poppers' => false,
+                'allow_kv_ns'   => false,
             ];
         }
 
-        $rsSites = p4c_query("SELECT `domain`
+        $rsSites = p4c_query("SELECT `domain`, `p4c_shop_categories`, `has_creditcard`, `has_paysafecard`
             FROM `sites`
             WHERE `partner_id` = '" . p4c_escape_string((string)$merchant->partner_id()) . "'
               AND `status` = '1'
@@ -2168,9 +2275,12 @@ class MoviesController
 
         if ($rsSites && p4c_num_rows($rsSites) > 0) {
             while ($sObj = p4c_fetch_object($rsSites)) {
+                $policy = ec_site_parse_policy($sObj);
                 $websites[] = [
-                    'value' => (string)$sObj->domain,
-                    'label' => (string)$sObj->domain,
+                    'value'         => (string)$sObj->domain,
+                    'label'         => (string)$sObj->domain,
+                    'allow_poppers' => !empty($policy['allow_poppers']),
+                    'allow_kv_ns'   => !empty($policy['allow_kv_ns']),
                 ];
             }
         }

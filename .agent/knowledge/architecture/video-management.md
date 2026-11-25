@@ -90,6 +90,16 @@ Jedes Accordion-Element nutzt ein kompaktes **2-Spalten-Grid** (`row-cols-md-2`)
 * Bei der Admin-Prüfung im ACP ist die automatische Keyword-Erkennung **vollständig deaktiviert**.
 * Der Admin sieht exakt 1:1 die vom Creator gespeicherten Kategorien (`category_slave`). Dadurch wird verhindert, dass Kategorien, die vom Creator bewusst abgewählt wurden, bei der Erst- oder Folgeprüfung ungewollt wieder aktiviert werden.
 
+### 4. Website-gebundene Kategorie-Freigaben über Pay4Coins (`includes/p4c_sites_sync.inc.php`)
+* **Single Source of Truth in Pay4Coins:** `sites.p4c_shop_categories` (JSON-Map ID→Name), `sites.has_creditcard` und `sites.has_paysafecard` werden über den Push-Endpunkt [`api/p4c_internal.php`](file:///c:/xampp/htdocs/EroCloud/api/p4c_internal.php) (`sync_site`), den 15-Minuten-Cronjob [`cronjobs/sync_p4c_sites.php`](file:///c:/xampp/htdocs/EroCloud/cronjobs/sync_p4c_sites.php) und den ACP-Button unter `#/sites` synchronisiert.
+* **Verbindliche ID-Auswertung:** Geprüft wird ausschließlich nach den numerischen `shop_categories`-IDs (`6` = Poppers, `4` = KV, NS (Digital); ID `3` für physischen Versand schaltet keine digitalen Filme frei). Unsynchronisierte Domains (`p4c_shop_categories IS NULL`) und `public` bleiben fail-closed gesperrt (`allow_poppers = false`, `allow_kv_ns = false`).
+* **Freigaberegeln:**
+  * `poppers`: nur bei expliziter Ziel-Domain (`visible_for_website != 'public'`), wenn Kategorie-ID `6` aktiv ist **und** `has_creditcard = 0` **und** `has_paysafecard = 0`.
+  * `kaviar` & `golden_showers`: nur bei expliziter Ziel-Domain (`visible_for_website != 'public'`), wenn Kategorie-ID `4` aktiv ist **und** `has_creditcard = 0` (`has_paysafecard` blockiert KV/NS Digital nicht).
+* **MCP vs. ACP (`breath_control` & Moderationsschutz):**
+  * Im MCP ([`MoviesController.php`](file:///c:/xampp/htdocs/EroCloud/mcp/mcp_neu/app/src/Modules/Movies/MoviesController.php)) werden `poppers`, `kaviar` und `golden_showers` client- und serverseitig nach `visible_for_website` gefiltert; `breath_control` (Atemkontrolle) wird im MCP komplett ausgeblendet und serverseitig abgelehnt.
+  * Im ACP ([`MoviesCheckingController.php`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/app/src/Modules/MoviesChecking/MoviesCheckingController.php), [`MoviesOnlineController.php`](file:///c:/xampp/htdocs/EroCloud/acp/acp_neu/app/src/Modules/MoviesOnline/MoviesOnlineController.php)) bleiben alle Kategorien inkl. `breath_control` sichtbar, während die Website-Policy-Validierung bei `movie_status = 'active'` greift (damit `blocked`/`deleted` jederzeit zur Moderation speicherbar bleiben).
+
 ---
 
 ## 4. ⚙️ Asynchrone Video-Konvertierung (`cronjobs/convert_movie.php`) & High-Performance-Auslieferung

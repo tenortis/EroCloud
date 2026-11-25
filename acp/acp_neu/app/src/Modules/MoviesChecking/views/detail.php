@@ -11,6 +11,7 @@ use App\Core\View;
 /** @var array<string, mixed> $onlineInfo */
 /** @var array<int, array<string, mixed>> $merchantActors */
 /** @var array<int, string> $merchantDomains */
+/** @var array<string, array<string, mixed>> $merchantDomainPolicies */
 /** @var array<string, array<int, array<string, mixed>>> $categoriesByType */
 /** @var array<int, array<string, mixed>> $rejectionReasons */
 /** @var array<int, array<string, mixed>> $rejectionHistory */
@@ -753,21 +754,25 @@ foreach ($rejectionReasons as $rrCheck) {
                   </select>
                 </div>
 
+                <?php
+                $domainPolicies = $merchantDomainPolicies ?? [];
+                $publicPolicy   = $domainPolicies['public'] ?? ec_site_get_policy_by_domain('public');
+                ?>
                 <div class="col-12">
                   <label class="form-label small fw-bold mb-1">Sichtbar für Webseite</label>
-                  <select name="visible_for_website" id="mc-visible-website" class="form-select form-select-sm">
-                    <option value="public" id="mc-visible-public-opt" <?= $movie['visible_for_website'] === 'public' ? 'selected' : '' ?>>
+                  <select name="visible_for_website" id="mc-visible-website" class="form-select form-select-sm" onchange="App.checkPoppersCategoryConstraint()">
+                    <option value="public" id="mc-visible-public-opt" <?= ec_site_policy_data_attributes($publicPolicy) ?> <?= $movie['visible_for_website'] === 'public' ? 'selected' : '' ?>>
                       Alle angeschlossenen Webseiten (public)
                     </option>
                     <?php foreach ($merchantDomains as $dom): ?>
-                    <option value="<?= View::e($dom) ?>" <?= $movie['visible_for_website'] === $dom ? 'selected' : '' ?>>
+                    <?php $domPolicy = $domainPolicies[$dom] ?? ec_site_get_policy_by_domain($dom); ?>
+                    <option value="<?= View::e($dom) ?>" <?= ec_site_policy_data_attributes($domPolicy) ?> <?= $movie['visible_for_website'] === $dom ? 'selected' : '' ?>>
                       Nur auf: <?= View::e($dom) ?>
                     </option>
                     <?php endforeach; ?>
                   </select>
-                  <div class="form-text small text-warning d-none" id="mc-poppers-warning">
-                    <i class="bi bi-exclamation-triangle-fill me-1"></i> Bei Auswahl der Kategorie „Poppers“ darf der Film nicht auf „public“ stehen.
-                  </div>
+                  <div class="form-text small mt-1" id="mc-site-policy-info"></div>
+                  <div class="alert alert-warning py-1 px-2 small mt-2 mb-0 d-none" id="mc-poppers-warning"></div>
                 </div>
 
                 <!-- SEO-Felder (kompakt & mit 1-Klick Generatoren) -->

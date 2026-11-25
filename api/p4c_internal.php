@@ -1,18 +1,18 @@
 <?php
 
 /**
- * EroCloud Internal Read-Only API for Pay4Coins (api.erocloud.net/p4c_internal.php)
+ * EroCloud Internal API for Pay4Coins (api.erocloud.net/p4c_internal.php)
  *
- * Stellt eine streng abgeschottete, rein lesende (Read-Only) interne Schnittstelle
- * exklusiv fuer den Pay4Coins-Server (ve49734318 / 91.184.46.111) und die EroCloud
- * selbst (t199 / 91.184.62.199) bereit.
+ * Stellt eine streng abgeschottete interne Schnittstelle exklusiv fuer den
+ * Pay4Coins-Server (ve49734318) und die EroCloud selbst (t199 / 91.184.62.199) bereit
+ * (Read-Only Moderationsabfragen + authentifizierter Site-Sync-Push `sync_site`).
  *
  * Doppelte Sicherheits-Architektur (Double-Lock):
  * 1. Strikte IP-Whitelist auf TCP-Ebene ($_SERVER['REMOTE_ADDR'] – kein X-Forwarded-For Spoofing moeglich).
  * 2. Kryptografischer 64-Zeichen Secret-Key (Timing-Safe geprueft via hash_equals).
- * 3. Rein lesender Action-Router (moderation_summary, ping, zukuenftig beliebig erweiterbar).
+ * 3. Action-Router (`ping`, `moderation_summary`, `sync_site`, `sync_all_sites`).
  *
- * Kompatibel mit PHP 8.0.30 & PHP 8.4.27+.
+ * Kompatibel mit PHP 8.0.30 & PHP 8.4.28+.
  *
  * @author      Martin Zimmermann
  * @copyright   (C) 2026 Cipa Media S.L.U.
@@ -44,7 +44,9 @@ function ec_p4c_internal_load_config(): array
     $defaults = array(
         'api_key' => 'p4c_ec_int_rd_9d4f2a8c1e7b5f3d0a6c8e2b4f9a1d7c3e5b8f0a2d4c6e9b1a3f',
         'allowed_ips' => array(
-            '91.184.46.111', // Pay4Coins Web- & ACP-Server (ve49734318)
+            '91.184.46.111', // Pay4Coins Web- & ACP-Server (ve49734318 Legacy-IP)
+            '91.184.50.9',   // Pay4Coins Web- & ACP-Server (ve49734318 Haupt-IP)
+            '91.184.60.136', // Pay4Coins Web- & ACP-Server (ve49734318 Migration-IP)
             '91.184.62.199', // EroCloud Server selbst (t199)
             '127.0.0.1',     // Localhost IPv4 (XAMPP / lokaler Selbstaufruf)
             '::1',           // Localhost IPv6 (XAMPP / lokaler Selbstaufruf)
@@ -164,7 +166,7 @@ if ($expectedKey === '' || $providedKey === '' || !hash_equals($expectedKey, $pr
 }
 
 // =========================================================================
-// 3. ACTION-ROUTER (Read-Only)
+// 3. ACTION-ROUTER
 // =========================================================================
 $action = 'moderation_summary';
 if (!empty($jsonBody['action']) && is_scalar($jsonBody['action'])) {
@@ -182,6 +184,74 @@ if ($action === 'ping') {
         'timestamp' => time(),
         'client_ip' => $remoteAddr,
     ));
+    p4c_close();
+    exit;
+}
+
+if ($action === 'sync_site') {
+    $sitePayload = $jsonBody['site'] ?? ($_POST['site'] ?? null);
+    if (is_string($sitePayload) && $sitePayload !== '') {
+        $decodedSite = @json_decode($sitePayload, true);
+        if (is_array($decodedSite)) {
+            $sitePayload = $decodedSite;
+        }
+    }
+
+    if (!is_array($sitePayload)) {
+        http_response_code(400);
+        echo json_encode(array(
+            'ok'    => false,
+            'error' => 'Missing or invalid site payload.',
+        ));
+        p4c_close();
+        exit;
+    }
+
+    $domain = trim((string)($sitePayload['domain'] ?? ''));
+    $siteId = abs((int)($sitePayload['site_id'] ?? 0));
+    if ($domain === '' || $siteId <= 0) {
+        http_response_code(400);
+        echo json_encode(array(
+            'ok'    => false,
+            'error' => 'Site domain and site_id are required.',
+        ));
+        p4c_close();
+        exit;
+    }
+
+    require_once SOURCEDIR . '/includes/p4c_sites_sync.inc.php';
+    $upsertRes = ec_p4c_upsert_site($domain, $sitePayload);
+
+    echo json_encode(array(
+        'ok'        => true,
+        'action'    => 'sync_site',
+        'result'    => $upsertRes,
+        'timestamp' => time(),
+    ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    p4c_close();
+    exit;
+}
+
+if ($action === 'sync_all_sites') {
+    require_once SOURCEDIR . '/includes/p4c_sites_sync.inc.php';
+    $syncRes = ec_p4c_sync_all_sites();
+    if (empty($syncRes['ok'])) {
+        http_response_code((int)($syncRes['http_status'] ?? 502));
+        echo json_encode(array(
+            'ok'     => false,
+            'action' => 'sync_all_sites',
+            'error'  => (string)($syncRes['error'] ?? 'Site sync failed.'),
+        ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        p4c_close();
+        exit;
+    }
+
+    echo json_encode(array(
+        'ok'        => true,
+        'action'    => 'sync_all_sites',
+        'result'    => $syncRes,
+        'timestamp' => time(),
+    ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     p4c_close();
     exit;
 }

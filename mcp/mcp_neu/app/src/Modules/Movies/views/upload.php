@@ -159,9 +159,11 @@ $downloadPercentOptions = range(0, 150);
 
               <div class="col-12 <?= count($actors) === 1 ? '' : 'col-md-6' ?>">
                 <label class="form-label fw-semibold">Sichtbarkeit / Portal</label>
-                <select name="visible_for_website" class="form-select">
+                <select name="visible_for_website" class="form-select js-movie-visible-website">
                   <?php foreach ($websites as $ws): ?>
                     <option value="<?= htmlspecialchars((string)$ws['value'], ENT_QUOTES, 'UTF-8') ?>"
+                            data-allow-poppers="<?= !empty($ws['allow_poppers']) ? '1' : '0' ?>"
+                            data-allow-kv-ns="<?= !empty($ws['allow_kv_ns']) ? '1' : '0' ?>"
                             <?= $visibleWebsite === (string)$ws['value'] ? 'selected' : '' ?>>
                       <?= htmlspecialchars((string)$ws['label'], ENT_QUOTES, 'UTF-8') ?>
                     </option>
@@ -329,12 +331,15 @@ $downloadPercentOptions = range(0, 150);
                       <div class="row g-2">
                         <?php foreach ($group['items'] as $catItem): ?>
                           <?php
-                          $nameId    = (string)$catItem['name_id'];
-                          $isChecked = !empty($catItem['is_checked']);
-                          $isSys     = !empty($catItem['is_system_detected']);
-                          $boxStyle  = $isSys ? 'background-color: #fff6d0; border: 1px solid #ffe8a1;' : '';
+                          $nameId     = (string)$catItem['name_id'];
+                          $isChecked  = !empty($catItem['is_checked']);
+                          $isSys      = !empty($catItem['is_system_detected']);
+                          $policyKey  = (string)($catItem['site_policy_key'] ?? '');
+                          $allowedNow = !isset($catItem['is_allowed_for_current_site']) || !empty($catItem['is_allowed_for_current_site']);
+                          $boxStyle   = $isSys ? 'background-color: #fff6d0; border: 1px solid #ffe8a1;' : '';
                           ?>
-                          <div class="col-12 col-sm-6">
+                          <div class="col-12 col-sm-6 <?= ($policyKey !== '' && !$allowedNow) ? 'd-none' : '' ?>"
+                               <?= $policyKey !== '' ? 'data-site-policy="' . htmlspecialchars($policyKey, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
                             <label class="d-flex align-items-center gap-2 p-2 rounded-2 border small cursor-pointer"
                                    style="<?= $boxStyle ?>"
                                    title="<?= htmlspecialchars((string)$catItem['hint'], ENT_QUOTES, 'UTF-8') ?>">
@@ -343,8 +348,12 @@ $downloadPercentOptions = range(0, 150);
                                      data-group-id="<?= $gId ?>"
                                      name="category_slave[]"
                                      value="<?= htmlspecialchars($nameId, ENT_QUOTES, 'UTF-8') ?>"
-                                     <?= $isChecked ? 'checked' : '' ?>>
+                                     <?= $isChecked ? 'checked' : '' ?>
+                                     <?= ($policyKey !== '' && !$allowedNow) ? 'disabled' : '' ?>>
                               <span class="text-truncate"><?= htmlspecialchars((string)$catItem['label'], ENT_QUOTES, 'UTF-8') ?></span>
+                              <?php if ($policyKey !== ''): ?>
+                                <span class="badge bg-info-subtle text-info-emphasis border ms-auto flex-shrink-0" style="font-size: 0.65rem;">Website-Freigabe</span>
+                              <?php endif; ?>
                             </label>
                           </div>
                         <?php endforeach; ?>

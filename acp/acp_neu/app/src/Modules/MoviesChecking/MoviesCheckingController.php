@@ -385,6 +385,9 @@ final class MoviesCheckingController
         $hasCustomFsk16  = is_file($movieDir . '/thumb_' . $movieId . '_' . $fileId . '_11.jpg');
         $hasCustomFsk18  = is_file($movieDir . '/thumb_' . $movieId . '_' . $fileId . '_12.jpg');
 
+        require_once SOURCEDIR . '/includes/p4c_sites_sync.inc.php';
+        ec_p4c_sites_ensure_schema();
+
         // Angeschlossene Partner-Webseiten laden (für visible_for_website)
         $currentVisibleForWebsite = trim((string)($m->visible_for_website ?? ''));
         if ($currentVisibleForWebsite === '') {
@@ -408,6 +411,13 @@ final class MoviesCheckingController
         }
         if ($currentVisibleForWebsite !== 'public' && !in_array($currentVisibleForWebsite, $merchantDomains, true)) {
             $merchantDomains[] = $currentVisibleForWebsite;
+        }
+
+        $merchantDomainPolicies = [
+            'public' => ec_site_get_policy_by_domain('public'),
+        ];
+        foreach ($merchantDomains as $dom) {
+            $merchantDomainPolicies[$dom] = ec_site_get_policy_by_domain($dom);
         }
 
         // Film-Texte dekodieren
@@ -582,9 +592,10 @@ final class MoviesCheckingController
         return View::render('MoviesChecking', 'detail', [
             'movie'            => $movieData,
             'onlineInfo'       => $onlineInfo,
-            'merchantActors'   => $merchantActors,
-            'merchantDomains'  => $merchantDomains,
-            'categoriesByType' => $categoriesByType,
+            'merchantActors'         => $merchantActors,
+            'merchantDomains'        => $merchantDomains,
+            'merchantDomainPolicies' => $merchantDomainPolicies,
+            'categoriesByType'       => $categoriesByType,
             'rejectionReasons' => $rejectionReasons,
             'rejectionHistory' => $rejectionHistory,
             'performersData'   => $performersData,
@@ -640,6 +651,9 @@ final class MoviesCheckingController
         $playtime   = abs((int)$m->playtime_seconds);
 
         $errors = [];
+
+        require_once SOURCEDIR . '/includes/p4c_sites_sync.inc.php';
+        ec_p4c_sites_ensure_schema();
 
         // 1. Darsteller validieren
         $actorId = abs((int)$this->request->post('actor_id', $m->actor_id));
@@ -765,9 +779,6 @@ final class MoviesCheckingController
         if ($visibleForWebsite === '') {
             $visibleForWebsite = 'public';
         }
-        if (in_array('poppers', $validCategories, true) && $visibleForWebsite === 'public') {
-            $errors[] = 'Filme mit der Kategorie „Poppers“ dürfen nicht auf „Alle Webseiten (public)“ gestellt werden.';
-        }
 
         $allowedStatuses = ['active', 'blocked'];
         if ($employeeRule === 'write') {
@@ -776,6 +787,15 @@ final class MoviesCheckingController
         $movieStatus = trim((string)$this->request->post('movie_status', 'active'));
         if (!in_array($movieStatus, $allowedStatuses, true)) {
             $errors[] = 'Ungültiger Film-Status ausgewählt.';
+        }
+
+        if ($movieStatus === 'active' && !empty($validCategories)) {
+            $catPolicyCheck = ec_movie_validate_categories_for_website($validCategories, $visibleForWebsite, false);
+            if (!$catPolicyCheck['valid']) {
+                foreach ($catPolicyCheck['errors'] as $policyErr) {
+                    $errors[] = $policyErr;
+                }
+            }
         }
         if ($movieStatus === 'active' && $onlineAtTs !== false && function_exists('ec_validate_online_at_future')) {
             $dateCheck = ec_validate_online_at_future($onlineAtRaw, 'Film', true);

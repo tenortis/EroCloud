@@ -22,3 +22,6 @@
 # alle 2 Minuten - Lokale KI-Untertitel (.vtt) & Visa/Mastercard BRAM-Compliance-Worker
 */2 * * * * /usr/bin/php /var/www/web1/htdocs/cronjobs/ai_compliance_worker.php >/dev/null 2>&1
 
+# alle 15 Minuten - Pay4Coins Webseiten inkl. Shop-Kategorien & Zahlungsarten synchronisieren
+*/15 * * * * /opt/php-8.4/bin/php /var/www/web1/htdocs/cronjobs/sync_p4c_sites.php >/dev/null 2>&1
+

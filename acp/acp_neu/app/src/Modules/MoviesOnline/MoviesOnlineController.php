@@ -498,6 +498,9 @@ final class MoviesOnlineController
             }
         }
 
+        require_once SOURCEDIR . '/includes/p4c_sites_sync.inc.php';
+        ec_p4c_sites_ensure_schema();
+
         // Partner-Domains laden
         $currentVisibleForWebsite = trim((string)($mo->visible_for_website ?? ''));
         if ($currentVisibleForWebsite === '') {
@@ -521,6 +524,13 @@ final class MoviesOnlineController
         }
         if ($currentVisibleForWebsite !== 'public' && !in_array($currentVisibleForWebsite, $merchantDomains, true)) {
             $merchantDomains[] = $currentVisibleForWebsite;
+        }
+
+        $merchantDomainPolicies = [
+            'public' => ec_site_get_policy_by_domain('public'),
+        ];
+        foreach ($merchantDomains as $dom) {
+            $merchantDomainPolicies[$dom] = ec_site_get_policy_by_domain($dom);
         }
 
         // Dateipfad & technische Details
@@ -793,9 +803,10 @@ final class MoviesOnlineController
             ],
             'prevOnlineId'     => $prevOnlineId,
             'nextOnlineId'     => $nextOnlineId,
-            'merchantActors'   => $merchantActors,
-            'merchantDomains'  => $merchantDomains,
-            'categoriesByType' => $categoriesByType,
+            'merchantActors'         => $merchantActors,
+            'merchantDomains'        => $merchantDomains,
+            'merchantDomainPolicies' => $merchantDomainPolicies,
+            'categoriesByType'       => $categoriesByType,
             'rejectionHistory' => $rejectionHistory,
             'performersData'   => $performersData,
             'aiData'           => $aiData,
@@ -850,6 +861,9 @@ final class MoviesOnlineController
         $movieDbId = abs((int)($m->id ?? 0));
 
         $errors = [];
+
+        require_once SOURCEDIR . '/includes/p4c_sites_sync.inc.php';
+        ec_p4c_sites_ensure_schema();
 
         // 1. Darsteller validieren
         $actorId = abs((int)$this->request->post('actor_id', $mo->actor_id));
@@ -980,9 +994,6 @@ final class MoviesOnlineController
         if ($visibleForWebsite === '') {
             $visibleForWebsite = 'public';
         }
-        if (in_array('poppers', $validCategories, true) && $visibleForWebsite === 'public') {
-            $errors[] = 'Filme mit der Kategorie „Poppers“ dürfen nicht auf „allen Partnerwebsites (public)“ vermarktet werden.';
-        }
 
         $movieStatus = trim((string)$this->request->post('movie_status', 'active'));
         if (!in_array($movieStatus, ['active', 'blocked', 'deleted'], true)) {
@@ -993,6 +1004,15 @@ final class MoviesOnlineController
             && (string)($m->status ?? '') !== 'deleted'
         ) {
             $errors[] = 'Du besitzt keine Schreib-/Löschberechtigung (Administrator-Status), um Filme auf den Status „Gelöscht“ zu setzen.';
+        }
+
+        if ($movieStatus === 'active' && !empty($validCategories)) {
+            $catPolicyCheck = ec_movie_validate_categories_for_website($validCategories, $visibleForWebsite, false);
+            if (!$catPolicyCheck['valid']) {
+                foreach ($catPolicyCheck['errors'] as $policyErr) {
+                    $errors[] = $policyErr;
+                }
+            }
         }
 
         if ($movieStatus === 'active' && function_exists('ec_validate_online_at_future')) {
@@ -1338,6 +1358,9 @@ final class MoviesOnlineController
             }
         }
 
+        require_once SOURCEDIR . '/includes/p4c_sites_sync.inc.php';
+        ec_p4c_sites_ensure_schema();
+
         // Partner-Domains laden
         $currentVisibleForWebsite = trim((string)($m->visible_for_website ?? ''));
         if ($currentVisibleForWebsite === '') {
@@ -1361,6 +1384,13 @@ final class MoviesOnlineController
         }
         if ($currentVisibleForWebsite !== 'public' && !in_array($currentVisibleForWebsite, $merchantDomains, true)) {
             $merchantDomains[] = $currentVisibleForWebsite;
+        }
+
+        $merchantDomainPolicies = [
+            'public' => ec_site_get_policy_by_domain('public'),
+        ];
+        foreach ($merchantDomains as $dom) {
+            $merchantDomainPolicies[$dom] = ec_site_get_policy_by_domain($dom);
         }
 
         // Dateipfad & technische Details
@@ -1621,9 +1651,10 @@ final class MoviesOnlineController
             ],
             'prevDraftId'      => $prevDraftId,
             'nextDraftId'      => $nextDraftId,
-            'merchantActors'   => $merchantActors,
-            'merchantDomains'  => $merchantDomains,
-            'categoriesByType' => $categoriesByType,
+            'merchantActors'         => $merchantActors,
+            'merchantDomains'        => $merchantDomains,
+            'merchantDomainPolicies' => $merchantDomainPolicies,
+            'categoriesByType'       => $categoriesByType,
             'rejectionHistory' => $rejectionHistory,
             'performersData'   => $performersData,
             'aiData'           => $aiData,

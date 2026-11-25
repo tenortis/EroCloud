@@ -1632,18 +1632,50 @@ const App = {
       });
     }
 
-    // 4. Kategorien-Zähler pro Akkordeon-Gruppe aktualisieren
-    document.querySelectorAll('.js-movie-cat-checkbox').forEach(cb => {
-      cb.addEventListener('change', () => {
-        const groupId = cb.getAttribute('data-group-id');
+    // 4. Kategorien-Zähler pro Akkordeon-Gruppe aktualisieren & Website-Freigaben synchronisieren
+    const updateMovieCatGroupCounts = () => {
+      document.querySelectorAll('.js-cat-group-count').forEach(badge => {
+        const groupId = badge.getAttribute('data-group-id');
         if (!groupId) return;
-        const checkedCount = document.querySelectorAll(`.js-movie-cat-checkbox[data-group-id="${groupId}"]:checked`).length;
-        const badge = document.querySelector(`.js-cat-group-count[data-group-id="${groupId}"]`);
-        if (badge) {
-          badge.textContent = `${checkedCount} gewählt`;
+        const checkedCount = document.querySelectorAll(`.js-movie-cat-checkbox[data-group-id="${groupId}"]:checked:not(:disabled)`).length;
+        badge.textContent = `${checkedCount} gewählt`;
+      });
+    };
+
+    const syncMovieCategoriesByWebsite = () => {
+      const visSelect = document.querySelector('.js-movie-visible-website');
+      if (!visSelect) return;
+      const opt = visSelect.options[visSelect.selectedIndex];
+      const allowPoppers = opt ? opt.getAttribute('data-allow-poppers') === '1' : false;
+      const allowKvNs    = opt ? opt.getAttribute('data-allow-kv-ns') === '1' : false;
+
+      document.querySelectorAll('[data-site-policy]').forEach(wrapEl => {
+        const policyKey = wrapEl.getAttribute('data-site-policy');
+        const allowed   = (policyKey === 'allow_poppers' && allowPoppers) || (policyKey === 'allow_kv_ns' && allowKvNs);
+        wrapEl.classList.toggle('d-none', !allowed);
+        const cb = wrapEl.querySelector('.js-movie-cat-checkbox');
+        if (cb) {
+          cb.disabled = !allowed;
+          if (!allowed && cb.checked) {
+            cb.checked = false;
+          }
         }
       });
+
+      updateMovieCatGroupCounts();
+    };
+
+    document.querySelectorAll('.js-movie-cat-checkbox').forEach(cb => {
+      cb.addEventListener('change', () => {
+        updateMovieCatGroupCounts();
+      });
     });
+
+    const visibleWebsiteSelect = document.querySelector('.js-movie-visible-website');
+    if (visibleWebsiteSelect) {
+      visibleWebsiteSelect.addEventListener('change', syncMovieCategoriesByWebsite);
+      syncMovieCategoriesByWebsite();
+    }
 
     // Hover-Lupe auch auf den Vorschaubildern der Film-Detailseite aktivieren
     this.initThumbnailHoverZoom();

@@ -8,6 +8,7 @@ if (!defined('SAFE_INC')) {
 }
 
 /** @var array<string, mixed> $site */
+/** @var array<string, mixed> $policy */
 /** @var int $prevId */
 /** @var int $nextId */
 /** @var array<int, array<string, mixed>> $banners */
@@ -275,6 +276,83 @@ $mid = (int)$site['merchant_id'];
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pay4Coins Shop-Kategorien & EroCloud Content-Freigaben -->
+                    <div class="col-12">
+                        <div class="card border">
+                            <div class="card-header bg-light py-2 fw-bold small d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <span><i class="bi bi-shield-check me-1 text-primary"></i>Pay4Coins Shop-Kategorien &amp; EroCloud Content-Freigaben</span>
+                                <span class="badge <?= !empty($policy['synced']) ? 'bg-success-subtle text-success-emphasis border border-success-subtle' : 'bg-warning text-dark' ?>">
+                                    <?= !empty($policy['synced']) ? 'Synchronisiert mit Pay4Coins' : 'Noch nicht synchronisiert' ?>
+                                </span>
+                            </div>
+                            <div class="card-body small">
+                                <?php if (empty($policy['synced'])): ?>
+                                    <div class="alert alert-warning py-2 mb-0 small d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                        <div>
+                                            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                                            Für diese Website liegen in EroCloud noch keine synchronisierten Pay4Coins-Shop-Kategorien und Zahlungsarten vor. Sonderkategorien (`Poppers`, `Kaviar (KV)`, `Natursekt (NS)`) bleiben bis zum Abgleich gesperrt.
+                                        </div>
+                                        <button type="button" class="btn btn-xs btn-primary py-1 px-2" onclick="App.Websites.syncFromP4c(this)">
+                                            <i class="bi bi-arrow-repeat me-1"></i>Jetzt synchronisieren
+                                        </button>
+                                    </div>
+                                <?php else: ?>
+                                    <?php if (!empty($policy['conflicts'])): ?>
+                                        <div class="alert alert-danger py-2 mb-3 small">
+                                            <?php foreach ((array)$policy['conflicts'] as $confMsg): ?>
+                                                <div><i class="bi bi-exclamation-octagon-fill me-1"></i><?= View::e((string)$confMsg) ?></div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <div class="row g-3">
+                                        <div class="col-12 col-md-4">
+                                            <div class="text-muted fw-semibold mb-2">Synchronisierte Pay4Coins-Shop-Kategorien:</div>
+                                            <?php $p4cCatsMap = (array)($policy['categories_map'] ?? []); ?>
+                                            <?php if (empty($p4cCatsMap)): ?>
+                                                <span class="text-muted">Keine Shop-Kategorien in Pay4Coins hinterlegt.</span>
+                                            <?php else: ?>
+                                                <div class="d-flex flex-wrap gap-1">
+                                                    <?php foreach ($p4cCatsMap as $cid => $cname): ?>
+                                                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">
+                                                            #<?= (int)$cid ?> <?= View::e((string)$cname) ?>
+                                                        </span>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+
+                                        <div class="col-12 col-md-4">
+                                            <div class="text-muted fw-semibold mb-2">Aktive Zahlungsarten (BRAM-Relevant):</div>
+                                            <div class="d-flex flex-wrap gap-2">
+                                                <span class="badge <?= !empty($policy['has_creditcard']) ? 'bg-warning text-dark' : 'bg-light text-muted border' ?>">
+                                                    <i class="bi bi-credit-card me-1"></i>Kreditkarte: <?= !empty($policy['has_creditcard']) ? 'Aktiv' : 'Inaktiv' ?>
+                                                </span>
+                                                <span class="badge <?= !empty($policy['has_paysafecard']) ? 'bg-info text-dark' : 'bg-light text-muted border' ?>">
+                                                    <i class="bi bi-upc-scan me-1"></i>Paysafecard: <?= !empty($policy['has_paysafecard']) ? 'Aktiv' : 'Inaktiv' ?>
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-12 col-md-4">
+                                            <div class="text-muted fw-semibold mb-2">Resultierende EroCloud-Upload-Freigaben:</div>
+                                            <div class="d-flex flex-wrap gap-2">
+                                                <span class="badge <?= !empty($policy['allow_poppers']) ? 'bg-success' : 'bg-secondary' ?>">
+                                                    <i class="bi <?= !empty($policy['allow_poppers']) ? 'bi-check-circle-fill' : 'bi-lock-fill' ?> me-1"></i>
+                                                    Poppers: <?= !empty($policy['allow_poppers']) ? 'Freigegeben' : 'Ausgeblendet' ?>
+                                                </span>
+                                                <span class="badge <?= !empty($policy['allow_kv_ns']) ? 'bg-success' : 'bg-secondary' ?>">
+                                                    <i class="bi <?= !empty($policy['allow_kv_ns']) ? 'bi-check-circle-fill' : 'bi-lock-fill' ?> me-1"></i>
+                                                    KV &amp; NS: <?= !empty($policy['allow_kv_ns']) ? 'Freigegeben' : 'Ausgeblendet' ?>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>

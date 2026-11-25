@@ -13,12 +13,15 @@ if (!defined('SAFE_INC')) {
 /** @var int $page */
 /** @var int $perPage */
 /** @var int $totalPages */
+/** @var bool $hasUnsyncedSites */
+/** @var int $unsyncedActiveCount */
 /** @var array<string, string> $filters */
 
 $stFilter  = $filters['status'] ?? 'all';
 $adsFilter = $filters['eroads'] ?? 'all';
 $sysFilter = $filters['shop_system'] ?? 'all';
 $banFilter = $filters['banners'] ?? 'all';
+$catFilter = $filters['category'] ?? 'all';
 $qVal      = $filters['q'] ?? '';
 $sortVal   = $filters['sort'] ?? 'id_desc';
 ?>
@@ -32,7 +35,7 @@ $sortVal   = $filters['sort'] ?? 'id_desc';
                 <span>Webseiten &amp; Partner-Shops</span>
             </h1>
             <p class="text-muted small mb-0">
-                Übersicht aller angeschlossenen Pay4Coins-Webseiten, EroCMS-/Eigen-Shops, EroAds-Teilnahmen, Werbebanner und Shop-Verkäufe.
+                Übersicht aller angeschlossenen Pay4Coins-Webseiten, EroCMS-/Eigen-Shops, Pay4Coins-Kategorien, EroAds-Teilnahmen, Werbebanner und Shop-Verkäufe.
             </p>
         </div>
         <div class="d-flex flex-wrap align-items-center gap-2">
@@ -44,6 +47,18 @@ $sortVal   = $filters['sort'] ?? 'id_desc';
             </button>
         </div>
     </div>
+
+    <?php if (!empty($hasUnsyncedSites)): ?>
+        <div class="alert alert-info d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4 py-2 px-3 small">
+            <div>
+                <i class="bi bi-info-circle-fill me-1"></i>
+                <strong><?= number_format((int)$unsyncedActiveCount, 0, ',', '.') ?> aktive Website(s)</strong> wurden noch nicht mit den Pay4Coins-Shop-Kategorien und Zahlungsarten synchronisiert. Bitte klicke einmal auf <strong>„Mit Pay4Coins synchronisieren“</strong>, damit Poppers / KV / NS korrekt freigeschaltet werden.
+            </div>
+            <button type="button" class="btn btn-xs btn-primary py-1 px-2 fw-semibold" onclick="App.Websites.syncFromP4c(document.getElementById('btn-sites-sync-p4c'))">
+                <i class="bi bi-arrow-repeat me-1"></i>Jetzt synchronisieren
+            </button>
+        </div>
+    <?php endif; ?>
 
     <!-- 2. 8 KPI-KACHELN (KLICKBAR ZUM SCHNELLFILTERN) -->
     <div class="row g-3 mb-4">
@@ -204,6 +219,17 @@ $sortVal   = $filters['sort'] ?? 'id_desc';
                         </select>
                     </div>
                     <div class="col-6 col-md-2">
+                        <label class="form-label small fw-semibold mb-1">P4C-Kategorien / Konflikte</label>
+                        <select class="form-select form-select-sm" id="sites-filter-category" onchange="App.Websites.applyFilters(1)">
+                            <option value="all" <?= $catFilter === 'all' ? 'selected' : '' ?>>Alle Kategorien</option>
+                            <option value="poppers" <?= $catFilter === 'poppers' ? 'selected' : '' ?>>Poppers (ID 6)</option>
+                            <option value="kv_ns_digital" <?= $catFilter === 'kv_ns_digital' ? 'selected' : '' ?>>KV, NS Digital (ID 4)</option>
+                            <option value="kv_ns_shipping" <?= $catFilter === 'kv_ns_shipping' ? 'selected' : '' ?>>KV, NS Versand (ID 3)</option>
+                            <option value="conflicts" <?= $catFilter === 'conflicts' ? 'selected' : '' ?>>Nur Konflikte (KK/PSC)</option>
+                            <option value="unsynced" <?= $catFilter === 'unsynced' ? 'selected' : '' ?>>Noch nicht synchronisiert</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2">
                         <label class="form-label small fw-semibold mb-1">EroAds-Teilnahme</label>
                         <select class="form-select form-select-sm" id="sites-filter-eroads" onchange="App.Websites.applyFilters(1)">
                             <option value="all" <?= $adsFilter === 'all' ? 'selected' : '' ?>>Alle</option>
@@ -211,7 +237,7 @@ $sortVal   = $filters['sort'] ?? 'id_desc';
                             <option value="inactive" <?= $adsFilter === 'inactive' ? 'selected' : '' ?>>EroAds Inaktiv</option>
                         </select>
                     </div>
-                    <div class="col-6 col-md-2">
+                    <div class="col-6 col-md-3">
                         <label class="form-label small fw-semibold mb-1">Shop-System &amp; Banner</label>
                         <div class="d-flex gap-1">
                             <select class="form-select form-select-sm" id="sites-filter-shopsys" onchange="App.Websites.applyFilters(1)">
@@ -226,7 +252,7 @@ $sortVal   = $filters['sort'] ?? 'id_desc';
                             </select>
                         </div>
                     </div>
-                    <div class="col-6 col-md-2">
+                    <div class="col-6 col-md-3">
                         <label class="form-label small fw-semibold mb-1">Sortierung</label>
                         <select class="form-select form-select-sm" id="sites-filter-sort" onchange="App.Websites.applyFilters(1)">
                             <option value="id_desc" <?= $sortVal === 'id_desc' ? 'selected' : '' ?>>Neueste zuerst (ID ↓)</option>
@@ -237,9 +263,12 @@ $sortVal   = $filters['sort'] ?? 'id_desc';
                             <option value="updated_desc" <?= $sortVal === 'updated_desc' ? 'selected' : '' ?>>Zuletzt aktualisiert ↓</option>
                         </select>
                     </div>
-                    <div class="col-12 col-md-1 d-grid">
+                    <div class="col-auto d-flex gap-2">
                         <button type="submit" class="btn btn-sm btn-primary fw-semibold">
                             <i class="bi bi-funnel-fill me-1"></i>Filtern
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="App.Websites.resetFilters()">
+                            Zurücksetzen
                         </button>
                     </div>
                 </div>
@@ -313,11 +342,42 @@ $sortVal   = $filters['sort'] ?? 'id_desc';
                                             <i class="bi bi-box-arrow-up-right"></i>
                                         </a>
                                     </div>
-                                    <div class="mt-0.5">
+                                    <div class="mt-0.5 d-flex flex-wrap gap-1 align-items-center">
                                         <?php if ($s['shop_system'] === 'erocms'): ?>
                                             <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">EroCMS</span>
                                         <?php else: ?>
                                             <span class="badge bg-dark bg-opacity-10 text-dark border">Eigenes System (<?= View::e((string)$s['shop_system']) ?>)</span>
+                                        <?php endif; ?>
+
+                                        <?php if (!empty($s['p4c_synced'])): ?>
+                                            <?php if (!empty($s['has_p4c_poppers'])): ?>
+                                                <span class="badge <?= !empty($s['allow_poppers']) ? 'bg-info-subtle text-info-emphasis border border-info-subtle' : 'bg-danger text-white' ?>"
+                                                      title="<?= !empty($s['allow_poppers']) ? 'Poppers auf dieser Website erlaubt' : 'Poppers in P4C aktiv, aber durch KK/PSC blockiert' ?>">
+                                                    Poppers
+                                                </span>
+                                            <?php endif; ?>
+                                            <?php if (!empty($s['has_p4c_kv_ns_digital'])): ?>
+                                                <span class="badge <?= !empty($s['allow_kv_ns']) ? 'bg-info-subtle text-info-emphasis border border-info-subtle' : 'bg-danger text-white' ?>"
+                                                      title="<?= !empty($s['allow_kv_ns']) ? 'KV & NS Digital auf dieser Website erlaubt' : 'KV/NS Digital in P4C aktiv, aber durch Kreditkarte blockiert' ?>">
+                                                    KV/NS Digital
+                                                </span>
+                                            <?php endif; ?>
+                                            <?php if (!empty($s['has_p4c_kv_ns_shipping'])): ?>
+                                                <span class="badge bg-secondary bg-opacity-10 text-secondary border" title="Pay4Coins: KV, NS, Speichel (Versand)">KV/NS Versand</span>
+                                            <?php endif; ?>
+                                            <?php if (!empty($s['has_creditcard'])): ?>
+                                                <span class="badge bg-warning bg-opacity-25 text-dark border border-warning" title="Kreditkarte in Pay4Coins aktiv">KK</span>
+                                            <?php endif; ?>
+                                            <?php if (!empty($s['has_paysafecard'])): ?>
+                                                <span class="badge bg-light text-dark border" title="Paysafecard in Pay4Coins aktiv">PSC</span>
+                                            <?php endif; ?>
+                                            <?php if (!empty($s['conflicts'])): ?>
+                                                <span class="badge bg-danger text-white" title="<?= View::e(implode(' | ', (array)$s['conflicts'])) ?>">
+                                                    <i class="bi bi-exclamation-triangle-fill me-1"></i>Konflikt
+                                                </span>
+                                            <?php endif; ?>
+                                        <?php else: ?>
+                                            <span class="badge bg-light text-muted border" title="Noch nicht mit Pay4Coins-Shop-Kategorien synchronisiert">P4C offen</span>
                                         <?php endif; ?>
                                     </div>
                                 </td>

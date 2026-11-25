@@ -73,10 +73,14 @@ final class WebsitesController
     // =========================================================================
     public function list(): string
     {
+        require_once SOURCEDIR . '/includes/p4c_sites_sync.inc.php';
+        ec_p4c_sites_ensure_schema();
+
         $statusFilter  = trim((string)$this->request->get('status', 'all'));
         $eroadsFilter  = trim((string)$this->request->get('eroads', 'all'));
         $shopSysFilter = trim((string)$this->request->get('shop_system', 'all'));
         $bannerFilter  = trim((string)$this->request->get('banners', 'all'));
+        $catFilter     = trim((string)$this->request->get('category', 'all'));
         $searchQuery   = trim((string)$this->request->get('q', ''));
         $sortBy        = trim((string)$this->request->get('sort', 'id_desc'));
         $page          = max(1, abs((int)$this->request->get('page', 1)));
@@ -100,6 +104,7 @@ final class WebsitesController
             'total_users'     => 0,
             'total_purchases' => 0,
         ];
+        $unsyncedActiveCount = 0;
 
         $rsKpi = p4c_query(
             "SELECT
@@ -108,7 +113,8 @@ final class WebsitesController
                 SUM(CASE WHEN `status` != '1' THEN 1 ELSE 0 END) AS `inactive_sites`,
                 SUM(CASE WHEN `is_eroads_active` = '1' THEN 1 ELSE 0 END) AS `eroads_active`,
                 SUM(CASE WHEN `shop_system` = 'erocms' THEN 1 ELSE 0 END) AS `shop_erocms`,
-                SUM(CASE WHEN `shop_system` = 'own' THEN 1 ELSE 0 END) AS `shop_own`
+                SUM(CASE WHEN `shop_system` = 'own' THEN 1 ELSE 0 END) AS `shop_own`,
+                SUM(CASE WHEN `status` = '1' AND `p4c_shop_categories` IS NULL THEN 1 ELSE 0 END) AS `unsynced_active`
              FROM `sites`;",
             __FILE__,
             __LINE__
@@ -120,6 +126,7 @@ final class WebsitesController
             $kpi['eroads_active']  = (int)($rowKpi->eroads_active ?? 0);
             $kpi['shop_erocms']    = (int)($rowKpi->shop_erocms ?? 0);
             $kpi['shop_own']       = (int)($rowKpi->shop_own ?? 0);
+            $unsyncedActiveCount   = (int)($rowKpi->unsynced_active ?? 0);
         }
 
         // 2. Vorab-Aggregation: Banner pro site_id (0 N+1 Queries!)
@@ -253,6 +260,22 @@ final class WebsitesController
             }
         }
 
+        if ($catFilter === 'poppers') {
+            $where[] = 's.`p4c_shop_categories` LIKE \'%"6":%\'';
+        } elseif ($catFilter === 'kv_ns_digital') {
+            $where[] = 's.`p4c_shop_categories` LIKE \'%"4":%\'';
+        } elseif ($catFilter === 'kv_ns_shipping') {
+            $where[] = 's.`p4c_shop_categories` LIKE \'%"3":%\'';
+        } elseif ($catFilter === 'conflicts') {
+            $where[] = '(s.`p4c_shop_categories` IS NOT NULL AND (('
+                . 's.`p4c_shop_categories` LIKE \'%"6":%\' AND (s.`has_creditcard` = 1 OR s.`has_paysafecard` = 1)'
+                . ') OR ('
+                . 's.`p4c_shop_categories` LIKE \'%"4":%\' AND s.`has_creditcard` = 1'
+                . ')))';
+        } elseif ($catFilter === 'unsynced') {
+            $where[] = 's.`p4c_shop_categories` IS NULL';
+        }
+
         if ($searchQuery !== '') {
             $qEsc   = p4c_escape_string($searchQuery);
             $qClean = ltrim($searchQuery, '#');
@@ -321,41 +344,55 @@ final class WebsitesController
                 $bStat  = $bannersBySiteId[$sid] ?? ['total' => 0, 'pending' => 0];
                 $uCnt   = $usersByShopId[$shopId] ?? 0;
                 $sStat  = $salesByShopId[$shopId] ?? ['movies' => 0, 'albums' => 0, 'total' => 0, 'rev_cents' => 0];
+                $policy = ec_site_parse_policy($row);
 
                 $sites[] = [
-                    'id'                  => $sid,
-                    'p4c_shop_id'         => $shopId,
-                    'partner_id'          => $this->toUtf8((string)($row->partner_id ?? '')),
-                    'merchant_id'         => $mid,
-                    'merchant_username'   => $this->toUtf8((string)($row->merchant_username ?? '')),
-                    'domain'              => $this->toUtf8((string)($row->domain ?? '')),
-                    'eroads_url'          => $this->toUtf8((string)($row->eroads_url ?? '')),
-                    'status'              => (int)($row->status ?? 0) === 1,
-                    'is_eroads_active'    => (int)($row->is_eroads_active ?? 0) === 1,
-                    'webmaster_commision' => (float)($row->webmaster_commision ?? 0),
-                    'shop_system'         => strtolower(trim((string)($row->shop_system ?? 'own'))),
-                    'banners_total'       => $bStat['total'],
-                    'banners_pending'     => $bStat['pending'],
-                    'users_count'         => $uCnt,
-                    'sales_total'         => $sStat['total'],
-                    'sales_rev_eur'       => number_format($sStat['rev_cents'] / 100, 2, ',', '.') . ' €',
-                    'updated_de'          => $this->formatDateTimeDe((string)($row->last_update_timestamp ?? '')),
+                    'id'                     => $sid,
+                    'p4c_shop_id'            => $shopId,
+                    'partner_id'             => $this->toUtf8((string)($row->partner_id ?? '')),
+                    'merchant_id'            => $mid,
+                    'merchant_username'      => $this->toUtf8((string)($row->merchant_username ?? '')),
+                    'domain'                 => $this->toUtf8((string)($row->domain ?? '')),
+                    'eroads_url'             => $this->toUtf8((string)($row->eroads_url ?? '')),
+                    'status'                 => (int)($row->status ?? 0) === 1,
+                    'is_eroads_active'       => (int)($row->is_eroads_active ?? 0) === 1,
+                    'webmaster_commision'    => (float)($row->webmaster_commision ?? 0),
+                    'shop_system'            => strtolower(trim((string)($row->shop_system ?? 'own'))),
+                    'banners_total'          => $bStat['total'],
+                    'banners_pending'        => $bStat['pending'],
+                    'users_count'            => $uCnt,
+                    'sales_total'            => $sStat['total'],
+                    'sales_rev_eur'          => number_format($sStat['rev_cents'] / 100, 2, ',', '.') . ' €',
+                    'updated_de'             => $this->formatDateTimeDe((string)($row->last_update_timestamp ?? '')),
+                    'p4c_synced'             => $policy['synced'],
+                    'p4c_categories'         => $policy['categories_map'],
+                    'has_creditcard'         => $policy['has_creditcard'],
+                    'has_paysafecard'        => $policy['has_paysafecard'],
+                    'has_p4c_poppers'        => $policy['has_p4c_poppers'],
+                    'has_p4c_kv_ns_digital'  => $policy['has_p4c_kv_ns_digital'],
+                    'has_p4c_kv_ns_shipping' => $policy['has_p4c_kv_ns_shipping'],
+                    'allow_poppers'          => $policy['allow_poppers'],
+                    'allow_kv_ns'            => $policy['allow_kv_ns'],
+                    'conflicts'              => $policy['conflicts'],
                 ];
             }
         }
 
         return View::render('Websites', 'list', [
-            'kpi'           => $kpi,
-            'sites'         => $sites,
-            'totalFiltered' => $totalFiltered,
-            'page'          => $page,
-            'perPage'       => $perPage,
-            'totalPages'    => $totalPages,
-            'filters'       => [
+            'kpi'                 => $kpi,
+            'sites'               => $sites,
+            'totalFiltered'       => $totalFiltered,
+            'page'                => $page,
+            'perPage'             => $perPage,
+            'totalPages'          => $totalPages,
+            'hasUnsyncedSites'    => $unsyncedActiveCount > 0,
+            'unsyncedActiveCount' => $unsyncedActiveCount,
+            'filters'             => [
                 'status'      => $statusFilter,
                 'eroads'      => $eroadsFilter,
                 'shop_system' => $shopSysFilter,
                 'banners'     => $bannerFilter,
+                'category'    => $catFilter,
                 'q'           => $searchQuery,
                 'sort'        => $sortBy,
             ],
@@ -367,6 +404,9 @@ final class WebsitesController
     // =========================================================================
     public function detail(): string
     {
+        require_once SOURCEDIR . '/includes/p4c_sites_sync.inc.php';
+        ec_p4c_sites_ensure_schema();
+
         $rawId = trim((string)$this->request->get('id', ''));
         if ($rawId === '') {
             return '<div class="alert alert-warning m-4"><i class="bi bi-exclamation-triangle me-2"></i>Bitte wähle eine Webseite aus. <a href="#/sites" class="alert-link">Zurück zur Webseiten-Übersicht</a></div>';
@@ -591,8 +631,11 @@ final class WebsitesController
             'sales_rev_eur'       => number_format($totalRevCents / 100, 2, ',', '.') . ' €',
         ];
 
+        $policy = ec_site_parse_policy($sRow);
+
         return View::render('Websites', 'detail', [
             'site'        => $site,
+            'policy'      => $policy,
             'prevId'      => $prevId,
             'nextId'      => $nextId,
             'banners'     => $banners,
@@ -615,182 +658,21 @@ final class WebsitesController
             return;
         }
 
-        // API-Key aus acp/includes/get_p4c_data/config.inc.php laden
-        $apikey = '';
-        $legacyConfigFile = defined('SOURCEDIR')
-            ? SOURCEDIR . '/acp/includes/get_p4c_data/config.inc.php'
-            : '';
-        if ($legacyConfigFile !== '' && is_file($legacyConfigFile)) {
-            include $legacyConfigFile;
-        }
-        if ($apikey === '') {
-            $apikey = '7RWV9xXfUbD2v2Mwa2eXa4aw2TS7gErw';
-        }
+        require_once SOURCEDIR . '/includes/p4c_sites_sync.inc.php';
+        $syncRes = ec_p4c_sync_all_sites();
 
-        $apiUrl = (defined('Pay4Coins_API_URL') ? rtrim((string)Pay4Coins_API_URL, '/') : 'https://api.pay4coins.com') . '/remote/index.php';
-        $ua     = (defined('PROJECTNAME') ? (string)PROJECTNAME : 'EroCloud')
-            . ' - ' . (defined('COMPANYNAME') ? (string)COMPANYNAME : 'CIPA Media')
-            . ' - ' . (defined('URL') ? (string)URL : '');
-
-        if (!function_exists('curl_init')) {
-            Response::error('Die PHP cURL-Erweiterung ist auf diesem System nicht verfügbar.', 500);
-            return;
-        }
-
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $apiUrl);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, 'api_name=get_sites&api_key=' . rawurlencode((string)$apikey));
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 8);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 20);
-        curl_setopt($ch, CURLOPT_USERAGENT, $ua);
-
-        $rawResponse = curl_exec($ch);
-        $curlErr     = curl_error($ch);
-        $httpCode    = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if (!is_string($rawResponse) || trim($rawResponse) === '') {
+        if (empty($syncRes['ok'])) {
             Response::error(
-                'Die Pay4Coins-API (' . $apiUrl . ') ist von diesem System aus aktuell nicht erreichbar'
-                . ($curlErr !== '' ? ': ' . $curlErr : ' (HTTP ' . $httpCode . ').'),
-                502
+                (string)($syncRes['error'] ?? 'Synchronisation mit Pay4Coins fehlgeschlagen.'),
+                (int)($syncRes['http_status'] ?? 502)
             );
             return;
         }
 
-        $sitesAry = json_decode($rawResponse, true);
-        if (!is_array($sitesAry)) {
-            Response::error('Ungültige JSON-Antwort von der Pay4Coins-API erhalten.', 502);
-            return;
-        }
-
-        $inserted    = 0;
-        $updated     = 0;
-        $deactivated = 0;
-        $renamed     = 0;
-        $now         = date('Y-m-d H:i:s');
-
-        foreach ($sitesAry as $domainKey => $siteAry) {
-            if (!is_array($siteAry)) {
-                continue;
-            }
-            $domain        = trim((string)$domainKey);
-            $shopId        = abs((int)($siteAry['site_id'] ?? 0));
-            $partnerId     = trim((string)($siteAry['partner_id'] ?? ''));
-            $eroadsUrl     = trim((string)($siteAry['eroads_url'] ?? ''));
-            $blocked       = abs((int)($siteAry['blocked'] ?? 0));
-            $eroadsActive  = abs((int)($siteAry['is_eroads_active'] ?? 0)) === 1 ? 1 : 0;
-            $wmCommission  = abs((float)($siteAry['webmaster_commision'] ?? 0));
-            $numArticles   = abs((int)($siteAry['number_of_articles'] ?? 0));
-            $numMovies     = abs((int)($siteAry['number_of_movies'] ?? 0));
-            $numAlbums     = abs((int)($siteAry['number_of_photoalbums'] ?? 0));
-            $shopSystem    = trim((string)($siteAry['shop_system'] ?? 'own'));
-
-            if ($shopId <= 0 || $domain === '') {
-                continue;
-            }
-
-            $rsExist = p4c_query(
-                "SELECT `id`, `domain` FROM `sites` WHERE `p4c_shop_id` = '" . $shopId . "' LIMIT 1;",
-                __FILE__,
-                __LINE__
-            );
-            $existingObj = ($rsExist && p4c_num_rows($rsExist) > 0) ? p4c_fetch_object($rsExist) : null;
-
-            if ($blocked === 0) {
-                if ($existingObj === null) {
-                    p4c_query(
-                        "INSERT INTO `sites` SET
-                            `p4c_shop_id`           = '" . $shopId . "',
-                            `partner_id`            = '" . p4c_escape_string($partnerId) . "',
-                            `domain`                = '" . p4c_escape_string($domain) . "',
-                            `eroads_url`            = '" . p4c_escape_string($eroadsUrl) . "',
-                            `status`                = '1',
-                            `is_eroads_active`      = '" . $eroadsActive . "',
-                            `webmaster_commision`   = '" . $wmCommission . "',
-                            `number_of_articles`    = '" . $numArticles . "',
-                            `number_of_movies`      = '" . $numMovies . "',
-                            `number_of_photoalbums` = '" . $numAlbums . "',
-                            `last_update_timestamp` = '" . $now . "',
-                            `shop_system`           = '" . p4c_escape_string($shopSystem) . "';",
-                        __FILE__,
-                        __LINE__
-                    );
-                    $inserted++;
-                } else {
-                    p4c_query(
-                        "UPDATE `sites` SET
-                            `partner_id`            = '" . p4c_escape_string($partnerId) . "',
-                            `eroads_url`            = '" . p4c_escape_string($eroadsUrl) . "',
-                            `status`                = '1',
-                            `is_eroads_active`      = '" . $eroadsActive . "',
-                            `webmaster_commision`   = '" . $wmCommission . "',
-                            `number_of_articles`    = '" . $numArticles . "',
-                            `number_of_movies`      = '" . $numMovies . "',
-                            `number_of_photoalbums` = '" . $numAlbums . "',
-                            `last_update_timestamp` = '" . $now . "',
-                            `shop_system`           = '" . p4c_escape_string($shopSystem) . "'
-                         WHERE `p4c_shop_id` = '" . $shopId . "'
-                         LIMIT 1;",
-                        __FILE__,
-                        __LINE__
-                    );
-                    $updated++;
-                }
-            } elseif ($existingObj !== null) {
-                p4c_query(
-                    "UPDATE `sites` SET
-                        `partner_id`            = '" . p4c_escape_string($partnerId) . "',
-                        `eroads_url`            = '" . p4c_escape_string($eroadsUrl) . "',
-                        `status`                = '0',
-                        `is_eroads_active`      = '0',
-                        `webmaster_commision`   = '" . $wmCommission . "',
-                        `number_of_articles`    = '" . $numArticles . "',
-                        `number_of_movies`      = '" . $numMovies . "',
-                        `number_of_photoalbums` = '" . $numAlbums . "',
-                        `last_update_timestamp` = '" . $now . "',
-                        `shop_system`           = '" . p4c_escape_string($shopSystem) . "'
-                     WHERE `p4c_shop_id` = '" . $shopId . "'
-                     LIMIT 1;",
-                    __FILE__,
-                    __LINE__
-                );
-                $deactivated++;
-
-                $domEsc = p4c_escape_string($domain);
-                $rsTrk  = p4c_query(
-                    "SELECT `id`, `url_id` FROM `user_tracking_sites`
-                     WHERE `url` LIKE 'https://" . $domEsc . "%' OR `url` LIKE 'http://" . $domEsc . "%';",
-                    __FILE__,
-                    __LINE__
-                );
-                if ($rsTrk && p4c_num_rows($rsTrk) > 0) {
-                    while ($trkObj = p4c_fetch_object($rsTrk)) {
-                        p4c_query(
-                            "DELETE FROM `user_tracking_website_access` WHERE `url_id` = '" . p4c_escape_string((string)$trkObj->url_id) . "';",
-                            __FILE__,
-                            __LINE__
-                        );
-                        p4c_query(
-                            "DELETE FROM `user_tracking_sites` WHERE `id` = '" . abs((int)$trkObj->id) . "';",
-                            __FILE__,
-                            __LINE__
-                        );
-                    }
-                }
-            }
-
-            if ($existingObj !== null && (string)$existingObj->domain !== $domain) {
-                $domEsc = p4c_escape_string($domain);
-                p4c_query("UPDATE `sites` SET `domain` = '" . $domEsc . "' WHERE `p4c_shop_id` = '" . $shopId . "' LIMIT 1;", __FILE__, __LINE__);
-                p4c_query("UPDATE `actor_member_info` SET `domain` = '" . $domEsc . "' WHERE `p4c_shop_id` = '" . $shopId . "';", __FILE__, __LINE__);
-                p4c_query("UPDATE `messenger_sync` SET `domain` = '" . $domEsc . "' WHERE `p4c_shop_id` = '" . $shopId . "';", __FILE__, __LINE__);
-                $renamed++;
-            }
-        }
+        $inserted    = (int)($syncRes['inserted'] ?? 0);
+        $updated     = (int)($syncRes['updated'] ?? 0);
+        $deactivated = (int)($syncRes['deactivated'] ?? 0);
+        $renamed     = (int)($syncRes['renamed'] ?? 0);
 
         if (function_exists('log_action')) {
             log_action("Webseiten-Abgleich mit Pay4Coins ausgeführt ({$inserted} neu, {$updated} aktiv aktualisiert, {$deactivated} deaktiviert, {$renamed} umbenannt).");
@@ -802,7 +684,7 @@ final class WebsitesController
             'updated'     => $updated,
             'deactivated' => $deactivated,
             'renamed'     => $renamed,
-            'message'     => "Pay4Coins-Webseiten-Abgleich erfolgreich: {$inserted} neu angelegt, {$updated} aktualisiert, {$deactivated} deaktiviert" . ($renamed > 0 ? ", {$renamed} Domains umbenannt." : '.'),
+            'message'     => (string)($syncRes['message'] ?? 'Pay4Coins-Webseiten-Abgleich erfolgreich.'),
         ]);
     }
 }
