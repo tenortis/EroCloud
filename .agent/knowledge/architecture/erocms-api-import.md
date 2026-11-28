@@ -39,7 +39,10 @@ Dieses Dokument beschreibt die technische Funktionsweise der zentralen API-Schni
 
 ### C. Film-Kauf & Streaming-/Download-Auslieferung
 * **Kauf:** [`api/buy_movie_erocms.php`](file:///c:/xampp/htdocs/EroCloud/api/buy_movie_erocms.php) $\rightarrow$ schreibt `movies_access`.
-* **Token & Player/Downloader:** [`api/get_movie_url.php`](file:///c:/xampp/htdocs/EroCloud/api/get_movie_url.php) validiert `user_streaming_key` gegen `movies_access` und generiert ein **30 Minuten** gültiges Einweg-`access_token` für `/Player/...` bzw. `/Downloader/...`.
+* **Token & Player/Downloader:** [`api/get_movie_url.php`](file:///c:/xampp/htdocs/EroCloud/api/get_movie_url.php) validiert `user_streaming_key` gegen `movies_access` und vergibt ein **6 Stunden** gültiges `access_token` für `/Player/...` ([`api/movie_player.php`](file:///c:/xampp/htdocs/EroCloud/api/movie_player.php)) bzw. `/Downloader/...` ([`api/movie_downloader.php`](file:///c:/xampp/htdocs/EroCloud/api/movie_downloader.php)).
+* **RFC-7233-Download & saubere `?start=download`-Weiterleitung (`api/.htaccess`, `api/movie_downloader.php` & `api/photo_album_downloader.php`):**
+  * Die Zwischenseiten von [`api/movie_downloader.php`](file:///c:/xampp/htdocs/EroCloud/api/movie_downloader.php) und [`api/photo_album_downloader.php`](file:///c:/xampp/htdocs/EroCloud/api/photo_album_downloader.php) leiten per `Refresh: 2; url=...?start=download` (inkl. direktem Fallback-Button) auf den Datei-Stream weiter; [`api/.htaccess`](file:///c:/xampp/htdocs/EroCloud/api/.htaccess) routet `/Player/...`, `/Downloader/...` und `/PhotoAlbumDownloader/...` per `[QSA,L]` (inkl. Abwärtskompatibilität für alte `&start=download`-Aufrufe).
+  * `movie_downloader.php` unterstützt vollständiges HTTP-Range-Streaming (`206 Partial Content`, `ETag`, `If-Range`, `512 KB`-Chunks mit exakter `strlen()`-Bytezählung nach `session_write_close()` und `p4c_close()`); `photo_album_downloader.php` erzeugt das ZIP-Archiv erst beim eigentlichen `?start=download`-Abruf kollisionsfrei in `TEMP_DIR` mit automatischem Cleanup via `register_shutdown_function`.
 
 ---
 

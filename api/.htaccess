@@ -9,9 +9,11 @@ RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 RewriteRule ^ai-gateway$ ai_gateway.php [L,QSA]
 RewriteRule ^p4c-internal$ p4c_internal.php [L,QSA]
 
-RewriteRule ^Player/([^/]+)/([^/]+)/([^/?&]+)$ movie_player.php?user_streaming_key=$1&movie_id=$2&access_token=$3&%{QUERY_STRING} [L]
-RewriteRule ^Downloader/([^/]+)/([^/]+)/([^/?&]+)$ movie_downloader.php?user_streaming_key=$1&movie_id=$2&access_token=$3&%{QUERY_STRING} [L]
-RewriteRule ^PhotoAlbumDownloader/([^/]+)/([^/]+)/([^/?&]+)$ photo_album_downloader.php?user_key=$1&album_id=$2&access_token=$3&%{QUERY_STRING} [L]
+RewriteRule ^Player/([^/]+)/([^/]+)/([^/?&]+)$ movie_player.php?user_streaming_key=$1&movie_id=$2&access_token=$3 [QSA,L]
+RewriteRule ^Downloader/([^/]+)/([^/]+)/([^/?&]+)&start=download$ movie_downloader.php?user_streaming_key=$1&movie_id=$2&access_token=$3&start=download [QSA,L]
+RewriteRule ^Downloader/([^/]+)/([^/]+)/([^/?&]+)$ movie_downloader.php?user_streaming_key=$1&movie_id=$2&access_token=$3 [QSA,L]
+RewriteRule ^PhotoAlbumDownloader/([^/]+)/([^/]+)/([^/?&]+)&start=download$ photo_album_downloader.php?user_key=$1&album_id=$2&access_token=$3&start=download [QSA,L]
+RewriteRule ^PhotoAlbumDownloader/([^/]+)/([^/]+)/([^/?&]+)$ photo_album_downloader.php?user_key=$1&album_id=$2&access_token=$3 [QSA,L]
 RewriteRule ^PlayerPoster/FSK16/(.*)$ movie_poster.php?fsk=16&file_id=$1&%{QUERY_STRING}
 RewriteRule ^PlayerPoster/FSK18/(.*)$ movie_poster.php?fsk=18&file_id=$1&%{QUERY_STRING}
 RewriteRule ^ProfilePicture/(.*)$ profile_picture.php?id=$1&%{QUERY_STRING}
